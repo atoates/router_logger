@@ -3,7 +3,7 @@ const { logger } = require('../config/database');
 
 // Allow overriding the RMS API base and prefix via env for compatibility with API changes
 const RMS_API_BASE_URL = process.env.RMS_API_BASE_URL || 'https://api.rms.teltonika-networks.com';
-const RMS_API_PREFIX = process.env.RMS_API_PREFIX || '/v3'; // common prefix in newer docs; fallbacks are implemented
+const RMS_API_PREFIX = process.env.RMS_API_PREFIX || ''; // No prefix by default; RMS API uses /api/... directly
 
 class RMSClient {
   constructor(accessToken) {
@@ -12,7 +12,8 @@ class RMSClient {
       baseURL: RMS_API_BASE_URL,
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       // Slightly longer timeout for RMS API
       timeout: 15000
@@ -53,9 +54,9 @@ class RMSClient {
     try {
       const params = { limit, offset };
       const response = await this.requestWithFallback('get', [
-        `${RMS_API_PREFIX}/devices`,
-        '/devices',
-        '/api/devices'
+        `/api/devices`,
+        `/devices`,
+        `${RMS_API_PREFIX}/devices`
       ], { params });
       return response.data;
     } catch (error) {
@@ -70,9 +71,9 @@ class RMSClient {
   async getDevice(deviceId) {
     try {
       const response = await this.requestWithFallback('get', [
-        `${RMS_API_PREFIX}/devices/${deviceId}`,
+        `/api/devices/${deviceId}`,
         `/devices/${deviceId}`,
-        `/api/devices/${deviceId}`
+        `${RMS_API_PREFIX}/devices/${deviceId}`
       ]);
       return response.data;
     } catch (error) {
@@ -87,18 +88,13 @@ class RMSClient {
   async getDeviceMonitoring(deviceId) {
     try {
       const urlCandidates = [
-        `${RMS_API_PREFIX}/devices/${deviceId}/monitoring`,
-        `${RMS_API_PREFIX}/devices/${deviceId}/monitoring/data`,
-        `${RMS_API_PREFIX}/devices/${deviceId}/monitoring/values`,
-        `${RMS_API_PREFIX}/devices/${deviceId}/realtime`,
-        `/devices/${deviceId}/monitoring`,
-        `/devices/${deviceId}/monitoring/data`,
-        `/devices/${deviceId}/monitoring/values`,
-        `/devices/${deviceId}/realtime`,
         `/api/devices/${deviceId}/monitoring`,
         `/api/devices/${deviceId}/monitoring/data`,
-        `/api/devices/${deviceId}/monitoring/values`,
-        `/api/devices/${deviceId}/realtime`,
+        `/api/devices/${deviceId}/data`,
+        `/devices/${deviceId}/monitoring`,
+        `/devices/${deviceId}/monitoring/data`,
+        `/devices/${deviceId}/data`,
+        `${RMS_API_PREFIX}/devices/${deviceId}/monitoring`
       ];
 
       const paramsVariants = [
@@ -144,15 +140,10 @@ class RMSClient {
       ];
 
       const urlCandidates = [
-        `${RMS_API_PREFIX}/devices/${deviceId}/statistics`,
-        `${RMS_API_PREFIX}/devices/${deviceId}/statistics/traffic`,
-        `${RMS_API_PREFIX}/devices/${deviceId}/traffic`,
-        `/devices/${deviceId}/statistics`,
-        `/devices/${deviceId}/statistics/traffic`,
-        `/devices/${deviceId}/traffic`,
         `/api/devices/${deviceId}/statistics`,
         `/api/devices/${deviceId}/statistics/traffic`,
-        `/api/devices/${deviceId}/traffic`,
+        `/devices/${deviceId}/statistics`,
+        `${RMS_API_PREFIX}/devices/${deviceId}/statistics`
       ];
 
       let lastErr;
@@ -192,18 +183,11 @@ class RMSClient {
         { companyId, deviceId, start: from, end: to },
       ];
       const urlCandidates = [
-        `${RMS_API_PREFIX}/statistics/companies/${companyId}/devices/${deviceId}`,
-        `${RMS_API_PREFIX}/companies/${companyId}/devices/${deviceId}/statistics`,
-        `${RMS_API_PREFIX}/companies/${companyId}/statistics/devices/${deviceId}`,
-        `${RMS_API_PREFIX}/statistics/companies/${companyId}/devices`,
-        `${RMS_API_PREFIX}/companies/${companyId}/statistics/devices`,
-        `${RMS_API_PREFIX}/statistics/devices`,
+        `/api/statistics/companies/${companyId}/devices/${deviceId}`,
+        `/api/companies/${companyId}/devices/${deviceId}/statistics`,
         `/statistics/companies/${companyId}/devices/${deviceId}`,
         `/companies/${companyId}/devices/${deviceId}/statistics`,
-        `/companies/${companyId}/statistics/devices/${deviceId}`,
-        `/statistics/companies/${companyId}/devices`,
-        `/companies/${companyId}/statistics/devices`,
-        `/statistics/devices`,
+        `${RMS_API_PREFIX}/statistics/companies/${companyId}/devices/${deviceId}`
       ];
 
       let lastErr;
@@ -247,14 +231,12 @@ class RMSClient {
       ];
 
       const urlCandidates = [
-        `${RMS_API_PREFIX}/devices/${deviceId}/data-usage`,
-        `${RMS_API_PREFIX}/devices/${deviceId}/usage`,
-        `${RMS_API_PREFIX}/devices/${deviceId}/metrics/data-usage`,
-        `/devices/${deviceId}/data-usage`,
-        `/devices/${deviceId}/usage`,
-        `/devices/${deviceId}/metrics/data-usage`,
         `/api/devices/${deviceId}/data-usage`,
         `/api/devices/${deviceId}/usage`,
+        `/api/devices/${deviceId}/data-usage/history`,
+        `/devices/${deviceId}/data-usage`,
+        `/devices/${deviceId}/usage`,
+        `${RMS_API_PREFIX}/devices/${deviceId}/data-usage`
       ];
 
       let lastErr;
@@ -286,9 +268,9 @@ class RMSClient {
   async getDeviceConfig(deviceId) {
     try {
       const response = await this.requestWithFallback('get', [
-        `${RMS_API_PREFIX}/devices/${deviceId}/config`,
+        `/api/devices/${deviceId}/config`,
         `/devices/${deviceId}/config`,
-        `/api/devices/${deviceId}/config`
+        `${RMS_API_PREFIX}/devices/${deviceId}/config`
       ]);
       return response.data;
     } catch (error) {
