@@ -86,12 +86,43 @@ class RMSClient {
    */
   async getDeviceMonitoring(deviceId) {
     try {
-      const response = await this.requestWithFallback('get', [
+      const urlCandidates = [
         `${RMS_API_PREFIX}/devices/${deviceId}/monitoring`,
+        `${RMS_API_PREFIX}/devices/${deviceId}/monitoring/data`,
+        `${RMS_API_PREFIX}/devices/${deviceId}/monitoring/values`,
+        `${RMS_API_PREFIX}/devices/${deviceId}/realtime`,
         `/devices/${deviceId}/monitoring`,
-        `/api/devices/${deviceId}/monitoring`
-      ]);
-      return response.data;
+        `/devices/${deviceId}/monitoring/data`,
+        `/devices/${deviceId}/monitoring/values`,
+        `/devices/${deviceId}/realtime`,
+        `/api/devices/${deviceId}/monitoring`,
+        `/api/devices/${deviceId}/monitoring/data`,
+        `/api/devices/${deviceId}/monitoring/values`,
+        `/api/devices/${deviceId}/realtime`,
+      ];
+
+      const paramsVariants = [
+        {},
+        { widgets: 'network,cellular,system,wifi,hardware,ethernet,vpn' },
+        { modules: 'network,cellular,system,wifi,hardware,ethernet,vpn' },
+        { keys: 'network.tx_bytes,network.rx_bytes,cellular.tx_bytes,cellular.rx_bytes,system.uptime,wifi.clients' },
+        { all: true },
+      ];
+
+      let lastErr;
+      for (const params of paramsVariants) {
+        try {
+          const response = await this.requestWithFallback('get', urlCandidates, { params });
+          const data = response.data;
+          if (data && Object.keys(data).length) return data;
+          lastErr = new Error('Empty monitoring response');
+        } catch (err) {
+          lastErr = err;
+          continue;
+        }
+      }
+      if (lastErr) throw lastErr;
+      return {};
     } catch (error) {
       logger.error(`Error fetching monitoring data for device ${deviceId}:`, error.response?.data || error.message);
       throw error;
