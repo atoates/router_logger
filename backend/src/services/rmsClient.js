@@ -228,6 +228,59 @@ class RMSClient {
   }
 
   /**
+   * Get device data usage (RMS Data usage tab endpoint)
+   * This is the endpoint that powers the "Data usage" tab in RMS UI
+   */
+  async getDeviceDataUsage(deviceId, fromDate, toDate) {
+    try {
+      // RMS data-usage endpoint typically uses date format YYYY-MM-DD or ISO
+      const formatDate = (d) => {
+        const dt = new Date(d);
+        return dt.toISOString().split('T')[0]; // YYYY-MM-DD
+      };
+
+      const paramVariants = [
+        { from: fromDate, to: toDate },
+        { from: formatDate(fromDate), to: formatDate(toDate) },
+        { date_from: fromDate, date_to: toDate },
+        { start_date: fromDate, end_date: toDate },
+      ];
+
+      const urlCandidates = [
+        `${RMS_API_PREFIX}/devices/${deviceId}/data-usage`,
+        `${RMS_API_PREFIX}/devices/${deviceId}/usage`,
+        `${RMS_API_PREFIX}/devices/${deviceId}/metrics/data-usage`,
+        `/devices/${deviceId}/data-usage`,
+        `/devices/${deviceId}/usage`,
+        `/devices/${deviceId}/metrics/data-usage`,
+        `/api/devices/${deviceId}/data-usage`,
+        `/api/devices/${deviceId}/usage`,
+      ];
+
+      let lastErr;
+      for (const params of paramVariants) {
+        try {
+          const response = await this.requestWithFallback('get', urlCandidates, { params });
+          const data = response.data;
+          // Data usage response may be array of daily records or object with totals
+          if (data && (Array.isArray(data) || (typeof data === 'object' && Object.keys(data).length))) {
+            return data;
+          }
+          lastErr = new Error('Empty data usage response');
+        } catch (err) {
+          lastErr = err;
+          continue;
+        }
+      }
+      if (lastErr) throw lastErr;
+      return null;
+    } catch (error) {
+      logger.error(`Error fetching data usage for device ${deviceId}:`, error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Get device configuration
    */
   async getDeviceConfig(deviceId) {

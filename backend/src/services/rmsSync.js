@@ -136,28 +136,62 @@ async function syncFromRMS() {
             const latest = await getLatestLog(String(telemetry.device_id));
             const fromIso = latest?.timestamp ? new Date(latest.timestamp).toISOString() : new Date(Date.now() - 15 * 60 * 1000).toISOString();
             const toIso = new Date().toISOString();
-            let stats = await rmsClient.getDeviceStatistics(deviceId, fromIso, toIso);
-            if (!stats || (Array.isArray(stats) && stats.length === 0)) {
-              // company-level fallback (uses site/company IDs when present)
-              const companyId = device.company_id || device.companyId || telemetry.site_id;
-              if (companyId) {
-                try {
-                  stats = await rmsClient.getCompanyDeviceStatistics(companyId, deviceId, fromIso, toIso);
-                } catch (e) {
-                  logger.warn(`Company stats fallback failed for device ${deviceId}: ${e.message}`);
+            
+            // Try data-usage endpoint first (most reliable for usage totals)
+            let usageData = null;
+            try {
+              usageData = await rmsClient.getDeviceDataUsage(deviceId, fromIso, toIso);
+            } catch (e) {
+              logger.warn(`Data usage fetch failed for device ${deviceId}: ${e.message}`);
+            }
+
+            let addTx = 0, addRx = 0;
+            
+            if (usageData) {
+              // Parse data-usage response (may be array of records or summary object)
+              const records = Array.isArray(usageData) ? usageData : (usageData?.data || usageData?.items || usageData?.records || []);
+              if (Array.isArray(records)) {
+                for (const rec of records) {
+                  const vals = typeof rec === 'object' && rec ? rec : {};
+                  const sent = Number(vals.sent || vals.tx || vals.tx_bytes || vals.upload || vals.data_sent || 0);
+                  const received = Number(vals.received || vals.rx || vals.rx_bytes || vals.download || vals.data_received || 0);
+                  if (isFinite(sent)) addTx += sent;
+                  if (isFinite(received)) addRx += received;
                 }
+              } else if (typeof usageData === 'object' && usageData) {
+                // If response is a summary object
+                const sent = Number(usageData.sent || usageData.tx || usageData.tx_bytes || usageData.upload || usageData.total_sent || 0);
+                const received = Number(usageData.received || usageData.rx || usageData.rx_bytes || usageData.download || usageData.total_received || 0);
+                if (isFinite(sent)) addTx = sent;
+                if (isFinite(received)) addRx = received;
               }
             }
-            // Normalize stats list
-            const list = Array.isArray(stats) ? stats : stats?.data || stats?.items || stats?.rows || [];
-            let addTx = 0, addRx = 0;
-            for (const s of list) {
-              const vals = typeof s === 'object' && s ? s : {};
-              const tx = Number(vals.tx_bytes ?? vals.tx ?? 0);
-              const rx = Number(vals.rx_bytes ?? vals.rx ?? 0);
-              if (isFinite(tx)) addTx += tx;
-              if (isFinite(rx)) addRx += rx;
+
+            // Fallback to statistics if data-usage was empty
+            if (addTx === 0 && addRx === 0) {
+              let stats = await rmsClient.getDeviceStatistics(deviceId, fromIso, toIso);
+              if (!stats || (Array.isArray(stats) && stats.length === 0)) {
+                // company-level fallback (uses site/company IDs when present)
+                const companyId = device.company_id || device.companyId || telemetry.site_id;
+                if (companyId) {
+                  try {
+                    stats = await rmsClient.getCompanyDeviceStatistics(companyId, deviceId, fromIso, toIso);
+                  } catch (e) {
+                    logger.warn(`Company stats fallback failed for device ${deviceId}: ${e.message}`);
+                  }
+                }
+              }
+              // Normalize stats list
+              const list = Array.isArray(stats) ? stats : stats?.data || stats?.items || stats?.rows || [];
+              for (const s of list) {
+                const vals = typeof s === 'object' && s ? s : {};
+                const tx = Number(vals.tx_bytes ?? vals.tx ?? 0);
+                const rx = Number(vals.rx_bytes ?? vals.rx ?? 0);
+                if (isFinite(tx)) addTx += tx;
+                if (isFinite(rx)) addRx += rx;
+              }
             }
+
             const baseTx = latest?.total_tx_bytes ? Number(latest.total_tx_bytes) : 0;
             const baseRx = latest?.total_rx_bytes ? Number(latest.total_rx_bytes) : 0;
             telemetry.counters.total_tx_bytes = baseTx + addTx;
