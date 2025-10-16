@@ -18,6 +18,8 @@ export const getLogs = (params) => api.get('/logs', { params });
 // Statistics
 export const getUsageStats = (params) => api.get('/stats/usage', { params });
 export const getUptimeData = (params) => api.get('/stats/uptime', { params });
+export const getStorageStats = (params) => api.get('/stats/storage', { params });
+export const getTopRouters = (params) => api.get('/stats/top-routers', { params });
 
 // Submit log (for testing)
 export const submitLog = (data) => api.post('/log', data);
