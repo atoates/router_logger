@@ -10,7 +10,7 @@
 
 const crypto = require('crypto');
 const axios = require('axios');
-const logger = require('../utils/logger');
+const { logger } = require('../config/database');
 const db = require('../database/db');
 
 class RMSOAuthService {

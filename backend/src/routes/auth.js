@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const oauthService = require('../services/oauthService');
-const logger = require('../utils/logger');
+const { logger } = require('../config/database');
 
 /**
  * GET /api/auth/rms/login
