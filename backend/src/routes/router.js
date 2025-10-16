@@ -32,11 +32,30 @@ router.post('/log', async (req, res) => {
   }
 });
 
-// GET all routers
+// GET all routers (deduplicated best-by-name)
 router.get('/routers', async (req, res) => {
   try {
     const routers = await getAllRouters();
-    res.json(routers);
+    // Merge duplicates by same name, prefer entries with logs, then latest seen
+    const byName = new Map();
+    for (const r of routers) {
+      const key = (r.name || '').toLowerCase();
+      if (!byName.has(key)) {
+        byName.set(key, r);
+        continue;
+      }
+      const cur = byName.get(key);
+      const curLogs = Number(cur.log_count || 0);
+      const newLogs = Number(r.log_count || 0);
+      if (newLogs > curLogs) {
+        byName.set(key, r);
+      } else if (newLogs === curLogs) {
+        const curSeen = cur.last_seen ? new Date(cur.last_seen).getTime() : 0;
+        const newSeen = r.last_seen ? new Date(r.last_seen).getTime() : 0;
+        if (newSeen > curSeen) byName.set(key, r);
+      }
+    }
+    res.json(Array.from(byName.values()));
   } catch (error) {
     logger.error('Error fetching routers:', error);
     res.status(500).json({ error: 'Failed to fetch routers' });

@@ -33,10 +33,33 @@ function RouterQuickSelect({ onSelectRouter, onClear }) {
     const q = input.trim().toLowerCase();
     if (!q) return [];
     const withName = routers.filter(r => (r.name || '').toLowerCase().includes(q));
-    // Prioritize startsWith matches, then others; cap to 8 items
-    const starts = withName.filter(r => (r.name || '').toLowerCase().startsWith(q));
-    const contains = withName.filter(r => !(r.name || '').toLowerCase().startsWith(q));
-    return [...starts, ...contains].slice(0, 8);
+
+    // Sort: startsWith > log_count desc > last_seen desc
+    const sorted = [...withName].sort((a, b) => {
+      const an = (a.name || '').toLowerCase();
+      const bn = (b.name || '').toLowerCase();
+      const aStarts = an.startsWith(q) ? 1 : 0;
+      const bStarts = bn.startsWith(q) ? 1 : 0;
+      if (aStarts !== bStarts) return bStarts - aStarts;
+      const aLogs = Number(a.log_count || 0);
+      const bLogs = Number(b.log_count || 0);
+      if (aLogs !== bLogs) return bLogs - aLogs;
+      const aSeen = a.last_seen ? new Date(a.last_seen).getTime() : 0;
+      const bSeen = b.last_seen ? new Date(b.last_seen).getTime() : 0;
+      return bSeen - aSeen;
+    });
+
+    // Deduplicate by name (keep the best-ranked entry per name)
+    const seen = new Set();
+    const uniqueByName = [];
+    for (const r of sorted) {
+      const key = (r.name || '').toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      uniqueByName.push(r);
+    }
+
+    return uniqueByName.slice(0, 8);
   }, [input, routers]);
 
   const exactMatch = useMemo(() => {
@@ -112,7 +135,7 @@ function RouterQuickSelect({ onSelectRouter, onClear }) {
                     }}
                   >
                     <span>{r.name || '(unnamed)'}</span>
-                    <span style={{ color: '#64748b', fontSize: 12 }}>ID: {r.router_id}</span>
+                    <span style={{ color: '#64748b', fontSize: 12 }}>ID: {r.router_id} · logs: {r.log_count ?? 0}</span>
                   </li>
                 ))}
               </ul>
