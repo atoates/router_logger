@@ -10,8 +10,7 @@
 
 const crypto = require('crypto');
 const axios = require('axios');
-const { logger } = require('../config/database');
-const db = require('../database/db');
+const { logger, pool } = require('../config/database');
 
 class RMSOAuthService {
   constructor() {
@@ -276,7 +275,7 @@ class RMSOAuthService {
     ];
 
     try {
-      const result = await db.query(query, values);
+      const result = await pool.query(query, values);
       logger.info('Stored OAuth token for user', { userId, expiresAt });
       return result.rows[0];
     } catch (error) {
@@ -298,7 +297,7 @@ class RMSOAuthService {
     `;
 
     try {
-      const result = await db.query(query, [userId]);
+      const result = await pool.query(query, [userId]);
       
       if (result.rows.length === 0) {
         return null;
@@ -357,7 +356,7 @@ class RMSOAuthService {
     const query = 'DELETE FROM oauth_tokens WHERE user_id = $1';
     
     try {
-      await db.query(query, [userId]);
+      await pool.query(query, [userId]);
       logger.info('Deleted OAuth token for user', { userId });
     } catch (error) {
       logger.error('Error deleting OAuth token', { error: error.message, userId });
