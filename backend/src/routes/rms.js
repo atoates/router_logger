@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { syncFromRMS } = require('../services/rmsSync');
 const RMSClient = require('../services/rmsClient');
+const oauthService = require('../services/oauthService');
 const { logger } = require('../config/database');
 
 // Manual trigger for RMS sync
@@ -25,25 +26,24 @@ router.post('/sync', async (req, res) => {
 });
 
 // Get RMS sync status
-router.get('/status', (req, res) => {
-  const rmsEnabled = !!process.env.RMS_ACCESS_TOKEN;
+router.get('/status', async (req, res) => {
+  const hasPat = !!process.env.RMS_ACCESS_TOKEN;
+  const hasOAuth = !!(await oauthService.getValidToken('default_rms_user'));
+  const rmsEnabled = hasPat || hasOAuth;
   res.json({
     enabled: rmsEnabled,
     syncInterval: process.env.RMS_SYNC_INTERVAL_MINUTES || 15,
-    tokenLength: process.env.RMS_ACCESS_TOKEN?.length || 0,
+    tokenType: hasOAuth ? 'oauth' : (hasPat ? 'pat' : 'none'),
     message: rmsEnabled 
-      ? 'RMS integration is enabled' 
-      : 'RMS integration is disabled (no access token)'
+      ? `RMS integration is enabled via ${hasOAuth ? 'OAuth' : 'PAT'}` 
+      : 'RMS integration is disabled (no token)'
   });
 });
 
 // Quick RMS API connectivity test
 router.get('/test', async (req, res) => {
   try {
-    if (!process.env.RMS_ACCESS_TOKEN) {
-      return res.status(400).json({ error: 'RMS disabled - no access token' });
-    }
-    const rms = new RMSClient(process.env.RMS_ACCESS_TOKEN);
+    const rms = await RMSClient.createWithAuth();
     
     // Try to fetch devices list
     const devicesResp = await rms.getDevices(5);

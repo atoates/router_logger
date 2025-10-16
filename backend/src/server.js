@@ -9,6 +9,7 @@ const { logger } = require('./config/database');
 const { initializeDatabase } = require('./database/migrate');
 const { initMQTT, closeMQTT } = require('./services/mqttService');
 const { startRMSSync } = require('./services/rmsSync');
+const oauthService = require('./services/oauthService');
 const routerRoutes = require('./routes/router');
 const rmsRoutes = require('./routes/rms');
 const authRoutes = require('./routes/auth');
@@ -72,9 +73,22 @@ async function startServer() {
     // Initialize MQTT if configured
     initMQTT();
     
-    // Start RMS sync if configured
+    // Start RMS sync if PAT or OAuth token is available
     const rmsSyncInterval = process.env.RMS_SYNC_INTERVAL_MINUTES || 15;
+    let canSync = false;
     if (process.env.RMS_ACCESS_TOKEN) {
+      canSync = true;
+      logger.info('RMS sync enabled via PAT');
+    } else {
+      const token = await oauthService.getValidToken('default_rms_user');
+      if (token) {
+        canSync = true;
+        logger.info('RMS sync enabled via OAuth');
+      } else {
+        logger.info('RMS sync not started yet (no PAT or OAuth token)');
+      }
+    }
+    if (canSync) {
       startRMSSync(parseInt(rmsSyncInterval));
       logger.info('RMS sync scheduler started');
     }
