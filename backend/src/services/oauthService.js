@@ -17,6 +17,15 @@ class RMSOAuthService {
     this.clientId = process.env.RMS_OAUTH_CLIENT_ID;
     this.clientSecret = process.env.RMS_OAUTH_CLIENT_SECRET;
     this.redirectUri = process.env.RMS_OAUTH_REDIRECT_URI;
+    // Allow configuring scopes via env; default to minimal set required
+    // Normalize commas/spaces and de-duplicate
+    const rawScopes = process.env.RMS_OAUTH_SCOPES || 'devices:read monitoring:read statistics:read';
+    this.scopes = rawScopes
+      .split(/[\s,]+/)
+      .map(s => s.trim())
+      .filter(Boolean)
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .join(' ');
   // Per RMS docs, OAuth endpoints live under /account/*
   // https://rms.teltonika-networks.com/account/authorize
   // https://rms.teltonika-networks.com/account/token
@@ -85,7 +94,7 @@ class RMSOAuthService {
       state: generatedState,
       code_challenge: codeChallenge,
       code_challenge_method: 'S256',
-      scope: 'devices:read monitoring:read statistics:read company_device_statistics:read'
+      scope: this.scopes
     });
 
     const authUrl = `${this.authUrl}?${params.toString()}`;
