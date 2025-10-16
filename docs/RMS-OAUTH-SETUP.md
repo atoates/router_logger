@@ -37,11 +37,9 @@ This guide walks you through setting up OAuth authentication with Teltonika RMS 
    - **Redirect URI**: `https://your-backend.up.railway.app/api/auth/rms/callback`
      - Replace `your-backend` with your actual Railway backend URL
      - Example: `https://routerlogger-production.up.railway.app/api/auth/rms/callback`
-   - **Scopes** (select all monitoring-related scopes):
-     - ✅ `devices:read` - Read device information
-     - ✅ `monitoring:read` - Read monitoring data
-     - ✅ `statistics:read` - Read statistics data
-     - ✅ `company_device_statistics:read` - Read company-level statistics
+    - **Scopes**
+       - Minimum required: `devices:read`, `monitoring:read`, `statistics:read`
+       - Optional: `company_device_statistics:read` (if your app needs company-level stats). Not requested by default; set env `RMS_OAUTH_SCOPES` to include it.
    - Click **"Create Application"** or **"Save"**
 
 4. **Copy Credentials**:
@@ -137,7 +135,7 @@ The migration creates the `oauth_tokens` table with:
 2. You should see a success toast: "Successfully authenticated with RMS!"
 3. The button should now show:
    - ✓ **Connected to RMS**
-   - Scopes: devices:read monitoring:read statistics:read...
+   - Scopes: devices:read monitoring:read statistics:read
    - **Disconnect** button
 
 ### D. Verify Data Ingestion
@@ -265,7 +263,7 @@ error: Error fetching monitoring data
    ```
    Should return: `{"authenticated":true,"configured":true}`
 2. Check backend logs for "Using OAuth token" message
-3. Verify scopes include `monitoring:read` and `statistics:read`
+3. Verify scopes include `devices:read`, `monitoring:read`, `statistics:read`
 4. Try logging out and logging back in
 
 ### Token Refresh Failing

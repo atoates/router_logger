@@ -39,6 +39,9 @@ RMS_OAUTH_CLIENT_SECRET=your_client_secret_from_rms
 RMS_OAUTH_REDIRECT_URI=https://your-backend.up.railway.app/api/auth/rms/callback
 
 # Note: With OAuth configured, RMS_ACCESS_TOKEN becomes optional fallback
+# Optional: override default scopes (space or comma separated). Default: "devices:read monitoring:read statistics:read"
+# Example to include company-level stats:
+# RMS_OAUTH_SCOPES="devices:read monitoring:read statistics:read company_device_statistics:read"
 ```
 
 ### MQTT (Optional - for router push)

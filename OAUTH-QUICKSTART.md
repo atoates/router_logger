@@ -40,11 +40,11 @@ Your OAuth implementation has been deployed! Here's what to do next:
    - **Name**: `Router Logger`
    - **Redirect URI**: `https://routerlogger-production.up.railway.app/api/auth/rms/callback`
      *(Replace with your actual Railway backend URL)*
-   - **Scopes**: Select all:
-     - ✅ `devices:read`
-     - ✅ `monitoring:read`
-     - ✅ `statistics:read`
-     - ✅ `company_device_statistics:read`
+    - **Scopes**: Select at least:
+       - ✅ `devices:read`
+       - ✅ `monitoring:read`
+       - ✅ `statistics:read`
+       - Optional: `company_device_statistics:read` (not requested by default; enable via RMS_OAUTH_SCOPES)
 5. Click "Create"
 6. **Copy the Client ID and Client Secret** (you won't see them again!)
 
@@ -85,7 +85,7 @@ Watch the Railway logs to see when deployment completes:
 7. You'll be redirected back with:
    ```
    ✓ Connected to RMS
-   Scopes: devices:read monitoring:read statistics:read...
+   Scopes: devices:read monitoring:read statistics:read
    [Disconnect]
    ```
 
