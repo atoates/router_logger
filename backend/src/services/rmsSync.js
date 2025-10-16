@@ -103,16 +103,11 @@ function transformRMSDeviceToTelemetry(device, monitoring) {
  * Sync data from RMS API
  */
 async function syncFromRMS() {
-  const accessToken = process.env.RMS_ACCESS_TOKEN;
-  
-  if (!accessToken) {
-    logger.warn('RMS_ACCESS_TOKEN not configured, skipping RMS sync');
-    return;
-  }
-
   try {
     logger.info('Starting RMS sync...');
-    const rmsClient = new RMSClient(accessToken);
+    
+    // Use OAuth token if available, fallback to PAT
+    const rmsClient = await RMSClient.createWithAuth();
     
     // Get all devices with monitoring data
     const devices = await rmsClient.getAllDevicesWithMonitoring();

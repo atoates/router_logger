@@ -4,12 +4,14 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser');
 const { logger } = require('./config/database');
 const { initializeDatabase } = require('./database/migrate');
 const { initMQTT, closeMQTT } = require('./services/mqttService');
 const { startRMSSync } = require('./services/rmsSync');
 const routerRoutes = require('./routes/router');
 const rmsRoutes = require('./routes/rms');
+const authRoutes = require('./routes/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -20,6 +22,7 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
   credentials: true
 }));
+app.use(cookieParser());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -47,6 +50,7 @@ app.get('/', (req, res) => {
 
 app.use('/api', routerRoutes);
 app.use('/api/rms', rmsRoutes);
+app.use('/api/auth', authRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

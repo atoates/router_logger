@@ -1,13 +1,15 @@
 const axios = require('axios');
 const { logger } = require('../config/database');
+const oauthService = require('./oauthService');
 
 // Allow overriding the RMS API base and prefix via env for compatibility with API changes
 const RMS_API_BASE_URL = process.env.RMS_API_BASE_URL || 'https://api.rms.teltonika-networks.com';
 const RMS_API_PREFIX = process.env.RMS_API_PREFIX || ''; // No prefix by default; RMS API uses /api/... directly
 
 class RMSClient {
-  constructor(accessToken) {
+  constructor(accessToken, isOAuthToken = false) {
     this.accessToken = accessToken;
+    this.isOAuthToken = isOAuthToken;
     this.client = axios.create({
       baseURL: RMS_API_BASE_URL,
       headers: {
@@ -18,6 +20,31 @@ class RMSClient {
       // Slightly longer timeout for RMS API
       timeout: 15000
     });
+  }
+
+  /**
+   * Create RMSClient with OAuth token if available, fallback to PAT
+   * @returns {Promise<RMSClient>}
+   */
+  static async createWithAuth() {
+    const userId = 'default_rms_user'; // Replace with actual user management
+    
+    // Try to get OAuth token first
+    const oauthToken = await oauthService.getValidToken(userId);
+    
+    if (oauthToken) {
+      logger.info('Using OAuth token for RMS API');
+      return new RMSClient(oauthToken.accessToken, true);
+    }
+    
+    // Fallback to Personal Access Token
+    const pat = process.env.RMS_ACCESS_TOKEN;
+    if (pat) {
+      logger.info('Using Personal Access Token for RMS API');
+      return new RMSClient(pat, false);
+    }
+    
+    throw new Error('No RMS authentication available (neither OAuth nor PAT)');
   }
 
   // Helper: try multiple paths (for different API prefixes) until one succeeds

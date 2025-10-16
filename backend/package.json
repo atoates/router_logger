@@ -22,7 +22,10 @@
     "winston": "^3.11.0",
     "date-fns": "^2.30.0",
     "mqtt": "^5.3.0",
-    "axios": "^1.6.2"
+    "axios": "^1.6.2",
+    "simple-oauth2": "^5.0.0",
+    "crypto": "^1.0.1",
+    "cookie-parser": "^1.4.6"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

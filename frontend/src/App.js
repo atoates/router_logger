@@ -8,6 +8,7 @@ import UsageStats from './components/UsageStats';
 import DataCharts from './components/DataCharts';
 import LogsTable from './components/LogsTable';
 import DeviceInfo from './components/DeviceInfo';
+import RMSAuthButton from './components/RMSAuthButton';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
@@ -41,6 +42,11 @@ function App() {
         {/* Top-level network status */}
         <ErrorBoundary>
           <StatusSummary />
+        </ErrorBoundary>
+
+        {/* RMS OAuth Authentication */}
+        <ErrorBoundary>
+          <RMSAuthButton />
         </ErrorBoundary>
 
         {/* Quick select by Name */}

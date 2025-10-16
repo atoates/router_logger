@@ -85,6 +85,53 @@ async function initializeDatabase() {
     await client.query(`ALTER TABLE router_logs ADD COLUMN IF NOT EXISTS vpn_name VARCHAR(100);`);
     await client.query(`ALTER TABLE router_logs ADD COLUMN IF NOT EXISTS eth_link_up BOOLEAN;`);
 
+    // Create oauth_tokens table for RMS OAuth authentication
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS oauth_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL UNIQUE,
+        access_token TEXT NOT NULL,
+        refresh_token TEXT,
+        token_type VARCHAR(50) DEFAULT 'Bearer',
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        scope TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_oauth_tokens_user_id 
+      ON oauth_tokens(user_id);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_oauth_tokens_expires_at 
+      ON oauth_tokens(expires_at);
+    `);
+
+    // Create trigger for oauth_tokens updated_at
+    await client.query(`
+      CREATE OR REPLACE FUNCTION update_oauth_tokens_updated_at()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = CURRENT_TIMESTAMP;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+
+    await client.query(`
+      DROP TRIGGER IF EXISTS oauth_tokens_updated_at ON oauth_tokens;
+    `);
+
+    await client.query(`
+      CREATE TRIGGER oauth_tokens_updated_at
+      BEFORE UPDATE ON oauth_tokens
+      FOR EACH ROW
+      EXECUTE FUNCTION update_oauth_tokens_updated_at();
+    `);
+
     // Create indexes for better query performance
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_router_logs_router_id 
