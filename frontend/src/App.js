@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import './App.css';
 import RouterList from './components/RouterList';
+import RouterQuickSelect from './components/RouterQuickSelect';
+import StatusSummary from './components/StatusSummary';
+import ErrorBoundary from './components/ErrorBoundary';
 import DateRangeFilter from './components/DateRangeFilter';
 import UsageStats from './components/UsageStats';
 import DataCharts from './components/DataCharts';
@@ -34,36 +37,49 @@ function App() {
           <p>Monitor and analyze your RUT200 router network in real-time</p>
         </div>
 
-        <RouterList onSelectRouter={handleRouterSelect} />
+        {/* Top-level network status */}
+        <ErrorBoundary>
+          <StatusSummary />
+        </ErrorBoundary>
+
+        {/* Quick select by ID (kept RouterList import for now; we can remove later if you prefer only input) */}
+        <ErrorBoundary>
+          <RouterQuickSelect onSelectRouter={handleRouterSelect} />
+        </ErrorBoundary>
 
         {selectedRouter && (
           <>
-            <DateRangeFilter onFilterChange={handleFilterChange} />
-            
-            <UsageStats 
-              routerId={selectedRouter.router_id}
-              startDate={dateRange.startDate}
-              endDate={dateRange.endDate}
-            />
-
-            <DataCharts 
-              routerId={selectedRouter.router_id}
-              startDate={dateRange.startDate}
-              endDate={dateRange.endDate}
-            />
-
-            <LogsTable 
-              routerId={selectedRouter.router_id}
-              startDate={dateRange.startDate}
-              endDate={dateRange.endDate}
-            />
+            <ErrorBoundary>
+              <DateRangeFilter onFilterChange={handleFilterChange} />
+            </ErrorBoundary>
+            <ErrorBoundary>
+              <UsageStats 
+                routerId={selectedRouter.router_id}
+                startDate={dateRange.startDate}
+                endDate={dateRange.endDate}
+              />
+            </ErrorBoundary>
+            <ErrorBoundary>
+              <DataCharts 
+                routerId={selectedRouter.router_id}
+                startDate={dateRange.startDate}
+                endDate={dateRange.endDate}
+              />
+            </ErrorBoundary>
+            <ErrorBoundary>
+              <LogsTable 
+                routerId={selectedRouter.router_id}
+                startDate={dateRange.startDate}
+                endDate={dateRange.endDate}
+              />
+            </ErrorBoundary>
           </>
         )}
 
         {!selectedRouter && (
           <div className="card">
             <h2>👆 Get Started</h2>
-            <p>Select a router from the list above to view its details, statistics, and logs.</p>
+            <p>Enter a router ID above to view its details, statistics, and logs.</p>
           </div>
         )}
       </div>
