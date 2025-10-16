@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import './App.css';
-import RouterList from './components/RouterList';
 import RouterQuickSelect from './components/RouterQuickSelect';
 import StatusSummary from './components/StatusSummary';
 import ErrorBoundary from './components/ErrorBoundary';

@@ -11,9 +11,10 @@ function StatusSummary({ onRoutersLoaded }) {
     const load = async () => {
       try {
         const res = await getRouters();
-        const routers = res.data || [];
-        const on = routers.filter(r => r.current_status === 'online').length;
-        const off = routers.filter(r => r.current_status !== 'online').length;
+  const routers = res.data || [];
+  const isOnline = (s) => (s === 'online' || s === 1 || s === '1' || s === true);
+  const on = routers.filter(r => isOnline(r.current_status)).length;
+  const off = routers.length - on;
         if (!mounted) return;
         setOnline(on);
         setOffline(off);

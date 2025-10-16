@@ -85,9 +85,11 @@ function LogsTable({ routerId, startDate, endDate }) {
                   <td>{formatBytes(Number(log.total_rx_bytes) || 0)}</td>
                   <td>{log.wifi_client_count || 0}</td>
                   <td>
-                    <span className={`status ${log.status === 'online' ? 'status-online' : 'status-offline'}`}>
-                      {log.status}
-                    </span>
+                    {(() => { const s = log.status; const isOn = (s === 'online' || s === 1 || s === '1' || s === true); return (
+                      <span className={`status ${isOn ? 'status-online' : 'status-offline'}`}>
+                        {isOn ? 'online' : 'offline'}
+                      </span>
+                    ); })()}
                   </td>
                 </tr>
               )})}
