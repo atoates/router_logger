@@ -69,15 +69,20 @@ function LogsTable({ routerId, startDate, endDate }) {
               </tr>
             </thead>
             <tbody>
-              {logs.map((log) => (
+              {logs.map((log) => {
+                const ts = new Date(log.timestamp);
+                const tsStr = isNaN(ts.getTime()) ? '-' : format(ts, 'MMM dd, HH:mm:ss');
+                const rsrp = log.rsrp != null && log.rsrp !== '' ? Number(log.rsrp) : null;
+                const rssi = log.rssi != null && log.rssi !== '' ? Number(log.rssi) : null;
+                return (
                 <tr key={log.id}>
-                  <td>{format(new Date(log.timestamp), 'MMM dd, HH:mm:ss')}</td>
+                  <td>{tsStr}</td>
                   <td>{log.operator || '-'}</td>
                   <td>{log.network_type || '-'}</td>
-                  <td>{log.rsrp ? `${log.rsrp} dBm` : '-'}</td>
-                  <td>{log.rssi ? `${log.rssi} dBm` : '-'}</td>
-                  <td>{formatBytes(log.total_tx_bytes || 0)}</td>
-                  <td>{formatBytes(log.total_rx_bytes || 0)}</td>
+                  <td>{rsrp != null ? `${Math.round(rsrp)} dBm` : '-'}</td>
+                  <td>{rssi != null ? `${Math.round(rssi)} dBm` : '-'}</td>
+                  <td>{formatBytes(Number(log.total_tx_bytes) || 0)}</td>
+                  <td>{formatBytes(Number(log.total_rx_bytes) || 0)}</td>
                   <td>{log.wifi_client_count || 0}</td>
                   <td>
                     <span className={`status ${log.status === 'online' ? 'status-online' : 'status-offline'}`}>
@@ -85,7 +90,7 @@ function LogsTable({ routerId, startDate, endDate }) {
                     </span>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>

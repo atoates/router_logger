@@ -8,18 +8,18 @@ import { format } from 'date-fns';
  */
 export function exportLogsToCSV(logs, filename = 'router-logs.csv') {
   const csvData = logs.map(log => ({
-    'Timestamp': format(new Date(log.timestamp), 'yyyy-MM-dd HH:mm:ss'),
+    'Timestamp': (() => { const d = new Date(log.timestamp); return isNaN(d.getTime()) ? '' : format(d, 'yyyy-MM-dd HH:mm:ss'); })(),
     'Router ID': log.router_id,
     'IMEI': log.imei || '',
     'Operator': log.operator || '',
     'Network Type': log.network_type || '',
     'WAN IP': log.wan_ip || '',
-    'RSRP': log.rsrp || '',
-    'RSRQ': log.rsrq || '',
-    'RSSI': log.rssi || '',
-    'Data Sent (MB)': ((log.total_tx_bytes || 0) / 1024 / 1024).toFixed(2),
-    'Data Received (MB)': ((log.total_rx_bytes || 0) / 1024 / 1024).toFixed(2),
-    'Uptime (hours)': ((log.uptime_seconds || 0) / 3600).toFixed(2),
+    'RSRP': log.rsrp != null ? Number(log.rsrp) : '',
+    'RSRQ': log.rsrq != null ? Number(log.rsrq) : '',
+    'RSSI': log.rssi != null ? Number(log.rssi) : '',
+    'Data Sent (MB)': (((Number(log.total_tx_bytes) || 0) / 1024 / 1024).toFixed(2)),
+    'Data Received (MB)': (((Number(log.total_rx_bytes) || 0) / 1024 / 1024).toFixed(2)),
+    'Uptime (hours)': (((Number(log.uptime_seconds) || 0) / 3600).toFixed(2)),
     'Status': log.status || '',
     'WiFi Clients': log.wifi_client_count || 0
   }));
@@ -58,14 +58,14 @@ export function exportUsageStatsToPDF(stats, routerId, startDate, endDate) {
   doc.text('Usage Summary', 14, 58);
   
   const summaryData = [
-    ['Total Logs', stats.total_logs || 0],
-    ['Total Data Sent', `${((stats.period_tx_bytes || 0) / 1024 / 1024 / 1024).toFixed(2)} GB`],
-    ['Total Data Received', `${((stats.period_rx_bytes || 0) / 1024 / 1024 / 1024).toFixed(2)} GB`],
-    ['Total Data Usage', `${((stats.total_data_usage || 0) / 1024 / 1024 / 1024).toFixed(2)} GB`],
-    ['Average RSRP', `${stats.avg_rsrp?.toFixed(0) || 'N/A'} dBm`],
-    ['Average RSSI', `${stats.avg_rssi?.toFixed(0) || 'N/A'} dBm`],
-    ['Average Uptime', `${((stats.avg_uptime || 0) / 3600).toFixed(1)} hours`],
-    ['Average WiFi Clients', stats.avg_clients?.toFixed(1) || '0'],
+    ['Total Logs', Number(stats.total_logs) || 0],
+    ['Total Data Sent', `${(((Number(stats.period_tx_bytes) || 0) / 1024 / 1024 / 1024).toFixed(2))} GB`],
+    ['Total Data Received', `${(((Number(stats.period_rx_bytes) || 0) / 1024 / 1024 / 1024).toFixed(2))} GB`],
+    ['Total Data Usage', `${(((Number(stats.total_data_usage) || 0) / 1024 / 1024 / 1024).toFixed(2))} GB`],
+    ['Average RSRP', `${(stats.avg_rsrp != null ? Number(stats.avg_rsrp).toFixed(0) : 'N/A')} dBm`],
+    ['Average RSSI', `${(stats.avg_rssi != null ? Number(stats.avg_rssi).toFixed(0) : 'N/A')} dBm`],
+    ['Average Uptime', `${(((Number(stats.avg_uptime) || 0) / 3600).toFixed(1))} hours`],
+    ['Average WiFi Clients', (Number(stats.avg_clients) ? Number(stats.avg_clients).toFixed(1) : '0')],
   ];
   
   doc.autoTable({
@@ -119,11 +119,12 @@ export function exportUptimeReportToPDF(uptimeData, routerId, startDate, endDate
   });
   
   // Detailed log
-  const logData = uptimeData.slice(0, 50).map(entry => [
-    format(new Date(entry.timestamp), 'yyyy-MM-dd HH:mm'),
-    `${((entry.uptime_seconds || 0) / 3600).toFixed(2)} hrs`,
-    entry.status
-  ]);
+  const logData = uptimeData.slice(0, 50).map(entry => {
+    const d = new Date(entry.timestamp);
+    const ts = isNaN(d.getTime()) ? '' : format(d, 'yyyy-MM-dd HH:mm');
+    const up = ((Number(entry.uptime_seconds) || 0) / 3600).toFixed(2);
+    return [ts, `${up} hrs`, entry.status];
+  });
   
   doc.setFontSize(12);
   doc.text('Recent Uptime Logs (Last 50)', 14, doc.lastAutoTable.finalY + 15);
@@ -144,13 +145,16 @@ export function exportUptimeReportToPDF(uptimeData, routerId, startDate, endDate
  * Format bytes to human readable
  */
 export function formatBytes(bytes, decimals = 2) {
-  if (bytes === 0) return '0 Bytes';
-  
-  const k = 1024;
+  const n = Number(bytes);
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+
+  if (!isFinite(n) || n <= 0) return '0 Bytes';
+
+  const k = 1024;
+  const rawIndex = Math.floor(Math.log(n) / Math.log(k));
+  const i = Math.max(0, Math.min(rawIndex, sizes.length - 1));
+  const value = n / Math.pow(k, i);
+
+  return parseFloat(value.toFixed(dm)) + ' ' + sizes[i];
 }

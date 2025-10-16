@@ -21,7 +21,22 @@ function UsageStats({ routerId, startDate, endDate }) {
         end_date: endDate
       };
       const response = await getUsageStats(params);
-      setStats(response.data);
+      const d = response.data || {};
+      // Coerce numeric strings to numbers and provide safe defaults
+      const normalized = {
+        ...d,
+        total_logs: Number(d.total_logs) || 0,
+        period_tx_bytes: Number(d.period_tx_bytes) || 0,
+        period_rx_bytes: Number(d.period_rx_bytes) || 0,
+        total_data_usage: Number(d.total_data_usage) || 0,
+        avg_rsrp: d.avg_rsrp != null ? Number(d.avg_rsrp) : null,
+        avg_rsrq: d.avg_rsrq != null ? Number(d.avg_rsrq) : null,
+        avg_rssi: d.avg_rssi != null ? Number(d.avg_rssi) : null,
+        avg_sinr: d.avg_sinr != null ? Number(d.avg_sinr) : null,
+        avg_uptime: Number(d.avg_uptime) || 0,
+        avg_clients: Number(d.avg_clients) || 0
+      };
+      setStats(normalized);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching stats:', error);

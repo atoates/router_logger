@@ -23,25 +23,29 @@ function DataCharts({ routerId, startDate, endDate }) {
         limit: 500
       };
       const response = await getLogs(params);
-      
-      // Process data for charts
-      const processed = response.data
+
+      // Process data for charts; coerce numeric strings to numbers
+      const processed = (response.data || [])
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
         .map((log, index, array) => {
           const prev = index > 0 ? array[index - 1] : null;
-          const txDelta = prev ? Math.max(0, (log.total_tx_bytes - prev.total_tx_bytes) / 1024 / 1024) : 0;
-          const rxDelta = prev ? Math.max(0, (log.total_rx_bytes - prev.total_rx_bytes) / 1024 / 1024) : 0;
+          const tx = Number(log.total_tx_bytes) || 0;
+          const rx = Number(log.total_rx_bytes) || 0;
+          const prevTx = prev ? (Number(prev.total_tx_bytes) || 0) : 0;
+          const prevRx = prev ? (Number(prev.total_rx_bytes) || 0) : 0;
+          const txDelta = prev ? Math.max(0, (tx - prevTx) / 1024 / 1024) : 0;
+          const rxDelta = prev ? Math.max(0, (rx - prevRx) / 1024 / 1024) : 0;
           
           return {
             timestamp: format(new Date(log.timestamp), 'MMM dd HH:mm'),
             tx_mb: txDelta,
             rx_mb: rxDelta,
             total_mb: txDelta + rxDelta,
-            rsrp: log.rsrp || null,
-            rsrq: log.rsrq || null,
-            rssi: log.rssi || null,
+            rsrp: log.rsrp != null ? Number(log.rsrp) : null,
+            rsrq: log.rsrq != null ? Number(log.rsrq) : null,
+            rssi: log.rssi != null ? Number(log.rssi) : null,
             wifi_clients: log.wifi_client_count || 0,
-            uptime_hours: (log.uptime_seconds || 0) / 3600
+            uptime_hours: ((Number(log.uptime_seconds) || 0) / 3600)
           };
         });
       

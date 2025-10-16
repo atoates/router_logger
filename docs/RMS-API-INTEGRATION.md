@@ -114,6 +114,37 @@ info: Fetched 25 devices from RMS
 info: RMS sync complete: 25 successful, 0 errors
 ```
 
+## Endpoint compatibility (important)
+
+Teltonika’s RMS API has gone through a few path revisions. We default to the current stable paths, and you can override them via environment variables if Teltonika changes something in the future.
+
+- RMS_API_BASE_URL: Base URL for the RMS API
+   - Default: https://api.rms.teltonika-networks.com
+   - Example override (rare): https://sandbox.api.rms.teltonika-networks.com
+
+- RMS_API_PREFIX: Path prefix before resources
+   - Default: /v3
+   - Fallbacks: the backend automatically tries these paths in order when calling RMS:
+      1) ${RMS_API_PREFIX}/devices (e.g., /v3/devices)
+      2) /devices
+      3) /api/devices
+
+In practice today, /devices is the working path at https://api.rms.teltonika-networks.com. If Teltonika moves endpoints under /v3, the default will keep working. If you need to force a specific prefix, set RMS_API_PREFIX accordingly.
+
+### Set these in Railway (optional)
+
+If you need to override defaults:
+
+```bash
+# Set base URL (optional)
+railway variables --set RMS_API_BASE_URL="https://api.rms.teltonika-networks.com"
+
+# Force a specific prefix (optional)
+railway variables --set RMS_API_PREFIX="/v3"
+```
+
+No restart is required beyond the standard Railway redeploy when variables change.
+
 ## How It Works
 
 1. **Scheduled Sync**: Every 15 minutes (configurable), the system:
