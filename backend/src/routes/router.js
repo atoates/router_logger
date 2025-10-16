@@ -38,6 +38,7 @@ router.get('/routers', async (req, res) => {
     const routers = await getAllRouters();
     // Merge duplicates by same name, prefer entries with logs, then latest seen
     const byName = new Map();
+    const isSerialLike = (id) => /^(\d){9,}$/.test(String(id || ''));
     for (const r of routers) {
       const key = (r.name || '').toLowerCase();
       if (!byName.has(key)) {
@@ -45,25 +46,23 @@ router.get('/routers', async (req, res) => {
         continue;
       }
       const cur = byName.get(key);
-      const curLogs = Number(cur.log_count || 0);
-      const newLogs = Number(r.log_count || 0);
-
-      // Prefer higher log count
-      if (newLogs !== curLogs) {
-        if (newLogs > curLogs) byName.set(key, r);
-        continue;
-      }
-
-  // Tie-breaker: prefer serial-looking IDs (>=9 digits) to RMS numeric IDs (often shorter)
-  const isSerialLike = (id) => /^(\d){9,}$/.test(String(id || ''));
-  const curIsSerial = isSerialLike(cur.router_id);
-  const newIsSerial = isSerialLike(r.router_id);
+      const curIsSerial = isSerialLike(cur.router_id);
+      const newIsSerial = isSerialLike(r.router_id);
+      // Prefer serial-like first
       if (newIsSerial !== curIsSerial) {
         if (newIsSerial) byName.set(key, r);
         continue;
       }
 
-      // Final tie-breaker: most recent last_seen
+      // Next prefer higher log count
+      const curLogs = Number(cur.log_count || 0);
+      const newLogs = Number(r.log_count || 0);
+      if (newLogs !== curLogs) {
+        if (newLogs > curLogs) byName.set(key, r);
+        continue;
+      }
+
+      // Finally, most recent last_seen
       const curSeen = cur.last_seen ? new Date(cur.last_seen).getTime() : 0;
       const newSeen = r.last_seen ? new Date(r.last_seen).getTime() : 0;
       if (newSeen > curSeen) byName.set(key, r);
