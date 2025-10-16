@@ -216,31 +216,43 @@ async function syncFromRMS() {
   }
 }
 
+// Keep a singleton interval so we don't start duplicates
+let syncIntervalId = null;
+
 /**
- * Start scheduled RMS sync
+ * Start scheduled RMS sync (idempotent)
  */
 function startRMSSync(intervalMinutes = 15) {
+  if (syncIntervalId) {
+    logger.info('RMS sync scheduler already running');
+    return syncIntervalId;
+  }
+
   const intervalMs = intervalMinutes * 60 * 1000;
-  
   logger.info(`Starting RMS sync scheduler (every ${intervalMinutes} minutes)`);
-  
+
   // Run immediately on startup
   syncFromRMS().catch(error => {
     logger.error('Initial RMS sync failed:', error.message);
   });
-  
+
   // Then run on schedule
-  const intervalId = setInterval(() => {
+  syncIntervalId = setInterval(() => {
     syncFromRMS().catch(error => {
       logger.error('Scheduled RMS sync failed:', error.message);
     });
   }, intervalMs);
-  
-  return intervalId;
+
+  return syncIntervalId;
+}
+
+function isRMSSyncRunning() {
+  return !!syncIntervalId;
 }
 
 module.exports = {
   syncFromRMS,
   startRMSSync,
+  isRMSSyncRunning,
   transformRMSDeviceToTelemetry
 };
