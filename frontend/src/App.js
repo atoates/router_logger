@@ -21,7 +21,8 @@ function App() {
 
   const handleRouterSelect = (router) => {
     setSelectedRouter(router);
-    toast.success(`Selected router: ${router.router_id}`);
+    const label = router.name ? `${router.name} (ID ${router.router_id})` : `ID ${router.router_id}`;
+    toast.success(`Selected router: ${label}`);
   };
 
   const handleFilterChange = (newRange) => {
@@ -42,7 +43,7 @@ function App() {
           <StatusSummary />
         </ErrorBoundary>
 
-        {/* Quick select by ID (kept RouterList import for now; we can remove later if you prefer only input) */}
+        {/* Quick select by Name */}
         <ErrorBoundary>
           <RouterQuickSelect onSelectRouter={handleRouterSelect} />
         </ErrorBoundary>
@@ -82,7 +83,7 @@ function App() {
         {!selectedRouter && (
           <div className="card">
             <h2>👆 Get Started</h2>
-            <p>Enter a router ID above to view its details, statistics, and logs.</p>
+            <p>Start typing a router name above to view its details, statistics, and logs.</p>
           </div>
         )}
       </div>

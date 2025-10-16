@@ -4,6 +4,7 @@ import { getRouters } from '../services/api';
 function RouterQuickSelect({ onSelectRouter }) {
   const [routers, setRouters] = useState([]);
   const [input, setInput] = useState('');
+  const [highlightIndex, setHighlightIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -28,33 +29,95 @@ function RouterQuickSelect({ onSelectRouter }) {
     return () => { mounted = false; clearInterval(interval); };
   }, []);
 
-  const matched = useMemo(() => {
-    const id = input.trim();
-    if (!id) return null;
-    return routers.find(r => String(r.router_id) === id) || null;
+  const suggestions = useMemo(() => {
+    const q = input.trim().toLowerCase();
+    if (!q) return [];
+    const withName = routers.filter(r => (r.name || '').toLowerCase().includes(q));
+    // Prioritize startsWith matches, then others; cap to 8 items
+    const starts = withName.filter(r => (r.name || '').toLowerCase().startsWith(q));
+    const contains = withName.filter(r => !(r.name || '').toLowerCase().startsWith(q));
+    return [...starts, ...contains].slice(0, 8);
+  }, [input, routers]);
+
+  const exactMatch = useMemo(() => {
+    const q = input.trim().toLowerCase();
+    if (!q) return null;
+    return routers.find(r => (r.name || '').toLowerCase() === q) || null;
   }, [input, routers]);
 
   const handleSelect = () => {
-    if (matched) {
-      onSelectRouter(matched);
+    const chosen = exactMatch || suggestions[highlightIndex] || suggestions[0] || null;
+    if (chosen) {
+      onSelectRouter(chosen);
       setError('');
     } else {
-      setError('Router ID not found');
+      setError('Router name not found');
     }
   };
 
   return (
     <div className="card">
-      <h3>🔎 Select Router by ID</h3>
+      <h3>🔎 Select Router by Name</h3>
       <div className="filter-bar">
         <div className="form-group" style={{ minWidth: 260 }}>
-          <label>Router ID</label>
+          <label>Router Name</label>
           <input
             type="text"
             value={input}
-            onChange={e => setInput(e.target.value.replace(/[^0-9]/g, ''))}
-            placeholder="Enter router ID (numbers only)"
+            onChange={e => { setInput(e.target.value); setError(''); setHighlightIndex(0); }}
+            onKeyDown={e => {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setHighlightIndex(i => Math.min(i + 1, Math.max(suggestions.length - 1, 0)));
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setHighlightIndex(i => Math.max(i - 1, 0));
+              } else if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSelect();
+              } else if (e.key === 'Escape') {
+                setInput('');
+              }
+            }}
+            placeholder="Start typing a router name"
           />
+          {suggestions.length > 0 && (
+            <div style={{ position: 'relative' }}>
+              <ul style={{
+                position: 'absolute',
+                zIndex: 10,
+                listStyle: 'none',
+                margin: 0,
+                padding: 0,
+                width: '100%',
+                maxHeight: 200,
+                overflowY: 'auto',
+                border: '1px solid #e2e8f0',
+                borderTop: 'none',
+                background: 'white',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+              }}>
+                {suggestions.map((r, idx) => (
+                  <li
+                    key={r.router_id}
+                    onMouseDown={() => { onSelectRouter(r); setError(''); }}
+                    onMouseEnter={() => setHighlightIndex(idx)}
+                    style={{
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      background: idx === highlightIndex ? '#f1f5f9' : 'white',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                    }}
+                  >
+                    <span>{r.name || '(unnamed)'}</span>
+                    <span style={{ color: '#64748b', fontSize: 12 }}>ID: {r.router_id}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
         <div className="form-group">
           <label>&nbsp;</label>
@@ -64,9 +127,9 @@ function RouterQuickSelect({ onSelectRouter }) {
         </div>
       </div>
       {error && <div style={{ color: '#dc2626', marginTop: '8px' }}>{error}</div>}
-      {matched && (
+      {exactMatch && (
         <div style={{ marginTop: '8px', color: '#64748b' }}>
-          Found: <strong>{matched.name || matched.router_id}</strong> ({matched.current_status || 'unknown'})
+          Found: <strong>{exactMatch.name || exactMatch.router_id}</strong> ({exactMatch.current_status || 'unknown'})
         </div>
       )}
     </div>
