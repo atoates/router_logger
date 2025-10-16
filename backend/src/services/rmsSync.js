@@ -134,13 +134,15 @@ async function syncFromRMS() {
           if (bothZero) {
             const deviceId = device.id || device.device_id || device.uuid || device.serial_number || telemetry.device_id;
             const latest = await getLatestLog(String(telemetry.device_id));
-            const fromIso = latest?.timestamp ? new Date(latest.timestamp).toISOString() : new Date(Date.now() - 15 * 60 * 1000).toISOString();
+            const fromIso = latest?.timestamp ? new Date(latest.timestamp).toISOString() : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
             const toIso = new Date().toISOString();
             
             // Try data-usage endpoint first (most reliable for usage totals)
             let usageData = null;
             try {
+              logger.info(`Attempting data-usage fetch for device ${deviceId} from ${fromIso} to ${toIso}`);
               usageData = await rmsClient.getDeviceDataUsage(deviceId, fromIso, toIso);
+              logger.info(`Data-usage response for ${deviceId}: ${usageData ? JSON.stringify(usageData).substring(0, 500) : 'null'}`);
             } catch (e) {
               logger.warn(`Data usage fetch failed for device ${deviceId}: ${e.message}`);
             }
@@ -165,6 +167,7 @@ async function syncFromRMS() {
                 if (isFinite(sent)) addTx = sent;
                 if (isFinite(received)) addRx = received;
               }
+              logger.info(`Parsed usage for ${deviceId}: addTx=${addTx}, addRx=${addRx}`);
             }
 
             // Fallback to statistics if data-usage was empty
@@ -196,6 +199,7 @@ async function syncFromRMS() {
             const baseRx = latest?.total_rx_bytes ? Number(latest.total_rx_bytes) : 0;
             telemetry.counters.total_tx_bytes = baseTx + addTx;
             telemetry.counters.total_rx_bytes = baseRx + addRx;
+            logger.info(`Final counters for ${deviceId}: TX=${telemetry.counters.total_tx_bytes}, RX=${telemetry.counters.total_rx_bytes}`);
           }
         } catch (statsErr) {
           // Non-fatal; proceed with whatever we have
