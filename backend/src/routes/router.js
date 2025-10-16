@@ -54,9 +54,10 @@ router.get('/routers', async (req, res) => {
         continue;
       }
 
-      // Tie-breaker: prefer serial-type entries (device_serial === router_id)
-      const curIsSerial = cur.device_serial && String(cur.device_serial) === String(cur.router_id);
-      const newIsSerial = r.device_serial && String(r.device_serial) === String(r.router_id);
+  // Tie-breaker: prefer serial-looking IDs (>=9 digits) to RMS numeric IDs (often shorter)
+  const isSerialLike = (id) => /^(\d){9,}$/.test(String(id || ''));
+  const curIsSerial = isSerialLike(cur.router_id);
+  const newIsSerial = isSerialLike(r.router_id);
       if (newIsSerial !== curIsSerial) {
         if (newIsSerial) byName.set(key, r);
         continue;

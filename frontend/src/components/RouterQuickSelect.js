@@ -64,8 +64,9 @@ function RouterQuickSelect({ onSelectRouter, onClear }) {
         if (newLogs > curLogs) bestByName.set(key, r);
         continue;
       }
-      const curIsSerial = cur.device_serial && String(cur.device_serial) === String(cur.router_id);
-      const newIsSerial = r.device_serial && String(r.device_serial) === String(r.router_id);
+  const isSerialLike = (id) => /^(\d){9,}$/.test(String(id || ''));
+  const curIsSerial = isSerialLike(cur.router_id);
+  const newIsSerial = isSerialLike(r.router_id);
       if (newIsSerial !== curIsSerial) {
         if (newIsSerial) bestByName.set(key, r);
         continue;
