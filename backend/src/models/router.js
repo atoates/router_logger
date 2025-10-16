@@ -248,11 +248,29 @@ async function getUptimeData(routerId, startDate, endDate) {
   }
 }
 
+// Get the latest log for a router
+async function getLatestLog(routerId) {
+  const query = `
+    SELECT * FROM router_logs
+    WHERE router_id = $1
+    ORDER BY timestamp DESC
+    LIMIT 1;
+  `;
+  try {
+    const result = await pool.query(query, [routerId]);
+    return result.rows[0] || null;
+  } catch (error) {
+    logger.error('Error fetching latest log:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   upsertRouter,
   insertLog,
   getAllRouters,
   getLogs,
   getUsageStats,
-  getUptimeData
+  getUptimeData,
+  getLatestLog
 };

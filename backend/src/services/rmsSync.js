@@ -1,5 +1,6 @@
 const RMSClient = require('./rmsClient');
 const { processRouterTelemetry } = require('./telemetryProcessor');
+const { getLatestLog } = require('../models/router');
 const { logger } = require('../config/database');
 
 /**
@@ -95,6 +96,37 @@ async function syncFromRMS() {
     for (const device of devices) {
       try {
         const telemetry = transformRMSDeviceToTelemetry(device, device.monitoring);
+
+        // If monitoring did not provide cumulative counters, try to derive from statistics API
+        const tx0 = Number(telemetry?.counters?.total_tx_bytes || 0);
+        const rx0 = Number(telemetry?.counters?.total_rx_bytes || 0);
+        const bothZero = (!isFinite(tx0) || tx0 === 0) && (!isFinite(rx0) || rx0 === 0);
+        try {
+          if (bothZero) {
+            const deviceId = device.id || device.device_id || device.uuid || device.serial_number || telemetry.device_id;
+            const latest = await getLatestLog(String(telemetry.device_id));
+            const fromIso = latest?.timestamp ? new Date(latest.timestamp).toISOString() : new Date(Date.now() - 15 * 60 * 1000).toISOString();
+            const toIso = new Date().toISOString();
+            const stats = await rmsClient.getDeviceStatistics(deviceId, fromIso, toIso);
+            // Normalize stats list
+            const list = Array.isArray(stats) ? stats : stats?.data || stats?.items || stats?.rows || [];
+            let addTx = 0, addRx = 0;
+            for (const s of list) {
+              const vals = typeof s === 'object' && s ? s : {};
+              const tx = Number(vals.tx_bytes ?? vals.tx ?? 0);
+              const rx = Number(vals.rx_bytes ?? vals.rx ?? 0);
+              if (isFinite(tx)) addTx += tx;
+              if (isFinite(rx)) addRx += rx;
+            }
+            const baseTx = latest?.total_tx_bytes ? Number(latest.total_tx_bytes) : 0;
+            const baseRx = latest?.total_rx_bytes ? Number(latest.total_rx_bytes) : 0;
+            telemetry.counters.total_tx_bytes = baseTx + addTx;
+            telemetry.counters.total_rx_bytes = baseRx + addRx;
+          }
+        } catch (statsErr) {
+          // Non-fatal; proceed with whatever we have
+          logger.warn(`Stats fallback failed for device ${device.id}: ${statsErr.message}`);
+        }
         await processRouterTelemetry(telemetry);
         successCount++;
       } catch (error) {
