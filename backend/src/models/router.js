@@ -518,3 +518,120 @@ async function getTopRoutersByUsage(days = 7, limit = 5) {
 }
 
 module.exports.getTopRoutersByUsage = getTopRoutersByUsage;
+
+/**
+ * Aggregate network-wide usage by day for the last N days.
+ * Returns [{ date, tx_bytes, rx_bytes, total_bytes }].
+ */
+async function getNetworkUsageByDay(days = 7) {
+  try {
+    const daysInt = Math.max(1, Math.min(90, Number(days) || 7));
+    const query = `
+      WITH filtered AS (
+        SELECT router_id, timestamp, total_tx_bytes, total_rx_bytes
+        FROM router_logs
+        WHERE timestamp >= (CURRENT_DATE - ($1::int - 1) * INTERVAL '1 day')
+      ), ordered AS (
+        SELECT 
+          router_id, timestamp, total_tx_bytes, total_rx_bytes,
+          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_tx,
+          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_rx
+        FROM filtered
+      ), deltas AS (
+        SELECT 
+          date_trunc('day', timestamp)::date AS day,
+          GREATEST(total_tx_bytes - COALESCE(prev_tx, 0), 0) AS tx_delta,
+          GREATEST(total_rx_bytes - COALESCE(prev_rx, 0), 0) AS rx_delta
+        FROM ordered
+      )
+      SELECT 
+        day AS date,
+        SUM(tx_delta)::bigint AS tx_bytes,
+        SUM(rx_delta)::bigint AS rx_bytes,
+        SUM(tx_delta + rx_delta)::bigint AS total_bytes
+      FROM deltas
+      GROUP BY day
+      ORDER BY day ASC;
+    `;
+    const result = await pool.query(query, [daysInt]);
+    return result.rows;
+  } catch (error) {
+    logger.error('Error fetching network usage by day:', error);
+    throw error;
+  }
+}
+
+module.exports.getNetworkUsageByDay = getNetworkUsageByDay;
+
+/**
+ * Operator distribution and usage for last N days.
+ * Returns counts by operator and total usage assigned to the router's latest operator.
+ */
+async function getOperatorDistribution(days = 7) {
+  try {
+    const daysInt = Math.max(1, Math.min(90, Number(days) || 7));
+    const latestPerRouter = `
+      SELECT DISTINCT ON (router_id) router_id, operator
+      FROM router_logs
+      WHERE operator IS NOT NULL AND operator <> ''
+      ORDER BY router_id, timestamp DESC
+    `;
+
+    const countsQuery = `
+      SELECT operator, COUNT(*)::int AS router_count
+      FROM (${latestPerRouter}) t
+      GROUP BY operator
+      ORDER BY router_count DESC;
+    `;
+    const countsRes = await pool.query(countsQuery);
+
+    const usageQuery = `
+      WITH latest AS (${latestPerRouter}),
+      filtered AS (
+        SELECT l.router_id, l.timestamp, l.total_tx_bytes, l.total_rx_bytes, lat.operator
+        FROM router_logs l
+        JOIN latest lat ON lat.router_id = l.router_id
+        WHERE l.timestamp >= (CURRENT_DATE - ($1::int - 1) * INTERVAL '1 day')
+      ), ordered AS (
+        SELECT 
+          router_id, operator, timestamp, total_tx_bytes, total_rx_bytes,
+          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_tx,
+          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_rx
+        FROM filtered
+      ), deltas AS (
+        SELECT 
+          operator,
+          GREATEST(total_tx_bytes - COALESCE(prev_tx, 0), 0) AS tx_delta,
+          GREATEST(total_rx_bytes - COALESCE(prev_rx, 0), 0) AS rx_delta
+        FROM ordered
+      )
+      SELECT operator,
+             SUM(tx_delta)::bigint AS tx_bytes,
+             SUM(rx_delta)::bigint AS rx_bytes,
+             SUM(tx_delta + rx_delta)::bigint AS total_bytes
+      FROM deltas
+      GROUP BY operator
+      ORDER BY total_bytes DESC;
+    `;
+    const usageRes = await pool.query(usageQuery, [daysInt]);
+
+    // merge counts and usage by operator
+    const usageMap = new Map((usageRes.rows || []).map(r => [r.operator || 'Unknown', r]));
+    const out = (countsRes.rows || []).map(r => {
+      const u = usageMap.get(r.operator || 'Unknown') || { tx_bytes: 0, rx_bytes: 0, total_bytes: 0 };
+      return {
+        operator: r.operator || 'Unknown',
+        router_count: Number(r.router_count) || 0,
+        tx_bytes: Number(u.tx_bytes) || 0,
+        rx_bytes: Number(u.rx_bytes) || 0,
+        total_bytes: Number(u.total_bytes) || 0
+      };
+    });
+    return out;
+  } catch (error) {
+    logger.error('Error fetching operator distribution:', error);
+    throw error;
+  }
+}
+
+module.exports.getOperatorDistribution = getOperatorDistribution;

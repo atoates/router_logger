@@ -8,7 +8,9 @@ const {
   getUsageStats,
   getUptimeData,
   getStorageStats,
-  getTopRoutersByUsage
+  getTopRoutersByUsage,
+  getNetworkUsageByDay,
+  getOperatorDistribution
 } = require('../models/router');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger } = require('../config/database');
@@ -154,6 +156,30 @@ router.get('/stats/top-routers', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching top routers by usage:', error);
     res.status(500).json({ error: 'Failed to fetch top routers' });
+  }
+});
+
+// GET network usage by day (last N days)
+router.get('/stats/network-usage', async (req, res) => {
+  try {
+    const days = req.query.days ? Number(req.query.days) : 7;
+    const data = await getNetworkUsageByDay(days);
+    res.json(data);
+  } catch (error) {
+    logger.error('Error fetching network usage by day:', error);
+    res.status(500).json({ error: 'Failed to fetch network usage' });
+  }
+});
+
+// GET operator distribution (counts and usage)
+router.get('/stats/operators', async (req, res) => {
+  try {
+    const days = req.query.days ? Number(req.query.days) : 7;
+    const data = await getOperatorDistribution(days);
+    res.json(data);
+  } catch (error) {
+    logger.error('Error fetching operator distribution:', error);
+    res.status(500).json({ error: 'Failed to fetch operator distribution' });
   }
 });
 

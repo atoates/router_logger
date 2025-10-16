@@ -50,6 +50,8 @@ app.get('/', (req, res) => {
       uptimeStats: '/api/stats/uptime',
       storageStats: '/api/stats/storage',
       topRouters: '/api/stats/top-routers',
+      networkUsage: '/api/stats/network-usage',
+      operatorDistribution: '/api/stats/operators',
       oauthLogin: '/api/auth/rms/login',
       oauthStatus: '/api/auth/rms/status'
     }

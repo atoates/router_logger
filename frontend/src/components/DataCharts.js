@@ -110,64 +110,7 @@ function DataCharts({ routerId, startDate, endDate }) {
         </div>
       </div>
 
-      {/* Signal Quality Chart */}
-      <div className="card">
-        <h3>Signal Quality (RSRP, RSSI)</h3>
-        <div className="chart-container">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="timestamp" 
-                angle={-45} 
-                textAnchor="end" 
-                height={80}
-                interval="preserveStartEnd"
-              />
-              <YAxis label={{ value: 'dBm', angle: -90, position: 'insideLeft' }} />
-              <Tooltip />
-              <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="rsrp" 
-                stroke="#ff7300" 
-                name="RSRP (dBm)"
-                connectNulls
-              />
-              <Line 
-                type="monotone" 
-                dataKey="rssi" 
-                stroke="#387908" 
-                name="RSSI (dBm)"
-                connectNulls
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* WiFi Clients Chart */}
-      <div className="card">
-        <h3>WiFi Connected Clients</h3>
-        <div className="chart-container">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="timestamp" 
-                angle={-45} 
-                textAnchor="end" 
-                height={80}
-                interval="preserveStartEnd"
-              />
-              <YAxis label={{ value: 'Clients', angle: -90, position: 'insideLeft' }} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="wifi_clients" fill="#667eea" name="WiFi Clients" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      {/* We detected signal/wifi fields are often missing; hide these charts to keep dashboard useful */}
 
       {/* Uptime Chart */}
       <div className="card">

@@ -10,6 +10,7 @@ import LogsTable from './components/LogsTable';
 import DeviceInfo from './components/DeviceInfo';
 import RMSAuthButton from './components/RMSAuthButton';
 import TopRouters from './components/TopRouters';
+import NetworkOverview from './components/NetworkOverview';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
@@ -96,6 +97,9 @@ function App() {
               <h2>👆 Get Started</h2>
               <p>Start typing a router name above to view its details, statistics, and logs.</p>
             </div>
+            <ErrorBoundary>
+              <NetworkOverview days={7} />
+            </ErrorBoundary>
             <ErrorBoundary>
               <TopRouters days={7} limit={5} />
             </ErrorBoundary>
