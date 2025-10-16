@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { syncFromRMS } = require('../services/rmsSync');
+const { mergeDuplicateRouters } = require('../models/router');
 const RMSClient = require('../services/rmsClient');
 const oauthService = require('../services/oauthService');
 const { logger } = require('../config/database');
@@ -100,3 +101,14 @@ router.get('/debug/:deviceId', async (req, res) => {
 });
 
 module.exports = router;
+
+// Admin: merge duplicate routers by name into serial-like ID
+router.post('/admin/merge-routers', async (req, res) => {
+  try {
+    const result = await mergeDuplicateRouters();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    logger.error('Merge duplicate routers failed:', err.message);
+    res.status(500).json({ success: false, error: 'Merge failed', message: err.message });
+  }
+});
