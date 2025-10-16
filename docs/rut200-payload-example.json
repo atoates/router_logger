@@ -1,0 +1,43 @@
+{
+  "device_id": "RUT200-serial-12345",
+  "imei": "352XXXXXXXXXXXX",
+  "timestamp": "2025-10-15T12:00:00Z",
+  "name": "Router Alpha",
+  "location": "Site A - Building 1",
+  "site_id": "site_001",
+  
+  "wan_ip": "51.15.2.34",
+  "operator": "Vodafone",
+  "mcc": "234",
+  "mnc": "15",
+  "network_type": "LTE",
+  
+  "cell": {
+    "lac": "12345",
+    "tac": "12345",
+    "cid": "67890",
+    "rsrp": -95,
+    "rsrq": -9,
+    "sinr": 10
+  },
+  
+  "counters": {
+    "total_tx_bytes": 123456789,
+    "total_rx_bytes": 234567890
+  },
+  
+  "clients": [
+    {
+      "mac": "aa:bb:cc:dd:ee:ff",
+      "ip": "192.168.1.10",
+      "assoc_time": "2025-10-15T11:45:00Z",
+      "tx": 12345,
+      "rx": 54321,
+      "rssi": -60
+    }
+  ],
+  
+  "fw_version": "RUT2_R_00.07.04.5",
+  "uptime": 86400,
+  "status": "online"
+}
