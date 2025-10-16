@@ -7,6 +7,7 @@ import DateRangeFilter from './components/DateRangeFilter';
 import UsageStats from './components/UsageStats';
 import DataCharts from './components/DataCharts';
 import LogsTable from './components/LogsTable';
+import DeviceInfo from './components/DeviceInfo';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
@@ -50,6 +51,9 @@ function App() {
           <>
             <ErrorBoundary>
               <DateRangeFilter onFilterChange={handleFilterChange} />
+            </ErrorBoundary>
+            <ErrorBoundary>
+              <DeviceInfo routerId={selectedRouter.router_id} />
             </ErrorBoundary>
             <ErrorBoundary>
               <UsageStats 
