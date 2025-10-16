@@ -15,6 +15,35 @@ function transformRMSDeviceToTelemetry(device, monitoring) {
   const vpn = monitoring?.vpn || {};
   const eth = monitoring?.ethernet || {};
 
+  // Helper to coerce to finite number
+  const num = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  // Try multiple candidate keys for byte counters (RMS variants differ)
+  const pickBytes = (obj, keys = []) => {
+    for (const k of keys) {
+      if (obj && Object.prototype.hasOwnProperty.call(obj, k)) {
+        const v = num(obj[k]);
+        if (v > 0) return v;
+      }
+    }
+    return 0;
+  };
+
+  const txCandidates = [
+    'tx_bytes','tx','bytes_sent','data_sent','upload','bytes_out','out'
+  ];
+  const rxCandidates = [
+    'rx_bytes','rx','bytes_received','data_received','download','bytes_in','in'
+  ];
+
+  const total_tx_bytes =
+    pickBytes(network, txCandidates) || pickBytes(cellular, txCandidates) || 0;
+  const total_rx_bytes =
+    pickBytes(network, rxCandidates) || pickBytes(cellular, rxCandidates) || 0;
+
   return {
     device_id: device.serial_number || device.id,
     imei: device.imei || cellular.imei,
@@ -43,8 +72,8 @@ function transformRMSDeviceToTelemetry(device, monitoring) {
     
     // Data Counters
     counters: {
-      total_tx_bytes: network.tx_bytes || cellular.tx_bytes || 0,
-      total_rx_bytes: network.rx_bytes || cellular.rx_bytes || 0
+      total_tx_bytes,
+      total_rx_bytes
     },
     
     // WiFi Clients
