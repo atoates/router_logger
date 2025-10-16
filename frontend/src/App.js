@@ -45,7 +45,10 @@ function App() {
 
         {/* Quick select by Name */}
         <ErrorBoundary>
-          <RouterQuickSelect onSelectRouter={handleRouterSelect} />
+          <RouterQuickSelect 
+            onSelectRouter={handleRouterSelect}
+            onClear={() => setSelectedRouter(null)}
+          />
         </ErrorBoundary>
 
         {selectedRouter && (

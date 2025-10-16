@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getRouters } from '../services/api';
 
-function RouterQuickSelect({ onSelectRouter }) {
+function RouterQuickSelect({ onSelectRouter, onClear }) {
   const [routers, setRouters] = useState([]);
   const [input, setInput] = useState('');
   const [highlightIndex, setHighlightIndex] = useState(0);
@@ -123,6 +123,13 @@ function RouterQuickSelect({ onSelectRouter }) {
           <label>&nbsp;</label>
           <button className="btn btn-primary" onClick={handleSelect} disabled={loading}>
             {loading ? 'Loading…' : 'Load Router'}
+          </button>
+          <button
+            className="btn btn-secondary"
+            style={{ marginLeft: 8 }}
+            onClick={() => { setInput(''); setHighlightIndex(0); setError(''); if (onClear) onClear(); }}
+          >
+            Clear
           </button>
         </div>
       </div>
