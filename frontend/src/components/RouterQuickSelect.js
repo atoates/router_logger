@@ -49,17 +49,32 @@ function RouterQuickSelect({ onSelectRouter, onClear }) {
       return bSeen - aSeen;
     });
 
-    // Deduplicate by name (keep the best-ranked entry per name)
-    const seen = new Set();
-    const uniqueByName = [];
+    // Deduplicate by name (keep best entry per name) with stronger preference for serial ID
+    const bestByName = new Map();
     for (const r of sorted) {
       const key = (r.name || '').toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      uniqueByName.push(r);
+      const cur = bestByName.get(key);
+      if (!cur) {
+        bestByName.set(key, r);
+        continue;
+      }
+      const curLogs = Number(cur.log_count || 0);
+      const newLogs = Number(r.log_count || 0);
+      if (newLogs !== curLogs) {
+        if (newLogs > curLogs) bestByName.set(key, r);
+        continue;
+      }
+      const curIsSerial = cur.device_serial && String(cur.device_serial) === String(cur.router_id);
+      const newIsSerial = r.device_serial && String(r.device_serial) === String(r.router_id);
+      if (newIsSerial !== curIsSerial) {
+        if (newIsSerial) bestByName.set(key, r);
+        continue;
+      }
+      const curSeen = cur.last_seen ? new Date(cur.last_seen).getTime() : 0;
+      const newSeen = r.last_seen ? new Date(r.last_seen).getTime() : 0;
+      if (newSeen > curSeen) bestByName.set(key, r);
     }
-
-    return uniqueByName.slice(0, 8);
+    return Array.from(bestByName.values()).slice(0, 8);
   }, [input, routers]);
 
   const exactMatch = useMemo(() => {

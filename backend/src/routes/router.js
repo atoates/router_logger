@@ -47,13 +47,25 @@ router.get('/routers', async (req, res) => {
       const cur = byName.get(key);
       const curLogs = Number(cur.log_count || 0);
       const newLogs = Number(r.log_count || 0);
-      if (newLogs > curLogs) {
-        byName.set(key, r);
-      } else if (newLogs === curLogs) {
-        const curSeen = cur.last_seen ? new Date(cur.last_seen).getTime() : 0;
-        const newSeen = r.last_seen ? new Date(r.last_seen).getTime() : 0;
-        if (newSeen > curSeen) byName.set(key, r);
+
+      // Prefer higher log count
+      if (newLogs !== curLogs) {
+        if (newLogs > curLogs) byName.set(key, r);
+        continue;
       }
+
+      // Tie-breaker: prefer serial-type entries (device_serial === router_id)
+      const curIsSerial = cur.device_serial && String(cur.device_serial) === String(cur.router_id);
+      const newIsSerial = r.device_serial && String(r.device_serial) === String(r.router_id);
+      if (newIsSerial !== curIsSerial) {
+        if (newIsSerial) byName.set(key, r);
+        continue;
+      }
+
+      // Final tie-breaker: most recent last_seen
+      const curSeen = cur.last_seen ? new Date(cur.last_seen).getTime() : 0;
+      const newSeen = r.last_seen ? new Date(r.last_seen).getTime() : 0;
+      if (newSeen > curSeen) byName.set(key, r);
     }
     res.json(Array.from(byName.values()));
   } catch (error) {
