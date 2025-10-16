@@ -103,13 +103,45 @@ class RMSClient {
    */
   async getDeviceStatistics(deviceId, from, to) {
     try {
-      const params = { from, to };
-      const response = await this.requestWithFallback('get', [
+      // Build parameter variants: ISO strings, epoch seconds, alternate keys
+      const epochSec = (d) => Math.floor(new Date(d).getTime() / 1000);
+      const paramVariants = [
+        { from, to },
+        { from: epochSec(from), to: epochSec(to) },
+        { date_from: from, date_to: to },
+        { start: from, end: to },
+      ];
+
+      const urlCandidates = [
         `${RMS_API_PREFIX}/devices/${deviceId}/statistics`,
+        `${RMS_API_PREFIX}/devices/${deviceId}/statistics/traffic`,
+        `${RMS_API_PREFIX}/devices/${deviceId}/traffic`,
         `/devices/${deviceId}/statistics`,
-        `/api/devices/${deviceId}/statistics`
-      ], { params });
-      return response.data;
+        `/devices/${deviceId}/statistics/traffic`,
+        `/devices/${deviceId}/traffic`,
+        `/api/devices/${deviceId}/statistics`,
+        `/api/devices/${deviceId}/statistics/traffic`,
+        `/api/devices/${deviceId}/traffic`,
+      ];
+
+      let lastErr;
+      for (const params of paramVariants) {
+        try {
+          const response = await this.requestWithFallback('get', urlCandidates, { params });
+          const data = response.data;
+          const list = Array.isArray(data) ? data : data?.data || data?.items || data?.rows || [];
+          if (Array.isArray(list) && list.length >= 1) {
+            return list;
+          }
+          // If empty, try next param variant
+          lastErr = new Error('Empty statistics response');
+        } catch (err) {
+          lastErr = err;
+          continue;
+        }
+      }
+      if (lastErr) throw lastErr;
+      return [];
     } catch (error) {
       logger.error(`Error fetching statistics for device ${deviceId}:`, error.response?.data || error.message);
       throw error;
