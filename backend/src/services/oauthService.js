@@ -20,10 +20,18 @@ class RMSOAuthService {
     // Allow configuring scopes via env; default to minimal set required
     // Normalize commas/spaces and de-duplicate
     const rawScopes = process.env.RMS_OAUTH_SCOPES || 'devices:read monitoring:read statistics:read';
+    const allowedScopes = new Set(['devices:read', 'monitoring:read', 'statistics:read']);
     this.scopes = rawScopes
       .split(/[\s,]+/)
       .map(s => s.trim())
       .filter(Boolean)
+      .filter(scope => {
+        const ok = allowedScopes.has(scope);
+        if (!ok) {
+          logger.warn('Dropping unsupported RMS OAuth scope', { scope });
+        }
+        return ok;
+      })
       .filter((v, i, a) => a.indexOf(v) === i)
       .join(' ');
   // Per RMS docs, OAuth endpoints live under /account/*
