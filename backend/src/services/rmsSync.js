@@ -136,7 +136,18 @@ async function syncFromRMS() {
             const latest = await getLatestLog(String(telemetry.device_id));
             const fromIso = latest?.timestamp ? new Date(latest.timestamp).toISOString() : new Date(Date.now() - 15 * 60 * 1000).toISOString();
             const toIso = new Date().toISOString();
-            const stats = await rmsClient.getDeviceStatistics(deviceId, fromIso, toIso);
+            let stats = await rmsClient.getDeviceStatistics(deviceId, fromIso, toIso);
+            if (!stats || (Array.isArray(stats) && stats.length === 0)) {
+              // company-level fallback (uses site/company IDs when present)
+              const companyId = device.company_id || device.companyId || telemetry.site_id;
+              if (companyId) {
+                try {
+                  stats = await rmsClient.getCompanyDeviceStatistics(companyId, deviceId, fromIso, toIso);
+                } catch (e) {
+                  logger.warn(`Company stats fallback failed for device ${deviceId}: ${e.message}`);
+                }
+              }
+            }
             // Normalize stats list
             const list = Array.isArray(stats) ? stats : stats?.data || stats?.items || stats?.rows || [];
             let addTx = 0, addRx = 0;

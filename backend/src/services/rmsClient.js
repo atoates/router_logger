@@ -149,6 +149,54 @@ class RMSClient {
   }
 
   /**
+   * Get company device statistics (traffic) using company_device_statistics scope
+   */
+  async getCompanyDeviceStatistics(companyId, deviceId, from, to) {
+    try {
+      const epochSec = (d) => Math.floor(new Date(d).getTime() / 1000);
+      const paramVariants = [
+        { company_id: companyId, device_id: deviceId, from, to },
+        { company_id: companyId, device_id: deviceId, from: epochSec(from), to: epochSec(to) },
+        { companyId, deviceId, date_from: from, date_to: to },
+        { companyId, deviceId, start: from, end: to },
+      ];
+      const urlCandidates = [
+        `${RMS_API_PREFIX}/statistics/companies/${companyId}/devices/${deviceId}`,
+        `${RMS_API_PREFIX}/companies/${companyId}/devices/${deviceId}/statistics`,
+        `${RMS_API_PREFIX}/companies/${companyId}/statistics/devices/${deviceId}`,
+        `${RMS_API_PREFIX}/statistics/companies/${companyId}/devices`,
+        `${RMS_API_PREFIX}/companies/${companyId}/statistics/devices`,
+        `${RMS_API_PREFIX}/statistics/devices`,
+        `/statistics/companies/${companyId}/devices/${deviceId}`,
+        `/companies/${companyId}/devices/${deviceId}/statistics`,
+        `/companies/${companyId}/statistics/devices/${deviceId}`,
+        `/statistics/companies/${companyId}/devices`,
+        `/companies/${companyId}/statistics/devices`,
+        `/statistics/devices`,
+      ];
+
+      let lastErr;
+      for (const params of paramVariants) {
+        try {
+          const response = await this.requestWithFallback('get', urlCandidates, { params });
+          const data = response.data;
+          const list = Array.isArray(data) ? data : data?.data || data?.items || data?.rows || [];
+          if (Array.isArray(list) && list.length >= 1) return list;
+          lastErr = new Error('Empty company statistics response');
+        } catch (err) {
+          lastErr = err;
+          continue;
+        }
+      }
+      if (lastErr) throw lastErr;
+      return [];
+    } catch (error) {
+      logger.error(`Error fetching company statistics for company ${companyId} device ${deviceId}:`, error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Get device configuration
    */
   async getDeviceConfig(deviceId) {
