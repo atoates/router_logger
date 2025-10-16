@@ -6,7 +6,7 @@ const oauthService = require('../services/oauthService');
 const { logger } = require('../config/database');
 
 // Manual trigger for RMS sync
-router.post('/sync', async (req, res) => {
+async function handleSync(req, res) {
   try {
     logger.info('Manual RMS sync triggered');
     const result = await syncFromRMS();
@@ -23,7 +23,10 @@ router.post('/sync', async (req, res) => {
       message: error.message
     });
   }
-});
+}
+
+router.post('/sync', handleSync);
+router.get('/sync', handleSync);
 
 // Get RMS sync status
 router.get('/status', async (req, res) => {
