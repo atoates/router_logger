@@ -59,6 +59,13 @@ function DeviceInfo({ routerId }) {
           <Field label="VPN" value={info.vpn_status ? `${info.vpn_status}${info.vpn_name ? ` (${info.vpn_name})` : ''}` : '-'} />
           <Field label="Ethernet Link" value={info.eth_link_up === true ? 'Up' : (info.eth_link_up === false ? 'Down' : '-')} />
           <Field label="WiFi Clients" value={info.wifi_client_count} />
+          <Field label="Total TX" value={info.total_tx_bytes} formatter={(v) => `${(Number(v||0)/1024/1024).toFixed(2)} MB`} />
+          <Field label="Total RX" value={info.total_rx_bytes} formatter={(v) => `${(Number(v||0)/1024/1024).toFixed(2)} MB`} />
+        </div>
+      )}
+      {!loading && info && Number(info.total_tx_bytes||0) === 0 && Number(info.total_rx_bytes||0) === 0 && (
+        <div style={{ marginTop: 12, color: '#64748b' }}>
+          Note: No usage data reported by RMS for this device in the latest sync. If the router was active, check the RMS monitoring profile and statistics permissions.
         </div>
       )}
     </div>
