@@ -72,14 +72,26 @@ async function processRouterTelemetry(data) {
       firmware_version: data.fw_version || data.firmware_version,
       cpu_usage: data.cpu_usage,
       memory_free: data.memory_free,
-      status: data.status || 'online',
+  status: (data.status === 'online' || data.status === 1 || data.status === '1' || data.status === true) ? 'online' : 'offline',
       
       // Wi-Fi Clients
       wifi_clients: data.clients ? JSON.stringify(data.clients) : null,
       wifi_client_count: data.clients ? data.clients.length : 0,
       
       // Store raw data for reference
-      raw_data: JSON.stringify(data)
+      raw_data: JSON.stringify(data),
+      // Additional RMS extras if present
+      iccid: data.iccid,
+      imsi: data.imsi,
+      cpu_temp_c: data.cpu_temp_c,
+      board_temp_c: data.board_temp_c,
+      input_voltage_mv: data.input_voltage_mv,
+      conn_uptime_seconds: data.conn_uptime_seconds,
+      wan_type: data.wan_type,
+      wan_ipv6: data.wan_ipv6,
+      vpn_status: data.vpn_status,
+      vpn_name: data.vpn_name,
+      eth_link_up: data.eth_link_up
     };
 
     // Insert log entry

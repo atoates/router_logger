@@ -46,7 +46,9 @@ async function insertLog(logData) {
       latitude, longitude, location_accuracy,
       total_tx_bytes, total_rx_bytes,
       uptime_seconds, firmware_version, cpu_usage, memory_free, status,
-      wifi_clients, wifi_client_count, raw_data
+      wifi_clients, wifi_client_count, raw_data,
+      iccid, imsi, cpu_temp_c, board_temp_c, input_voltage_mv, conn_uptime_seconds,
+      wan_type, wan_ipv6, vpn_status, vpn_name, eth_link_up
     )
     VALUES (
       $1, $2, $3, $4, $5, $6, $7, $8,
@@ -54,7 +56,9 @@ async function insertLog(logData) {
       $16, $17, $18,
       $19, $20,
       $21, $22, $23, $24, $25,
-      $26, $27, $28
+      $26, $27, $28,
+      $29, $30, $31, $32, $33, $34,
+      $35, $36, $37, $38, $39
     )
     RETURNING *;
   `;
@@ -87,7 +91,18 @@ async function insertLog(logData) {
     logData.status || 'online',
     logData.wifi_clients,
     logData.wifi_client_count || 0,
-    logData.raw_data
+    logData.raw_data,
+    logData.iccid,
+    logData.imsi,
+    logData.cpu_temp_c,
+    logData.board_temp_c,
+    logData.input_voltage_mv,
+    logData.conn_uptime_seconds,
+    logData.wan_type,
+    logData.wan_ipv6,
+    logData.vpn_status,
+    logData.vpn_name,
+    logData.eth_link_up
   ];
   
   try {

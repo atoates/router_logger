@@ -72,6 +72,19 @@ async function initializeDatabase() {
       );
     `);
 
+    // Add extra columns for additional RMS data (idempotent)
+    await client.query(`ALTER TABLE router_logs ADD COLUMN IF NOT EXISTS iccid VARCHAR(32);`);
+    await client.query(`ALTER TABLE router_logs ADD COLUMN IF NOT EXISTS imsi VARCHAR(32);`);
+    await client.query(`ALTER TABLE router_logs ADD COLUMN IF NOT EXISTS cpu_temp_c DECIMAL(5,2);`);
+    await client.query(`ALTER TABLE router_logs ADD COLUMN IF NOT EXISTS board_temp_c DECIMAL(5,2);`);
+    await client.query(`ALTER TABLE router_logs ADD COLUMN IF NOT EXISTS input_voltage_mv INTEGER;`);
+    await client.query(`ALTER TABLE router_logs ADD COLUMN IF NOT EXISTS conn_uptime_seconds INTEGER;`);
+    await client.query(`ALTER TABLE router_logs ADD COLUMN IF NOT EXISTS wan_type VARCHAR(50);`);
+    await client.query(`ALTER TABLE router_logs ADD COLUMN IF NOT EXISTS wan_ipv6 VARCHAR(45);`);
+    await client.query(`ALTER TABLE router_logs ADD COLUMN IF NOT EXISTS vpn_status VARCHAR(50);`);
+    await client.query(`ALTER TABLE router_logs ADD COLUMN IF NOT EXISTS vpn_name VARCHAR(100);`);
+    await client.query(`ALTER TABLE router_logs ADD COLUMN IF NOT EXISTS eth_link_up BOOLEAN;`);
+
     // Create indexes for better query performance
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_router_logs_router_id 
