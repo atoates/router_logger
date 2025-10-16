@@ -69,15 +69,12 @@ router.get('/test', async (req, res) => {
 // Debug endpoint to view raw RMS data for a device
 router.get('/debug/:deviceId', async (req, res) => {
   try {
-    if (!process.env.RMS_ACCESS_TOKEN) {
-      return res.status(400).json({ error: 'RMS disabled' });
-    }
     const { deviceId } = req.params;
     const minutes = parseInt(req.query.minutes || '60', 10);
     const to = new Date();
     const from = new Date(Date.now() - minutes * 60 * 1000);
 
-    const rms = new RMSClient(process.env.RMS_ACCESS_TOKEN);
+    const rms = await RMSClient.createWithAuth();
     const [device, monitoring, dataUsage, statistics] = await Promise.allSettled([
       rms.getDevice(deviceId),
       rms.getDeviceMonitoring(deviceId),
