@@ -49,6 +49,7 @@ app.get('/', (req, res) => {
       usageStats: '/api/stats/usage',
       uptimeStats: '/api/stats/uptime',
       storageStats: '/api/stats/storage',
+      topRouters: '/api/stats/top-routers',
       oauthLogin: '/api/auth/rms/login',
       oauthStatus: '/api/auth/rms/status'
     }

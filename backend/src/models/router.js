@@ -133,9 +133,41 @@ async function getAllRouters() {
   }
 }
 
-// Get logs with filters
+// Get logs with filters (excluding certain fields from response)
 async function getLogs(filters = {}) {
-  let query = `SELECT * FROM router_logs WHERE 1=1`;
+  let query = `SELECT 
+      router_id,
+      imei,
+      timestamp,
+      wan_ip,
+      operator,
+      mcc,
+      mnc,
+      -- network_type excluded by request
+      lac,
+      tac,
+      cell_id,
+      rsrp,
+      rsrq,
+      rssi,
+      sinr,
+      latitude,
+      longitude,
+      location_accuracy,
+      total_tx_bytes,
+      total_rx_bytes,
+      uptime_seconds,
+      firmware_version,
+      cpu_usage,
+      memory_free,
+      status,
+      wifi_clients,
+      wifi_client_count,
+      raw_data,
+      -- excluded: iccid, imsi, cpu_temp_c, board_temp_c, input_voltage_mv, wan_type, wan_ipv6, vpn_status, vpn_name
+      conn_uptime_seconds,
+      eth_link_up
+    FROM router_logs WHERE 1=1`;
   const values = [];
   let paramCount = 1;
   
@@ -440,3 +472,49 @@ async function getStorageStats(sampleSize = 1000) {
 }
 
 module.exports.getStorageStats = getStorageStats;
+
+/**
+ * Top routers by data usage over the last N days.
+ * Returns router_id, name, tx_bytes, rx_bytes, total_bytes.
+ */
+async function getTopRoutersByUsage(days = 7, limit = 5) {
+  try {
+    const daysInt = Math.max(1, Math.min(365, Number(days) || 7));
+    const limInt = Math.max(1, Math.min(100, Number(limit) || 5));
+    const query = `
+      WITH filtered AS (
+        SELECT router_id, timestamp, total_tx_bytes, total_rx_bytes
+        FROM router_logs
+        WHERE timestamp >= NOW() - ($1::int || ' days')::interval
+      ), ordered AS (
+        SELECT 
+          router_id, timestamp, total_tx_bytes, total_rx_bytes,
+          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_tx,
+          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_rx
+        FROM filtered
+      ), deltas AS (
+        SELECT 
+          router_id,
+          GREATEST(total_tx_bytes - COALESCE(prev_tx, 0), 0) AS tx_delta,
+          GREATEST(total_rx_bytes - COALESCE(prev_rx, 0), 0) AS rx_delta
+        FROM ordered
+      )
+      SELECT r.router_id, r.name,
+             SUM(d.tx_delta)::bigint AS tx_bytes,
+             SUM(d.rx_delta)::bigint AS rx_bytes,
+             SUM(d.tx_delta + d.rx_delta)::bigint AS total_bytes
+      FROM deltas d
+      JOIN routers r ON r.router_id = d.router_id
+      GROUP BY r.router_id, r.name
+      ORDER BY total_bytes DESC
+      LIMIT $2;
+    `;
+    const result = await pool.query(query, [daysInt, limInt]);
+    return result.rows;
+  } catch (error) {
+    logger.error('Error fetching top routers by usage:', error);
+    throw error;
+  }
+}
+
+module.exports.getTopRoutersByUsage = getTopRoutersByUsage;

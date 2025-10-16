@@ -7,7 +7,8 @@ const {
   getLogs,
   getUsageStats,
   getUptimeData,
-  getStorageStats
+  getStorageStats,
+  getTopRoutersByUsage
 } = require('../models/router');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger } = require('../config/database');
@@ -140,6 +141,19 @@ router.get('/stats/storage', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching storage stats:', error);
     res.status(500).json({ error: 'Failed to fetch storage stats' });
+  }
+});
+
+// GET top routers by data usage (last N days)
+router.get('/stats/top-routers', async (req, res) => {
+  try {
+    const days = req.query.days ? Number(req.query.days) : 7;
+    const limit = req.query.limit ? Number(req.query.limit) : 5;
+    const top = await getTopRoutersByUsage(days, limit);
+    res.json(top);
+  } catch (error) {
+    logger.error('Error fetching top routers by usage:', error);
+    res.status(500).json({ error: 'Failed to fetch top routers' });
   }
 });
 

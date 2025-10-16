@@ -94,17 +94,8 @@ function transformRMSDeviceToTelemetry(device, monitoring) {
     uptime: system.uptime || 0,
     status: device.status || (monitoring?.online ? 'online' : 'offline'),
 
-    // Extras
-    iccid: cellular.iccid || cellular.sim_iccid,
-    imsi: cellular.imsi,
-    cpu_temp_c: system.cpu_temp || hw.cpu_temp,
-    board_temp_c: system.board_temp || hw.board_temp,
-    input_voltage_mv: hw.input_voltage_mv || hw.voltage_mv || system.input_voltage_mv,
+    // Extras (reduced)
     conn_uptime_seconds: network.conn_uptime || network.connection_uptime || 0,
-    wan_type: network.wan_type || network.primary || network.interface,
-    wan_ipv6: network.ipv6,
-    vpn_status: vpn.status,
-    vpn_name: vpn.name,
     eth_link_up: eth.link_up || eth.link || false
   };
 }
