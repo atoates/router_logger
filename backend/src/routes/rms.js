@@ -36,8 +36,6 @@ router.get('/status', (req, res) => {
   });
 });
 
-module.exports = router;
-
 // Debug endpoint to view raw RMS data for a device
 router.get('/debug/:deviceId', async (req, res) => {
   try {
@@ -62,3 +60,5 @@ router.get('/debug/:deviceId', async (req, res) => {
     res.status(500).json({ error: 'RMS debug failed', message: err.message });
   }
 });
+
+module.exports = router;
