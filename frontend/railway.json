@@ -5,7 +5,7 @@
     "buildCommand": "npm run build"
   },
   "deploy": {
-    "startCommand": "npx serve -s build -p $PORT",
+    "startCommand": "serve -s build -l $PORT",
     "numReplicas": 1
   }
 }
