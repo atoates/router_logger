@@ -6,7 +6,8 @@ const {
   getAllRouters, 
   getLogs,
   getUsageStats,
-  getUptimeData
+  getUptimeData,
+  getStorageStats
 } = require('../models/router');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger } = require('../config/database');
@@ -127,6 +128,18 @@ router.get('/stats/uptime', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching uptime data:', error);
     res.status(500).json({ error: 'Failed to fetch uptime data' });
+  }
+});
+
+// GET storage stats (dashboard)
+router.get('/stats/storage', async (req, res) => {
+  try {
+    const sampleSize = req.query.sample_size ? Number(req.query.sample_size) : 1000;
+    const stats = await getStorageStats(sampleSize);
+    res.json(stats);
+  } catch (error) {
+    logger.error('Error fetching storage stats:', error);
+    res.status(500).json({ error: 'Failed to fetch storage stats' });
   }
 });
 

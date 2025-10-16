@@ -332,3 +332,111 @@ async function mergeDuplicateRouters() {
 }
 
 module.exports.mergeDuplicateRouters = mergeDuplicateRouters;
+
+/**
+ * Compute storage-related stats:
+ * - totalRouters
+ * - totalLogs
+ * - logsPerDay7 (last 7 days inclusive)
+ * - logsPerDay30 (last 30 days inclusive)
+ * - avgLogJsonSizeBytes (approx, sampled from latest N rows via row_to_json)
+ * - estimatedCurrentJsonBytes (totalLogs * avg size)
+ * - projections (30/90 day) based on avg daily logs over last 7 and 30 days
+ */
+async function getStorageStats(sampleSize = 1000) {
+  try {
+    // Totals
+    const totalsRes = await pool.query(`
+      SELECT 
+        (SELECT COUNT(*) FROM routers) AS total_routers,
+        (SELECT COUNT(*) FROM router_logs) AS total_logs;
+    `);
+    const totals = totalsRes.rows[0] || { total_routers: 0, total_logs: 0 };
+
+    // Per-day counts for last 7 days (inclusive today)
+    const perDay7Res = await pool.query(`
+      WITH days AS (
+        SELECT generate_series::date AS day
+        FROM generate_series((CURRENT_DATE - INTERVAL '6 days')::date, CURRENT_DATE::date, '1 day')
+      ), counts AS (
+        SELECT date_trunc('day', timestamp)::date AS day, COUNT(*) AS cnt
+        FROM router_logs
+        WHERE timestamp >= (CURRENT_DATE - INTERVAL '6 days')
+        GROUP BY 1
+      )
+      SELECT d.day, COALESCE(c.cnt, 0) AS count
+      FROM days d
+      LEFT JOIN counts c ON c.day = d.day
+      ORDER BY d.day ASC;
+    `);
+
+    // Per-day counts for last 30 days (inclusive today)
+    const perDay30Res = await pool.query(`
+      WITH days AS (
+        SELECT generate_series::date AS day
+        FROM generate_series((CURRENT_DATE - INTERVAL '29 days')::date, CURRENT_DATE::date, '1 day')
+      ), counts AS (
+        SELECT date_trunc('day', timestamp)::date AS day, COUNT(*) AS cnt
+        FROM router_logs
+        WHERE timestamp >= (CURRENT_DATE - INTERVAL '29 days')
+        GROUP BY 1
+      )
+      SELECT d.day, COALESCE(c.cnt, 0) AS count
+      FROM days d
+      LEFT JOIN counts c ON c.day = d.day
+      ORDER BY d.day ASC;
+    `);
+
+    // Average JSON size per log (sample latest N rows)
+    const avgSizeRes = await pool.query(
+      `SELECT AVG(octet_length(row_to_json(t)::text))::bigint AS avg_bytes
+       FROM (
+         SELECT * FROM router_logs
+         ORDER BY timestamp DESC
+         LIMIT $1
+       ) t;`,
+      [Math.max(1, Math.min(10000, Number(sampleSize) || 1000))]
+    );
+    const avgBytes = Number(avgSizeRes.rows[0]?.avg_bytes || 0);
+
+    // Compute averages and projections
+    const logsPerDay7 = perDay7Res.rows.map(r => ({ date: r.day.toISOString?.() || r.day, count: Number(r.count) }));
+    const logsPerDay30 = perDay30Res.rows.map(r => ({ date: r.day.toISOString?.() || r.day, count: Number(r.count) }));
+
+    const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+    const avg = (arr) => (arr.length ? sum(arr) / arr.length : 0);
+
+    const avgDaily7 = avg(logsPerDay7.map(d => d.count));
+    const avgDaily30 = avg(logsPerDay30.map(d => d.count));
+
+    const estimatedCurrentJsonBytes = Math.round(Number(totals.total_logs || 0) * avgBytes);
+    const projected30DaysBytes_7dAvg = Math.round(avgDaily7 * 30 * avgBytes);
+    const projected90DaysBytes_7dAvg = Math.round(avgDaily7 * 90 * avgBytes);
+    const projected30DaysBytes_30dAvg = Math.round(avgDaily30 * 30 * avgBytes);
+    const projected90DaysBytes_30dAvg = Math.round(avgDaily30 * 90 * avgBytes);
+
+    return {
+      totalRouters: Number(totals.total_routers || 0),
+      totalLogs: Number(totals.total_logs || 0),
+      logsPerDay7,
+      logsPerDay30,
+      avgLogJsonSizeBytes: Number.isFinite(avgBytes) ? Number(avgBytes) : 0,
+      estimatedCurrentJsonBytes,
+      projections: {
+        using7DayAvg: {
+          projected30DaysBytes: projected30DaysBytes_7dAvg,
+          projected90DaysBytes: projected90DaysBytes_7dAvg
+        },
+        using30DayAvg: {
+          projected30DaysBytes: projected30DaysBytes_30dAvg,
+          projected90DaysBytes: projected90DaysBytes_30dAvg
+        }
+      }
+    };
+  } catch (error) {
+    logger.error('Error computing storage stats:', error);
+    throw error;
+  }
+}
+
+module.exports.getStorageStats = getStorageStats;

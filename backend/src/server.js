@@ -48,6 +48,7 @@ app.get('/', (req, res) => {
       submitLog: 'POST /api/log',
       usageStats: '/api/stats/usage',
       uptimeStats: '/api/stats/uptime',
+      storageStats: '/api/stats/storage',
       oauthLogin: '/api/auth/rms/login',
       oauthStatus: '/api/auth/rms/status'
     }
