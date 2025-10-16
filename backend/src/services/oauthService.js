@@ -19,28 +19,9 @@ class RMSOAuthService {
     this.redirectUri = process.env.RMS_OAUTH_REDIRECT_URI;
     // Allow configuring scopes via env; default to minimal set required
     // Normalize commas/spaces and de-duplicate
-    const rawScopesEnv = process.env.RMS_OAUTH_SCOPES;
-    if (!rawScopesEnv || rawScopesEnv.toLowerCase() === 'auto') {
-      // Omit scope parameter entirely by default; let RMS assign defaults
-      this.scopes = null;
-    } else {
-      const rawScopes = rawScopesEnv;
-      const allowedScopes = new Set(['devices:read', 'monitoring:read', 'statistics:read', 'company_device_statistics:read']);
-      const parsed = rawScopes
-        .split(/[\s,]+/)
-        .map(s => s.trim())
-        .filter(Boolean)
-        .filter(scope => {
-          const ok = allowedScopes.has(scope);
-          if (!ok) {
-            logger.warn('Dropping unsupported RMS OAuth scope', { scope });
-          }
-          return ok;
-        })
-        .filter((v, i, a) => a.indexOf(v) === i)
-        .join(' ');
-      this.scopes = parsed || null; // if empty after filtering, omit
-    }
+    // IMPORTANT: RMS may not accept scope parameter; rely on app-configured scopes
+    // Force omitting scope to avoid invalid_scope errors
+    this.scopes = null;
   // Per RMS docs, OAuth endpoints live under /account/*
   // https://rms.teltonika-networks.com/account/authorize
   // https://rms.teltonika-networks.com/account/token
