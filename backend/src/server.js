@@ -37,13 +37,15 @@ app.use('/api/', limiter);
 app.get('/', (req, res) => {
   res.json({ 
     message: 'RUT200 Router Logger API',
-    version: '1.0.0',
+    version: '1.0.1', // Updated with OAuth support
     endpoints: {
       routers: '/api/routers',
       logs: '/api/logs',
       submitLog: 'POST /api/log',
       usageStats: '/api/stats/usage',
-      uptimeStats: '/api/stats/uptime'
+      uptimeStats: '/api/stats/uptime',
+      oauthLogin: '/api/auth/rms/login',
+      oauthStatus: '/api/auth/rms/status'
     }
   });
 });
