@@ -43,18 +43,26 @@ router.get('/debug/:deviceId', async (req, res) => {
       return res.status(400).json({ error: 'RMS disabled' });
     }
     const { deviceId } = req.params;
-    const minutes = parseInt(req.query.minutes || '60');
+    const minutes = parseInt(req.query.minutes || '60', 10);
     const to = new Date();
     const from = new Date(Date.now() - minutes * 60 * 1000);
 
     const rms = new RMSClient(process.env.RMS_ACCESS_TOKEN);
-    const [device, monitoring, statistics] = await Promise.all([
-      rms.getDevice(deviceId).catch(() => null),
-      rms.getDeviceMonitoring(deviceId).catch(() => null),
-      rms.getDeviceStatistics(deviceId, from.toISOString(), to.toISOString()).catch(() => [])
+    const [device, monitoring, dataUsage, statistics] = await Promise.allSettled([
+      rms.getDevice(deviceId),
+      rms.getDeviceMonitoring(deviceId),
+      rms.getDeviceDataUsage(deviceId, from.toISOString(), to.toISOString()),
+      rms.getDeviceStatistics(deviceId, from.toISOString(), to.toISOString())
     ]);
 
-    res.json({ device, monitoring, statisticsSample: Array.isArray(statistics) ? statistics.slice(0, 10) : statistics });
+    const settled = (p) => (p.status === 'fulfilled' ? p.value : { error: p.reason?.message || 'Failed' });
+
+    res.json({
+      device: settled(device),
+      monitoring: settled(monitoring),
+      dataUsage: settled(dataUsage),
+      statisticsSample: Array.isArray(settled(statistics)) ? settled(statistics).slice(0, 10) : settled(statistics)
+    });
   } catch (err) {
     logger.error('RMS debug failed:', err.message);
     res.status(500).json({ error: 'RMS debug failed', message: err.message });
