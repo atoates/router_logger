@@ -39,22 +39,32 @@ function transformRMSDeviceToTelemetry(device, monitoring) {
     'rx_bytes','rx','bytes_received','data_received','download','bytes_in','in'
   ];
 
-  const total_tx_bytes =
+  let total_tx_bytes =
     pickBytes(network, txCandidates) || pickBytes(cellular, txCandidates) || 0;
-  const total_rx_bytes =
+  let total_rx_bytes =
     pickBytes(network, rxCandidates) || pickBytes(cellular, rxCandidates) || 0;
 
+  // Fallback: some RMS endpoints provide counters on the device root (e.g., 'sent'/'received')
+  if ((total_tx_bytes === 0 && total_rx_bytes === 0) || (!Number.isFinite(total_tx_bytes) && !Number.isFinite(total_rx_bytes))) {
+    const rootTx = pickBytes(device, ['sent','tx','tx_bytes','upload','bytes_sent','data_sent']);
+    const rootRx = pickBytes(device, ['received','rx','rx_bytes','download','bytes_received','data_received']);
+    if (rootTx > 0 || rootRx > 0) {
+      total_tx_bytes = rootTx;
+      total_rx_bytes = rootRx;
+    }
+  }
+
   return {
-    device_id: device.serial_number || device.id,
-    imei: device.imei || cellular.imei,
+  device_id: device.serial_number || device.serial || device.id,
+  imei: device.imei || cellular.imei,
     timestamp: new Date().toISOString(),
     name: device.name,
     location: device.location || device.group,
     site_id: device.group || device.company_id,
     
     // WAN & Network
-    wan_ip: network.wan_ip || network.ip,
-    operator: cellular.operator || cellular.network_name,
+  wan_ip: network.wan_ip || network.ip || device.wan_ip,
+  operator: cellular.operator || cellular.network_name || device.operator,
     mcc: cellular.mcc,
     mnc: cellular.mnc,
     network_type: cellular.network_type || cellular.connection_type,
@@ -80,7 +90,7 @@ function transformRMSDeviceToTelemetry(device, monitoring) {
     clients: wifi.clients || [],
     
     // System Info
-    fw_version: device.firmware_version || system.firmware,
+  fw_version: device.firmware_version || device.firmware || system.firmware,
     uptime: system.uptime || 0,
     status: device.status || (monitoring?.online ? 'online' : 'offline'),
 
