@@ -30,10 +30,40 @@ router.get('/status', (req, res) => {
   res.json({
     enabled: rmsEnabled,
     syncInterval: process.env.RMS_SYNC_INTERVAL_MINUTES || 15,
+    tokenLength: process.env.RMS_ACCESS_TOKEN?.length || 0,
     message: rmsEnabled 
       ? 'RMS integration is enabled' 
       : 'RMS integration is disabled (no access token)'
   });
+});
+
+// Quick RMS API connectivity test
+router.get('/test', async (req, res) => {
+  try {
+    if (!process.env.RMS_ACCESS_TOKEN) {
+      return res.status(400).json({ error: 'RMS disabled - no access token' });
+    }
+    const rms = new RMSClient(process.env.RMS_ACCESS_TOKEN);
+    
+    // Try to fetch devices list
+    const devicesResp = await rms.getDevices(5);
+    const devices = Array.isArray(devicesResp) ? devicesResp : devicesResp?.data || [];
+    
+    res.json({
+      success: true,
+      message: `Successfully fetched ${devices.length} devices`,
+      sampleDevice: devices[0] || null
+    });
+  } catch (err) {
+    logger.error('RMS test failed:', err.message);
+    res.status(500).json({
+      success: false,
+      error: 'RMS API test failed',
+      message: err.message,
+      status: err.response?.status,
+      data: err.response?.data
+    });
+  }
 });
 
 // Debug endpoint to view raw RMS data for a device
