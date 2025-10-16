@@ -3,8 +3,8 @@
  * Handles OAuth 2.0 Authorization Code Flow with PKCE for Teltonika RMS
  * 
  * Based on RMS OAuth documentation:
- * - Authorization endpoint: https://rms.teltonika-networks.com/oauth/authorize
- * - Token endpoint: https://rms.teltonika-networks.com/oauth/token
+ * - Authorization endpoint: https://rms.teltonika-networks.com/account/authorize
+ * - Token endpoint: https://rms.teltonika-networks.com/account/token
  * - Requires PKCE (code_challenge, code_verifier)
  */
 
@@ -17,9 +17,12 @@ class RMSOAuthService {
     this.clientId = process.env.RMS_OAUTH_CLIENT_ID;
     this.clientSecret = process.env.RMS_OAUTH_CLIENT_SECRET;
     this.redirectUri = process.env.RMS_OAUTH_REDIRECT_URI;
-    this.authUrl = 'https://rms.teltonika-networks.com/oauth/authorize';
-    this.tokenUrl = 'https://rms.teltonika-networks.com/oauth/token';
-    this.revokeUrl = 'https://rms.teltonika-networks.com/oauth/revoke';
+  // Per RMS docs, OAuth endpoints live under /account/*
+  // https://rms.teltonika-networks.com/account/authorize
+  // https://rms.teltonika-networks.com/account/token
+  this.authUrl = 'https://rms.teltonika-networks.com/account/authorize';
+  this.tokenUrl = 'https://rms.teltonika-networks.com/account/token';
+  this.revokeUrl = 'https://rms.teltonika-networks.com/account/revoke';
     
     // In-memory PKCE storage (in production, use Redis or DB)
     this.pkceStore = new Map();
@@ -122,16 +125,19 @@ class RMSOAuthService {
     this.pkceStore.delete(state); // Use once only
 
     try {
+      // RMS expects application/x-www-form-urlencoded body
+      const params = new URLSearchParams();
+      params.set('grant_type', 'authorization_code');
+      params.set('code', code);
+      params.set('redirect_uri', this.redirectUri);
+      params.set('client_id', this.clientId);
+      // client_secret is only required for confidential clients; include if configured
+      if (this.clientSecret) params.set('client_secret', this.clientSecret);
+      params.set('code_verifier', codeVerifier);
+
       const response = await axios.post(
         this.tokenUrl,
-        {
-          grant_type: 'authorization_code',
-          code,
-          redirect_uri: this.redirectUri,
-          client_id: this.clientId,
-          client_secret: this.clientSecret,
-          code_verifier: codeVerifier
-        },
+        params.toString(),
         {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
@@ -168,23 +174,27 @@ class RMSOAuthService {
    * @param {string} refreshToken - Refresh token
    * @returns {Object} New token response
    */
-  async refreshAccessToken(refreshToken) {
+  async refreshAccessToken(refreshToken, previousAccessToken = undefined) {
     if (!this.clientId || !this.clientSecret) {
-      throw new Error('RMS OAuth not configured');
+      // For public clients (PKCE), client_secret is not required
     }
 
     try {
+      const params = new URLSearchParams();
+      params.set('grant_type', 'refresh_token');
+      params.set('refresh_token', refreshToken);
+      params.set('client_id', this.clientId);
+      // Include client_secret if configured (confidential clients)
+      if (this.clientSecret) params.set('client_secret', this.clientSecret);
+
       const response = await axios.post(
         this.tokenUrl,
-        {
-          grant_type: 'refresh_token',
-          refresh_token: refreshToken,
-          client_id: this.clientId,
-          client_secret: this.clientSecret
-        },
+        params.toString(),
         {
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
+            'Content-Type': 'application/x-www-form-urlencoded',
+            // RMS docs: provide the (expired) access token with refresh
+            ...(previousAccessToken ? { Authorization: `Bearer ${previousAccessToken}` } : {})
           }
         }
       );
@@ -218,14 +228,14 @@ class RMSOAuthService {
    */
   async revokeToken(token, tokenTypeHint = 'access_token') {
     try {
+      const params = new URLSearchParams();
+      params.set('token', token);
+      params.set('token_type_hint', tokenTypeHint);
+      params.set('client_id', this.clientId);
+      if (this.clientSecret) params.set('client_secret', this.clientSecret);
       await axios.post(
         this.revokeUrl,
-        {
-          token,
-          token_type_hint: tokenTypeHint,
-          client_id: this.clientId,
-          client_secret: this.clientSecret
-        },
+        params.toString(),
         {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
@@ -321,7 +331,7 @@ class RMSOAuthService {
         logger.info('Token expired, refreshing...', { userId });
         
         try {
-          const newTokenData = await this.refreshAccessToken(tokenRow.refresh_token);
+          const newTokenData = await this.refreshAccessToken(tokenRow.refresh_token, tokenRow.access_token);
           await this.storeToken(userId, newTokenData);
           
           return {
