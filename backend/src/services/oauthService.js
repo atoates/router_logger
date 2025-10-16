@@ -20,12 +20,12 @@ class RMSOAuthService {
     // Allow configuring scopes via env; default to minimal set required
     // Normalize commas/spaces and de-duplicate
     const rawScopesEnv = process.env.RMS_OAUTH_SCOPES;
-    if (rawScopesEnv && rawScopesEnv.toLowerCase() === 'auto') {
-      // Omit scope parameter entirely; let RMS assign default scopes
+    if (!rawScopesEnv || rawScopesEnv.toLowerCase() === 'auto') {
+      // Omit scope parameter entirely by default; let RMS assign defaults
       this.scopes = null;
     } else {
-      const rawScopes = rawScopesEnv || 'devices:read monitoring:read statistics:read';
-      const allowedScopes = new Set(['devices:read', 'monitoring:read', 'statistics:read']);
+      const rawScopes = rawScopesEnv;
+      const allowedScopes = new Set(['devices:read', 'monitoring:read', 'statistics:read', 'company_device_statistics:read']);
       const parsed = rawScopes
         .split(/[\s,]+/)
         .map(s => s.trim())
