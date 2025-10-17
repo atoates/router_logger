@@ -11,6 +11,7 @@ import DeviceInfo from './components/DeviceInfo';
 import RMSAuthButton from './components/RMSAuthButton';
 import TopRouters from './components/TopRouters';
 import NetworkOverview from './components/NetworkOverview';
+import DashboardV2 from './components/DashboardV2';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
@@ -19,6 +20,7 @@ function App() {
   const [selectedRouter, setSelectedRouter] = useState(null);
   const [activeTab, setActiveTab] = useState('network'); // 'network' | 'router'
   const [timePreset, setTimePreset] = useState({ type: 'rolling', value: 24 }); // rolling hours or calendar days
+  const [dashboardVersion, setDashboardVersion] = useState('v2'); // 'v1' | 'v2'
   const [dateRange, setDateRange] = useState({
     startDate: startOfDay(subDays(new Date(), 7)).toISOString(),
     endDate: endOfDay(new Date()).toISOString()
@@ -35,6 +37,46 @@ function App() {
     toast.info('Date range updated');
   };
 
+  // V2 Dashboard - if selected, render just the V2 component
+  if (dashboardVersion === 'v2') {
+    return (
+      <div className="app">
+        <div className="container">
+          <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', gap:16 }}>
+            <div>
+              <h1>🌐 RUT200 Router Logger Dashboard</h1>
+              <p>Monitor and analyze your RUT200 router network in real-time</p>
+            </div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 8, background: 'rgba(255,255,255,0.2)', padding: 4, borderRadius: 8 }}>
+                <button 
+                  className={`btn ${dashboardVersion === 'v1' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setDashboardVersion('v1')}
+                  style={{ fontSize: 12 }}
+                >
+                  V1
+                </button>
+                <button 
+                  className={`btn ${dashboardVersion === 'v2' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setDashboardVersion('v2')}
+                  style={{ fontSize: 12 }}
+                >
+                  V2
+                </button>
+              </div>
+              <RMSAuthButton variant="header" />
+            </div>
+          </div>
+          <ErrorBoundary>
+            <DashboardV2 />
+          </ErrorBoundary>
+        </div>
+        <ToastContainer position="bottom-right" autoClose={3000} />
+      </div>
+    );
+  }
+
+  // V1 Dashboard - original layout
   return (
     <div className="app">
       <div className="container">
@@ -43,7 +85,23 @@ function App() {
             <h1>🌐 RUT200 Router Logger Dashboard</h1>
             <p>Monitor and analyze your RUT200 router network in real-time</p>
           </div>
-          <div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 8, background: 'rgba(255,255,255,0.2)', padding: 4, borderRadius: 8 }}>
+              <button 
+                className={`btn ${dashboardVersion === 'v1' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setDashboardVersion('v1')}
+                style={{ fontSize: 12 }}
+              >
+                V1
+              </button>
+              <button 
+                className={`btn ${dashboardVersion === 'v2' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setDashboardVersion('v2')}
+                style={{ fontSize: 12 }}
+              >
+                V2
+              </button>
+            </div>
             <RMSAuthButton variant="header" />
           </div>
         </div>
