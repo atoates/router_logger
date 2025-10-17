@@ -544,22 +544,41 @@ async function getNetworkUsageByDay(days = 7) {
   try {
     const daysInt = Math.max(1, Math.min(90, Number(days) || 7));
     const query = `
-      WITH filtered AS (
-        SELECT router_id, timestamp, total_tx_bytes, total_rx_bytes
-        FROM router_logs
-        WHERE timestamp >= (CURRENT_DATE - ($1::int - 1) * INTERVAL '1 day')
+      WITH params AS (
+        SELECT (CURRENT_DATE - ($1::int - 1) * INTERVAL '1 day') AS start_ts
+      ), base AS (
+        SELECT l.router_id, l.total_tx_bytes AS base_tx, l.total_rx_bytes AS base_rx
+        FROM router_logs l
+        JOIN (
+          SELECT router_id, MAX(timestamp) AS ts
+          FROM router_logs, params
+          WHERE timestamp < (SELECT start_ts FROM params)
+          GROUP BY router_id
+        ) b ON b.router_id = l.router_id AND b.ts = l.timestamp
       ), ordered AS (
         SELECT 
-          router_id, timestamp, total_tx_bytes, total_rx_bytes,
-          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_tx,
-          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_rx
-        FROM filtered
+          l.router_id, 
+          date_trunc('day', l.timestamp)::date AS day,
+          l.timestamp, 
+          l.total_tx_bytes, 
+          l.total_rx_bytes,
+          LAG(l.total_tx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS prev_tx,
+          LAG(l.total_rx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS prev_rx
+        FROM router_logs l, params
+        WHERE l.timestamp >= (SELECT start_ts FROM params)
       ), deltas AS (
         SELECT 
-          date_trunc('day', timestamp)::date AS day,
-          GREATEST(total_tx_bytes - COALESCE(prev_tx, 0), 0) AS tx_delta,
-          GREATEST(total_rx_bytes - COALESCE(prev_rx, 0), 0) AS rx_delta
-        FROM ordered
+          o.day,
+          CASE 
+            WHEN o.prev_tx IS NOT NULL THEN GREATEST(o.total_tx_bytes - o.prev_tx, 0)
+            ELSE GREATEST(o.total_tx_bytes - COALESCE(b.base_tx, o.total_tx_bytes), 0)
+          END AS tx_delta,
+          CASE 
+            WHEN o.prev_rx IS NOT NULL THEN GREATEST(o.total_rx_bytes - o.prev_rx, 0)
+            ELSE GREATEST(o.total_rx_bytes - COALESCE(b.base_rx, o.total_rx_bytes), 0)
+          END AS rx_delta
+        FROM ordered o
+        LEFT JOIN base b ON b.router_id = o.router_id
       )
       SELECT 
         day AS date,
@@ -661,25 +680,41 @@ async function getNetworkUsageRolling(hours = 24, bucket = 'hour') {
     const hrs = Math.max(1, Math.min(24 * 30, Number(hours) || 24));
     const buck = bucket === 'day' ? 'day' : 'hour';
     const query = `
-      WITH filtered AS (
-        SELECT router_id, timestamp, total_tx_bytes, total_rx_bytes
-        FROM router_logs
-        WHERE timestamp >= NOW() - ($1::int || ' hours')::interval
+      WITH params AS (
+        SELECT NOW() - ($1::int || ' hours')::interval AS start_ts
+      ), base AS (
+        SELECT l.router_id, l.total_tx_bytes AS base_tx, l.total_rx_bytes AS base_rx
+        FROM router_logs l
+        JOIN (
+          SELECT router_id, MAX(timestamp) AS ts
+          FROM router_logs, params
+          WHERE timestamp < (SELECT start_ts FROM params)
+          GROUP BY router_id
+        ) b ON b.router_id = l.router_id AND b.ts = l.timestamp
       ), ordered AS (
         SELECT 
-          router_id,
-          date_trunc('${buck}', timestamp) AS bucket_ts,
-          timestamp,
-          total_tx_bytes, total_rx_bytes,
-          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_tx,
-          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_rx
-        FROM filtered
+          l.router_id,
+          date_trunc('${buck}', l.timestamp) AS bucket_ts,
+          l.timestamp,
+          l.total_tx_bytes, l.total_rx_bytes,
+          LAG(l.total_tx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS prev_tx,
+          LAG(l.total_rx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS prev_rx
+        FROM router_logs l, params
+        WHERE l.timestamp >= (SELECT start_ts FROM params)
       ), deltas AS (
         SELECT 
-          bucket_ts,
-          GREATEST(total_tx_bytes - COALESCE(prev_tx, 0), 0) AS tx_delta,
-          GREATEST(total_rx_bytes - COALESCE(prev_rx, 0), 0) AS rx_delta
-        FROM ordered
+          o.bucket_ts,
+          o.router_id,
+          CASE 
+            WHEN o.prev_tx IS NOT NULL THEN GREATEST(o.total_tx_bytes - o.prev_tx, 0)
+            ELSE GREATEST(o.total_tx_bytes - COALESCE(b.base_tx, o.total_tx_bytes), 0)
+          END AS tx_delta,
+          CASE 
+            WHEN o.prev_rx IS NOT NULL THEN GREATEST(o.total_rx_bytes - o.prev_rx, 0)
+            ELSE GREATEST(o.total_rx_bytes - COALESCE(b.base_rx, o.total_rx_bytes), 0)
+          END AS rx_delta
+        FROM ordered o
+        LEFT JOIN base b ON b.router_id = o.router_id
       )
       SELECT 
         bucket_ts AS date,
