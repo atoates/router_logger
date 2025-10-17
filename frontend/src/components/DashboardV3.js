@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getRouters, getNetworkUsageRolling, getNetworkUsage, getTopRoutersRolling, getTopRouters, getOperators, getStorageStats } from '../services/api';
+import api from '../services/api';
 import { AreaChart, Area, BarChart, Bar, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
 import '../DashboardV3.css';
 
@@ -142,6 +143,7 @@ export default function DashboardV3() {
   const [top, setTop] = useState([]);
   const [operators, setOperators] = useState([]);
   const [storage, setStorage] = useState(null);
+  const [dbSize, setDbSize] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const updateTime = (m, v) => { setMode(m); setValue(v); };
@@ -161,12 +163,16 @@ export default function DashboardV3() {
           mode==='rolling' ? getTopRoutersRolling({ hours: hrs, limit: 5 }) : getTopRouters({ days, limit: 5 }),
           getOperators({ days: effectiveDaysForOps })
         ];
+        // Also fetch DB size (non-blocking for critical metrics)
+        const dbSizePromise = api.get('/stats/db-size').catch(()=>({ data: null }));
         const [rRes, sRes, uRes, tRes, oRes] = await Promise.all(promises);
+        const dbRes = await dbSizePromise;
         setRouters(rRes.data || []);
         setStorage(sRes.data || null);
         setUsage(uRes.data || []);
         setTop((tRes.data || []).map(r=>({ name: r.name || r.router_id, tx_bytes: Number(r.tx_bytes)||0, rx_bytes: Number(r.rx_bytes)||0, total_bytes: Number(r.total_bytes)||0 })));
         setOperators((oRes.data || []).map((x,i)=>({ name: x.operator || 'Unknown', value: Number(x.total_bytes)||0, fill: COLORS[i%COLORS.length] })));
+  setDbSize(dbRes?.data || null);
 
         // Previous period for network-level delta
         if (mode==='rolling') {
@@ -275,6 +281,43 @@ export default function DashboardV3() {
         </div>
 
         <div className="col">
+          {/* Storage Card */}
+          <div className="v3-card">
+            <div className="v3-card-title">Storage</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={{ display:'flex', justifyContent:'space-between' }}>
+                <span>Total DB</span>
+                <strong>{dbSize ? formatBytes(dbSize.db_bytes) : '—'}</strong>
+              </div>
+              {dbSize && dbSize.tables && dbSize.tables.map(t => (
+                <div key={t.name} style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
+                    <span style={{ fontWeight:600 }}>{t.name}</span>
+                    <span style={{ color:'#64748b', fontSize:12 }}>{t.row_count?.toLocaleString()} rows</span>
+                  </div>
+                  {/* simple stacked bar: table/index/toast */}
+                  {(() => {
+                    const total = (t.total_bytes||1);
+                    const tb = (t.table_bytes||0)/total*100;
+                    const ib = (t.index_bytes||0)/total*100;
+                    const ob = (t.toast_bytes||0)/total*100;
+                    return (
+                      <div style={{ height:10, width:'100%', background:'#e5e7eb', borderRadius:6, overflow:'hidden' }}>
+                        <div style={{ width:`${tb}%`, height:'100%', background:'#6366f1' }} title={`Table: ${formatBytes(t.table_bytes)}`} />
+                        <div style={{ width:`${ib}%`, height:'100%', background:'#10b981' }} title={`Indexes: ${formatBytes(t.index_bytes)}`} />
+                        <div style={{ width:`${ob}%`, height:'100%', background:'#f59e0b' }} title={`TOAST: ${formatBytes(t.toast_bytes)}`} />
+                      </div>
+                    );
+                  })()}
+                  <div style={{ display:'flex', justifyContent:'space-between', color:'#64748b', fontSize:12 }}>
+                    <span>Total</span>
+                    <span>{formatBytes(t.total_bytes)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="v3-card">
             <div className="v3-card-title">Top 5 Routers</div>
             <div style={{ height: 240 }}>
