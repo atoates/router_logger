@@ -14,7 +14,8 @@ const {
   getOperatorDistribution,
   getNetworkUsageRolling,
   getTopRoutersByUsageRolling,
-  getOperatorDistributionRolling
+  getOperatorDistributionRolling,
+  getDatabaseSizeStats
 } = require('../models/router');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger } = require('../config/database');
@@ -239,6 +240,17 @@ router.get('/stats/top-routers-rolling', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching rolling top routers:', error);
     res.status(500).json({ error: 'Failed to fetch rolling top routers' });
+  }
+});
+
+// GET database size statistics
+router.get('/stats/db-size', async (req, res) => {
+  try {
+    const data = await getDatabaseSizeStats();
+    res.json(data);
+  } catch (error) {
+    logger.error('Error fetching database size stats:', error);
+    res.status(500).json({ error: 'Failed to fetch database size stats' });
   }
 });
 

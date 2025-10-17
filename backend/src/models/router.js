@@ -857,3 +857,54 @@ async function getOperatorDistributionRolling(hours = 24) {
 }
 
 module.exports.getOperatorDistributionRolling = getOperatorDistributionRolling;
+
+/**
+ * Database size statistics for key relations.
+ * Returns per-table sizes (table/index/total/toast) and row counts, plus database total size.
+ */
+async function getDatabaseSizeStats() {
+  try {
+    const rels = ['routers', 'router_logs'];
+    const sizesQuery = `
+      SELECT
+        c.relname AS name,
+        pg_table_size(c.oid) AS table_bytes,
+        pg_indexes_size(c.oid) AS index_bytes,
+        (pg_total_relation_size(c.oid) - pg_table_size(c.oid) - pg_indexes_size(c.oid)) AS toast_bytes,
+        pg_total_relation_size(c.oid) AS total_bytes
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname = ANY($1::text[])
+      ORDER BY total_bytes DESC;`;
+    const sizesRes = await pool.query(sizesQuery, [rels]);
+
+    const countsRes = await pool.query(`
+      SELECT 'routers' AS name, COUNT(*)::bigint AS row_count FROM routers
+      UNION ALL
+      SELECT 'router_logs' AS name, COUNT(*)::bigint AS row_count FROM router_logs;
+    `);
+
+    const dbSizeRes = await pool.query(`SELECT pg_database_size(current_database()) AS db_bytes;`);
+
+    // Merge counts into sizes map
+    const countMap = new Map((countsRes.rows || []).map(r => [r.name, Number(r.row_count) || 0]));
+    const tables = (sizesRes.rows || []).map(r => ({
+      name: r.name,
+      table_bytes: Number(r.table_bytes) || 0,
+      index_bytes: Number(r.index_bytes) || 0,
+      toast_bytes: Number(r.toast_bytes) || 0,
+      total_bytes: Number(r.total_bytes) || 0,
+      row_count: countMap.get(r.name) || 0
+    }));
+
+    return {
+      db_bytes: Number(dbSizeRes.rows?.[0]?.db_bytes || 0),
+      tables
+    };
+  } catch (error) {
+    logger.error('Error computing database size stats:', error);
+    throw error;
+  }
+}
+
+module.exports.getDatabaseSizeStats = getDatabaseSizeStats;
