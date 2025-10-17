@@ -203,6 +203,17 @@ export default function DashboardV3() {
   const totalNow = sumBytes(usage);
   const totalPrev = sumBytes(usagePrev);
   const latestTs = usage.length ? usage[usage.length-1].date : null;
+  const yMax = useMemo(() => {
+    if (!usage || usage.length === 0) return 1;
+    let m = 1;
+    for (const d of usage) {
+      const tx = Number(d.tx_bytes) || 0;
+      const rx = Number(d.rx_bytes) || 0;
+      if (tx > m) m = tx;
+      if (rx > m) m = rx;
+    }
+    return m;
+  }, [usage]);
 
   const className = `dashboard-v3${dark ? ' dark' : ''}`;
 
@@ -233,7 +244,7 @@ export default function DashboardV3() {
             <div className="v3-card-title">Network Usage ({mode==='rolling'? value+'h' : 'Last '+value+'d'})</div>
             <div style={{ height: 220 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={usage}>
+                <AreaChart data={usage} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gTx" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#6366f1" stopOpacity={0.7}/>
@@ -246,8 +257,9 @@ export default function DashboardV3() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke={dark?'#334155':'#e5e7eb'} />
                   <XAxis dataKey="date" tickFormatter={(t)=>{ const d=new Date(t); return mode==='rolling'? d.getHours()+':00' : (t||'').slice(5,10); }} tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} />
-                  <YAxis tickFormatter={(v)=> formatBytes(v).split(' ')[0]} tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} />
+                  <YAxis domain={[0, Math.ceil(yMax * 1.1)]} tickFormatter={(v)=> formatBytes(v)} tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} />
                   <Tooltip formatter={(v)=>formatBytes(v)} labelFormatter={(t)=> new Date(t).toLocaleString()} />
+                  <Legend />
                   <Area type="monotone" dataKey="tx_bytes" stroke="#6366f1" fill="url(#gTx)" name="TX" />
                   <Area type="monotone" dataKey="rx_bytes" stroke="#10b981" fill="url(#gRx)" name="RX" />
                 </AreaChart>
