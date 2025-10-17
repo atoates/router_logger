@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AreaChart, Area, LineChart, Line, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { getLogs, getUsageStats, getUptimeData } from '../services/api';
 import './RouterDashboard.css';
 
@@ -77,46 +77,34 @@ export default function RouterDashboard({ router }) {
 
   // Build deltas series from cumulative totals
   const series = useMemo(() => {
-    if (!logs || logs.length === 0) return { txrx: [], signals: [], latest: null };
+    if (!logs || logs.length === 0) return { txrx: [], latest: null };
     // logs endpoint orders DESC, so reverse to ASC
     const asc = [...logs].sort((a,b)=> new Date(a.timestamp) - new Date(b.timestamp));
     let prevTx = null, prevRx = null;
     const txrx = [];
-    const signals = [];
     for (const l of asc) {
       const ts = new Date(l.timestamp);
       const tx = Number(l.total_tx_bytes)||0;
       const rx = Number(l.total_rx_bytes)||0;
       const dtx = prevTx == null ? 0 : Math.max(tx - prevTx, 0);
       const drx = prevRx == null ? 0 : Math.max(rx - prevRx, 0);
-      const rsrp = Number.isFinite(Number(l.rsrp)) ? Number(l.rsrp) : null;
-      const rsrq = Number.isFinite(Number(l.rsrq)) ? Number(l.rsrq) : null;
-      const rssi = Number.isFinite(Number(l.rssi)) ? Number(l.rssi) : null;
-      const sinr = Number.isFinite(Number(l.sinr)) ? Number(l.sinr) : null;
       txrx.push({ 
         date: ts.toISOString(), 
         tx_bytes: dtx, 
         rx_bytes: drx, 
         total_bytes: dtx + drx,
-        // Inline fields to avoid timestamp matching later
+        // Inline fields to avoid timestamp matching later (no signal fields)
         operator: l.operator,
         wan_ip: l.wan_ip,
-        status: l.status,
-        rsrp,
-        sinr
+        status: l.status
       });
-      signals.push({ date: ts.toISOString(), rsrp, rsrq, rssi, sinr });
       prevTx = tx; prevRx = rx;
     }
     const latest = asc[asc.length-1];
-    return { txrx, signals, latest };
+    return { txrx, latest };
   }, [logs]);
 
   const totalBytes = useMemo(() => (series.txrx || []).reduce((s,d)=> s + (Number(d.total_bytes)||0), 0), [series]);
-  const avgRSRP = useMemo(() => {
-    const arr = (series.signals||[]).map(s=> Number(s.rsrp)).filter(Number.isFinite);
-    if (!arr.length) return null; const avg = arr.reduce((a,b)=>a+b,0)/arr.length; return Math.round(avg);
-  }, [series]);
   const onlinePct = useMemo(() => {
     if (!uptime || uptime.length === 0) return null;
     const on = uptime.filter(u => (u.status === 'online' || u.status === 1 || u.status === '1' || u.status === true)).length;
@@ -163,11 +151,6 @@ export default function RouterDashboard({ router }) {
           <div className="value">{onlinePct==null? '—' : `${onlinePct}%`}</div>
           <div className="sub">{uptime?.length || 0} samples</div>
         </div>
-        <div className="metric" style={{ borderLeftColor:'#f59e0b' }}>
-          <div className="label">Avg RSRP</div>
-          <div className="value">{avgRSRP==null? '—' : `${avgRSRP} dBm`}</div>
-          <div className="sub">Signal quality</div>
-        </div>
         <div className="metric" style={{ borderLeftColor:'#8b5cf6' }}>
           <div className="label">Logs</div>
           <div className="value">{stats?.total_logs?.toLocaleString?.() || (logs?.length||0)}</div>
@@ -204,23 +187,7 @@ export default function RouterDashboard({ router }) {
             </div>
           </div>
 
-          <div className="card">
-            <div className="card-title">Signal</div>
-            <div style={{ height: 220 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={series.signals} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="date" tickFormatter={(t)=> new Date(t).toLocaleTimeString()} tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip labelFormatter={(t)=> new Date(t).toLocaleString()} />
-                  <Legend />
-                  <Line type="monotone" dataKey="rsrp" stroke="#6366f1" dot={false} name="RSRP (dBm)" />
-                  <Line type="monotone" dataKey="rsrq" stroke="#10b981" dot={false} name="RSRQ (dB)" />
-                  <Line type="monotone" dataKey="sinr" stroke="#f59e0b" dot={false} name="SINR (dB)" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          {/* Signal chart removed per request */}
         </div>
 
         <div className="col">
@@ -265,8 +232,7 @@ export default function RouterDashboard({ router }) {
                 <th>WAN IP</th>
                 <th>TX Δ</th>
                 <th>RX Δ</th>
-                <th>RSRP</th>
-                <th>SINR</th>
+                {/* Signal columns removed */}
               </tr>
             </thead>
             <tbody>
@@ -281,8 +247,7 @@ export default function RouterDashboard({ router }) {
                     <td>{d.wan_ip || ''}</td>
                     <td>{formatBytes(d.tx_bytes)}</td>
                     <td>{formatBytes(d.rx_bytes)}</td>
-                    <td>{d.rsrp ?? ''}</td>
-                    <td>{d.sinr ?? ''}</td>
+                    {/* Signal values removed */}
                   </tr>
                 );
               })}

@@ -29,10 +29,6 @@ function UsageStats({ routerId, startDate, endDate }) {
         period_tx_bytes: Number(d.period_tx_bytes) || 0,
         period_rx_bytes: Number(d.period_rx_bytes) || 0,
         total_data_usage: Number(d.total_data_usage) || 0,
-        avg_rsrp: d.avg_rsrp != null ? Number(d.avg_rsrp) : null,
-        avg_rsrq: d.avg_rsrq != null ? Number(d.avg_rsrq) : null,
-        avg_rssi: d.avg_rssi != null ? Number(d.avg_rssi) : null,
-        avg_sinr: d.avg_sinr != null ? Number(d.avg_sinr) : null,
         avg_uptime: Number(d.avg_uptime) || 0,
         avg_clients: Number(d.avg_clients) || 0
       };
@@ -88,19 +84,7 @@ function UsageStats({ routerId, startDate, endDate }) {
           <div className="stat-value">{stats.total_logs || 0}</div>
         </div>
         
-        <div className="stat-card">
-          <div className="stat-label">Avg RSRP</div>
-          <div className="stat-value">
-            {stats.avg_rsrp ? `${Math.round(stats.avg_rsrp)} dBm` : 'N/A'}
-          </div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-label">Avg RSSI</div>
-          <div className="stat-value">
-            {stats.avg_rssi ? `${Math.round(stats.avg_rssi)} dBm` : 'N/A'}
-          </div>
-        </div>
+        {/* Signal summary cards removed per request */}
         
         <div className="stat-card">
           <div className="stat-label">Avg Uptime</div>

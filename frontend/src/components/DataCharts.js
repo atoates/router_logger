@@ -41,9 +41,6 @@ function DataCharts({ routerId, startDate, endDate }) {
             tx_mb: txDelta,
             rx_mb: rxDelta,
             total_mb: txDelta + rxDelta,
-            rsrp: log.rsrp != null ? Number(log.rsrp) : null,
-            rsrq: log.rsrq != null ? Number(log.rsrq) : null,
-            rssi: log.rssi != null ? Number(log.rssi) : null,
             wifi_clients: log.wifi_client_count || 0,
             uptime_hours: ((Number(log.uptime_seconds) || 0) / 3600)
           };

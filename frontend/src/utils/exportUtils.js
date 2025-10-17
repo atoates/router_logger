@@ -58,8 +58,6 @@ export function exportUsageStatsToPDF(stats, routerId, startDate, endDate) {
     ['Total Data Sent', `${(((Number(stats.period_tx_bytes) || 0) / 1024 / 1024 / 1024).toFixed(2))} GB`],
     ['Total Data Received', `${(((Number(stats.period_rx_bytes) || 0) / 1024 / 1024 / 1024).toFixed(2))} GB`],
     ['Total Data Usage', `${(((Number(stats.total_data_usage) || 0) / 1024 / 1024 / 1024).toFixed(2))} GB`],
-    ['Average RSRP', `${(stats.avg_rsrp != null ? Number(stats.avg_rsrp).toFixed(0) : 'N/A')} dBm`],
-    ['Average RSSI', `${(stats.avg_rssi != null ? Number(stats.avg_rssi).toFixed(0) : 'N/A')} dBm`],
     ['Average Uptime', `${(((Number(stats.avg_uptime) || 0) / 3600).toFixed(1))} hours`],
     ['Average WiFi Clients', (Number(stats.avg_clients) ? Number(stats.avg_clients).toFixed(1) : '0')],
   ];
