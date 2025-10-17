@@ -202,6 +202,7 @@ export default function DashboardV3() {
   const sumBytes = (arr) => arr.reduce((s,d)=> s + (Number(d.total_bytes)||0), 0);
   const totalNow = sumBytes(usage);
   const totalPrev = sumBytes(usagePrev);
+  const latestTs = usage.length ? usage[usage.length-1].date : null;
 
   const className = `dashboard-v3${dark ? ' dark' : ''}`;
 
@@ -234,20 +235,28 @@ export default function DashboardV3() {
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={usage}>
                   <defs>
-                    <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id="gTx" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#6366f1" stopOpacity={0.7}/>
                       <stop offset="95%" stopColor="#6366f1" stopOpacity={0.1}/>
+                    </linearGradient>
+                    <linearGradient id="gRx" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.7}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke={dark?'#334155':'#e5e7eb'} />
                   <XAxis dataKey="date" tickFormatter={(t)=>{ const d=new Date(t); return mode==='rolling'? d.getHours()+':00' : (t||'').slice(5,10); }} tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} />
                   <YAxis tickFormatter={(v)=> formatBytes(v).split(' ')[0]} tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} />
                   <Tooltip formatter={(v)=>formatBytes(v)} labelFormatter={(t)=> new Date(t).toLocaleString()} />
-                  <Area type="monotone" dataKey="total_bytes" stroke="#6366f1" fill="url(#g1)" name="Total" />
+                  <Area type="monotone" dataKey="tx_bytes" stroke="#6366f1" fill="url(#gTx)" name="TX" />
+                  <Area type="monotone" dataKey="rx_bytes" stroke="#10b981" fill="url(#gRx)" name="RX" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <div className="v3-delta">Period change: <DeltaBadge current={totalNow} previous={totalPrev} /></div>
+            <div className="v3-delta" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span>Period change: <DeltaBadge current={totalNow} previous={totalPrev} /></span>
+              {latestTs && (<span className="v3-ts" style={{ color: '#64748b' }}>Data through {new Date(latestTs).toLocaleString()}</span>)}
+            </div>
           </div>
 
           <Heatmap data={usagePrev.concat(usage)} mode={mode} />

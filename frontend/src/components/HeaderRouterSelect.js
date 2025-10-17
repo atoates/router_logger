@@ -56,7 +56,10 @@ export default function HeaderRouterSelect({ onSelect }) {
           borderRadius: 6,
           border: '1px solid #e2e8f0',
           width: 240,
-          fontSize: 13
+          fontSize: 13,
+          color: '#0f172a',
+          backgroundColor: '#ffffff',
+          outline: 'none'
         }}
       />
       {open && suggestions.length>0 && (

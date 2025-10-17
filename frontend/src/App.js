@@ -79,7 +79,7 @@ function App() {
                   onClick={() => setDashboardVersion('v3')}
                   style={{ fontSize: 12 }}
                 >
-                  V3
+                  Dashboard
                 </button>
               </div>
               <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
@@ -126,7 +126,7 @@ function App() {
                   onClick={() => setDashboardVersion('v3')}
                   style={{ fontSize: 12 }}
                 >
-                  V3
+                  Dashboard
                 </button>
               </div>
               <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
@@ -172,7 +172,7 @@ function App() {
                 onClick={() => setDashboardVersion('v3')}
                 style={{ fontSize: 12 }}
               >
-                V3
+                Dashboard
               </button>
             </div>
             <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
