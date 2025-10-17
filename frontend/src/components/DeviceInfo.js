@@ -44,19 +44,10 @@ function DeviceInfo({ routerId }) {
         <div className="grid">
           <Field label="Router ID" value={info.router_id} />
           <Field label="IMEI" value={info.imei} />
-          <Field label="ICCID" value={info.iccid} />
-          <Field label="IMSI" value={info.imsi} />
           <Field label="Firmware" value={info.firmware_version} />
-          <Field label="WAN Type" value={info.wan_type} />
           <Field label="WAN IPv4" value={info.wan_ip} />
-          <Field label="WAN IPv6" value={info.wan_ipv6} />
           <Field label="Operator" value={info.operator} />
-          <Field label="Network" value={info.network_type} />
           <Field label="Conn Uptime" value={info.conn_uptime_seconds} formatter={(v) => `${(Number(v||0)/3600).toFixed(1)} hrs`} />
-          <Field label="CPU Temp" value={info.cpu_temp_c} formatter={(v) => `${Number(v).toFixed(1)} °C`} />
-          <Field label="Board Temp" value={info.board_temp_c} formatter={(v) => `${Number(v).toFixed(1)} °C`} />
-          <Field label="Input Voltage" value={info.input_voltage_mv} formatter={(v) => `${Number(v)/1000} V`} />
-          <Field label="VPN" value={info.vpn_status ? `${info.vpn_status}${info.vpn_name ? ` (${info.vpn_name})` : ''}` : '-'} />
           <Field label="Ethernet Link" value={info.eth_link_up === true ? 'Up' : (info.eth_link_up === false ? 'Down' : '-')} />
           <Field label="WiFi Clients" value={info.wifi_client_count} />
           <Field label="Total TX" value={info.total_tx_bytes} formatter={(v) => `${(Number(v||0)/1024/1024).toFixed(2)} MB`} />

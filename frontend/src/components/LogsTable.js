@@ -59,9 +59,7 @@ function LogsTable({ routerId, startDate, endDate }) {
               <tr>
                 <th>Timestamp</th>
                 <th>Operator</th>
-                <th>Network</th>
-                <th>RSRP</th>
-                <th>RSSI</th>
+                {/* Removed: Network, RSRP, RSSI */}
                 <th>Data TX</th>
                 <th>Data RX</th>
                 <th>WiFi Clients</th>
@@ -78,9 +76,7 @@ function LogsTable({ routerId, startDate, endDate }) {
                 <tr key={log.id}>
                   <td>{tsStr}</td>
                   <td>{log.operator || '-'}</td>
-                  <td>{log.network_type || '-'}</td>
-                  <td>{rsrp != null ? `${Math.round(rsrp)} dBm` : '-'}</td>
-                  <td>{rssi != null ? `${Math.round(rssi)} dBm` : '-'}</td>
+                  {/* Removed fields per request */}
                   <td>{formatBytes(Number(log.total_tx_bytes) || 0)}</td>
                   <td>{formatBytes(Number(log.total_rx_bytes) || 0)}</td>
                   <td>{log.wifi_client_count || 0}</td>
