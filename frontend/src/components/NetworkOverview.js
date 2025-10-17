@@ -17,6 +17,10 @@ export default function NetworkOverview({ days = 7, hours = null, mode = 'calend
   const [usage, setUsage] = useState([]);
   const [operators, setOperators] = useState([]);
   const [loading, setLoading] = useState(false);
+  // Separate time controls for operator pie
+  const [opMode, setOpMode] = useState('calendar'); // 'calendar' | 'rolling'
+  const [opDays, setOpDays] = useState(7);
+  const [opHours, setOpHours] = useState(24);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -25,24 +29,14 @@ export default function NetworkOverview({ days = 7, hours = null, mode = 'calend
         const usageReq = mode==='rolling'
           ? getNetworkUsageRolling({ hours: hours || 24, bucket: 'hour' })
           : getNetworkUsage({ days });
-        const [u, o] = await Promise.all([
-          usageReq,
-          getOperators({ days: mode==='rolling' ? 7 : days })
-        ]);
+        const [u] = await Promise.all([ usageReq ]);
         const udata = (u.data || []).map(d => ({
           date: mode==='rolling' ? d.date : d.date?.slice(0,10),
           tx_mb: (Number(d.tx_bytes) || 0) / 1_000_000,
           rx_mb: (Number(d.rx_bytes) || 0) / 1_000_000,
           total_mb: (Number(d.total_bytes) || 0) / 1_000_000
         }));
-        const odata = (o.data || []).map((r, i) => ({
-          operator: r.operator || 'Unknown',
-          value: Number(r.total_bytes) || 0,
-          router_count: Number(r.router_count) || 0,
-          fill: COLORS[i % COLORS.length]
-        }));
         setUsage(udata);
-        setOperators(odata);
       } catch (e) {
         console.error('Failed to load network overview', e);
       } finally {
@@ -51,6 +45,25 @@ export default function NetworkOverview({ days = 7, hours = null, mode = 'calend
     };
     fetchAll();
   }, [days, hours, mode]);
+
+  // Fetch operator distribution separately with its own time range
+  useEffect(() => {
+    const loadOperators = async () => {
+      try {
+        const o = await getOperators({ days: opMode==='rolling' ? 7 : opDays });
+        const odata = (o.data || []).map((r, i) => ({
+          operator: r.operator || 'Unknown',
+          value: Number(r.total_bytes) || 0,
+          router_count: Number(r.router_count) || 0,
+          fill: COLORS[i % COLORS.length]
+        }));
+        setOperators(odata);
+      } catch (e) {
+        console.error('Failed to load operator distribution', e);
+      }
+    };
+    loadOperators();
+  }, [opMode, opDays, opHours]);
 
   return (
     <div className="card">
@@ -76,9 +89,18 @@ export default function NetworkOverview({ days = 7, hours = null, mode = 'calend
 
           {operators.length > 0 && (
             <div className="chart-container" style={{ height: 260, marginTop: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontWeight: 600 }}>Operator Distribution ({opMode==='rolling' ? `Last ${opHours}h` : `Last ${opDays}d`})</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className={`btn ${opMode==='rolling'&&opHours===24?'btn-primary':'btn-secondary'}`} onClick={()=>{setOpMode('rolling'); setOpHours(24);}}>24h</button>
+                  <button className={`btn ${opMode==='calendar'&&opDays===7?'btn-primary':'btn-secondary'}`} onClick={()=>{setOpMode('calendar'); setOpDays(7);}}>7d</button>
+                  <button className={`btn ${opMode==='calendar'&&opDays===30?'btn-primary':'btn-secondary'}`} onClick={()=>{setOpMode('calendar'); setOpDays(30);}}>30d</button>
+                  <button className={`btn ${opMode==='calendar'&&opDays===90?'btn-primary':'btn-secondary'}`} onClick={()=>{setOpMode('calendar'); setOpDays(90);}}>90d</button>
+                </div>
+              </div>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={operators} dataKey="value" nameKey="operator" label={(e)=>`${e.operator}`}> 
+                  <Pie data={operators} dataKey="value" nameKey="operator" label={(e)=>`${e.operator}`} labelLine>
                     {operators.map((entry, index) => (
                       <Cell key={index} fill={entry.fill} />
                     ))}
@@ -87,6 +109,15 @@ export default function NetworkOverview({ days = 7, hours = null, mode = 'calend
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
+              {/* Ensure all operators are visible even if a slice label is too small */}
+              <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {operators.map((op, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent:'space-between', color:'#475569' }}>
+                    <span><span style={{ display:'inline-block', width:10, height:10, background: op.fill, marginRight:6, borderRadius:2 }} />{op.operator}</span>
+                    <span>{formatBytes(op.value)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           {usage.length === 0 && operators.length === 0 && (

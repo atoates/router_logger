@@ -7,6 +7,7 @@ function RouterQuickSelect({ onSelectRouter, onClear }) {
   const [highlightIndex, setHighlightIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -89,6 +90,9 @@ function RouterQuickSelect({ onSelectRouter, onClear }) {
     if (chosen) {
       onSelectRouter(chosen);
       setError('');
+      // Close dropdown and clear input so suggestions disappear
+      setInput('');
+      setOpen(false);
     } else {
       setError('Router name not found');
     }
@@ -103,7 +107,7 @@ function RouterQuickSelect({ onSelectRouter, onClear }) {
           <input
             type="text"
             value={input}
-            onChange={e => { setInput(e.target.value); setError(''); setHighlightIndex(0); }}
+            onChange={e => { setInput(e.target.value); setError(''); setHighlightIndex(0); setOpen(true); }}
             onKeyDown={e => {
               if (e.key === 'ArrowDown') {
                 e.preventDefault();
@@ -115,12 +119,14 @@ function RouterQuickSelect({ onSelectRouter, onClear }) {
                 e.preventDefault();
                 handleSelect();
               } else if (e.key === 'Escape') {
-                setInput('');
+                setInput(''); setOpen(false);
               }
             }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 100)}
             placeholder="Start typing a router name"
           />
-          {suggestions.length > 0 && (
+          {open && suggestions.length > 0 && (
             <div style={{ position: 'relative' }}>
               <ul style={{
                 position: 'absolute',
@@ -139,7 +145,7 @@ function RouterQuickSelect({ onSelectRouter, onClear }) {
                 {suggestions.map((r, idx) => (
                   <li
                     key={r.router_id}
-                    onMouseDown={() => { onSelectRouter(r); setError(''); }}
+                    onMouseDown={() => { onSelectRouter(r); setError(''); setInput(''); setOpen(false); }}
                     onMouseEnter={() => setHighlightIndex(idx)}
                     style={{
                       padding: '8px 12px',
