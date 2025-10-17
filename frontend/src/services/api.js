@@ -22,6 +22,8 @@ export const getStorageStats = (params) => api.get('/stats/storage', { params })
 export const getTopRouters = (params) => api.get('/stats/top-routers', { params });
 export const getNetworkUsage = (params) => api.get('/stats/network-usage', { params });
 export const getOperators = (params) => api.get('/stats/operators', { params });
+export const getNetworkUsageRolling = (params) => api.get('/stats/network-usage-rolling', { params });
+export const getTopRoutersRolling = (params) => api.get('/stats/top-routers-rolling', { params });
 
 // Submit log (for testing)
 export const submitLog = (data) => api.post('/log', data);

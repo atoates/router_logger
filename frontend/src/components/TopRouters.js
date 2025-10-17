@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getTopRouters } from '../services/api';
+import { getTopRouters, getTopRoutersRolling } from '../services/api';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
 function formatBytes(bytes) {
@@ -11,7 +11,7 @@ function formatBytes(bytes) {
   return n + ' B';
 }
 
-export default function TopRouters({ days = 7, limit = 5 }) {
+export default function TopRouters({ days = 7, hours = null, rolling = false, limit = 5 }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +19,9 @@ export default function TopRouters({ days = 7, limit = 5 }) {
     const fetchTop = async () => {
       setLoading(true);
       try {
-        const res = await getTopRouters({ days, limit });
+        const res = rolling
+          ? await getTopRoutersRolling({ hours: hours || 24, limit })
+          : await getTopRouters({ days, limit });
         const rows = (res.data || []).map(r => ({
           name: r.name || r.router_id,
           total_bytes: Number(r.total_bytes) || 0,
@@ -34,11 +36,11 @@ export default function TopRouters({ days = 7, limit = 5 }) {
       }
     };
     fetchTop();
-  }, [days, limit]);
+  }, [days, hours, rolling, limit]);
 
   return (
     <div className="card">
-      <h3>Top {limit} Routers by Data (Last {days} days)</h3>
+  <h3>Top {limit} Routers by Data ({rolling ? `Last ${hours || 24}h` : `Last ${days} days`})</h3>
       {loading && <div className="loading">Loading…</div>}
       {!loading && data.length === 0 && <p>No data.</p>}
       {!loading && data.length > 0 && (

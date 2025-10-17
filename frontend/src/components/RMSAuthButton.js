@@ -8,7 +8,7 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
  * RMS OAuth Authentication Button
  * Handles OAuth login/logout flow with RMS
  */
-function RMSAuthButton() {
+function RMSAuthButton({ variant = 'panel' }) {
   const [authStatus, setAuthStatus] = useState({
     loading: true,
     authenticated: false,
@@ -95,10 +95,21 @@ function RMSAuthButton() {
   };
 
   if (authStatus.loading) {
-    return <div className="rms-auth-loading">Checking authentication...</div>;
+    return variant === 'header' ? (
+      <div className="rms-auth-loading" style={{ fontSize: '0.9rem' }}>Checking…</div>
+    ) : (
+      <div className="rms-auth-loading">Checking authentication...</div>
+    );
   }
 
   if (!authStatus.configured) {
+    if (variant === 'header') {
+      return (
+        <button onClick={handleLogin} className="rms-auth-button login" style={{ fontSize: '0.85rem' }}>
+          Configure RMS
+        </button>
+      );
+    }
     return (
       <div className="rms-auth-not-configured">
         <span className="rms-auth-icon">⚙️</span>
@@ -111,6 +122,14 @@ function RMSAuthButton() {
   }
 
   if (authStatus.authenticated) {
+    if (variant === 'header') {
+      return (
+        <div className="rms-auth-container authenticated" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="rms-auth-icon">✓</span>
+          <span className="rms-auth-text" title="Connected to RMS">Connected</span>
+        </div>
+      );
+    }
     return (
       <div className="rms-auth-container authenticated">
         <div className="rms-auth-status">
@@ -133,14 +152,16 @@ function RMSAuthButton() {
     <div className="rms-auth-container">
       <div className="rms-auth-status">
         <span className="rms-auth-icon">🔒</span>
-        <span className="rms-auth-text">Not connected to RMS</span>
+        <span className="rms-auth-text">{variant === 'header' ? 'RMS' : 'Not connected to RMS'}</span>
       </div>
-      <button onClick={handleLogin} className="rms-auth-button login">
-        Connect with RMS
+      <button onClick={handleLogin} className="rms-auth-button login" style={variant==='header'?{padding:'4px 8px', fontSize:'0.85rem'}:undefined}>
+        Connect
       </button>
-      <div className="rms-auth-hint">
-        Sign in to access full device monitoring data
-      </div>
+      {variant !== 'header' && (
+        <div className="rms-auth-hint">
+          Sign in to access full device monitoring data
+        </div>
+      )}
     </div>
   );
 }

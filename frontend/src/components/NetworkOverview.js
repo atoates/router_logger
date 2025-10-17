@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getNetworkUsage, getOperators } from '../services/api';
+import { getNetworkUsage, getOperators, getNetworkUsageRolling } from '../services/api';
 import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, Legend, PieChart, Pie, Cell } from 'recharts';
 
 function formatBytes(bytes) {
@@ -13,7 +13,7 @@ function formatBytes(bytes) {
 
 const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7f50', '#a4de6c', '#d0ed57'];
 
-export default function NetworkOverview({ days = 7 }) {
+export default function NetworkOverview({ days = 7, hours = null, mode = 'calendar' }) {
   const [usage, setUsage] = useState([]);
   const [operators, setOperators] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -22,12 +22,15 @@ export default function NetworkOverview({ days = 7 }) {
     const fetchAll = async () => {
       setLoading(true);
       try {
+        const usageReq = mode==='rolling'
+          ? getNetworkUsageRolling({ hours: hours || 24, bucket: 'hour' })
+          : getNetworkUsage({ days });
         const [u, o] = await Promise.all([
-          getNetworkUsage({ days }),
-          getOperators({ days })
+          usageReq,
+          getOperators({ days: mode==='rolling' ? 7 : days })
         ]);
         const udata = (u.data || []).map(d => ({
-          date: d.date?.slice(0,10),
+          date: mode==='rolling' ? d.date : d.date?.slice(0,10),
           tx_mb: (Number(d.tx_bytes) || 0) / 1_000_000,
           rx_mb: (Number(d.rx_bytes) || 0) / 1_000_000,
           total_mb: (Number(d.total_bytes) || 0) / 1_000_000
@@ -47,11 +50,11 @@ export default function NetworkOverview({ days = 7 }) {
       }
     };
     fetchAll();
-  }, [days]);
+  }, [days, hours, mode]);
 
   return (
     <div className="card">
-      <h3>Network Overview (Last {days} days)</h3>
+  <h3>Network Overview ({mode==='rolling' ? `Last ${hours || 24}h` : `Last ${days} days`})</h3>
       {loading && <div className="loading">Loading…</div>}
       {!loading && (
         <>

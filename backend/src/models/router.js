@@ -635,3 +635,95 @@ async function getOperatorDistribution(days = 7) {
 }
 
 module.exports.getOperatorDistribution = getOperatorDistribution;
+
+/**
+ * Rolling window network usage, grouped by bucket (hour or day).
+ */
+async function getNetworkUsageRolling(hours = 24, bucket = 'hour') {
+  try {
+    const hrs = Math.max(1, Math.min(24 * 30, Number(hours) || 24));
+    const buck = bucket === 'day' ? 'day' : 'hour';
+    const query = `
+      WITH filtered AS (
+        SELECT router_id, timestamp, total_tx_bytes, total_rx_bytes
+        FROM router_logs
+        WHERE timestamp >= NOW() - ($1::int || ' hours')::interval
+      ), ordered AS (
+        SELECT 
+          router_id,
+          date_trunc('${buck}', timestamp) AS bucket_ts,
+          timestamp,
+          total_tx_bytes, total_rx_bytes,
+          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_tx,
+          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_rx
+        FROM filtered
+      ), deltas AS (
+        SELECT 
+          bucket_ts,
+          GREATEST(total_tx_bytes - COALESCE(prev_tx, 0), 0) AS tx_delta,
+          GREATEST(total_rx_bytes - COALESCE(prev_rx, 0), 0) AS rx_delta
+        FROM ordered
+      )
+      SELECT 
+        bucket_ts AS date,
+        SUM(tx_delta)::bigint AS tx_bytes,
+        SUM(rx_delta)::bigint AS rx_bytes,
+        SUM(tx_delta + rx_delta)::bigint AS total_bytes
+      FROM deltas
+      GROUP BY bucket_ts
+      ORDER BY bucket_ts ASC;
+    `;
+    const result = await pool.query(query, [hrs]);
+    return result.rows;
+  } catch (error) {
+    logger.error('Error fetching rolling network usage:', error);
+    throw error;
+  }
+}
+
+module.exports.getNetworkUsageRolling = getNetworkUsageRolling;
+
+/**
+ * Rolling window top routers by usage in last N hours.
+ */
+async function getTopRoutersByUsageRolling(hours = 24, limit = 5) {
+  try {
+    const hrs = Math.max(1, Math.min(24 * 30, Number(hours) || 24));
+    const lim = Math.max(1, Math.min(100, Number(limit) || 5));
+    const query = `
+      WITH filtered AS (
+        SELECT router_id, timestamp, total_tx_bytes, total_rx_bytes
+        FROM router_logs
+        WHERE timestamp >= NOW() - ($1::int || ' hours')::interval
+      ), ordered AS (
+        SELECT 
+          router_id, timestamp, total_tx_bytes, total_rx_bytes,
+          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_tx,
+          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_rx
+        FROM filtered
+      ), deltas AS (
+        SELECT 
+          router_id,
+          GREATEST(total_tx_bytes - COALESCE(prev_tx, 0), 0) AS tx_delta,
+          GREATEST(total_rx_bytes - COALESCE(prev_rx, 0), 0) AS rx_delta
+        FROM ordered
+      )
+      SELECT r.router_id, r.name,
+             SUM(d.tx_delta)::bigint AS tx_bytes,
+             SUM(d.rx_delta)::bigint AS rx_bytes,
+             SUM(d.tx_delta + d.rx_delta)::bigint AS total_bytes
+      FROM deltas d
+      JOIN routers r ON r.router_id = d.router_id
+      GROUP BY r.router_id, r.name
+      ORDER BY total_bytes DESC
+      LIMIT $2;
+    `;
+    const result = await pool.query(query, [hrs, lim]);
+    return result.rows;
+  } catch (error) {
+    logger.error('Error fetching rolling top routers:', error);
+    throw error;
+  }
+}
+
+module.exports.getTopRoutersByUsageRolling = getTopRoutersByUsageRolling;

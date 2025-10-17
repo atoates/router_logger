@@ -51,6 +51,7 @@ app.get('/', (req, res) => {
       storageStats: '/api/stats/storage',
       topRouters: '/api/stats/top-routers',
       networkUsage: '/api/stats/network-usage',
+  networkUsageRolling: '/api/stats/network-usage-rolling',
       operatorDistribution: '/api/stats/operators',
       oauthLogin: '/api/auth/rms/login',
       oauthStatus: '/api/auth/rms/status'

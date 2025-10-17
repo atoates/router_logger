@@ -10,7 +10,9 @@ const {
   getStorageStats,
   getTopRoutersByUsage,
   getNetworkUsageByDay,
-  getOperatorDistribution
+  getOperatorDistribution,
+  getNetworkUsageRolling,
+  getTopRoutersByUsageRolling
 } = require('../models/router');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger } = require('../config/database');
@@ -180,6 +182,32 @@ router.get('/stats/operators', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching operator distribution:', error);
     res.status(500).json({ error: 'Failed to fetch operator distribution' });
+  }
+});
+
+// GET rolling network usage (hours, bucket=hour|day)
+router.get('/stats/network-usage-rolling', async (req, res) => {
+  try {
+    const hours = req.query.hours ? Number(req.query.hours) : 24;
+    const bucket = (req.query.bucket || 'hour').toString();
+    const data = await getNetworkUsageRolling(hours, bucket);
+    res.json(data);
+  } catch (error) {
+    logger.error('Error fetching rolling network usage:', error);
+    res.status(500).json({ error: 'Failed to fetch rolling network usage' });
+  }
+});
+
+// GET rolling top routers by usage (hours)
+router.get('/stats/top-routers-rolling', async (req, res) => {
+  try {
+    const hours = req.query.hours ? Number(req.query.hours) : 24;
+    const limit = req.query.limit ? Number(req.query.limit) : 5;
+    const data = await getTopRoutersByUsageRolling(hours, limit);
+    res.json(data);
+  } catch (error) {
+    logger.error('Error fetching rolling top routers:', error);
+    res.status(500).json({ error: 'Failed to fetch rolling top routers' });
   }
 });
 
