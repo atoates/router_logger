@@ -322,28 +322,42 @@ export default function DashboardV3({ onOpenRouter }) {
             <div className="v3-card-title">Top 5 Routers</div>
             <div style={{ height: 240 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={top} layout="vertical" margin={{ left: 80 }}>
+                <BarChart data={top} layout="vertical" margin={{ left: 200 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={dark?'#334155':'#e5e7eb'} />
                   <XAxis type="number" tickFormatter={(v)=>formatBytes(v).split(' ')[0]} tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} />
                   <YAxis 
                     type="category" 
                     dataKey="name" 
-                    width={160} 
+                    width={200} 
                     tick={(props) => {
                       const { x, y, payload } = props;
-                      const name = payload?.value;
-                      const fill = dark ? '#cbd5e1' : '#475569';
+                      const name = String(payload?.value || '');
+                      const on = !!onOpenRouter;
+                      const textColor = dark ? '#cbd5e1' : '#1f2937';
+                      const pillBg = dark ? '#1f2937' : '#e5e7eb';
+                      const charW = 7; // rough estimate
+                      const padX = 10;
+                      const h = 18;
+                      const w = Math.min(180, Math.max(40, name.length * charW + padX * 2));
+                      const rectX = x - w - 8; // anchor end
+                      const rectY = y - h / 2;
+                      // We cannot use :hover here easily; keep static pill, pointer cursor if clickable
                       return (
-                        <text x={x} y={y} dy={4} textAnchor="end" fill={fill} style={{ cursor: onOpenRouter ? 'pointer' : 'default' }}
-                          onClick={() => {
-                            if (!onOpenRouter) return;
-                            const item = top.find(t => t.name === name);
-                            const rid = item?.router_id;
-                            if (!rid) return;
-                            const router = routers.find(r => String(r.router_id) === String(rid)) || { router_id: rid, name: name };
-                            onOpenRouter(router);
-                          }}
-                        >{name}</text>
+                        <g style={{ cursor: on ? 'pointer' : 'default' }}
+                           onClick={() => {
+                             if (!onOpenRouter) return;
+                             const item = top.find(t => t.name === name);
+                             const rid = item?.router_id;
+                             if (!rid) return;
+                             const router = routers.find(r => String(r.router_id) === String(rid)) || { router_id: rid, name };
+                             onOpenRouter(router);
+                           }}
+                           role={on ? 'button' : undefined}
+                           tabIndex={on ? 0 : undefined}
+                        >
+                          <rect x={rectX} y={rectY} rx={9} ry={9} width={w} height={h} fill={pillBg} stroke={dark?'#475569':'#cbd5e1'} />
+                          <text x={x - padX} y={y + 4} textAnchor="end" fill={textColor} style={{ fontSize: 12, fontWeight: 600 }}>{name}</text>
+                        </g>
                       );
                     }}
                   />
