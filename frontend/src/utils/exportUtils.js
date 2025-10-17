@@ -77,60 +77,114 @@ export function exportUsageStatsToPDF(stats, routerId, startDate, endDate) {
 /**
  * Export uptime report to PDF
  */
-export function exportUptimeReportToPDF(uptimeData, routerId, startDate, endDate) {
+export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, endDate, options = {}) {
+  const { logoDataUrl } = options;
   const doc = new jsPDF();
-  
+
+  // Optional logo
+  let y = 14;
+  if (logoDataUrl) {
+    try {
+      doc.addImage(logoDataUrl, 'PNG', 14, y, 20, 20);
+      y += 4; // slight shift for title
+    } catch (e) {
+      // If image fails, continue without blocking
+    }
+  }
+
   // Title
   doc.setFontSize(18);
-  doc.text('Router Uptime Report', 14, 22);
-  
+  doc.text('Router Uptime Report', 40, y + 8);
+
   // Metadata
   doc.setFontSize(11);
-  doc.text(`Router ID: ${routerId}`, 14, 32);
-  doc.text(`Period: ${format(new Date(startDate), 'yyyy-MM-dd')} to ${format(new Date(endDate), 'yyyy-MM-dd')}`, 14, 38);
-  doc.text(`Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`, 14, 44);
-  
-  // Calculate uptime percentage
-  const totalRecords = uptimeData.length;
-  const onlineRecords = uptimeData.filter(d => d.status === 'online').length;
-  const uptimePercent = totalRecords > 0 ? ((onlineRecords / totalRecords) * 100).toFixed(2) : 0;
-  
+  doc.text(`Router ID: ${routerId}`, 14, y + 24);
+  doc.text(`Period: ${format(new Date(startDate), 'yyyy-MM-dd HH:mm')} to ${format(new Date(endDate), 'yyyy-MM-dd HH:mm')}`, 14, y + 30);
+  doc.text(`Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`, 14, y + 36);
+
+  // Sort uptime records ascending by timestamp for analysis
+  const sorted = (uptimeData || []).slice().sort((a,b)=> new Date(a.timestamp) - new Date(b.timestamp));
+  const totalRecords = sorted.length;
+  const onlineRecords = sorted.filter(d => d.status === 'online' || d.status === 1 || d.status === '1' || d.status === true).length;
+  const uptimePercent = totalRecords > 0 ? ((onlineRecords / totalRecords) * 100) : 0;
+
+  // Daily breakdown between date range
+  const dailyMap = new Map();
+  for (const entry of sorted) {
+    const d = new Date(entry.timestamp);
+    const key = format(d, 'yyyy-MM-dd');
+    const rec = dailyMap.get(key) || { date: key, total: 0, online: 0 };
+    rec.total += 1;
+    const isOn = (entry.status === 'online' || entry.status === 1 || entry.status === '1' || entry.status === true);
+    if (isOn) rec.online += 1;
+    dailyMap.set(key, rec);
+  }
+  const byDay = Array.from(dailyMap.values()).sort((a,b)=> a.date.localeCompare(b.date)).map(d => ({
+    ...d,
+    pct: d.total ? Math.round((d.online / d.total) * 10000)/100 : 0
+  }));
+
+  // Longest offline streak and total offline duration (approximate via gaps)
+  let longestOfflineSec = 0, currentStart = null, totalOfflineSec = 0;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const cur = sorted[i];
+    const next = sorted[i+1];
+    const curOn = (cur.status === 'online' || cur.status === 1 || cur.status === '1' || cur.status === true);
+    const dt = (new Date(next.timestamp) - new Date(cur.timestamp)) / 1000; // seconds between samples
+    if (!curOn) {
+      if (currentStart == null) currentStart = new Date(cur.timestamp);
+      totalOfflineSec += Math.max(0, dt);
+    } else if (currentStart != null) {
+      const run = (new Date(cur.timestamp) - currentStart) / 1000;
+      if (run > longestOfflineSec) longestOfflineSec = run;
+      currentStart = null;
+    }
+  }
+  if (currentStart != null && sorted.length > 0) {
+    const last = sorted[sorted.length-1];
+    const run = (new Date(last.timestamp) - currentStart) / 1000;
+    if (run > longestOfflineSec) longestOfflineSec = run;
+  }
+
+  const fmtHMS = (sec) => {
+    const s = Math.max(0, Math.floor(sec));
+    const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), ss = s%60;
+    return `${h}h ${m}m ${ss}s`;
+  };
+
+  // Summary table
   doc.setFontSize(14);
-  doc.text('Uptime Summary', 14, 58);
-  
+  const summaryStartY = y + 46;
+  doc.text('Uptime Summary', 14, summaryStartY);
   const summaryData = [
     ['Total Records', totalRecords],
     ['Online Records', onlineRecords],
-    ['Uptime Percentage', `${uptimePercent}%`],
+    ['Overall Uptime', `${uptimePercent.toFixed(2)}%`],
+    ['Total Offline', fmtHMS(totalOfflineSec)],
+    ['Longest Offline Streak', fmtHMS(longestOfflineSec)]
   ];
-  
   doc.autoTable({
-    startY: 62,
+    startY: summaryStartY + 4,
     head: [['Metric', 'Value']],
     body: summaryData,
     theme: 'grid',
     headStyles: { fillColor: [102, 126, 234] },
   });
-  
-  // Detailed log
-  const logData = uptimeData.slice(0, 50).map(entry => {
-    const d = new Date(entry.timestamp);
-    const ts = isNaN(d.getTime()) ? '' : format(d, 'yyyy-MM-dd HH:mm');
-    const up = ((Number(entry.uptime_seconds) || 0) / 3600).toFixed(2);
-    return [ts, `${up} hrs`, entry.status];
-  });
-  
+
+  // Daily breakdown table
+  const dailyStartY = (doc.lastAutoTable?.finalY || (summaryStartY + 30)) + 10;
   doc.setFontSize(12);
-  doc.text('Recent Uptime Logs (Last 50)', 14, doc.lastAutoTable.finalY + 15);
-  
+  doc.text('Daily Activity within Range', 14, dailyStartY);
+  const dailyBody = byDay.map(d => [d.date, d.total, d.online, `${d.pct.toFixed(2)}%`]);
   doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 20,
-    head: [['Timestamp', 'Uptime', 'Status']],
-    body: logData,
+    startY: dailyStartY + 4,
+    head: [['Date', 'Samples', 'Online', 'Uptime %']],
+    body: dailyBody,
     theme: 'striped',
     headStyles: { fillColor: [102, 126, 234] },
+    styles: { cellPadding: 2 }
   });
-  
+
   // Save
   doc.save(`router-uptime-report-${routerId}-${format(new Date(), 'yyyyMMdd')}.pdf`);
 }

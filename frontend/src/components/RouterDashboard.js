@@ -3,6 +3,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { AreaChart, Area, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
 import { getLogs, getUsageStats, getUptimeData } from '../services/api';
+import { exportUptimeReportToPDF } from '../utils/exportUtils';
 import './RouterDashboard.css';
 
 function formatBytes(bytes) {
@@ -129,6 +130,27 @@ export default function RouterDashboard({ router }) {
 
   const latest = series.latest;
 
+  // Load logo as data URL
+  const loadLogoDataUrl = async () => {
+    try {
+      const url = (process.env.PUBLIC_URL || '') + '/Logo.png';
+      const res = await fetch(url, { cache: 'no-store' });
+      const blob = await res.blob();
+      return await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+    } catch (_e) {
+      return null;
+    }
+  };
+
+  const handleExportUptime = async () => {
+    const logoDataUrl = await loadLogoDataUrl();
+    await exportUptimeReportToPDF(uptime || [], routerId, start, end, { logoDataUrl });
+  };
+
   return (
     <div className="router-dash">
       <div className="rd-header">
@@ -147,6 +169,9 @@ export default function RouterDashboard({ router }) {
             <button className={range.type==='days'&&range.value===7?'active':''} onClick={()=>setRange({type:'days', value:7})}>7d</button>
             <button className={range.type==='days'&&range.value===30?'active':''} onClick={()=>setRange({type:'days', value:30})}>30d</button>
             <button className={range.type==='custom'?'active':''} onClick={()=>setRange({type:'custom'})}>Custom</button>
+            <div style={{ marginLeft: 'auto' }}>
+              <button className="btn btn-primary" onClick={handleExportUptime}>Export Uptime Report (PDF)</button>
+            </div>
           </div>
           <span className="muted" style={{ marginLeft: 8 }}>{label}</span>
         </div>
