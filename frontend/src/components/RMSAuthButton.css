@@ -7,8 +7,8 @@
 }
 
 .rms-auth-container.authenticated {
-  background-color: #d4edda;
-  border-color: #c3e6cb;
+  background-color: #e8fff1;
+  border-color: #b7f0cf;
 }
 
 .rms-auth-status {
@@ -25,7 +25,7 @@
 .rms-auth-text {
   font-weight: 600;
   font-size: 14px;
-  color: #333;
+  color: #334155;
 }
 
 .rms-auth-scope {
@@ -81,6 +81,26 @@
   text-align: center;
   color: #6c757d;
   font-size: 14px;
+}
+
+/* Header variant: compact pill */
+.rms-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #10b981 0%, #0ea371 100%);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+}
+.rms-pill .tick {
+  background: rgba(255,255,255,0.2);
+  border-radius: 9999px;
+  padding: 0 6px;
+  font-weight: 800;
 }
 
 .rms-auth-not-configured {

@@ -40,6 +40,7 @@ export default function HeaderRouterSelect({ onSelect }) {
   return (
     <div style={{ position: 'relative', minWidth: 240 }}>
       <input
+        className="header-router-input"
         value={q}
         onChange={(e)=>{ setQ(e.target.value); setOpen(true); setHi(0); }}
         onFocus={()=>setOpen(true)}
@@ -59,7 +60,9 @@ export default function HeaderRouterSelect({ onSelect }) {
           fontSize: 13,
           color: '#0f172a',
           backgroundColor: '#ffffff',
-          outline: 'none'
+          outline: 'none',
+          fontWeight: 600,
+          boxShadow: '0 1px 2px rgba(0,0,0,0.08)'
         }}
       />
       {open && suggestions.length>0 && (
@@ -94,7 +97,7 @@ export default function HeaderRouterSelect({ onSelect }) {
                 fontSize: 13
               }}
             >
-              <span>{r.name || '(unnamed)'}</span>
+              <span style={{ color:'#0f172a' }}>{r.name || '(unnamed)'}</span>
               <span style={{ color:'#94a3b8' }}>logs {r.log_count ?? 0}</span>
             </li>
           ))}

@@ -124,9 +124,9 @@ function RMSAuthButton({ variant = 'panel' }) {
   if (authStatus.authenticated) {
     if (variant === 'header') {
       return (
-        <div className="rms-auth-container authenticated" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="rms-auth-icon">✓</span>
-          <span className="rms-auth-text" title="Connected to RMS">Connected</span>
+        <div className="rms-pill" title="Connected to RMS">
+          <span>RMS</span>
+          <span className="tick">✓</span>
         </div>
       );
     }
@@ -149,20 +149,23 @@ function RMSAuthButton({ variant = 'panel' }) {
   }
 
   return (
-    <div className="rms-auth-container">
-      <div className="rms-auth-status">
-        <span className="rms-auth-icon">🔒</span>
-        <span className="rms-auth-text">{variant === 'header' ? 'RMS' : 'Not connected to RMS'}</span>
-      </div>
-      <button onClick={handleLogin} className="rms-auth-button login" style={variant==='header'?{padding:'4px 8px', fontSize:'0.85rem'}:undefined}>
-        Connect
+    variant === 'header' ? (
+      <button onClick={handleLogin} className="rms-pill" style={{ background:'transparent', color:'#ffffff', border:'1.5px solid rgba(255,255,255,0.6)' }} title="Connect to RMS">
+        <span>RMS</span>
+        <span className="tick" style={{ background:'rgba(255,255,255,0.15)' }}>🔒</span>
       </button>
-      {variant !== 'header' && (
+    ) : (
+      <div className="rms-auth-container">
+        <div className="rms-auth-status">
+          <span className="rms-auth-icon">🔒</span>
+          <span className="rms-auth-text">Not connected to RMS</span>
+        </div>
+        <button onClick={handleLogin} className="rms-auth-button login">Connect</button>
         <div className="rms-auth-hint">
           Sign in to access full device monitoring data
         </div>
-      )}
-    </div>
+      </div>
+    )
   );
 }
 
