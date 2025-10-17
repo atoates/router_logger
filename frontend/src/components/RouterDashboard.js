@@ -89,8 +89,23 @@ export default function RouterDashboard({ router }) {
       const rx = Number(l.total_rx_bytes)||0;
       const dtx = prevTx == null ? 0 : Math.max(tx - prevTx, 0);
       const drx = prevRx == null ? 0 : Math.max(rx - prevRx, 0);
-      txrx.push({ date: ts.toISOString(), tx_bytes: dtx, rx_bytes: drx, total_bytes: dtx + drx });
-      signals.push({ date: ts.toISOString(), rsrp: l.rsrp, rsrq: l.rsrq, rssi: l.rssi, sinr: l.sinr });
+      const rsrp = Number.isFinite(Number(l.rsrp)) ? Number(l.rsrp) : null;
+      const rsrq = Number.isFinite(Number(l.rsrq)) ? Number(l.rsrq) : null;
+      const rssi = Number.isFinite(Number(l.rssi)) ? Number(l.rssi) : null;
+      const sinr = Number.isFinite(Number(l.sinr)) ? Number(l.sinr) : null;
+      txrx.push({ 
+        date: ts.toISOString(), 
+        tx_bytes: dtx, 
+        rx_bytes: drx, 
+        total_bytes: dtx + drx,
+        // Inline fields to avoid timestamp matching later
+        operator: l.operator,
+        wan_ip: l.wan_ip,
+        status: l.status,
+        rsrp,
+        sinr
+      });
+      signals.push({ date: ts.toISOString(), rsrp, rsrq, rssi, sinr });
       prevTx = tx; prevRx = rx;
     }
     const latest = asc[asc.length-1];
@@ -256,18 +271,18 @@ export default function RouterDashboard({ router }) {
             </thead>
             <tbody>
               {series.txrx.slice(-50).reverse().map((d, i) => {
-                const base = logs.find(l => new Date(l.timestamp).toISOString() === d.date) || {};
-                const isOnline = base.status==='online'||base.status===1||base.status==='1'||base.status===true;
+                const s = d.status;
+                const isOnline = (s==='online'||s===1||s==='1'||s===true);
                 return (
                   <tr key={i}>
                     <td>{new Date(d.date).toLocaleString()}</td>
                     <td>{isOnline? 'Online' : 'Offline'}</td>
-                    <td>{base.operator || ''}</td>
-                    <td>{base.wan_ip || ''}</td>
+                    <td>{d.operator || ''}</td>
+                    <td>{d.wan_ip || ''}</td>
                     <td>{formatBytes(d.tx_bytes)}</td>
                     <td>{formatBytes(d.rx_bytes)}</td>
-                    <td>{base.rsrp ?? ''}</td>
-                    <td>{base.sinr ?? ''}</td>
+                    <td>{d.rsrp ?? ''}</td>
+                    <td>{d.sinr ?? ''}</td>
                   </tr>
                 );
               })}
