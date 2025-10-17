@@ -13,6 +13,7 @@ import TopRouters from './components/TopRouters';
 import NetworkOverview from './components/NetworkOverview';
 import DashboardV2 from './components/DashboardV2';
 import DashboardV3 from './components/DashboardV3';
+import HeaderRouterSelect from './components/HeaderRouterSelect';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
@@ -36,6 +37,15 @@ function App() {
   const handleFilterChange = (newRange) => {
     setDateRange(newRange);
     toast.info('Date range updated');
+  };
+
+  // Header router selector should always open the Router details in V1
+  const handleHeaderRouterSelect = (router) => {
+    setSelectedRouter(router);
+    setActiveTab('router');
+    if (dashboardVersion !== 'v1') setDashboardVersion('v1');
+    const label = router.name ? `${router.name} (ID ${router.router_id})` : `ID ${router.router_id}`;
+    toast.success(`Opening ${label}`);
   };
 
   // V3 Dashboard - if selected, render just the V3 component
@@ -72,6 +82,7 @@ function App() {
                   V3
                 </button>
               </div>
+              <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
               <RMSAuthButton variant="header" />
             </div>
           </div>
@@ -110,7 +121,15 @@ function App() {
                 >
                   V2
                 </button>
+                <button 
+                  className={`btn ${dashboardVersion === 'v3' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setDashboardVersion('v3')}
+                  style={{ fontSize: 12 }}
+                >
+                  V3
+                </button>
               </div>
+              <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
               <RMSAuthButton variant="header" />
             </div>
           </div>
@@ -148,7 +167,15 @@ function App() {
               >
                 V2
               </button>
+              <button 
+                className={`btn ${dashboardVersion === 'v3' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setDashboardVersion('v3')}
+                style={{ fontSize: 12 }}
+              >
+                V3
+              </button>
             </div>
+            <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
             <RMSAuthButton variant="header" />
           </div>
         </div>
