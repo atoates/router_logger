@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { AreaChart, Area, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
 import { getLogs, getUsageStats, getUptimeData } from '../services/api';
 import './RouterDashboard.css';
@@ -27,7 +29,9 @@ function StatusPill({ status }) {
 }
 
 export default function RouterDashboard({ router }) {
-  const [range, setRange] = useState({ type: 'hours', value: 24 }); // hours|days
+  const [range, setRange] = useState({ type: 'hours', value: 24 }); // hours|days|custom
+  const [customStart, setCustomStart] = useState(null);
+  const [customEnd, setCustomEnd] = useState(null);
   const [, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState(null);
@@ -36,14 +40,22 @@ export default function RouterDashboard({ router }) {
   const routerId = router?.router_id;
 
   const { start, end, label } = useMemo(() => {
-    const end = new Date().toISOString();
-    if (range.type === 'hours') {
-      const start = isoMinus({ hours: range.value || 24 });
-      return { start, end, label: `Last ${range.value}h` };
+    const nowIso = new Date().toISOString();
+    if (range.type === 'custom') {
+      const s = customStart ? new Date(customStart).toISOString() : isoMinus({ hours: 24 });
+      const e = customEnd ? new Date(customEnd).toISOString() : nowIso;
+      const lbl = customStart && customEnd
+        ? `${new Date(s).toLocaleString()} → ${new Date(e).toLocaleString()}`
+        : 'Custom (pick dates)';
+      return { start: s, end: e, label: lbl };
     }
-    const start = isoMinus({ days: range.value || 7 });
-    return { start, end, label: `Last ${range.value}d` };
-  }, [range]);
+    if (range.type === 'hours') {
+      const s = isoMinus({ hours: range.value || 24 });
+      return { start: s, end: nowIso, label: `Last ${range.value}h` };
+    }
+    const s = isoMinus({ days: range.value || 7 });
+    return { start: s, end: nowIso, label: `Last ${range.value}d` };
+  }, [range, customStart, customEnd]);
 
   useEffect(() => {
     let mounted = true;
@@ -134,8 +146,9 @@ export default function RouterDashboard({ router }) {
             <button className={range.type==='hours'&&range.value===24?'active':''} onClick={()=>setRange({type:'hours', value:24})}>24h</button>
             <button className={range.type==='days'&&range.value===7?'active':''} onClick={()=>setRange({type:'days', value:7})}>7d</button>
             <button className={range.type==='days'&&range.value===30?'active':''} onClick={()=>setRange({type:'days', value:30})}>30d</button>
+            <button className={range.type==='custom'?'active':''} onClick={()=>setRange({type:'custom'})}>Custom</button>
           </div>
-          <span className="muted">{label}</span>
+          <span className="muted" style={{ marginLeft: 8 }}>{label}</span>
         </div>
       </div>
 
@@ -157,6 +170,48 @@ export default function RouterDashboard({ router }) {
           <div className="sub">in range</div>
         </div>
       </div>
+
+      {range.type==='custom' && (
+        <div className="card" style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <span className="muted">From</span>
+            <DatePicker
+              selected={customStart}
+              onChange={(d)=> setCustomStart(d)}
+              showTimeSelect
+              timeIntervals={15}
+              dateFormat="yyyy-MM-dd HH:mm"
+              placeholderText="Select start"
+              maxDate={customEnd || undefined}
+              className="input"
+            />
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <span className="muted">To</span>
+            <DatePicker
+              selected={customEnd}
+              onChange={(d)=> setCustomEnd(d)}
+              showTimeSelect
+              timeIntervals={15}
+              dateFormat="yyyy-MM-dd HH:mm"
+              placeholderText="Select end"
+              minDate={customStart || undefined}
+              className="input"
+            />
+          </div>
+          <div style={{ display:'flex', gap:8, marginLeft:'auto' }}>
+            <button 
+              className="btn btn-secondary" 
+              onClick={()=>{ setCustomStart(null); setCustomEnd(null); setRange({ type:'hours', value:24 }); }}
+            >Reset</button>
+            <button 
+              className="btn btn-primary" 
+              onClick={()=> setRange({ type:'custom' })}
+              disabled={!(customStart && customEnd) || (customStart && customEnd && (new Date(customEnd) <= new Date(customStart)))}
+            >Apply</button>
+          </div>
+        </div>
+      )}
 
       <div className="rd-grid">
         <div className="col">
