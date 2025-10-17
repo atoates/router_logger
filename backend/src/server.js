@@ -78,7 +78,7 @@ async function startServer() {
     initMQTT();
     
     // Start RMS sync if PAT or OAuth token is available
-    const rmsSyncInterval = process.env.RMS_SYNC_INTERVAL_MINUTES || 15;
+  const rmsSyncInterval = process.env.RMS_SYNC_INTERVAL_MINUTES || 60;
     let canSync = false;
     if (process.env.RMS_ACCESS_TOKEN) {
       canSync = true;
