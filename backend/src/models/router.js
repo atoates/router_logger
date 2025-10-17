@@ -796,3 +796,64 @@ async function getTopRoutersByUsageRolling(hours = 24, limit = 5) {
 }
 
 module.exports.getTopRoutersByUsageRolling = getTopRoutersByUsageRolling;
+
+/**
+ * True rolling window operator distribution for last N hours.
+ * Attributes byte deltas to the operator present at each log within the window.
+ */
+async function getOperatorDistributionRolling(hours = 24) {
+  try {
+    const hrs = Math.max(1, Math.min(24 * 30, Number(hours) || 24));
+    const query = `
+      WITH params AS (
+        SELECT NOW() - ($1::int || ' hours')::interval AS start_ts
+      ), base AS (
+        SELECT l.router_id, l.total_tx_bytes AS base_tx, l.total_rx_bytes AS base_rx
+        FROM router_logs l
+        JOIN (
+          SELECT router_id, MAX(timestamp) AS ts
+          FROM router_logs, params
+          WHERE timestamp < (SELECT start_ts FROM params)
+          GROUP BY router_id
+        ) b ON b.router_id = l.router_id AND b.ts = l.timestamp
+      ), ordered AS (
+        SELECT 
+          l.router_id,
+          l.timestamp,
+          COALESCE(NULLIF(TRIM(l.operator), ''), 'Unknown') AS operator,
+          l.total_tx_bytes, l.total_rx_bytes,
+          LAG(l.total_tx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS prev_tx,
+          LAG(l.total_rx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS prev_rx
+        FROM router_logs l, params
+        WHERE l.timestamp >= (SELECT start_ts FROM params)
+      ), deltas AS (
+        SELECT 
+          o.operator,
+          CASE 
+            WHEN o.prev_tx IS NOT NULL THEN GREATEST(o.total_tx_bytes - o.prev_tx, 0)
+            ELSE GREATEST(o.total_tx_bytes - COALESCE(b.base_tx, o.total_tx_bytes), 0)
+          END AS tx_delta,
+          CASE 
+            WHEN o.prev_rx IS NOT NULL THEN GREATEST(o.total_rx_bytes - o.prev_rx, 0)
+            ELSE GREATEST(o.total_rx_bytes - COALESCE(b.base_rx, o.total_rx_bytes), 0)
+          END AS rx_delta
+        FROM ordered o
+        LEFT JOIN base b ON b.router_id = o.router_id
+      )
+      SELECT operator,
+             SUM(tx_delta)::bigint AS tx_bytes,
+             SUM(rx_delta)::bigint AS rx_bytes,
+             SUM(tx_delta + rx_delta)::bigint AS total_bytes
+      FROM deltas
+      GROUP BY operator
+      ORDER BY total_bytes DESC;
+    `;
+    const result = await pool.query(query, [hrs]);
+    return result.rows;
+  } catch (error) {
+    logger.error('Error fetching rolling operator distribution:', error);
+    throw error;
+  }
+}
+
+module.exports.getOperatorDistributionRolling = getOperatorDistributionRolling;

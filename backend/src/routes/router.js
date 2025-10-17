@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const { 
   upsertRouter, 
@@ -12,7 +13,8 @@ const {
   getNetworkUsageByDay,
   getOperatorDistribution,
   getNetworkUsageRolling,
-  getTopRoutersByUsageRolling
+  getTopRoutersByUsageRolling,
+  getOperatorDistributionRolling
 } = require('../models/router');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger } = require('../config/database');
@@ -38,9 +40,25 @@ router.post('/log', async (req, res) => {
   }
 });
 
-// GET all routers (deduplicated best-by-name)
+// In-memory cache for /routers with TTL and ETag support
+const ROUTERS_CACHE_TTL_SECONDS = parseInt(process.env.ROUTERS_CACHE_TTL_SECONDS || '60', 10);
+let routersCache = { data: null, etag: null, expiresAt: 0 };
+
+// GET all routers (deduplicated best-by-name) with cache/ETag
 router.get('/routers', async (req, res) => {
   try {
+    const now = Date.now();
+    if (routersCache.data && routersCache.expiresAt > now) {
+      // ETag support
+      if (req.headers['if-none-match'] && req.headers['if-none-match'] === routersCache.etag) {
+        res.status(304).end();
+        return;
+      }
+      res.set('ETag', routersCache.etag);
+      res.set('X-Cache', 'HIT');
+      return res.json(routersCache.data);
+    }
+
     const routers = await getAllRouters();
     // Merge duplicates by same name, prefer entries with logs, then latest seen
     const byName = new Map();
@@ -54,26 +72,27 @@ router.get('/routers', async (req, res) => {
       const cur = byName.get(key);
       const curIsSerial = isSerialLike(cur.router_id);
       const newIsSerial = isSerialLike(r.router_id);
-      // Prefer serial-like first
       if (newIsSerial !== curIsSerial) {
         if (newIsSerial) byName.set(key, r);
         continue;
       }
-
-      // Next prefer higher log count
       const curLogs = Number(cur.log_count || 0);
       const newLogs = Number(r.log_count || 0);
       if (newLogs !== curLogs) {
         if (newLogs > curLogs) byName.set(key, r);
         continue;
       }
-
-      // Finally, most recent last_seen
       const curSeen = cur.last_seen ? new Date(cur.last_seen).getTime() : 0;
       const newSeen = r.last_seen ? new Date(r.last_seen).getTime() : 0;
       if (newSeen > curSeen) byName.set(key, r);
     }
-    res.json(Array.from(byName.values()));
+    const data = Array.from(byName.values());
+    const hash = crypto.createHash('sha1').update(JSON.stringify(data)).digest('hex');
+    const etag = 'W/"' + hash + '"';
+    routersCache = { data, etag, expiresAt: Date.now() + ROUTERS_CACHE_TTL_SECONDS * 1000 };
+    res.set('ETag', etag);
+    res.set('X-Cache', 'MISS');
+    return res.json(data);
   } catch (error) {
     logger.error('Error fetching routers:', error);
     res.status(500).json({ error: 'Failed to fetch routers' });
@@ -182,6 +201,18 @@ router.get('/stats/operators', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching operator distribution:', error);
     res.status(500).json({ error: 'Failed to fetch operator distribution' });
+  }
+});
+
+// GET true rolling operator distribution (hours)
+router.get('/stats/operators-rolling', async (req, res) => {
+  try {
+    const hours = req.query.hours ? Number(req.query.hours) : 24;
+    const data = await getOperatorDistributionRolling(hours);
+    res.json(data);
+  } catch (error) {
+    logger.error('Error fetching rolling operator distribution:', error);
+    res.status(500).json({ error: 'Failed to fetch rolling operator distribution' });
   }
 });
 

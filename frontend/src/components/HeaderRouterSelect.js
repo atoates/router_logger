@@ -20,7 +20,7 @@ export default function HeaderRouterSelect({ onSelect }) {
       }
     };
     load();
-    const id = setInterval(load, 60000);
+    const id = setInterval(load, 300000); // 5 minutes
     return () => { mounted = false; clearInterval(id); };
   }, []);
 

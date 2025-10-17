@@ -291,7 +291,7 @@ export default function DashboardV2() {
     };
 
     loadDashboard();
-    const interval = setInterval(loadDashboard, 60000); // Refresh every minute
+    const interval = setInterval(loadDashboard, 300000); // Refresh every 5 minutes
     return () => clearInterval(interval);
   }, []);
 
@@ -314,7 +314,7 @@ export default function DashboardV2() {
           <p>Real-time monitoring and analytics</p>
         </div>
         <div className="header-actions">
-          <span className="last-update">Auto-refresh every 60s</span>
+          <span className="last-update">Auto-refresh every 5m</span>
         </div>
       </div>
 

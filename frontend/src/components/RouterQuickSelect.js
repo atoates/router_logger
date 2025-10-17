@@ -26,7 +26,7 @@ function RouterQuickSelect({ onSelectRouter, onClear }) {
       }
     };
     load();
-    const interval = setInterval(load, 60000);
+    const interval = setInterval(load, 300000); // 5 minutes
     return () => { mounted = false; clearInterval(interval); };
   }, []);
 

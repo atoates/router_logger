@@ -9,8 +9,30 @@ const api = axios.create({
   },
 });
 
+// Simple in-module cache for routers with TTL and in-flight dedupe
+let _routersCache = { data: null, expiresAt: 0 };
+let _routersInflight = null;
+const ROUTERS_TTL_MS = (Number(process.env.REACT_APP_ROUTERS_TTL_SECONDS) || 90) * 1000;
+
 // Routers
-export const getRouters = () => api.get('/routers');
+export const getRouters = async () => {
+  const now = Date.now();
+  if (_routersCache.data && _routersCache.expiresAt > now) {
+    return { data: _routersCache.data, fromCache: true };
+  }
+  if (_routersInflight) {
+    return _routersInflight;
+  }
+  _routersInflight = api.get('/routers')
+    .then((res) => {
+      _routersCache = { data: res.data, expiresAt: Date.now() + ROUTERS_TTL_MS };
+      return res;
+    })
+    .finally(() => {
+      _routersInflight = null;
+    });
+  return _routersInflight;
+};
 
 // Logs
 export const getLogs = (params) => api.get('/logs', { params });
@@ -24,6 +46,7 @@ export const getNetworkUsage = (params) => api.get('/stats/network-usage', { par
 export const getOperators = (params) => api.get('/stats/operators', { params });
 export const getNetworkUsageRolling = (params) => api.get('/stats/network-usage-rolling', { params });
 export const getTopRoutersRolling = (params) => api.get('/stats/top-routers-rolling', { params });
+export const getOperatorsRolling = (params) => api.get('/stats/operators-rolling', { params });
 
 // Submit log (for testing)
 export const submitLog = (data) => api.post('/log', data);
