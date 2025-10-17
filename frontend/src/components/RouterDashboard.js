@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AreaChart, Area, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
 import { getLogs, getUsageStats, getUptimeData } from '../services/api';
 import './RouterDashboard.css';
 
@@ -209,10 +209,28 @@ export default function RouterDashboard({ router }) {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={(uptime||[]).slice(-120)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="timestamp" tickFormatter={(t)=> new Date(t).toLocaleTimeString()} hide />
-                  <YAxis hide />
-                  <Tooltip labelFormatter={(t)=> new Date(t).toLocaleString()} formatter={(v)=> v? 'online' : 'offline'} />
-                  <Bar dataKey={(d)=> (d.status==='online'||d.status===1||d.status==='1'||d.status===true)?1:0} fill="#10b981" name="Online" />
+                  <XAxis 
+                    dataKey="timestamp" 
+                    tickFormatter={(t)=> { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }}
+                    tick={{ fontSize: 10 }}
+                    interval="preserveStartEnd"
+                    minTickGap={12}
+                  />
+                  <YAxis domain={[0,1]} hide />
+                  <Tooltip 
+                    labelFormatter={(t)=> new Date(t).toLocaleString()} 
+                    formatter={(_, __, p)=> {
+                      const s = p?.payload?.status; 
+                      const on = (s==='online'||s===1||s==='1'||s===true);
+                      return on ? ['online','Status'] : ['offline','Status'];
+                    }} 
+                  />
+                  <Bar dataKey={() => 1} name="Status">
+                    {(uptime||[]).slice(-120).map((d, i) => {
+                      const s = d?.status; const on = (s==='online'||s===1||s==='1'||s===true);
+                      return <Cell key={`cell-${i}`} fill={on ? '#10b981' : '#ef4444'} />
+                    })}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
