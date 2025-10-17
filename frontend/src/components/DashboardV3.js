@@ -137,6 +137,7 @@ export default function DashboardV3({ onOpenRouter }) {
   const [mode, setMode] = useState('rolling');
   const [value, setValue] = useState(24);
   const [dark, setDark] = useState(false);
+  const [hoveredPill, setHoveredPill] = useState(null);
   const [routers, setRouters] = useState([]);
   const [usage, setUsage] = useState([]);
   const [usagePrev, setUsagePrev] = useState([]);
@@ -322,20 +323,22 @@ export default function DashboardV3({ onOpenRouter }) {
             <div className="v3-card-title">Top 5 Routers</div>
             <div style={{ height: 240 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={top} layout="vertical" margin={{ left: 200 }}>
+                <BarChart data={top} layout="vertical" margin={{ left: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={dark?'#334155':'#e5e7eb'} />
                   <XAxis type="number" tickFormatter={(v)=>formatBytes(v).split(' ')[0]} tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} />
                   <YAxis 
                     type="category" 
                     dataKey="name" 
-                    width={200} 
+                    width={160} 
                     tick={(props) => {
                       const { x, y, payload } = props;
                       const name = String(payload?.value || '');
                       const on = !!onOpenRouter;
                       const textColor = dark ? '#cbd5e1' : '#1f2937';
-                      const pillBg = dark ? '#1f2937' : '#e5e7eb';
-                      const charW = 7; // rough estimate
+                      const baseBg = dark ? '#1f2937' : '#e5e7eb';
+                      const hoverBg = dark ? '#374151' : '#d1d5db';
+                      const pillBg = hoveredPill === name ? hoverBg : baseBg;
+                      const charW = 6; // rough estimate
                       const padX = 10;
                       const h = 18;
                       const w = Math.min(180, Math.max(40, name.length * charW + padX * 2));
@@ -352,6 +355,8 @@ export default function DashboardV3({ onOpenRouter }) {
                              const router = routers.find(r => String(r.router_id) === String(rid)) || { router_id: rid, name };
                              onOpenRouter(router);
                            }}
+                           onMouseEnter={() => setHoveredPill(name)}
+                           onMouseLeave={() => setHoveredPill(null)}
                            role={on ? 'button' : undefined}
                            tabIndex={on ? 0 : undefined}
                         >
