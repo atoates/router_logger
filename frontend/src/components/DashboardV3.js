@@ -144,7 +144,7 @@ export default function DashboardV3() {
   const [operators, setOperators] = useState([]);
   const [storage, setStorage] = useState(null);
   const [dbSize, setDbSize] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
 
   const updateTime = (m, v) => { setMode(m); setValue(v); };
 
@@ -158,7 +158,7 @@ export default function DashboardV3() {
 
         const promises = [
           getRouters(),
-          storage? Promise.resolve({ data: storage }) : getStorageStats({ sample_size: 800 }),
+          getStorageStats({ sample_size: 800 }),
           mode==='rolling' ? getNetworkUsageRolling({ hours: hrs, bucket: 'hour' }) : getNetworkUsage({ days }),
           mode==='rolling' ? getTopRoutersRolling({ hours: hrs, limit: 5 }) : getTopRouters({ days, limit: 5 }),
           getOperators({ days: effectiveDaysForOps })

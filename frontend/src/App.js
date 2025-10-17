@@ -1,13 +1,6 @@
 import React, { useState } from 'react';
 import './App.css';
-import RouterQuickSelect from './components/RouterQuickSelect';
-import StatusSummary from './components/StatusSummary';
 import ErrorBoundary from './components/ErrorBoundary';
-import DateRangeFilter from './components/DateRangeFilter';
-import UsageStats from './components/UsageStats';
-import DataCharts from './components/DataCharts';
-import LogsTable from './components/LogsTable';
-import DeviceInfo from './components/DeviceInfo';
 import RMSAuthButton from './components/RMSAuthButton';
 import TopRouters from './components/TopRouters';
 import NetworkOverview from './components/NetworkOverview';
@@ -17,28 +10,25 @@ import RouterDashboard from './components/RouterDashboard';
 import HeaderRouterSelect from './components/HeaderRouterSelect';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { subDays, startOfDay, endOfDay } from 'date-fns';
+// import { subDays, startOfDay, endOfDay } from 'date-fns';
 
 function App() {
   const [selectedRouter, setSelectedRouter] = useState(null);
   const [activeTab, setActiveTab] = useState('network'); // 'network' | 'router'
-  const [timePreset, setTimePreset] = useState({ type: 'rolling', value: 24 }); // rolling hours or calendar days
+  const [timePreset] = useState({ type: 'rolling', value: 24 }); // rolling hours or calendar days
   const [dashboardVersion, setDashboardVersion] = useState('v3'); // 'v1' | 'v2' | 'v3'
-  const [dateRange, setDateRange] = useState({
-    startDate: startOfDay(subDays(new Date(), 7)).toISOString(),
-    endDate: endOfDay(new Date()).toISOString()
-  });
+  // Deprecated V1 date range state (no longer used)
+  // const [dateRange, setDateRange] = useState({
+  //   startDate: startOfDay(subDays(new Date(), 7)).toISOString(),
+  //   endDate: endOfDay(new Date()).toISOString()
+  // });
 
-  const handleRouterSelect = (router) => {
-    setSelectedRouter(router);
-    const label = router.name ? `${router.name} (ID ${router.router_id})` : `ID ${router.router_id}`;
-    toast.success(`Selected router: ${label}`);
-  };
+  // Removed quick-select handler per request
 
-  const handleFilterChange = (newRange) => {
-    setDateRange(newRange);
-    toast.info('Date range updated');
-  };
+  // const handleFilterChange = (newRange) => {
+  //   setDateRange(newRange);
+  //   toast.info('Date range updated');
+  // };
 
   // Header router selector should always open the Router details in V1
   const handleHeaderRouterSelect = (router) => {
@@ -188,27 +178,7 @@ function App() {
 
         {/* RMS OAuth status moved to header; panel removed */}
 
-        {/* Quick select by Name */}
-        <ErrorBoundary>
-          <RouterQuickSelect 
-            onSelectRouter={handleRouterSelect}
-            onClear={() => setSelectedRouter(null)}
-          />
-        </ErrorBoundary>
-
-        {/* Tabs and time selectors */}
-        <div className="card" style={{ display:'flex', alignItems:'center', gap:16, justifyContent:'space-between' }}>
-          <div className="tabs">
-            <button className={`btn ${activeTab==='network'?'btn-primary':'btn-secondary'}`} onClick={()=>setActiveTab('network')}>Network</button>
-            <button className={`btn ${activeTab==='router'?'btn-primary':'btn-secondary'}`} onClick={()=>setActiveTab('router')} disabled={!selectedRouter}>Router</button>
-          </div>
-          <div className="time-selectors" style={{ display:'flex', gap:8 }}>
-            <button className={`btn ${timePreset.type==='rolling'&&timePreset.value===24?'btn-primary':'btn-secondary'}`} onClick={()=>setTimePreset({type:'rolling', value:24})}>Last 24h</button>
-            <button className={`btn ${timePreset.type==='days'&&timePreset.value===7?'btn-primary':'btn-secondary'}`} onClick={()=>setTimePreset({type:'days', value:7})}>7d</button>
-            <button className={`btn ${timePreset.type==='days'&&timePreset.value===30?'btn-primary':'btn-secondary'}`} onClick={()=>setTimePreset({type:'days', value:30})}>30d</button>
-            <button className={`btn ${timePreset.type==='days'&&timePreset.value===90?'btn-primary':'btn-secondary'}`} onClick={()=>setTimePreset({type:'days', value:90})}>90d</button>
-          </div>
-        </div>
+        {/* Removed: Quick select and tabs/time controls per request */}
 
         {activeTab==='router' && selectedRouter && (
           <ErrorBoundary>
@@ -220,7 +190,7 @@ function App() {
           <>
             <div className="card">
               <h2>👆 Get Started</h2>
-              <p>Start typing a router name above to view its details, statistics, and logs.</p>
+              <p>Use the router selector in the header to open a router’s details. Network overview below defaults to the last 24 hours.</p>
             </div>
             <ErrorBoundary>
               {timePreset.type==='rolling' ? (

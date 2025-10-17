@@ -28,7 +28,7 @@ function StatusPill({ status }) {
 
 export default function RouterDashboard({ router }) {
   const [range, setRange] = useState({ type: 'hours', value: 24 }); // hours|days
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState(null);
   const [uptime, setUptime] = useState([]);
