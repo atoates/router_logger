@@ -14,6 +14,7 @@ import NetworkOverview from './components/NetworkOverview';
 import DashboardV2 from './components/DashboardV2';
 import DashboardV3 from './components/DashboardV3';
 import RouterDashboard from './components/RouterDashboard';
+import Logo from '../Logo.png';
 import HeaderRouterSelect from './components/HeaderRouterSelect';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -60,13 +61,14 @@ function App() {
               <p>Monitor and analyze your RUT200 router network in real-time</p>
             </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <img src={Logo} alt="Logo" style={{ height: 28, width: 'auto', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.15)' }} />
               <div style={{ display: 'flex', gap: 8, background: 'rgba(255,255,255,0.2)', padding: 4, borderRadius: 8 }}>
                 <button 
                   className={`btn ${dashboardVersion === 'v1' ? 'btn-primary' : 'btn-secondary'}`}
                   onClick={() => setDashboardVersion('v1')}
                   style={{ fontSize: 12 }}
                 >
-                  V1
+                  Router Log
                 </button>
                 <button 
                   className={`btn ${dashboardVersion === 'v2' ? 'btn-primary' : 'btn-secondary'}`}
@@ -107,13 +109,14 @@ function App() {
               <p>Monitor and analyze your RUT200 router network in real-time</p>
             </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <img src={Logo} alt="Logo" style={{ height: 28, width: 'auto', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.15)' }} />
               <div style={{ display: 'flex', gap: 8, background: 'rgba(255,255,255,0.2)', padding: 4, borderRadius: 8 }}>
                 <button 
                   className={`btn ${dashboardVersion === 'v1' ? 'btn-primary' : 'btn-secondary'}`}
                   onClick={() => setDashboardVersion('v1')}
                   style={{ fontSize: 12 }}
                 >
-                  V1
+                  Router Log
                 </button>
                 <button 
                   className={`btn ${dashboardVersion === 'v2' ? 'btn-primary' : 'btn-secondary'}`}
@@ -153,13 +156,14 @@ function App() {
             <p>Monitor and analyze your RUT200 router network in real-time</p>
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <img src={Logo} alt="Logo" style={{ height: 28, width: 'auto', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.15)' }} />
             <div style={{ display: 'flex', gap: 8, background: 'rgba(255,255,255,0.2)', padding: 4, borderRadius: 8 }}>
               <button 
                 className={`btn ${dashboardVersion === 'v1' ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => setDashboardVersion('v1')}
                 style={{ fontSize: 12 }}
               >
-                V1
+                Router Log
               </button>
               <button 
                 className={`btn ${dashboardVersion === 'v2' ? 'btn-primary' : 'btn-secondary'}`}
@@ -181,10 +185,7 @@ function App() {
           </div>
         </div>
 
-        {/* Top-level network status */}
-        <ErrorBoundary>
-          <StatusSummary />
-        </ErrorBoundary>
+        {/* Top-level network status removed as requested */}
 
         {/* RMS OAuth status moved to header; panel removed */}
 
