@@ -133,7 +133,7 @@ function DeltaBadge({ current, previous }) {
   return <span className={`delta ${cls}`}>{sym} {Math.abs(rounded)}%</span>;
 }
 
-export default function DashboardV3() {
+export default function DashboardV3({ onOpenRouter }) {
   const [mode, setMode] = useState('rolling');
   const [value, setValue] = useState(24);
   const [dark, setDark] = useState(false);
@@ -170,7 +170,7 @@ export default function DashboardV3() {
         setRouters(rRes.data || []);
         setStorage(sRes.data || null);
         setUsage(uRes.data || []);
-        setTop((tRes.data || []).map(r=>({ name: r.name || r.router_id, tx_bytes: Number(r.tx_bytes)||0, rx_bytes: Number(r.rx_bytes)||0, total_bytes: Number(r.total_bytes)||0 })));
+  setTop((tRes.data || []).map(r=>({ router_id: r.router_id, name: r.name || r.router_id, tx_bytes: Number(r.tx_bytes)||0, rx_bytes: Number(r.rx_bytes)||0, total_bytes: Number(r.total_bytes)||0 })));
         setOperators((oRes.data || []).map((x,i)=>({ name: x.operator || 'Unknown', value: Number(x.total_bytes)||0, fill: COLORS[i%COLORS.length] })));
   setDbSize(dbRes?.data || null);
 
@@ -325,11 +325,44 @@ export default function DashboardV3() {
                 <BarChart data={top} layout="vertical" margin={{ left: 80 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={dark?'#334155':'#e5e7eb'} />
                   <XAxis type="number" tickFormatter={(v)=>formatBytes(v).split(' ')[0]} tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} />
-                  <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 12, fill: dark?'#cbd5e1':'#475569' }} />
+                  <YAxis 
+                    type="category" 
+                    dataKey="name" 
+                    width={160} 
+                    tick={(props) => {
+                      const { x, y, payload } = props;
+                      const name = payload?.value;
+                      const fill = dark ? '#cbd5e1' : '#475569';
+                      return (
+                        <text x={x} y={y} dy={4} textAnchor="end" fill={fill} style={{ cursor: onOpenRouter ? 'pointer' : 'default' }}
+                          onClick={() => {
+                            if (!onOpenRouter) return;
+                            const item = top.find(t => t.name === name);
+                            const rid = item?.router_id;
+                            if (!rid) return;
+                            const router = routers.find(r => String(r.router_id) === String(rid)) || { router_id: rid, name: name };
+                            onOpenRouter(router);
+                          }}
+                        >{name}</text>
+                      );
+                    }}
+                  />
                   <Tooltip formatter={(v)=>formatBytes(v)} />
                   <Legend />
-                  <Bar dataKey="tx_bytes" stackId="a" fill="#6366f1" name="TX" />
-                  <Bar dataKey="rx_bytes" stackId="a" fill="#10b981" name="RX" />
+                  <Bar dataKey="tx_bytes" stackId="a" fill="#6366f1" name="TX" onClick={(d)=>{
+                    if (!onOpenRouter) return;
+                    const rid = d?.payload?.router_id;
+                    if (!rid) return;
+                    const router = routers.find(r => String(r.router_id) === String(rid)) || { router_id: rid, name: d?.payload?.name };
+                    onOpenRouter(router);
+                  }} />
+                  <Bar dataKey="rx_bytes" stackId="a" fill="#10b981" name="RX" onClick={(d)=>{
+                    if (!onOpenRouter) return;
+                    const rid = d?.payload?.router_id;
+                    if (!rid) return;
+                    const router = routers.find(r => String(r.router_id) === String(rid)) || { router_id: rid, name: d?.payload?.name };
+                    onOpenRouter(router);
+                  }} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -79,7 +79,7 @@ function App() {
             </div>
           </div>
           <ErrorBoundary>
-            <DashboardV3 />
+            <DashboardV3 onOpenRouter={handleHeaderRouterSelect} />
           </ErrorBoundary>
         </div>
         <ToastContainer position="bottom-right" autoClose={3000} />
