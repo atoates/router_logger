@@ -13,6 +13,7 @@ import TopRouters from './components/TopRouters';
 import NetworkOverview from './components/NetworkOverview';
 import DashboardV2 from './components/DashboardV2';
 import DashboardV3 from './components/DashboardV3';
+import RouterDashboard from './components/RouterDashboard';
 import HeaderRouterSelect from './components/HeaderRouterSelect';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -210,36 +211,10 @@ function App() {
         </div>
 
         {activeTab==='router' && selectedRouter && (
-          <>
-            <ErrorBoundary>
-              <DateRangeFilter onFilterChange={handleFilterChange} />
-            </ErrorBoundary>
-            <ErrorBoundary>
-              <DeviceInfo routerId={selectedRouter.router_id} />
-            </ErrorBoundary>
-            <ErrorBoundary>
-              <UsageStats 
-                routerId={selectedRouter.router_id}
-                startDate={dateRange.startDate}
-                endDate={dateRange.endDate}
-              />
-            </ErrorBoundary>
-            <ErrorBoundary>
-              <DataCharts 
-                routerId={selectedRouter.router_id}
-                startDate={dateRange.startDate}
-                endDate={dateRange.endDate}
-              />
-            </ErrorBoundary>
-            <ErrorBoundary>
-              <LogsTable 
-                routerId={selectedRouter.router_id}
-                startDate={dateRange.startDate}
-                endDate={dateRange.endDate}
-              />
-            </ErrorBoundary>
-          </>
-  )}
+          <ErrorBoundary>
+            <RouterDashboard router={selectedRouter} />
+          </ErrorBoundary>
+        )}
 
         {activeTab==='network' && (
           <>
