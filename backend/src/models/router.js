@@ -920,6 +920,7 @@ async function getInspectionStatus() {
         location,
         created_at,
         last_seen,
+        created_at + INTERVAL '365 days' AS inspection_due,
         EXTRACT(DAY FROM (created_at + INTERVAL '365 days' - CURRENT_TIMESTAMP))::INTEGER AS days_remaining,
         CASE 
           WHEN created_at + INTERVAL '365 days' < CURRENT_TIMESTAMP THEN true
@@ -935,6 +936,7 @@ async function getInspectionStatus() {
       location: r.location,
       created_at: r.created_at,
       last_seen: r.last_seen,
+      inspection_due: r.inspection_due,
       days_remaining: Number(r.days_remaining) || 0,
       overdue: r.overdue
     }));

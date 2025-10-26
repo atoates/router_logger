@@ -223,9 +223,15 @@ export default function RouterDashboard({ router }) {
           </div>
           <div className="sub">
             {inspectionStatus ? (
-              inspectionStatus.overdue 
-                ? 'OVERDUE - Reinspection Required' 
-                : 'until reinspection'
+              <>
+                {inspectionStatus.overdue 
+                  ? 'OVERDUE - Reinspection Required' 
+                  : 'until reinspection'}
+                <br/>
+                <span style={{ fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  Due: {inspectionStatus.inspectionDue.toLocaleDateString()}
+                </span>
+              </>
             ) : 'No inspection date'}
           </div>
         </div>
