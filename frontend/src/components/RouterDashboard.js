@@ -128,6 +128,24 @@ export default function RouterDashboard({ router }) {
     let m = 1; for (const d of series.txrx||[]) { if (d.tx_bytes>m) m=d.tx_bytes; if (d.rx_bytes>m) m=d.rx_bytes; } return Math.ceil(m*1.1);
   }, [series]);
 
+  // Calculate inspection status
+  const inspectionStatus = useMemo(() => {
+    if (!router?.created_at) return null;
+    const createdDate = new Date(router.created_at);
+    const inspectionDue = new Date(createdDate);
+    inspectionDue.setFullYear(inspectionDue.getFullYear() + 1); // 365 days from created_at
+    const now = new Date();
+    const msRemaining = inspectionDue - now;
+    const daysRemaining = Math.floor(msRemaining / (1000 * 60 * 60 * 24));
+    const overdue = daysRemaining < 0;
+    return {
+      createdDate,
+      inspectionDue,
+      daysRemaining,
+      overdue
+    };
+  }, [router]);
+
   const latest = series.latest;
 
   // Load logo as data URL
@@ -193,6 +211,23 @@ export default function RouterDashboard({ router }) {
           <div className="label">Logs</div>
           <div className="value">{stats?.total_logs?.toLocaleString?.() || (logs?.length||0)}</div>
           <div className="sub">in range</div>
+        </div>
+        <div className="metric" style={{ borderLeftColor: inspectionStatus?.overdue ? '#ef4444' : '#f59e0b' }}>
+          <div className="label">Inspection Status</div>
+          <div className="value">
+            {inspectionStatus ? (
+              inspectionStatus.overdue 
+                ? `${Math.abs(inspectionStatus.daysRemaining)} days overdue` 
+                : `${inspectionStatus.daysRemaining} days`
+            ) : '—'}
+          </div>
+          <div className="sub">
+            {inspectionStatus ? (
+              inspectionStatus.overdue 
+                ? 'OVERDUE - Reinspection Required' 
+                : 'until reinspection'
+            ) : 'No inspection date'}
+          </div>
         </div>
       </div>
 

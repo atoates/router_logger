@@ -15,7 +15,8 @@ const {
   getNetworkUsageRolling,
   getTopRoutersByUsageRolling,
   getOperatorDistributionRolling,
-  getDatabaseSizeStats
+  getDatabaseSizeStats,
+  getInspectionStatus
 } = require('../models/router');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger } = require('../config/database');
@@ -251,6 +252,17 @@ router.get('/stats/db-size', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching database size stats:', error);
     res.status(500).json({ error: 'Failed to fetch database size stats' });
+  }
+});
+
+// GET inspection status for all routers
+router.get('/stats/inspections', async (req, res) => {
+  try {
+    const data = await getInspectionStatus();
+    res.json(data);
+  } catch (error) {
+    logger.error('Error fetching inspection status:', error);
+    res.status(500).json({ error: 'Failed to fetch inspection status' });
   }
 });
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getRouters, getNetworkUsageRolling, getNetworkUsage, getTopRoutersRolling, getTopRouters, getOperators, getStorageStats } from '../services/api';
+import { getRouters, getNetworkUsageRolling, getNetworkUsage, getTopRoutersRolling, getTopRouters, getOperators, getStorageStats, getInspectionStatus } from '../services/api';
 import api from '../services/api';
 import { AreaChart, Area, BarChart, Bar, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
 import '../DashboardV3.css';
@@ -145,6 +145,7 @@ export default function DashboardV3({ onOpenRouter }) {
   const [operators, setOperators] = useState([]);
   const [storage, setStorage] = useState(null);
   const [dbSize, setDbSize] = useState(null);
+  const [inspections, setInspections] = useState([]);
   const [, setLoading] = useState(true);
 
   const updateTime = (m, v) => { setMode(m); setValue(v); };
@@ -169,8 +170,14 @@ export default function DashboardV3({ onOpenRouter }) {
           console.error('DB size fetch error:', err);
           return { data: null };
         });
+        // Also fetch inspection status
+        const inspectionPromise = getInspectionStatus().catch((err)=>{
+          console.error('Inspection fetch error:', err);
+          return { data: [] };
+        });
         const [rRes, sRes, uRes, tRes, oRes] = await Promise.all(promises);
         const dbRes = await dbSizePromise;
+        const inspRes = await inspectionPromise;
         console.log('DB size response:', dbRes);
         setRouters(rRes.data || []);
         setStorage(sRes.data || null);
@@ -179,6 +186,7 @@ export default function DashboardV3({ onOpenRouter }) {
         setOperators((oRes.data || []).map((x,i)=>({ name: x.operator || 'Unknown', value: Number(x.total_bytes)||0, fill: COLORS[i%COLORS.length] })));
   setDbSize(dbRes?.data || null);
         console.log('DB size state set to:', dbRes?.data);
+        setInspections(inspRes?.data || []);
 
         // Previous period for network-level delta
         if (mode==='rolling') {
@@ -408,6 +416,48 @@ export default function DashboardV3({ onOpenRouter }) {
               </div>
             </div>
           )}
+          
+          {/* Overdue Inspections Card */}
+          {(() => {
+            const overdue = inspections.filter(i => i.overdue);
+            if (overdue.length === 0) return null;
+            return (
+              <div className="v3-card">
+                <div className="v3-card-title" style={{ color: '#ef4444' }}>⚠️ Overdue Inspections ({overdue.length})</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:300, overflowY:'auto' }}>
+                  {overdue.map(insp => (
+                    <div 
+                      key={insp.router_id} 
+                      style={{ 
+                        display:'flex', 
+                        justifyContent:'space-between', 
+                        alignItems:'center',
+                        padding: 8,
+                        background: dark ? '#1f2937' : '#fee2e2',
+                        borderRadius: 6,
+                        cursor: onOpenRouter ? 'pointer' : 'default',
+                        borderLeft: '3px solid #ef4444'
+                      }}
+                      onClick={() => {
+                        if (!onOpenRouter) return;
+                        const router = routers.find(r => String(r.router_id) === String(insp.router_id)) || { router_id: insp.router_id, name: insp.name };
+                        onOpenRouter(router);
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{insp.name}</div>
+                        <div style={{ fontSize: 12, color: '#64748b' }}>{insp.location || 'No location'}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontWeight: 600, color: '#ef4444' }}>{Math.abs(insp.days_remaining)} days</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>overdue</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 

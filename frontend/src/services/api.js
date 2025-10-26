@@ -48,6 +48,9 @@ export const getNetworkUsageRolling = (params) => api.get('/stats/network-usage-
 export const getTopRoutersRolling = (params) => api.get('/stats/top-routers-rolling', { params });
 export const getOperatorsRolling = (params) => api.get('/stats/operators-rolling', { params });
 
+// Inspections
+export const getInspectionStatus = () => api.get('/stats/inspections');
+
 // Submit log (for testing)
 export const submitLog = (data) => api.post('/log', data);
 

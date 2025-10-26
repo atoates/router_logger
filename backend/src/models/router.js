@@ -907,4 +907,42 @@ async function getDatabaseSizeStats() {
   }
 }
 
+/**
+ * Get inspection status for all routers
+ * Returns routers with days_remaining until reinspection (365 days from created_at)
+ */
+async function getInspectionStatus() {
+  try {
+    const query = `
+      SELECT 
+        router_id,
+        name,
+        location,
+        created_at,
+        last_seen,
+        EXTRACT(DAY FROM (created_at + INTERVAL '365 days' - CURRENT_TIMESTAMP))::INTEGER AS days_remaining,
+        CASE 
+          WHEN created_at + INTERVAL '365 days' < CURRENT_TIMESTAMP THEN true
+          ELSE false
+        END AS overdue
+      FROM routers
+      ORDER BY days_remaining ASC;
+    `;
+    const result = await pool.query(query);
+    return result.rows.map(r => ({
+      router_id: r.router_id,
+      name: r.name || r.router_id,
+      location: r.location,
+      created_at: r.created_at,
+      last_seen: r.last_seen,
+      days_remaining: Number(r.days_remaining) || 0,
+      overdue: r.overdue
+    }));
+  } catch (error) {
+    logger.error('Error getting inspection status:', error);
+    throw error;
+  }
+}
+
 module.exports.getDatabaseSizeStats = getDatabaseSizeStats;
+module.exports.getInspectionStatus = getInspectionStatus;
