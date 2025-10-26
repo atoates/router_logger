@@ -327,7 +327,7 @@ export default function RouterDashboard({ router }) {
         <div className="col">
           <div className="card">
             <div className="card-title">TX/RX ({label})</div>
-            <div style={{ height: 220 }}>
+            <div style={{ height: 240 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={series.txrx} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
@@ -371,7 +371,7 @@ export default function RouterDashboard({ router }) {
 
           <div className="card">
             <div className="card-title">Uptime samples</div>
-            <div style={{ height: 120 }}>
+            <div style={{ height: 140 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={(uptime||[]).slice(-120)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -407,49 +407,42 @@ export default function RouterDashboard({ router }) {
               <span>Inspections</span>
               <button 
                 className="btn btn-sm btn-primary" 
-                style={{ fontSize: '12px', padding: '4px 12px' }}
+                style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '6px' }}
                 onClick={handleLogInspection}
               >
                 ✓ Log Inspection
               </button>
             </div>
-            <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+            <div className="inspections-list">
               {inspections.length === 0 ? (
-                <div style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>
+                <div className="inspections-empty">
                   No inspections logged yet
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <>
                   {inspections.map((insp, idx) => (
-                    <div 
-                      key={insp.id} 
-                      style={{ 
-                        padding: 8, 
-                        background: idx === 0 ? '#f0fdf4' : '#f8fafc',
-                        borderLeft: idx === 0 ? '3px solid #10b981' : '3px solid #e2e8f0',
-                        borderRadius: 4,
-                        fontSize: 13
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <strong>{new Date(insp.inspected_at).toLocaleDateString()}</strong>
-                        <span style={{ color: '#64748b', fontSize: 11 }}>
+                    <div key={insp.id} className={`inspection-item ${idx === 0 ? 'latest' : ''}`}>
+                      <div className="inspection-header">
+                        <span className="inspection-date">
+                          {new Date(insp.inspected_at).toLocaleDateString()}
+                        </span>
+                        <span className="inspection-time">
                           {new Date(insp.inspected_at).toLocaleTimeString()}
                         </span>
                       </div>
                       {insp.inspected_by && (
-                        <div style={{ color: '#64748b', fontSize: 11 }}>
+                        <div className="inspection-by">
                           By: {insp.inspected_by}
                         </div>
                       )}
                       {insp.notes && (
-                        <div style={{ color: '#475569', fontSize: 11, marginTop: 4 }}>
+                        <div className="inspection-notes">
                           {insp.notes}
                         </div>
                       )}
                     </div>
                   ))}
-                </div>
+                </>
               )}
             </div>
           </div>
