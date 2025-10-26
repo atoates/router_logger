@@ -130,7 +130,10 @@ export default function RouterDashboard({ router }) {
 
   // Calculate inspection status
   const inspectionStatus = useMemo(() => {
-    if (!router?.created_at) return null;
+    if (!router?.created_at) {
+      console.log('RouterDashboard - No created_at for router:', router?.router_id, 'Router object:', router);
+      return null;
+    }
     const createdDate = new Date(router.created_at);
     const inspectionDue = new Date(createdDate);
     inspectionDue.setFullYear(inspectionDue.getFullYear() + 1); // 365 days from created_at
@@ -138,6 +141,13 @@ export default function RouterDashboard({ router }) {
     const msRemaining = inspectionDue - now;
     const daysRemaining = Math.floor(msRemaining / (1000 * 60 * 60 * 24));
     const overdue = daysRemaining < 0;
+    console.log('RouterDashboard - Inspection calc for', router.router_id, {
+      created_at: router.created_at,
+      createdDate: createdDate.toISOString(),
+      inspectionDue: inspectionDue.toISOString(),
+      daysRemaining,
+      overdue
+    });
     return {
       createdDate,
       inspectionDue,
