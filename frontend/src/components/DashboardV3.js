@@ -165,15 +165,20 @@ export default function DashboardV3({ onOpenRouter }) {
           getOperators({ days: effectiveDaysForOps })
         ];
         // Also fetch DB size (non-blocking for critical metrics)
-        const dbSizePromise = api.get('/stats/db-size').catch(()=>({ data: null }));
+        const dbSizePromise = api.get('/stats/db-size').catch((err)=>{
+          console.error('DB size fetch error:', err);
+          return { data: null };
+        });
         const [rRes, sRes, uRes, tRes, oRes] = await Promise.all(promises);
         const dbRes = await dbSizePromise;
+        console.log('DB size response:', dbRes);
         setRouters(rRes.data || []);
         setStorage(sRes.data || null);
         setUsage(uRes.data || []);
   setTop((tRes.data || []).map(r=>({ router_id: r.router_id, name: r.name || r.router_id, tx_bytes: Number(r.tx_bytes)||0, rx_bytes: Number(r.rx_bytes)||0, total_bytes: Number(r.total_bytes)||0 })));
         setOperators((oRes.data || []).map((x,i)=>({ name: x.operator || 'Unknown', value: Number(x.total_bytes)||0, fill: COLORS[i%COLORS.length] })));
   setDbSize(dbRes?.data || null);
+        console.log('DB size state set to:', dbRes?.data);
 
         // Previous period for network-level delta
         if (mode==='rolling') {
