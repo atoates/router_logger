@@ -16,7 +16,9 @@ const {
   getTopRoutersByUsageRolling,
   getOperatorDistributionRolling,
   getDatabaseSizeStats,
-  getInspectionStatus
+  getInspectionStatus,
+  logInspection,
+  getInspectionHistory
 } = require('../models/router');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger } = require('../config/database');
@@ -263,6 +265,31 @@ router.get('/stats/inspections', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching inspection status:', error);
     res.status(500).json({ error: 'Failed to fetch inspection status' });
+  }
+});
+
+// POST log inspection for a router
+router.post('/inspections/:routerId', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const { inspected_by, notes } = req.body;
+    const inspection = await logInspection(routerId, inspected_by, notes);
+    res.json({ success: true, inspection });
+  } catch (error) {
+    logger.error('Error logging inspection:', error);
+    res.status(500).json({ error: 'Failed to log inspection' });
+  }
+});
+
+// GET inspection history for a router
+router.get('/inspections/:routerId', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const history = await getInspectionHistory(routerId);
+    res.json(history);
+  } catch (error) {
+    logger.error('Error fetching inspection history:', error);
+    res.status(500).json({ error: 'Failed to fetch inspection history' });
   }
 });
 

@@ -88,6 +88,28 @@ async function initializeDatabase() {
     // Add rms_created_at column to routers table for RMS device creation date (used for inspection tracking)
     await client.query(`ALTER TABLE routers ADD COLUMN IF NOT EXISTS rms_created_at TIMESTAMP;`);
 
+    // Create inspection_logs table to track device inspections
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS inspection_logs (
+        id SERIAL PRIMARY KEY,
+        router_id VARCHAR(255) NOT NULL,
+        inspected_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        inspected_by VARCHAR(255),
+        notes TEXT,
+        FOREIGN KEY (router_id) REFERENCES routers(router_id) ON DELETE CASCADE
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_inspection_logs_router_id 
+      ON inspection_logs(router_id);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_inspection_logs_inspected_at 
+      ON inspection_logs(inspected_at DESC);
+    `);
+
     // Create oauth_tokens table for RMS OAuth authentication
     await client.query(`
       CREATE TABLE IF NOT EXISTS oauth_tokens (

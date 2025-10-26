@@ -2,8 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { AreaChart, Area, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
-import { getLogs, getUsageStats, getUptimeData } from '../services/api';
+import { getLogs, getUsageStats, getUptimeData, logInspection } from '../services/api';
 import { exportUptimeReportToPDF } from '../utils/exportUtils';
+import { toast } from 'react-toastify';
 import './RouterDashboard.css';
 
 function formatBytes(bytes) {
@@ -182,6 +183,21 @@ export default function RouterDashboard({ router }) {
     await exportUptimeReportToPDF(uptime || [], routerId, start, end, { logoDataUrl });
   };
 
+  const handleLogInspection = async () => {
+    try {
+      await logInspection(routerId, {
+        inspected_by: 'System User',
+        notes: 'Inspection logged via dashboard'
+      });
+      toast.success('Inspection logged successfully! Counter will reset on next data refresh.');
+      // Reload the page after a short delay to show updated inspection status
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (error) {
+      console.error('Failed to log inspection:', error);
+      toast.error('Failed to log inspection');
+    }
+  };
+
   return (
     <div className="router-dash">
       <div className="rd-header">
@@ -244,6 +260,13 @@ export default function RouterDashboard({ router }) {
                 <span style={{ fontSize: '11px', marginTop: '4px', display: 'block' }}>
                   Due: {inspectionStatus.inspectionDue.toLocaleDateString()}
                 </span>
+                <button 
+                  className="btn btn-sm" 
+                  style={{ marginTop: '8px', fontSize: '12px', padding: '4px 12px' }}
+                  onClick={handleLogInspection}
+                >
+                  ✓ Log Inspection
+                </button>
               </>
             ) : 'No inspection date'}
           </div>
@@ -328,6 +351,7 @@ export default function RouterDashboard({ router }) {
           <div className="card">
             <div className="card-title">Latest</div>
             <div className="kv">
+              <div><span>IMEI</span><strong>{router?.imei || latest?.imei || '—'}</strong></div>
               <div><span>Operator</span><strong>{latest?.operator || '—'}</strong></div>
               <div><span>Network</span><strong>{latest?.network_type || '—'}</strong></div>
               <div><span>Firmware</span><strong>{latest?.firmware_version || router?.firmware_version || '—'}</strong></div>

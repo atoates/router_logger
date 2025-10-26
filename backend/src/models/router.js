@@ -911,25 +911,44 @@ async function getDatabaseSizeStats() {
 
 /**
  * Get inspection status for all routers
- * Returns routers with days_remaining until reinspection (365 days from created_at)
+ * Returns routers with days_remaining until reinspection (365 days from last inspection or created_at)
  */
 async function getInspectionStatus() {
   try {
     const query = `
       SELECT 
-        router_id,
-        name,
-        location,
-        created_at,
-        rms_created_at,
-        last_seen,
-        COALESCE(rms_created_at, created_at) + INTERVAL '365 days' AS inspection_due,
-        EXTRACT(DAY FROM (COALESCE(rms_created_at, created_at) + INTERVAL '365 days' - CURRENT_TIMESTAMP))::INTEGER AS days_remaining,
+        r.router_id,
+        r.name,
+        r.location,
+        r.created_at,
+        r.rms_created_at,
+        r.last_seen,
+        COALESCE(
+          (SELECT inspected_at FROM inspection_logs WHERE router_id = r.router_id ORDER BY inspected_at DESC LIMIT 1),
+          r.rms_created_at,
+          r.created_at
+        ) AS last_inspection,
+        COALESCE(
+          (SELECT inspected_at FROM inspection_logs WHERE router_id = r.router_id ORDER BY inspected_at DESC LIMIT 1),
+          r.rms_created_at,
+          r.created_at
+        ) + INTERVAL '365 days' AS inspection_due,
+        EXTRACT(DAY FROM (
+          COALESCE(
+            (SELECT inspected_at FROM inspection_logs WHERE router_id = r.router_id ORDER BY inspected_at DESC LIMIT 1),
+            r.rms_created_at,
+            r.created_at
+          ) + INTERVAL '365 days' - CURRENT_TIMESTAMP
+        ))::INTEGER AS days_remaining,
         CASE 
-          WHEN COALESCE(rms_created_at, created_at) + INTERVAL '365 days' < CURRENT_TIMESTAMP THEN true
+          WHEN COALESCE(
+            (SELECT inspected_at FROM inspection_logs WHERE router_id = r.router_id ORDER BY inspected_at DESC LIMIT 1),
+            r.rms_created_at,
+            r.created_at
+          ) + INTERVAL '365 days' < CURRENT_TIMESTAMP THEN true
           ELSE false
         END AS overdue
-      FROM routers
+      FROM routers r
       ORDER BY days_remaining ASC;
     `;
     const result = await pool.query(query);
@@ -937,7 +956,7 @@ async function getInspectionStatus() {
       router_id: r.router_id,
       name: r.name || r.router_id,
       location: r.location,
-      created_at: r.rms_created_at || r.created_at,
+      created_at: r.last_inspection,
       last_seen: r.last_seen,
       inspection_due: r.inspection_due,
       days_remaining: Number(r.days_remaining) || 0,
@@ -949,5 +968,44 @@ async function getInspectionStatus() {
   }
 }
 
+/**
+ * Log a new inspection for a router
+ */
+async function logInspection(routerId, inspectedBy = null, notes = null) {
+  try {
+    const query = `
+      INSERT INTO inspection_logs (router_id, inspected_by, notes)
+      VALUES ($1, $2, $3)
+      RETURNING *;
+    `;
+    const result = await pool.query(query, [routerId, inspectedBy, notes]);
+    logger.info(`Logged inspection for router ${routerId}`);
+    return result.rows[0];
+  } catch (error) {
+    logger.error('Error logging inspection:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get inspection history for a router
+ */
+async function getInspectionHistory(routerId) {
+  try {
+    const query = `
+      SELECT * FROM inspection_logs
+      WHERE router_id = $1
+      ORDER BY inspected_at DESC;
+    `;
+    const result = await pool.query(query, [routerId]);
+    return result.rows;
+  } catch (error) {
+    logger.error('Error getting inspection history:', error);
+    throw error;
+  }
+}
+
 module.exports.getDatabaseSizeStats = getDatabaseSizeStats;
 module.exports.getInspectionStatus = getInspectionStatus;
+module.exports.logInspection = logInspection;
+module.exports.getInspectionHistory = getInspectionHistory;

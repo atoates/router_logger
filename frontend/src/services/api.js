@@ -50,6 +50,8 @@ export const getOperatorsRolling = (params) => api.get('/stats/operators-rolling
 
 // Inspections
 export const getInspectionStatus = () => api.get('/stats/inspections');
+export const logInspection = (routerId, data) => api.post(`/inspections/${routerId}`, data);
+export const getInspectionHistory = (routerId) => api.get(`/inspections/${routerId}`);
 
 // Submit log (for testing)
 export const submitLog = (data) => api.post('/log', data);
