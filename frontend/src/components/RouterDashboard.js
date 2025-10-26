@@ -135,7 +135,16 @@ export default function RouterDashboard({ router }) {
 
   // Calculate inspection status
   const inspectionStatus = useMemo(() => {
-    const inspectionDate = router?.rms_created_at || router?.created_at;
+    // Priority: 1) Last inspection log, 2) RMS created_at, 3) Local created_at
+    let inspectionDate;
+    if (inspections && inspections.length > 0) {
+      // Use most recent inspection
+      inspectionDate = inspections[0].inspected_at;
+    } else {
+      // Fallback to RMS created_at or local created_at
+      inspectionDate = router?.rms_created_at || router?.created_at;
+    }
+    
     if (!inspectionDate) {
       console.log('RouterDashboard - No inspection date for router:', router?.router_id, 'Router object:', router);
       return null;
@@ -148,6 +157,8 @@ export default function RouterDashboard({ router }) {
     const daysRemaining = Math.floor(msRemaining / (1000 * 60 * 60 * 24));
     const overdue = daysRemaining < 0;
     console.log('RouterDashboard - Inspection calc for', router.router_id, {
+      hasInspections: inspections?.length > 0,
+      lastInspection: inspections?.[0]?.inspected_at,
       rms_created_at: router.rms_created_at,
       created_at: router.created_at,
       inspectionDate: inspectionDate,
@@ -162,7 +173,7 @@ export default function RouterDashboard({ router }) {
       daysRemaining,
       overdue
     };
-  }, [router]);
+  }, [router, inspections]);
 
   const latest = series.latest;
 
