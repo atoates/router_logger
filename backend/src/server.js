@@ -13,6 +13,7 @@ const oauthService = require('./services/oauthService');
 const routerRoutes = require('./routes/router');
 const rmsRoutes = require('./routes/rms');
 const authRoutes = require('./routes/auth');
+const { router: monitoringRoutes } = require('./routes/monitoring');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -53,10 +54,11 @@ app.get('/', (req, res) => {
       storageStats: '/api/stats/storage',
       topRouters: '/api/stats/top-routers',
       networkUsage: '/api/stats/network-usage',
-  networkUsageRolling: '/api/stats/network-usage-rolling',
+      networkUsageRolling: '/api/stats/network-usage-rolling',
       operatorDistribution: '/api/stats/operators',
       oauthLogin: '/api/auth/rms/login',
-      oauthStatus: '/api/auth/rms/status'
+      oauthStatus: '/api/auth/rms/status',
+      rmsUsageMonitoring: '/api/monitoring/rms-usage'
     }
   });
 });
@@ -64,6 +66,7 @@ app.get('/', (req, res) => {
 app.use('/api', routerRoutes);
 app.use('/api/rms', rmsRoutes);
 app.use('/api/auth', authRoutes);
+app.use(monitoringRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

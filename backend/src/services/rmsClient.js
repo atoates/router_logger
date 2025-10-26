@@ -2,6 +2,15 @@ const axios = require('axios');
 const { logger } = require('../config/database');
 const oauthService = require('./oauthService');
 
+// Import tracking function (will be set after module loads to avoid circular dependency)
+let trackRMSCall = null;
+try {
+  const monitoring = require('../routes/monitoring');
+  trackRMSCall = monitoring.trackRMSCall;
+} catch (e) {
+  // Monitoring not available yet, that's ok
+}
+
 // Allow overriding the RMS API base and prefix via env for compatibility with API changes
 const RMS_API_BASE_URL = process.env.RMS_API_BASE_URL || 'https://api.rms.teltonika-networks.com';
 const RMS_API_PREFIX = process.env.RMS_API_PREFIX || ''; // No prefix by default; RMS API uses /api/... directly
@@ -55,16 +64,23 @@ class RMSClient {
       while (attempt < retries) {
         try {
           const res = await this.client.request({ method, url: path, ...options });
-          if (res && res.status >= 200 && res.status < 300) return res;
+          if (res && res.status >= 200 && res.status < 300) {
+            // Track successful API call
+            if (trackRMSCall) trackRMSCall(path, res.status);
+            return res;
+          }
         } catch (err) {
           const status = err.response?.status;
           const data = err.response?.data;
+          
+          // Track API call even on error
+          if (trackRMSCall) trackRMSCall(path, status);
           
           // Handle rate limiting with exponential backoff
           if (status === 429) {
             const retryAfter = parseInt(err.response?.headers['retry-after'] || '60');
             const delay = Math.min(retryAfter * 1000, Math.pow(2, attempt) * 1000);
-            logger.warn(`RMS rate limit hit on ${path}. Waiting ${delay}ms before retry ${attempt + 1}/${retries}`);
+            logger.warn(`RMS rate limit hit on ${path}. Retry-After: ${retryAfter}s. Waiting ${delay}ms before retry ${attempt + 1}/${retries}`);
             await new Promise(resolve => setTimeout(resolve, delay));
             attempt++;
             lastErr = err;
