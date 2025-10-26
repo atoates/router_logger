@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { AreaChart, Area, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
-import { getLogs, getUsageStats, getUptimeData, logInspection } from '../services/api';
+import { getLogs, getUsageStats, getUptimeData, logInspection, getInspectionHistory } from '../services/api';
 import { exportUptimeReportToPDF } from '../utils/exportUtils';
 import { toast } from 'react-toastify';
 import './RouterDashboard.css';
@@ -38,6 +38,7 @@ export default function RouterDashboard({ router }) {
   const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState(null);
   const [uptime, setUptime] = useState([]);
+  const [inspections, setInspections] = useState([]);
 
   const routerId = router?.router_id;
 
@@ -65,15 +66,17 @@ export default function RouterDashboard({ router }) {
       if (!routerId) return;
       setLoading(true);
       try {
-        const [logsRes, statsRes, upRes] = await Promise.all([
+        const [logsRes, statsRes, upRes, inspRes] = await Promise.all([
           getLogs({ router_id: routerId, start_date: start, end_date: end, limit: 5000 }),
           getUsageStats({ router_id: routerId, start_date: start, end_date: end }),
-          getUptimeData({ router_id: routerId, start_date: start, end_date: end })
+          getUptimeData({ router_id: routerId, start_date: start, end_date: end }),
+          getInspectionHistory(routerId)
         ]);
         if (!mounted) return;
         setLogs(Array.isArray(logsRes.data) ? logsRes.data : []);
         setStats(statsRes.data || null);
         setUptime(Array.isArray(upRes.data) ? upRes.data : []);
+        setInspections(Array.isArray(inspRes.data) ? inspRes.data : []);
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Failed to load router dashboard', e);
@@ -81,6 +84,7 @@ export default function RouterDashboard({ router }) {
         setLogs([]);
         setStats(null);
         setUptime([]);
+        setInspections([]);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -260,13 +264,6 @@ export default function RouterDashboard({ router }) {
                 <span style={{ fontSize: '11px', marginTop: '4px', display: 'block' }}>
                   Due: {inspectionStatus.inspectionDue.toLocaleDateString()}
                 </span>
-                <button 
-                  className="btn btn-sm" 
-                  style={{ marginTop: '8px', fontSize: '12px', padding: '4px 12px' }}
-                  onClick={handleLogInspection}
-                >
-                  ✓ Log Inspection
-                </button>
               </>
             ) : 'No inspection date'}
           </div>
@@ -391,6 +388,58 @@ export default function RouterDashboard({ router }) {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Inspections</span>
+              <button 
+                className="btn btn-sm btn-primary" 
+                style={{ fontSize: '12px', padding: '4px 12px' }}
+                onClick={handleLogInspection}
+              >
+                ✓ Log Inspection
+              </button>
+            </div>
+            <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+              {inspections.length === 0 ? (
+                <div style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>
+                  No inspections logged yet
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {inspections.map((insp, idx) => (
+                    <div 
+                      key={insp.id} 
+                      style={{ 
+                        padding: 8, 
+                        background: idx === 0 ? '#f0fdf4' : '#f8fafc',
+                        borderLeft: idx === 0 ? '3px solid #10b981' : '3px solid #e2e8f0',
+                        borderRadius: 4,
+                        fontSize: 13
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <strong>{new Date(insp.inspected_at).toLocaleDateString()}</strong>
+                        <span style={{ color: '#64748b', fontSize: 11 }}>
+                          {new Date(insp.inspected_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      {insp.inspected_by && (
+                        <div style={{ color: '#64748b', fontSize: 11 }}>
+                          By: {insp.inspected_by}
+                        </div>
+                      )}
+                      {insp.notes && (
+                        <div style={{ color: '#475569', fontSize: 11, marginTop: 4 }}>
+                          {insp.notes}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
