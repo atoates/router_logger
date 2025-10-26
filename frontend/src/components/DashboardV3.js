@@ -308,7 +308,7 @@ export default function DashboardV3({ onOpenRouter }) {
                     const ib = (t.index_bytes||0)/total*100;
                     const ob = (t.toast_bytes||0)/total*100;
                     return (
-                      <div style={{ height:10, width:'100%', background:'#e5e7eb', borderRadius:6, overflow:'hidden' }}>
+                      <div style={{ height:10, width:'100%', background:'#e5e7eb', borderRadius:6, overflow:'hidden', display:'flex' }}>
                         <div style={{ width:`${tb}%`, height:'100%', background:'#6366f1' }} title={`Table: ${formatBytes(t.table_bytes)}`} />
                         <div style={{ width:`${ib}%`, height:'100%', background:'#10b981' }} title={`Indexes: ${formatBytes(t.index_bytes)}`} />
                         <div style={{ width:`${ob}%`, height:'100%', background:'#f59e0b' }} title={`TOAST: ${formatBytes(t.toast_bytes)}`} />
