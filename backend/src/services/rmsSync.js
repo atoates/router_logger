@@ -3,6 +3,16 @@ const { processRouterTelemetry } = require('./telemetryProcessor');
 const { getLatestLog } = require('../models/router');
 const { logger } = require('../config/database');
 
+// Throttle RMS API requests to avoid rate limiting
+const DELAY_BETWEEN_DEVICES_MS = parseInt(process.env.RMS_SYNC_DELAY_MS || '500'); // 500ms between devices by default
+
+/**
+ * Sleep helper for throttling
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 /**
  * Transform RMS device data to our telemetry format
  */
@@ -121,6 +131,11 @@ async function syncFromRMS() {
     
     for (const device of devices) {
       try {
+        // Throttle requests to avoid rate limiting
+        if (successCount > 0 || errorCount > 0) {
+          await sleep(DELAY_BETWEEN_DEVICES_MS);
+        }
+        
         const telemetry = transformRMSDeviceToTelemetry(device, device.monitoring);
 
         // If monitoring did not provide cumulative counters, try to derive from statistics API
@@ -200,12 +215,22 @@ async function syncFromRMS() {
           }
         } catch (statsErr) {
           // Non-fatal; proceed with whatever we have
-          logger.warn(`Stats fallback failed for device ${device.id}: ${statsErr.message}`);
+          // If it's a rate limit error, log specially and skip remaining stats calls
+          if (statsErr.response?.status === 429) {
+            logger.warn(`Rate limit hit during stats fetch for device ${device.id}. Skipping detailed stats for this sync.`);
+          } else {
+            logger.warn(`Stats fallback failed for device ${device.id}: ${statsErr.message}`);
+          }
         }
         await processRouterTelemetry(telemetry);
         successCount++;
       } catch (error) {
-        logger.error(`Error processing device ${device.id}:`, error.message);
+        // Special handling for rate limits
+        if (error.response?.status === 429) {
+          logger.error(`Rate limit error processing device ${device.id}. Consider increasing RMS_SYNC_DELAY_MS or sync interval.`);
+        } else {
+          logger.error(`Error processing device ${device.id}:`, error.message);
+        }
         errorCount++;
       }
     }

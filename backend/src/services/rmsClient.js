@@ -48,26 +48,48 @@ class RMSClient {
   }
 
   // Helper: try multiple paths (for different API prefixes) until one succeeds
-  async requestWithFallback(method, candidates, options = {}) {
+  async requestWithFallback(method, candidates, options = {}, retries = 3) {
     let lastErr;
     for (const path of candidates) {
-      try {
-        const res = await this.client.request({ method, url: path, ...options });
-        if (res && res.status >= 200 && res.status < 300) return res;
-      } catch (err) {
-        const status = err.response?.status;
-        const data = err.response?.data;
-        // 404 means wrong path; try next candidate. Other statuses should break early.
-        if (status === 404) {
-          logger.warn(`RMS ${method.toUpperCase()} ${path} -> 404 Not Found, trying next candidate`);
-          lastErr = err;
-          continue;
+      let attempt = 0;
+      while (attempt < retries) {
+        try {
+          const res = await this.client.request({ method, url: path, ...options });
+          if (res && res.status >= 200 && res.status < 300) return res;
+        } catch (err) {
+          const status = err.response?.status;
+          const data = err.response?.data;
+          
+          // Handle rate limiting with exponential backoff
+          if (status === 429) {
+            const retryAfter = parseInt(err.response?.headers['retry-after'] || '60');
+            const delay = Math.min(retryAfter * 1000, Math.pow(2, attempt) * 1000);
+            logger.warn(`RMS rate limit hit on ${path}. Waiting ${delay}ms before retry ${attempt + 1}/${retries}`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            attempt++;
+            lastErr = err;
+            continue;
+          }
+          
+          // 404 means wrong path; try next candidate. Other statuses should break early.
+          if (status === 404) {
+            logger.warn(`RMS ${method.toUpperCase()} ${path} -> 404 Not Found, trying next candidate`);
+            lastErr = err;
+            break; // Break retry loop, try next path
+          }
+          
+          // Auth or other error, surface it
+          logger.error(
+            `RMS ${method.toUpperCase()} ${path} failed: ${status || ''} ${data ? JSON.stringify(data) : err.message}`
+          );
+          throw err;
         }
-        // Rate limit or auth or other error, surface it
-        logger.error(
-          `RMS ${method.toUpperCase()} ${path} failed: ${status || ''} ${data ? JSON.stringify(data) : err.message}`
-        );
-        throw err;
+      }
+      
+      // If we exhausted retries for this path, try next candidate
+      if (attempt >= retries && lastErr?.response?.status === 429) {
+        logger.error(`Rate limit retries exhausted for ${path}, trying next candidate`);
+        continue;
       }
     }
     // If we exhausted candidates, throw last error or generic
