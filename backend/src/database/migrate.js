@@ -85,6 +85,9 @@ async function initializeDatabase() {
     await client.query(`ALTER TABLE router_logs ADD COLUMN IF NOT EXISTS vpn_name VARCHAR(100);`);
     await client.query(`ALTER TABLE router_logs ADD COLUMN IF NOT EXISTS eth_link_up BOOLEAN;`);
 
+    // Add rms_created_at column to routers table for RMS device creation date (used for inspection tracking)
+    await client.query(`ALTER TABLE routers ADD COLUMN IF NOT EXISTS rms_created_at TIMESTAMP;`);
+
     // Create oauth_tokens table for RMS OAuth authentication
     await client.query(`
       CREATE TABLE IF NOT EXISTS oauth_tokens (

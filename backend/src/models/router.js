@@ -5,9 +5,9 @@ async function upsertRouter(routerData) {
   const query = `
     INSERT INTO routers (
       router_id, device_serial, imei, name, location, 
-      site_id, firmware_version, last_seen
+      site_id, firmware_version, rms_created_at, last_seen
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
     ON CONFLICT (router_id) 
     DO UPDATE SET 
       device_serial = COALESCE($2, routers.device_serial),
@@ -16,6 +16,7 @@ async function upsertRouter(routerData) {
       location = COALESCE($5, routers.location),
       site_id = COALESCE($6, routers.site_id),
       firmware_version = COALESCE($7, routers.firmware_version),
+      rms_created_at = COALESCE($8, routers.rms_created_at),
       last_seen = CURRENT_TIMESTAMP
     RETURNING *;
   `;
@@ -28,7 +29,8 @@ async function upsertRouter(routerData) {
       routerData.name,
       routerData.location,
       routerData.site_id,
-      routerData.firmware_version
+      routerData.firmware_version,
+      routerData.rms_created_at || null
     ]);
     return result.rows[0];
   } catch (error) {
@@ -919,11 +921,12 @@ async function getInspectionStatus() {
         name,
         location,
         created_at,
+        rms_created_at,
         last_seen,
-        created_at + INTERVAL '365 days' AS inspection_due,
-        EXTRACT(DAY FROM (created_at + INTERVAL '365 days' - CURRENT_TIMESTAMP))::INTEGER AS days_remaining,
+        COALESCE(rms_created_at, created_at) + INTERVAL '365 days' AS inspection_due,
+        EXTRACT(DAY FROM (COALESCE(rms_created_at, created_at) + INTERVAL '365 days' - CURRENT_TIMESTAMP))::INTEGER AS days_remaining,
         CASE 
-          WHEN created_at + INTERVAL '365 days' < CURRENT_TIMESTAMP THEN true
+          WHEN COALESCE(rms_created_at, created_at) + INTERVAL '365 days' < CURRENT_TIMESTAMP THEN true
           ELSE false
         END AS overdue
       FROM routers
@@ -934,7 +937,7 @@ async function getInspectionStatus() {
       router_id: r.router_id,
       name: r.name || r.router_id,
       location: r.location,
-      created_at: r.created_at,
+      created_at: r.rms_created_at || r.created_at,
       last_seen: r.last_seen,
       inspection_due: r.inspection_due,
       days_remaining: Number(r.days_remaining) || 0,

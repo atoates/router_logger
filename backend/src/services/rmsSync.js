@@ -61,6 +61,7 @@ function transformRMSDeviceToTelemetry(device, monitoring) {
     name: device.name,
     location: device.location || device.group,
     site_id: device.group || device.company_id,
+    rms_created_at: device.created_at || device.createdAt || device.created || null,
     
     // WAN & Network
   wan_ip: network.wan_ip || network.ip || device.wan_ip,
