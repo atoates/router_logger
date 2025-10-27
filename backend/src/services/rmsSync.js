@@ -114,10 +114,22 @@ function transformRMSDeviceToTelemetry(device, monitoring) {
   };
 }
 
+// Mutex to prevent concurrent syncs
+let isSyncing = false;
+
 /**
  * Sync data from RMS API
  */
 async function syncFromRMS() {
+  // Prevent overlapping syncs
+  if (isSyncing) {
+    logger.warn('RMS sync already in progress, skipping this run');
+    return { skipped: true, reason: 'Already syncing' };
+  }
+
+  isSyncing = true;
+  const startTime = Date.now();
+
   try {
     logger.info('Starting RMS sync...');
     
@@ -125,7 +137,7 @@ async function syncFromRMS() {
     if (isApproachingQuota()) {
       const quotaStatus = getQuotaStatus();
       logger.warn(`Skipping RMS sync - approaching quota limit: ${quotaStatus.percentage.toFixed(1)}% (${quotaStatus.estimate.toLocaleString()} estimated monthly calls)`);
-      return;
+      return { skipped: true, reason: 'Quota limit' };
     }
     
     // Use OAuth token if available, fallback to PAT
@@ -278,10 +290,14 @@ async function syncFromRMS() {
     }
     
     logger.info(`RMS sync complete: ${successCount} successful, ${errorCount} errors`);
-    return { successCount, errorCount, total: devices.length };
+    const duration = Date.now() - startTime;
+    logger.info(`Sync duration: ${(duration / 1000).toFixed(2)}s for ${devices.length} devices`);
+    return { successCount, errorCount, total: devices.length, duration };
   } catch (error) {
     logger.error('RMS sync failed:', error.message);
     throw error;
+  } finally {
+    isSyncing = false;
   }
 }
 
