@@ -133,10 +133,10 @@ function DeltaBadge({ current, previous }) {
   return <span className={`delta ${cls}`}>{sym} {Math.abs(rounded)}%</span>;
 }
 
-export default function DashboardV3({ onOpenRouter }) {
+export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
   const [mode, setMode] = useState('rolling');
   const [value, setValue] = useState(24);
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(defaultDarkMode);
   const [hoveredPill, setHoveredPill] = useState(null);
   const [routers, setRouters] = useState([]);
   const [usage, setUsage] = useState([]);

@@ -1,5 +1,5 @@
 /* V3 Global */
-.dashboard-v3 { padding: 20px; max-width: 1600px; margin: 0 auto; }
+.dashboard-v3 { padding: 20px; max-width: 1600px; margin: 0 auto; min-height: 100vh; }
 .dashboard-v3.dark { background: #0b1220; color: #e5e7eb; }
 
 .v3-header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 20px; }
