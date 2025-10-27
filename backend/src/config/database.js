@@ -19,10 +19,14 @@ const logger = winston.createLogger({
   transports: [
     new winston.transports.Console({
       format: winston.format.simple()
-    }),
-    new winston.transports.File({ filename: 'error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'combined.log' })
+    })
   ]
 });
+
+// Only add file transports in development (Railway has ephemeral storage)
+if (process.env.NODE_ENV !== 'production') {
+  logger.add(new winston.transports.File({ filename: 'error.log', level: 'error' }));
+  logger.add(new winston.transports.File({ filename: 'combined.log' }));
+}
 
 module.exports = { pool, logger };
