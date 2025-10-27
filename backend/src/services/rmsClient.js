@@ -105,7 +105,7 @@ class RMSClient {
   }
 
   /**
-   * Get all devices from RMS
+   * Get all devices from RMS (with pagination support)
    */
   async getDevices(limit = 100, offset = 0) {
     try {
@@ -120,6 +120,38 @@ class RMSClient {
       logger.error('Error fetching devices from RMS:', error.response?.data || error.message);
       throw error;
     }
+  }
+
+  /**
+   * Get ALL devices from RMS (automatically handles pagination)
+   * @param {number} pageSize - Number of devices per page (default 100)
+   * @returns {Array} All devices across all pages
+   */
+  async getAllDevicesPaginated(pageSize = 100) {
+    const allDevices = [];
+    let offset = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await this.getDevices(pageSize, offset);
+      // Normalize various possible list wrappers from RMS API
+      const devices = Array.isArray(response)
+        ? response
+        : response?.data || response?.items || response?.rows || [];
+      
+      allDevices.push(...devices);
+      
+      // Continue if we got a full page (indicates more data available)
+      hasMore = devices.length === pageSize;
+      offset += pageSize;
+
+      if (hasMore) {
+        logger.info(`Fetched ${allDevices.length} devices so far, fetching more...`);
+      }
+    }
+
+    logger.info(`Total devices fetched: ${allDevices.length}`);
+    return allDevices;
   }
 
   /**
@@ -231,15 +263,12 @@ class RMSClient {
   }
 
   /**
-   * Get all devices with their monitoring data
+   * Get all devices with their monitoring data (uses pagination automatically)
    */
   async getAllDevicesWithMonitoring() {
     try {
-      const devicesResponse = await this.getDevices(1000); // Get up to 1000 devices
-      // Normalize various possible list wrappers from RMS API
-      const devices = Array.isArray(devicesResponse)
-        ? devicesResponse
-        : devicesResponse?.data || devicesResponse?.items || devicesResponse?.rows || [];
+      // Use paginated fetch to handle >1000 devices
+      const devices = await this.getAllDevicesPaginated(100);
 
       logger.info(`Processing ${devices.length} devices (will skip monitoring calls to save API quota)`);
       
