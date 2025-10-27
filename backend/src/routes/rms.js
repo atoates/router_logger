@@ -79,9 +79,10 @@ router.get('/debug/:deviceId', async (req, res) => {
     const from = new Date(Date.now() - minutes * 60 * 1000);
 
     const rms = await RMSClient.createWithAuth();
-    const [device, monitoring, dataUsage, statistics] = await Promise.allSettled([
+    // Note: getDeviceMonitoring was removed to save API quota
+    // Monitoring data is now included in the device list response
+    const [device, dataUsage, statistics] = await Promise.allSettled([
       rms.getDevice(deviceId),
-      rms.getDeviceMonitoring(deviceId),
       rms.getDeviceDataUsage(deviceId, from.toISOString(), to.toISOString()),
       rms.getDeviceStatistics(deviceId, from.toISOString(), to.toISOString())
     ]);
@@ -90,7 +91,6 @@ router.get('/debug/:deviceId', async (req, res) => {
 
     res.json({
       device: settled(device),
-      monitoring: settled(monitoring),
       dataUsage: settled(dataUsage),
       statisticsSample: Array.isArray(settled(statistics)) ? settled(statistics).slice(0, 10) : settled(statistics)
     });
