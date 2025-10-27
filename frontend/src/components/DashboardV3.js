@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getRouters, getNetworkUsageRolling, getNetworkUsage, getTopRoutersRolling, getTopRouters, getOperators, getStorageStats, getInspectionStatus } from '../services/api';
+import { getRouters, getNetworkUsageRolling, getNetworkUsage, getTopRoutersRolling, getTopRouters, getOperators, getStorageStats, getInspectionStatus, getRMSUsage } from '../services/api';
 import api from '../services/api';
 import { AreaChart, Area, BarChart, Bar, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
 import '../DashboardV3.css';
@@ -146,6 +146,7 @@ export default function DashboardV3({ onOpenRouter }) {
   const [storage, setStorage] = useState(null);
   const [dbSize, setDbSize] = useState(null);
   const [inspections, setInspections] = useState([]);
+  const [rmsUsage, setRMSUsage] = useState(null);
   const [, setLoading] = useState(true);
 
   const updateTime = (m, v) => { setMode(m); setValue(v); };
@@ -175,9 +176,15 @@ export default function DashboardV3({ onOpenRouter }) {
           console.error('Inspection fetch error:', err);
           return { data: [] };
         });
+        // Also fetch RMS usage monitoring
+        const rmsUsagePromise = getRMSUsage().catch((err)=>{
+          console.error('RMS usage fetch error:', err);
+          return { data: null };
+        });
         const [rRes, sRes, uRes, tRes, oRes] = await Promise.all(promises);
         const dbRes = await dbSizePromise;
         const inspRes = await inspectionPromise;
+        const rmsRes = await rmsUsagePromise;
         console.log('DB size response:', dbRes);
         setRouters(rRes.data || []);
         setStorage(sRes.data || null);
@@ -187,6 +194,7 @@ export default function DashboardV3({ onOpenRouter }) {
   setDbSize(dbRes?.data || null);
         console.log('DB size state set to:', dbRes?.data);
         setInspections(inspRes?.data || []);
+        setRMSUsage(rmsRes?.data || null);
 
         // Previous period for network-level delta
         if (mode==='rolling') {
@@ -467,6 +475,42 @@ export default function DashboardV3({ onOpenRouter }) {
               </div>
             );
           })()}
+          
+          {/* RMS API Usage Monitoring */}
+          {rmsUsage && (
+            <div className="v3-card">
+              <div className="v3-card-title">📊 RMS API Usage</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Total Requests</span>
+                  <strong>{fmtNum(rmsUsage.apiUsage?.total || 0)}</strong>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Daily Estimate</span>
+                  <strong>{fmtNum(rmsUsage.apiUsage?.estimates?.dailyRate || 0)}</strong>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Monthly Estimate</span>
+                  <strong>{fmtNum(rmsUsage.apiUsage?.estimates?.monthlyRate || 0)}</strong>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : (parseFloat(rmsUsage.apiUsage?.estimates?.percentOfQuota || '0') > 80 ? '#fee2e2' : '#f0fdf4'), borderRadius:6, borderLeft: `3px solid ${parseFloat(rmsUsage.apiUsage?.estimates?.percentOfQuota || '0') > 80 ? '#ef4444' : '#10b981'}` }}>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Quota Usage</span>
+                  <strong>{rmsUsage.apiUsage?.estimates?.percentOfQuota || '0%'}</strong>
+                </div>
+                {rmsUsage.apiUsage?.rateLimitHits > 0 && (
+                  <div style={{ padding:8, background:'#fef2f2', borderRadius:6, borderLeft:'3px solid #ef4444', fontSize:12 }}>
+                    <div style={{ fontWeight:600, color:'#991b1b', marginBottom:4 }}>⚠️ Rate Limit Hits: {rmsUsage.apiUsage.rateLimitHits}</div>
+                    {rmsUsage.apiUsage.lastRateLimit && (
+                      <div style={{ color:'#64748b' }}>Last: {new Date(rmsUsage.apiUsage.lastRateLimit).toLocaleString()}</div>
+                    )}
+                  </div>
+                )}
+                <div style={{ fontSize:11, color:'#94a3b8', paddingTop:8, borderTop: `1px solid ${dark ? '#334155' : '#e5e7eb'}` }}>
+                  Tracked since: {new Date(rmsUsage.apiUsage?.since).toLocaleString()}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

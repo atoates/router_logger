@@ -326,37 +326,6 @@ export default function RouterDashboard({ router }) {
       <div className="rd-grid">
         <div className="col">
           <div className="card">
-            <div className="card-title">TX/RX ({label})</div>
-            <div style={{ height: 240 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={series.txrx} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="rdTx" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.7}/>
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0.1}/>
-                    </linearGradient>
-                    <linearGradient id="rdRx" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.7}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="date" tickFormatter={(t)=> new Date(t).toLocaleTimeString()} tick={{ fontSize: 11 }} />
-                  <YAxis domain={[0, yMax]} tickFormatter={(v)=>formatBytes(v)} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v)=>formatBytes(v)} labelFormatter={(t)=> new Date(t).toLocaleString()} />
-                  <Legend />
-                  <Area type="monotone" dataKey="tx_bytes" stroke="#6366f1" fill="url(#rdTx)" name="TX" />
-                  <Area type="monotone" dataKey="rx_bytes" stroke="#10b981" fill="url(#rdRx)" name="RX" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Signal chart removed per request */}
-        </div>
-
-        <div className="col">
-          <div className="card">
             <div className="card-title">Latest</div>
             <div className="kv">
               <div><span>IMEI</span><strong>{router?.imei || latest?.imei || '—'}</strong></div>
@@ -368,7 +337,9 @@ export default function RouterDashboard({ router }) {
               <div><span>WAN IP</span><strong>{latest?.wan_ip || '—'}</strong></div>
             </div>
           </div>
+        </div>
 
+        <div className="col">
           <div className="card">
             <div className="card-title">Uptime samples</div>
             <div style={{ height: 140 }}>
@@ -446,6 +417,34 @@ export default function RouterDashboard({ router }) {
               )}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* TX/RX Chart - Full Width */}
+      <div className="card">
+        <div className="card-title">TX/RX ({label})</div>
+        <div style={{ height: 260 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={series.txrx} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="rdTx" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.7}/>
+                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0.1}/>
+                </linearGradient>
+                <linearGradient id="rdRx" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.7}/>
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="date" tickFormatter={(t)=> new Date(t).toLocaleTimeString()} tick={{ fontSize: 11 }} />
+              <YAxis domain={[0, yMax]} tickFormatter={(v)=>formatBytes(v)} tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(v)=>formatBytes(v)} labelFormatter={(t)=> new Date(t).toLocaleString()} />
+              <Legend />
+              <Area type="monotone" dataKey="tx_bytes" stroke="#6366f1" fill="url(#rdTx)" name="TX" />
+              <Area type="monotone" dataKey="rx_bytes" stroke="#10b981" fill="url(#rdRx)" name="RX" />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
