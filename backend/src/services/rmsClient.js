@@ -355,21 +355,25 @@ class RMSClient {
         ? devicesResponse
         : devicesResponse?.data || devicesResponse?.items || devicesResponse?.rows || [];
 
-      const devicesWithMonitoring = await Promise.all(
-        devices.map(async (device) => {
-          try {
-            const deviceId = device.id || device.device_id || device.uuid || device.serial_number;
-            const monitoring = deviceId ? await this.getDeviceMonitoring(deviceId) : undefined;
-            return {
-              ...device,
-              monitoring
-            };
-          } catch (error) {
-            logger.warn(`Could not fetch monitoring for device ${device.id || device.device_id}`);
-            return device;
+      logger.info(`Processing ${devices.length} devices (will skip monitoring calls to save API quota)`);
+      
+      // OPTIMIZATION: The devices list already contains status and basic info
+      // We don't need to call /monitoring for each device every sync
+      // The monitoring endpoint provides real-time data, but we're logging every hour anyway
+      // So we can use the device list data directly to save 50-100 API calls per sync
+      const devicesWithMonitoring = devices.map((device) => {
+        return {
+          ...device,
+          // Use status from device list instead of separate monitoring call
+          monitoring: {
+            status: device.status || device.state || device.connection_state,
+            last_seen: device.last_seen || device.last_activity || device.updated_at,
+            // These fields may or may not be in the device list, but they're not critical
+            uptime: device.uptime,
+            signal_strength: device.signal_strength || device.rssi,
           }
-        })
-      );
+        };
+      });
 
       return devicesWithMonitoring;
     } catch (error) {
