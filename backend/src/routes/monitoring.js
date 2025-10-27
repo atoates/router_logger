@@ -29,6 +29,42 @@ function trackRMSCall(endpoint, status) {
   }
 }
 
+// Check if we're approaching quota limit
+function isApproachingQuota() {
+  const now = new Date();
+  const hoursSinceReset = (now - apiMetrics.lastReset) / (1000 * 60 * 60);
+  
+  if (hoursSinceReset === 0) return false;
+  
+  const monthlyEstimate = (apiMetrics.rmsApiCalls / hoursSinceReset) * 730; // hours in 30 days
+  const quotaLimit = 100000;
+  const quotaPercentage = (monthlyEstimate / quotaLimit) * 100;
+  
+  // Return true if we're at 90% or higher
+  return quotaPercentage >= 90;
+}
+
+// Get current quota status
+function getQuotaStatus() {
+  const now = new Date();
+  const hoursSinceReset = (now - apiMetrics.lastReset) / (1000 * 60 * 60);
+  
+  if (hoursSinceReset === 0) return { approaching: false, percentage: 0, estimate: 0 };
+  
+  const monthlyEstimate = (apiMetrics.rmsApiCalls / hoursSinceReset) * 730;
+  const quotaLimit = 100000;
+  const quotaPercentage = (monthlyEstimate / quotaLimit) * 100;
+  
+  return {
+    approaching: quotaPercentage >= 90,
+    percentage: quotaPercentage,
+    estimate: monthlyEstimate,
+    limit: quotaLimit,
+    current: apiMetrics.rmsApiCalls
+  };
+}
+
+
 // Get current API usage metrics
 router.get('/api/monitoring/rms-usage', async (req, res) => {
   try {
@@ -129,4 +165,4 @@ router.get('/api/monitoring/db-health', async (req, res) => {
   }
 });
 
-module.exports = { router, trackRMSCall, apiMetrics };
+module.exports = { router, trackRMSCall, apiMetrics, isApproachingQuota, getQuotaStatus };

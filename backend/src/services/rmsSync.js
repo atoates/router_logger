@@ -2,9 +2,12 @@ const RMSClient = require('./rmsClient');
 const { processRouterTelemetry } = require('./telemetryProcessor');
 const { getLatestLog } = require('../models/router');
 const { logger } = require('../config/database');
+const { isApproachingQuota, getQuotaStatus } = require('../routes/monitoring');
 
 // Throttle RMS API requests to avoid rate limiting
-const DELAY_BETWEEN_DEVICES_MS = parseInt(process.env.RMS_SYNC_DELAY_MS || '500'); // 500ms between devices by default
+// Delay between processing devices (configurable via env)
+const DELAY_BETWEEN_DEVICES_MS = parseInt(process.env.RMS_SYNC_DELAY_MS || '500', 10);
+const INITIAL_SYNC_DELAY_MS = parseInt(process.env.RMS_INITIAL_SYNC_DELAY_MS || '2000', 10); // Longer delay for initial sync
 
 /**
  * Sleep helper for throttling
@@ -118,6 +121,13 @@ async function syncFromRMS() {
   try {
     logger.info('Starting RMS sync...');
     
+    // Check if we're approaching quota limit before starting sync
+    if (isApproachingQuota()) {
+      const quotaStatus = getQuotaStatus();
+      logger.warn(`Skipping RMS sync - approaching quota limit: ${quotaStatus.percentage.toFixed(1)}% (${quotaStatus.estimate.toLocaleString()} estimated monthly calls)`);
+      return;
+    }
+    
     // Use OAuth token if available, fallback to PAT
     const rmsClient = await RMSClient.createWithAuth();
     
@@ -128,12 +138,23 @@ async function syncFromRMS() {
     // Process each device
     let successCount = 0;
     let errorCount = 0;
+    let rateLimitHit = false;
     
     for (const device of devices) {
+      // Circuit breaker: stop processing if rate limit hit
+      if (rateLimitHit) {
+        logger.error('Rate limit detected earlier in sync, aborting remaining devices to conserve quota');
+        break;
+      }
+      
       try {
         // Throttle requests to avoid rate limiting
+        // Use longer delay for initial sync when fetching stats
         if (successCount > 0 || errorCount > 0) {
-          await sleep(DELAY_BETWEEN_DEVICES_MS);
+          const latest = await getLatestLog(String(device.id || device.device_id || device.serial_number));
+          const isInitialDevice = !latest || (!latest.total_tx_bytes && !latest.total_rx_bytes);
+          const delay = isInitialDevice ? INITIAL_SYNC_DELAY_MS : DELAY_BETWEEN_DEVICES_MS;
+          await sleep(delay);
         }
         
         const telemetry = transformRMSDeviceToTelemetry(device, device.monitoring);
@@ -229,9 +250,11 @@ async function syncFromRMS() {
             }
           } catch (statsErr) {
             // Non-fatal; proceed with whatever we have
-            // If it's a rate limit error, log specially and skip remaining stats calls
+            // If it's a rate limit error, set flag and abort sync
             if (statsErr.response?.status === 429) {
-              logger.warn(`Rate limit hit during stats fetch for device ${device.id}. Skipping detailed stats for this sync.`);
+              logger.error(`Rate limit hit during stats fetch for device ${device.id}. Aborting sync to prevent quota exhaustion.`);
+              rateLimitHit = true;
+              throw statsErr; // Re-throw to trigger outer catch and stop sync
             } else {
               logger.warn(`Stats fallback failed for device ${device.id}: ${statsErr.message}`);
             }
@@ -243,7 +266,10 @@ async function syncFromRMS() {
       } catch (error) {
         // Special handling for rate limits
         if (error.response?.status === 429) {
-          logger.error(`Rate limit error processing device ${device.id}. Consider increasing RMS_SYNC_DELAY_MS or sync interval.`);
+          logger.error(`Rate limit error processing device ${device.id}. Stopping sync immediately to conserve quota.`);
+          rateLimitHit = true;
+          errorCount++;
+          break; // Stop processing remaining devices
         } else {
           logger.error(`Error processing device ${device.id}:`, error.message);
         }
