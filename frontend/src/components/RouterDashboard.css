@@ -48,6 +48,38 @@
 .inspection-notes{color:#475569;font-size:11px;margin-top:6px;padding-top:6px;border-top:1px solid #e2e8f0}
 .inspections-empty{padding:20px;text-align:center;color:#94a3b8;font-size:13px}
 
+/* Dark mode styles */
+body.dark-mode .rd-header h2{color:#f1f5f9}
+body.dark-mode .rd-sub{color:#94a3b8}
+body.dark-mode .rd-range .seg button{background:#1e293b;border-color:#334155;color:#e2e8f0}
+body.dark-mode .rd-range .seg button:hover{background:#334155;border-color:#475569}
+body.dark-mode .rd-range .seg button.active{background:#6366f1;color:#fff;border-color:#6366f1}
+body.dark-mode .metric{background:#1e293b;border-color:#334155}
+body.dark-mode .metric .label{color:#94a3b8}
+body.dark-mode .metric .value{color:#f1f5f9}
+body.dark-mode .metric .sub{color:#64748b}
+body.dark-mode .card{background:#1e293b;border-color:#334155}
+body.dark-mode .card-title{color:#f1f5f9}
+body.dark-mode .kv div{background:#0f172a}
+body.dark-mode .kv span{color:#94a3b8}
+body.dark-mode .kv strong{color:#e2e8f0}
+body.dark-mode .table-wrap th{background:#0f172a;color:#cbd5e1}
+body.dark-mode .table-wrap td{color:#e2e8f0;border-bottom-color:#334155}
+body.dark-mode .table-wrap tbody tr:hover{background:#334155}
+body.dark-mode .inspections-list::-webkit-scrollbar-track{background:#0f172a}
+body.dark-mode .inspections-list::-webkit-scrollbar-thumb{background:#475569}
+body.dark-mode .inspections-list::-webkit-scrollbar-thumb:hover{background:#64748b}
+body.dark-mode .inspection-item{background:#0f172a;border-left-color:#334155;color:#e2e8f0}
+body.dark-mode .inspection-item:hover{background:#1e293b}
+body.dark-mode .inspection-item.latest{background:#064e3b;border-left-color:#10b981}
+body.dark-mode .inspection-item.latest:hover{background:#065f46}
+body.dark-mode .inspection-date{color:#f1f5f9}
+body.dark-mode .inspection-time{color:#94a3b8}
+body.dark-mode .inspection-by{color:#94a3b8}
+body.dark-mode .inspection-notes{color:#cbd5e1;border-top-color:#334155}
+body.dark-mode .inspections-empty{color:#64748b}
+body.dark-mode .muted{color:#64748b}
+
 @media (max-width: 1200px) {
   .rd-grid{grid-template-columns:1fr}
   .rd-metrics{grid-template-columns:repeat(2,1fr)}
