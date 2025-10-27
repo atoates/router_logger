@@ -173,6 +173,33 @@ async function initializeDatabase() {
       ON router_logs(router_id, timestamp);
     `);
 
+    // Performance indexes for common query patterns (Migration 006)
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_router_logs_router_ts 
+      ON router_logs (router_id, timestamp DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_router_logs_ts 
+      ON router_logs (timestamp DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_inspection_logs_router_ts 
+      ON inspection_logs (router_id, inspected_at DESC);
+    `);
+
+    // Partial index for recent logs (last 90 days) - speeds up dashboard queries
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_router_logs_recent 
+      ON router_logs (timestamp DESC) 
+      WHERE timestamp > NOW() - INTERVAL '90 days';
+    `);
+
+    // Analyze tables to update query planner statistics
+    await client.query(`ANALYZE router_logs;`);
+    await client.query(`ANALYZE inspection_logs;`);
+
     console.log('Database tables created successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
