@@ -99,4 +99,34 @@ router.post('/api/monitoring/reset-metrics', (req, res) => {
   res.json({ message: 'Metrics reset successfully', metrics: apiMetrics });
 });
 
+// Database health check - see if we have any data
+router.get('/api/monitoring/db-health', async (req, res) => {
+  try {
+    const [routerCount, logCount, recentLogs, oldestLog, newestLog] = await Promise.all([
+      pool.query('SELECT COUNT(*) as count FROM routers'),
+      pool.query('SELECT COUNT(*) as count FROM router_logs'),
+      pool.query('SELECT COUNT(*) as count FROM router_logs WHERE timestamp > NOW() - INTERVAL \'24 hours\''),
+      pool.query('SELECT MIN(timestamp) as oldest FROM router_logs'),
+      pool.query('SELECT MAX(timestamp) as newest FROM router_logs')
+    ]);
+
+    res.json({
+      database: {
+        routers: parseInt(routerCount.rows[0]?.count || 0),
+        totalLogs: parseInt(logCount.rows[0]?.count || 0),
+        logsLast24h: parseInt(recentLogs.rows[0]?.count || 0),
+        oldestLog: oldestLog.rows[0]?.oldest,
+        newestLog: newestLog.rows[0]?.newest,
+        dataAge: newestLog.rows[0]?.newest 
+          ? Math.round((Date.now() - new Date(newestLog.rows[0].newest)) / 60000) + ' minutes ago'
+          : 'No data'
+      },
+      status: parseInt(logCount.rows[0]?.count || 0) > 0 ? 'OK' : 'NO_DATA'
+    });
+  } catch (error) {
+    logger.error('Error checking DB health:', error);
+    res.status(500).json({ error: 'Failed to check database health' });
+  }
+});
+
 module.exports = { router, trackRMSCall, apiMetrics };
