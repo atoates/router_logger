@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { AreaChart, Area, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
@@ -60,9 +60,13 @@ export default function RouterDashboard({ router }) {
     return { start: s, end: nowIso, label: `Last ${range.value}d` };
   }, [range, customStart, customEnd]);
 
+  const loadSeqRef = useRef(0);
   useEffect(() => {
     let mounted = true;
-    const load = async () => {
+    const seq = ++loadSeqRef.current; // mark this load as the latest
+
+    // Debounce rapid changes (e.g., fast toggling timeframes)
+    const timeout = setTimeout(async () => {
       if (!routerId) return;
       setLoading(true);
       try {
@@ -72,7 +76,8 @@ export default function RouterDashboard({ router }) {
           getUptimeData({ router_id: routerId, start_date: start, end_date: end }),
           getInspectionHistory(routerId)
         ]);
-        if (!mounted) return;
+        // Ignore if a newer load started or component unmounted
+        if (!mounted || seq !== loadSeqRef.current) return;
         setLogs(Array.isArray(logsRes.data) ? logsRes.data : []);
         setStats(statsRes.data || null);
         setUptime(Array.isArray(upRes.data) ? upRes.data : []);
@@ -80,17 +85,17 @@ export default function RouterDashboard({ router }) {
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Failed to load router dashboard', e);
-        if (!mounted) return;
+        if (!mounted || seq !== loadSeqRef.current) return;
         setLogs([]);
         setStats(null);
         setUptime([]);
         setInspections([]);
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted && seq === loadSeqRef.current) setLoading(false);
       }
-    };
-    load();
-    return () => { mounted = false; };
+    }, 350);
+
+    return () => { mounted = false; clearTimeout(timeout); };
   }, [routerId, start, end]);
 
   // Build deltas series from cumulative totals
