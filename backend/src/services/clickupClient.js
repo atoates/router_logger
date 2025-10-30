@@ -191,6 +191,13 @@ class ClickUpClient {
       return response.data;
     } catch (error) {
       logger.error('Error creating ClickUp task:', error.response?.data || error.message);
+      // Re-throw with ClickUp's actual error message
+      if (error.response?.data) {
+        const clickupError = new Error(error.response.data.err || error.response.data.error || 'ClickUp API error');
+        clickupError.clickupData = error.response.data;
+        clickupError.status = error.response.status;
+        throw clickupError;
+      }
       throw error;
     }
   }

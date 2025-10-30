@@ -27,46 +27,39 @@ const STATUS_OPTIONS = {
 
 async function updateTaskCustomFields() {
   try {
-    console.log('Fetching routers with linked tasks...');
+    console.log('Fetching routers with linked tasks...\n');
     
     const routersRes = await axios.get(`${BACKEND_URL}/api/routers`);
     const routers = routersRes.data.filter(r => r.clickup_task_id);
     
-    console.log(`Found ${routers.length} routers with ClickUp tasks`);
+    console.log(`Found ${routers.length} routers with ClickUp tasks\n`);
     
     let updated = 0;
     let errors = 0;
     
     for (const router of routers) {
       try {
-        console.log(`\n📝 Updating task ${router.clickup_task_id} for Router #${router.router_id}`);
-        
         // Prepare custom fields data
         const customFields = [];
         
-        // Router ID (text)
+        // Router ID (text) - required
         customFields.push({
           id: CUSTOM_FIELDS.ROUTER_ID,
           value: router.router_id.toString()
         });
         
-        // IMEI (number) - convert IMEI string to number
+        // IMEI (number)
         if (router.imei) {
-          customFields.push({
-            id: CUSTOM_FIELDS.IMEI,
-            value: parseInt(router.imei) || 0
-          });
+          const imeiNum = parseInt(router.imei);
+          if (!isNaN(imeiNum)) {
+            customFields.push({
+              id: CUSTOM_FIELDS.IMEI,
+              value: imeiNum
+            });
+          }
         }
         
-        // Router Model (text)
-        if (router.model) {
-          customFields.push({
-            id: CUSTOM_FIELDS.ROUTER_MODEL,
-            value: router.model
-          });
-        }
-        
-        // Firmware (long text)
+        // Firmware (text)
         if (router.firmware_version) {
           customFields.push({
             id: CUSTOM_FIELDS.FIRMWARE,
@@ -74,39 +67,18 @@ async function updateTaskCustomFields() {
           });
         }
         
-        // Last Online (date) - convert to timestamp
-        if (router.last_connection) {
-          const lastOnline = new Date(router.last_connection).getTime();
+        // Last Online (date timestamp in milliseconds)
+        if (router.last_seen) {
           customFields.push({
             id: CUSTOM_FIELDS.LAST_ONLINE,
-            value: lastOnline
+            value: new Date(router.last_seen).getTime()
           });
         }
         
-        // Data Usage (number) - total bytes
-        if (router.total_data_sent || router.total_data_received) {
-          const totalData = (router.total_data_sent || 0) + (router.total_data_received || 0);
-          // Convert to MB
-          const dataMB = Math.round(totalData / 1024 / 1024);
-          customFields.push({
-            id: CUSTOM_FIELDS.DATA_USAGE,
-            value: dataMB
-          });
-        }
-        
-        // Operational Status (dropdown)
-        // Determine status based on last connection
-        let statusValue = STATUS_OPTIONS.OFFLINE;
-        if (router.last_connection) {
-          const lastSeen = new Date(router.last_connection);
-          const now = new Date();
-          const hoursSinceLastSeen = (now - lastSeen) / (1000 * 60 * 60);
-          
-          if (hoursSinceLastSeen < 24) {
-            statusValue = STATUS_OPTIONS.ONLINE;
-          }
-        }
-        
+        // Operational Status (dropdown: use UUID option IDs)
+        const statusValue = router.current_status === 'online' 
+          ? STATUS_OPTIONS.ONLINE 
+          : STATUS_OPTIONS.OFFLINE;
         customFields.push({
           id: CUSTOM_FIELDS.OPERATIONAL_STATUS,
           value: statusValue
@@ -122,11 +94,8 @@ async function updateTaskCustomFields() {
           updateData
         );
         
-        console.log(`✅ Updated custom fields for Router #${router.router_id}`);
-        console.log(`   - Router ID: ${router.router_id}`);
-        console.log(`   - IMEI: ${router.imei || 'N/A'}`);
-        console.log(`   - Model: ${router.model || 'N/A'}`);
-        console.log(`   - Status: ${statusValue === STATUS_OPTIONS.ONLINE ? 'Online' : 'Offline'}`);
+        const statusText = statusValue === STATUS_OPTIONS.ONLINE ? 'Online' : 'Offline';
+        console.log(`✅ ${router.router_id.padEnd(12)} → ${router.clickup_task_id} (${statusText})`);
         
         updated++;
         
@@ -134,8 +103,14 @@ async function updateTaskCustomFields() {
         await new Promise(resolve => setTimeout(resolve, 300));
         
       } catch (error) {
-        console.error(`❌ Error updating task for router ${router.router_id}:`, 
-          error.response?.data || error.message);
+        const errorData = error.response?.data;
+        const errorMsg = errorData?.clickupError?.err || errorData?.error || error.message;
+        console.log(`❌ ${router.router_id.padEnd(12)} - ${errorMsg}`);
+        if (errors === 0) {
+          console.log('\n=== FIRST ERROR DETAILS ===');
+          console.log('Response:', JSON.stringify(errorData, null, 2));
+          console.log('=========================\n');
+        }
         errors++;
       }
     }

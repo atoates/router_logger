@@ -225,7 +225,11 @@ router.post('/tasks/:listId', async (req, res) => {
     res.json({ task });
   } catch (error) {
     logger.error('Error creating task:', error);
-    res.status(500).json({ error: error.message });
+    const errorMessage = error.clickupData?.err || error.clickupData?.error || error.message;
+    res.status(error.status || 500).json({ 
+      error: errorMessage,
+      clickupError: error.clickupData 
+    });
   }
 });
 
@@ -294,6 +298,33 @@ router.post('/link-router', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error linking router to task:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/clickup/reset-all-links
+ * Clear all ClickUp task links (for re-creation)
+ */
+router.post('/reset-all-links', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE routers 
+       SET clickup_task_id = NULL, 
+           clickup_task_url = NULL,
+           clickup_list_id = NULL
+       WHERE clickup_task_id IS NOT NULL
+       RETURNING router_id`
+    );
+
+    logger.info('Reset all ClickUp links', { count: result.rows.length });
+
+    res.json({ 
+      success: true,
+      count: result.rows.length
+    });
+  } catch (error) {
+    logger.error('Error resetting ClickUp links:', error);
     res.status(500).json({ error: error.message });
   }
 });
