@@ -1,6 +1,7 @@
 const axios = require('axios');
 
 const BACKEND_URL = 'https://routerlogger-production.up.railway.app';
+const FRONTEND_URL = 'https://routerlogger-frontend-production.up.railway.app';
 const LIST_ID = '901517043586';
 
 const CUSTOM_FIELDS = {
@@ -8,7 +9,8 @@ const CUSTOM_FIELDS = {
   IMEI: '8b278eb1-ba02-43c7-81d6-0b739c089e7c',
   FIRMWARE: '845f6619-e3ee-4634-b92a-a117f14fb8c7',
   LAST_ONLINE: '684e19a1-06c3-4bfd-94dd-6aca4a9b85fe',
-  OPERATIONAL_STATUS: '8a661229-13f0-4693-a7cb-1df86725cfed'
+  OPERATIONAL_STATUS: '8a661229-13f0-4693-a7cb-1df86725cfed',
+  ROUTER_DASHBOARD: 'b9cf2e41-dc79-4768-985a-bda52b9dad1f'
 };
 
 // Operational status dropdown option UUIDs
@@ -81,9 +83,16 @@ async function createAllTasks() {
         value: statusValue
       });
       
+      // Router Dashboard (URL) - direct link to router's page
+      const dashboardUrl = `${FRONTEND_URL}/router/${router.router_id}`;
+      customFields.push({
+        id: CUSTOM_FIELDS.ROUTER_DASHBOARD,
+        value: dashboardUrl
+      });
+      
       const taskData = {
         name: router.name || `Router #${router.router_id}`,
-        status: 'to do',
+        // status: 'to do',  // Let ClickUp use default status
         priority: 3,
         tags: ['router', 'auto-created'],
         custom_fields: customFields

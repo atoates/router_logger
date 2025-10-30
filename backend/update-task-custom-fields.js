@@ -5,6 +5,7 @@
 const axios = require('axios');
 
 const BACKEND_URL = 'https://routerlogger-production.up.railway.app';
+const FRONTEND_URL = 'https://routerlogger-frontend-production.up.railway.app';
 
 // Custom field IDs from ClickUp
 const CUSTOM_FIELDS = {
@@ -15,7 +16,8 @@ const CUSTOM_FIELDS = {
   IMEI: '8b278eb1-ba02-43c7-81d6-0b739c089e7c',
   ROUTER_ID: 'dfe0016c-4ab0-4dd9-bb38-b338411e9b47',
   LAST_ONLINE: '684e19a1-06c3-4bfd-94dd-6aca4a9b85fe',
-  DATA_USAGE: 'c58206db-e995-4717-8e62-d36e15d0a3e2'
+  DATA_USAGE: 'c58206db-e995-4717-8e62-d36e15d0a3e2',
+  ROUTER_DASHBOARD: 'b9cf2e41-dc79-4768-985a-bda52b9dad1f'
 };
 
 // Operational status options
@@ -82,6 +84,13 @@ async function updateTaskCustomFields() {
         customFields.push({
           id: CUSTOM_FIELDS.OPERATIONAL_STATUS,
           value: statusValue
+        });
+        
+        // Router Dashboard (URL) - direct link to router's page
+        const dashboardUrl = `${FRONTEND_URL}/router/${router.router_id}`;
+        customFields.push({
+          id: CUSTOM_FIELDS.ROUTER_DASHBOARD,
+          value: dashboardUrl
         });
         
         // Update task via ClickUp API
