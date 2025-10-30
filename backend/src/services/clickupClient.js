@@ -302,13 +302,23 @@ class ClickUpClient {
         }
       }
       
-      // Apply search filter if provided
+      // Apply search filter if provided and exclude router tasks
       let filteredTasks = allTasks;
       if (searchQuery) {
         const searchLower = searchQuery.toLowerCase();
+        filteredTasks = allTasks.filter(task => {
+          // Exclude tasks from "Routers" list
+          if (task.list_name?.toLowerCase() === 'routers') {
+            return false;
+          }
+          
+          return task.name.toLowerCase().includes(searchLower) ||
+                 task.description?.toLowerCase().includes(searchLower);
+        });
+      } else {
+        // Even without search query, exclude router tasks
         filteredTasks = allTasks.filter(task => 
-          task.name.toLowerCase().includes(searchLower) ||
-          task.description?.toLowerCase().includes(searchLower)
+          task.list_name?.toLowerCase() !== 'routers'
         );
       }
       
@@ -396,14 +406,24 @@ class ClickUpClient {
         }
       }
       
-      // Apply search filter if provided
+      // Apply search filter if provided and exclude router tasks
       let filteredTasks = allTasks;
       if (searchQuery) {
         const searchLower = searchQuery.toLowerCase();
+        filteredTasks = allTasks.filter(task => {
+          // Exclude tasks from "Routers" list
+          if (task.list?.name?.toLowerCase() === 'routers') {
+            return false;
+          }
+          
+          return task.name.toLowerCase().includes(searchLower) ||
+                 task.description?.toLowerCase().includes(searchLower) ||
+                 task.list?.name?.toLowerCase().includes(searchLower);
+        });
+      } else {
+        // Even without search query, exclude router tasks
         filteredTasks = allTasks.filter(task => 
-          task.name.toLowerCase().includes(searchLower) ||
-          task.description?.toLowerCase().includes(searchLower) ||
-          task.list?.name?.toLowerCase().includes(searchLower)
+          task.list?.name?.toLowerCase() !== 'routers'
         );
       }
       

@@ -242,7 +242,7 @@ export default function PropertySearchWidget({ router, onAssigned }) {
           <div className="psw-search-input-wrapper">
             <input
               type="text"
-              placeholder={spaceId ? "Search Active Accounts..." : "Search all ClickUp tasks..."}
+              placeholder={spaceId ? "Search properties (e.g., Cambridge, Colchester)..." : "Search property locations..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
@@ -279,7 +279,7 @@ export default function PropertySearchWidget({ router, onAssigned }) {
 
           {searchQuery.length < 2 && (
             <div className="psw-hint">
-              Type to search {spaceId ? 'Active Accounts' : 'all tasks'}...
+              Type to search property locations (excludes router tasks)...
             </div>
           )}
         </div>
