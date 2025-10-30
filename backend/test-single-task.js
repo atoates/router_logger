@@ -1,5 +1,4 @@
 const axios = require('axios');
-const db = require('./src/config/database');
 
 const BACKEND_URL = 'https://routerlogger-production.up.railway.app';
 
@@ -16,88 +15,44 @@ const CUSTOM_FIELDS = {
 };
 
 const STATUS_OPTIONS = {
-  ONLINE: 'b256bad4-2f9e-4e98-89b1-77a2a5443337',
-  OFFLINE: '7149ad8d-db43-48ab-a038-a17162c7495d',
-  MAINTENANCE: '38342970-fdd4-4c9f-bcea-738be4f6e2c5'
+  ONLINE: 0,      // orderindex 0
+  OFFLINE: 1,     // orderindex 1
+  MAINTENANCE: 2  // orderindex 2
 };
 
 async function testCreateTask() {
   try {
-    console.log('Fetching test router...');
-    const [routers] = await db.query(
-      'SELECT * FROM routers LIMIT 1'
-    );
-    
-    if (!routers.length) {
-      console.log('No routers found');
-      return;
-    }
-    
-    const router = routers[0];
-    console.log(`Testing with router: ${router.router_id} (${router.name})`);
-    
-    const taskName = `Test Router ${router.router_id}`;
-    const customFields = [];
-    
-    // Router ID
-    if (router.router_id) {
-      customFields.push({
+    const taskName = `Test Router 9999999`;
+    const customFields = [
+      {
         id: CUSTOM_FIELDS.ROUTER_ID,
-        value: router.router_id.toString()
-      });
-    }
-    
-    // IMEI
-    if (router.imei) {
-      customFields.push({
+        value: '9999999'
+      },
+      {
         id: CUSTOM_FIELDS.IMEI,
-        value: parseInt(router.imei)
-      });
-    }
-    
-    // Router Model
-    if (router.model) {
-      customFields.push({
+        value: 123456789012345
+      },
+      {
         id: CUSTOM_FIELDS.ROUTER_MODEL,
-        value: router.model
-      });
-    }
-    
-    // Firmware
-    if (router.firmware_version) {
-      customFields.push({
+        value: 'RUT200'
+      },
+      {
         id: CUSTOM_FIELDS.FIRMWARE,
-        value: router.firmware_version
-      });
-    }
-    
-    // Last Online
-    if (router.last_connection) {
-      const timestamp = new Date(router.last_connection).getTime();
-      customFields.push({
+        value: 'RUT2_R_00.07.06.6'
+      },
+      {
         id: CUSTOM_FIELDS.LAST_ONLINE,
-        value: timestamp
-      });
-    }
-    
-    // Data Usage
-    const dataUsageMB = Math.round(
-      (router.total_data_sent + router.total_data_received) / 1024 / 1024
-    );
-    customFields.push({
-      id: CUSTOM_FIELDS.DATA_USAGE,
-      value: dataUsageMB
-    });
-    
-    // Operational Status
-    const hoursSinceLastConnection = router.last_connection 
-      ? (Date.now() - new Date(router.last_connection).getTime()) / (1000 * 60 * 60)
-      : 9999;
-    const statusValue = hoursSinceLastConnection < 24 ? STATUS_OPTIONS.ONLINE : STATUS_OPTIONS.OFFLINE;
-    customFields.push({
-      id: CUSTOM_FIELDS.OPERATIONAL_STATUS,
-      value: statusValue
-    });
+        value: Date.now()
+      },
+      {
+        id: CUSTOM_FIELDS.DATA_USAGE,
+        value: 1500
+      },
+      {
+        id: CUSTOM_FIELDS.OPERATIONAL_STATUS,
+        value: STATUS_OPTIONS.ONLINE
+      }
+    ];
     
     const taskData = {
       name: taskName,
@@ -117,11 +72,17 @@ async function testCreateTask() {
     );
     
     console.log('\n=== Response ===');
-    console.log(JSON.stringify(response.data, null, 2));
+    console.log(`Task ID: ${response.data.task.id}`);
+    console.log(`Task Name: ${response.data.task.name}`);
+    console.log(`Custom Fields: ${JSON.stringify(response.data.task.custom_fields, null, 2)}`);
     
     process.exit(0);
   } catch (error) {
     console.error('Error:', error.response?.data || error.message);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', JSON.stringify(error.response.data, null, 2));
+    }
     process.exit(1);
   }
 }
