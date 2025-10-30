@@ -65,7 +65,8 @@ router.post('/assign', async (req, res) => {
       propertyName,
       installedAt,
       installedBy,
-      notes
+      notes,
+      validateClickUp = true // Optional: validate against ClickUp
     } = req.body;
 
     if (!routerId || !propertyTaskId) {
@@ -74,7 +75,7 @@ router.post('/assign', async (req, res) => {
       });
     }
 
-    // Assign in database
+    // Assign in database (validates property in ClickUp if requested)
     const assignment = await propertyService.assignRouterToProperty({
       routerId,
       propertyTaskId,
@@ -82,7 +83,7 @@ router.post('/assign', async (req, res) => {
       installedAt,
       installedBy,
       notes
-    });
+    }, validateClickUp);
 
     // TODO: Sync to ClickUp (update relationship custom fields)
     // This will be implemented once ClickUp custom fields are set up
@@ -94,8 +95,18 @@ router.post('/assign', async (req, res) => {
 
   } catch (error) {
     logger.error('Error assigning router to property:', error);
-    res.status(error.message.includes('already assigned') ? 409 : 500)
-      .json({ error: error.message });
+    
+    // Return appropriate status codes
+    let status = 500;
+    if (error.message.includes('already assigned')) {
+      status = 409; // Conflict
+    } else if (error.message.includes('not a property task')) {
+      status = 400; // Bad request
+    } else if (error.message.includes('No ClickUp token')) {
+      status = 401; // Unauthorized
+    }
+    
+    res.status(status).json({ error: error.message });
   }
 });
 
@@ -152,7 +163,8 @@ router.post('/move', async (req, res) => {
       newPropertyName,
       movedAt,
       movedBy,
-      notes
+      notes,
+      validateClickUp = true
     } = req.body;
 
     if (!routerId || !newPropertyTaskId) {
@@ -169,7 +181,7 @@ router.post('/move', async (req, res) => {
       movedAt,
       movedBy,
       notes
-    });
+    }, validateClickUp);
 
     // TODO: Sync to ClickUp
 
@@ -180,7 +192,15 @@ router.post('/move', async (req, res) => {
 
   } catch (error) {
     logger.error('Error moving router to property:', error);
-    res.status(500).json({ error: error.message });
+    
+    let status = 500;
+    if (error.message.includes('not a property task')) {
+      status = 400;
+    } else if (error.message.includes('No ClickUp token')) {
+      status = 401;
+    }
+    
+    res.status(status).json({ error: error.message });
   }
 });
 
@@ -217,13 +237,19 @@ router.post('/bulk-assign', async (req, res) => {
       routerIds,
       installedAt,
       installedBy,
-      notes
+      notes,
+      validateClickUp = true
     } = req.body;
 
     if (!propertyTaskId || !routerIds || !Array.isArray(routerIds)) {
       return res.status(400).json({ 
         error: 'propertyTaskId and routerIds (array) are required' 
       });
+    }
+
+    // Validate property once before bulk operation (if requested)
+    if (validateClickUp) {
+      await propertyService.validatePropertyTask(propertyTaskId);
     }
 
     const results = [];
@@ -238,7 +264,7 @@ router.post('/bulk-assign', async (req, res) => {
           installedAt,
           installedBy,
           notes
-        });
+        }, false); // Skip per-router validation since we validated once above
         results.push({ routerId, success: true, assignment });
       } catch (error) {
         errors.push({ routerId, error: error.message });
@@ -270,6 +296,52 @@ router.get('/stats', async (req, res) => {
   } catch (error) {
     logger.error('Error getting property stats:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/router-properties/search-properties/:listId
+ * Search for property tasks in ClickUp (Type = "property")
+ */
+router.get('/search-properties/:listId', async (req, res) => {
+  try {
+    const { listId } = req.params;
+    const { search = '' } = req.query;
+
+    const propertyTasks = await clickupClient.searchPropertyTasks(listId, search, 'default');
+
+    // Format for easy selection in UI
+    const properties = propertyTasks.map(task => ({
+      id: task.id,
+      name: task.name,
+      status: task.status?.status,
+      url: task.url,
+      description: task.description,
+      tags: task.tags?.map(t => t.name) || [],
+      // Include any property-specific custom fields
+      customFields: task.custom_fields?.reduce((acc, field) => {
+        if (field.name && field.value !== null && field.value !== undefined) {
+          acc[field.name] = field.value;
+        }
+        return acc;
+      }, {})
+    }));
+
+    res.json({
+      properties,
+      count: properties.length,
+      listId
+    });
+
+  } catch (error) {
+    logger.error('Error searching property tasks:', error);
+    
+    let status = 500;
+    if (error.message.includes('No ClickUp token')) {
+      status = 401;
+    }
+    
+    res.status(status).json({ error: error.message });
   }
 });
 

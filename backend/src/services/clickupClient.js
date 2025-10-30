@@ -243,6 +243,82 @@ class ClickUpClient {
       throw error;
     }
   }
+
+  /**
+   * Search for property tasks (tasks with Type = "property")
+   * @param {string} listId - List ID to search in
+   * @param {string} searchQuery - Optional search query for task name
+   * @param {string} userId - User identifier
+   * @returns {Promise<Array>} Property tasks
+   */
+  async searchPropertyTasks(listId, searchQuery = '', userId = 'default') {
+    try {
+      const client = await this.getAuthorizedClient(userId);
+      
+      // Get all tasks from the list (ClickUp doesn't support filtering by custom fields in the API)
+      const response = await client.get(`/list/${listId}/task`, {
+        params: {
+          archived: false,
+          subtasks: false,
+          include_closed: false
+        }
+      });
+      
+      const tasks = response.data.tasks || [];
+      
+      // Filter for tasks with Type = "property"
+      const propertyTasks = tasks.filter(task => {
+        // Check if task has Type custom field set to "property"
+        const typeField = task.custom_fields?.find(field => 
+          field.name?.toLowerCase() === 'type'
+        );
+        
+        // Handle dropdown custom fields
+        const fieldValue = typeField?.value || typeField?.type_config?.default;
+        const isProperty = fieldValue === 'property' || 
+                          fieldValue?.toLowerCase() === 'property' ||
+                          typeField?.value?.name?.toLowerCase() === 'property';
+        
+        // Apply search filter if provided
+        if (searchQuery && isProperty) {
+          return task.name.toLowerCase().includes(searchQuery.toLowerCase());
+        }
+        
+        return isProperty;
+      });
+      
+      logger.info('Found property tasks', { 
+        listId, 
+        total: tasks.length, 
+        properties: propertyTasks.length,
+        searchQuery 
+      });
+      
+      return propertyTasks;
+    } catch (error) {
+      logger.error('Error searching property tasks:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Get custom fields for a list
+   * @param {string} listId - List ID
+   * @param {string} userId - User identifier
+   * @returns {Promise<Array>} Custom fields configuration
+   */
+  async getCustomFields(listId, userId = 'default') {
+    try {
+      const client = await this.getAuthorizedClient(userId);
+      const response = await client.get(`/list/${listId}/field`);
+      
+      logger.info('Retrieved custom fields', { listId, count: response.data.fields?.length });
+      return response.data.fields || [];
+    } catch (error) {
+      logger.error('Error getting custom fields:', error.response?.data || error.message);
+      throw error;
+    }
+  }
 }
 
 module.exports = new ClickUpClient();

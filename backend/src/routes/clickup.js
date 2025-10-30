@@ -407,6 +407,54 @@ router.get('/router-task/:routerId', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/clickup/properties/:listId
+ * Search for property tasks in a list
+ */
+router.get('/properties/:listId', async (req, res) => {
+  try {
+    const { listId } = req.params;
+    const { search = '' } = req.query;
+
+    const propertyTasks = await clickupClient.searchPropertyTasks(listId, search, 'default');
+
+    // Format for easy consumption
+    const properties = propertyTasks.map(task => ({
+      id: task.id,
+      name: task.name,
+      status: task.status?.status,
+      url: task.url,
+      description: task.description,
+      tags: task.tags?.map(t => t.name),
+      custom_fields: task.custom_fields
+    }));
+
+    res.json({ 
+      properties,
+      count: properties.length 
+    });
+  } catch (error) {
+    logger.error('Error searching property tasks:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/clickup/custom-fields/:listId
+ * Get custom fields configuration for a list
+ */
+router.get('/custom-fields/:listId', async (req, res) => {
+  try {
+    const { listId } = req.params;
+    const fields = await clickupClient.getCustomFields(listId, 'default');
+    
+    res.json({ fields });
+  } catch (error) {
+    logger.error('Error getting custom fields:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Clean up expired OAuth states periodically
 setInterval(() => {
   const now = Date.now();

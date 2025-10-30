@@ -4,13 +4,50 @@
  */
 
 const { pool, logger } = require('../config/database');
+const clickupClient = require('./clickupClient');
+
+/**
+ * Validate that a property task exists in ClickUp and has Type = "property"
+ * @param {string} propertyTaskId - ClickUp task ID
+ * @returns {Promise<Object>} Task details if valid
+ */
+async function validatePropertyTask(propertyTaskId) {
+  try {
+    const task = await clickupClient.getTask(propertyTaskId, 'default');
+    
+    // Check if task has Type = "property"
+    const typeField = task.custom_fields?.find(field => 
+      field.name?.toLowerCase() === 'type'
+    );
+    
+    const fieldValue = typeField?.value || typeField?.type_config?.default;
+    const isProperty = fieldValue === 'property' || 
+                      fieldValue?.toLowerCase() === 'property' ||
+                      typeField?.value?.name?.toLowerCase() === 'property';
+    
+    if (!isProperty) {
+      throw new Error(
+        `Task ${propertyTaskId} is not a property task. ` +
+        `Please select a task with Type = "property".`
+      );
+    }
+    
+    return task;
+  } catch (error) {
+    if (error.message.includes('not a property task')) {
+      throw error;
+    }
+    throw new Error(`Failed to validate property task: ${error.message}`);
+  }
+}
 
 /**
  * Assign router to a property
  * @param {Object} assignment - Assignment details
+ * @param {boolean} validateClickUp - Whether to validate property exists in ClickUp (default: true)
  * @returns {Promise<Object>} Created assignment record
  */
-async function assignRouterToProperty(assignment) {
+async function assignRouterToProperty(assignment, validateClickUp = true) {
   const {
     routerId,
     propertyTaskId,
@@ -23,6 +60,17 @@ async function assignRouterToProperty(assignment) {
   const client = await pool.connect();
   
   try {
+    // Validate property task in ClickUp if requested
+    let validatedPropertyName = propertyName;
+    if (validateClickUp) {
+      const propertyTask = await validatePropertyTask(propertyTaskId);
+      validatedPropertyName = propertyTask.name; // Use official name from ClickUp
+      logger.info('Property task validated', { 
+        propertyTaskId, 
+        propertyName: validatedPropertyName 
+      });
+    }
+
     await client.query('BEGIN');
 
     // Check if router already has an active assignment
@@ -47,7 +95,7 @@ async function assignRouterToProperty(assignment) {
        (router_id, property_clickup_task_id, property_name, installed_at, installed_by, notes)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [routerId, propertyTaskId, propertyName, installedAt, installedBy, notes]
+      [routerId, propertyTaskId, validatedPropertyName, installedAt, installedBy, notes]
     );
 
     const newAssignment = assignmentResult.rows[0];
@@ -59,7 +107,7 @@ async function assignRouterToProperty(assignment) {
            current_property_name = $2,
            property_installed_at = $3
        WHERE router_id = $4`,
-      [propertyTaskId, propertyName, installedAt, routerId]
+      [propertyTaskId, validatedPropertyName, installedAt, routerId]
     );
 
     await client.query('COMMIT');
@@ -67,8 +115,11 @@ async function assignRouterToProperty(assignment) {
     logger.info('Router assigned to property', { 
       routerId, 
       propertyTaskId, 
-      propertyName 
+      propertyName: validatedPropertyName 
     });
+
+    // TODO: Sync with ClickUp - update property's "Installed Routers" relationship field
+    // and router's "Current Property" relationship field
 
     return newAssignment;
 
@@ -153,9 +204,10 @@ async function removeRouterFromProperty(removal) {
 /**
  * Move router from one property to another (convenience method)
  * @param {Object} move - Move details
+ * @param {boolean} validateClickUp - Whether to validate property exists in ClickUp
  * @returns {Promise<Object>} New assignment record
  */
-async function moveRouterToProperty(move) {
+async function moveRouterToProperty(move, validateClickUp = true) {
   const {
     routerId,
     newPropertyTaskId,
@@ -181,7 +233,7 @@ async function moveRouterToProperty(move) {
     installedAt: movedAt,
     installedBy: movedBy,
     notes
-  });
+  }, validateClickUp);
 }
 
 /**
@@ -343,5 +395,6 @@ module.exports = {
   getCurrentProperty,
   getPropertyHistory,
   getRoutersAtProperty,
-  getPropertyStats
+  getPropertyStats,
+  validatePropertyTask
 };
