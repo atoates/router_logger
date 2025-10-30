@@ -293,4 +293,20 @@ router.get('/inspections/:routerId', async (req, res) => {
   }
 });
 
+// POST clear all ClickUp task associations
+router.post('/clear-clickup-tasks', async (req, res) => {
+  try {
+    const db = require('../config/database');
+    await db.query(
+      'UPDATE routers SET clickup_task_id = NULL, clickup_task_url = NULL, clickup_list_id = NULL'
+    );
+    logger.info('Cleared all ClickUp task associations');
+    res.json({ success: true, message: 'Cleared all ClickUp task associations' });
+  } catch (error) {
+    logger.error('Error clearing task associations:', error);
+    res.status(500).json({ error: 'Failed to clear task associations' });
+  }
+});
+
 module.exports = router;
+
