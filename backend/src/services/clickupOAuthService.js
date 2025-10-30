@@ -27,13 +27,10 @@ class ClickUpOAuthService {
    * @returns {string} Authorization URL
    */
   getAuthorizationUrl(state) {
-    const params = new URLSearchParams({
-      client_id: this.clientId,
-      redirect_uri: this.redirectUri,
-      state: state
-    });
-
-    return `${CLICKUP_AUTH_URL}?${params.toString()}`;
+    // Manually encode only what's necessary - redirect_uri should be encoded once
+    const encodedRedirectUri = encodeURIComponent(this.redirectUri);
+    
+    return `${CLICKUP_AUTH_URL}?client_id=${this.clientId}&redirect_uri=${encodedRedirectUri}&state=${state}`;
   }
 
   /**
