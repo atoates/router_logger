@@ -245,51 +245,106 @@ class ClickUpClient {
   }
 
   /**
-   * Search for property tasks (tasks with Task Type = "Property")
-   * @param {string} listId - List ID to search in
+   * Search for property tasks across a space
+   * @param {string} spaceId - Space ID to search in
    * @param {string} searchQuery - Optional search query for task name
    * @param {string} userId - User identifier
-   * @returns {Promise<Array>} Property tasks
+   * @returns {Promise<Array>} Tasks from the space
    */
-  async searchPropertyTasks(listId, searchQuery = '', userId = 'default') {
+  async searchPropertyTasks(spaceId, searchQuery = '', userId = 'default') {
     try {
       const client = await this.getAuthorizedClient(userId);
       
-      // Get all tasks from the list
-      const response = await client.get(`/list/${listId}/task`, {
-        params: {
-          archived: false,
-          subtasks: false,
-          include_closed: false
+      // Get all lists in the space
+      const listsResponse = await client.get(`/space/${spaceId}/list`, {
+        params: { archived: false }
+      });
+      
+      const lists = listsResponse.data.lists || [];
+      let allTasks = [];
+      
+      // Get tasks from each list
+      for (const list of lists) {
+        try {
+          const tasksResponse = await client.get(`/list/${list.id}/task`, {
+            params: {
+              archived: false,
+              subtasks: false,
+              include_closed: false
+            }
+          });
+          
+          const tasks = tasksResponse.data.tasks || [];
+          allTasks = allTasks.concat(tasks.map(task => ({
+            ...task,
+            list_name: list.name,
+            list_id: list.id
+          })));
+        } catch (error) {
+          logger.warn(`Error getting tasks from list ${list.id}:`, error.message);
         }
+      }
+      
+      // Apply search filter if provided
+      let filteredTasks = allTasks;
+      if (searchQuery) {
+        const searchLower = searchQuery.toLowerCase();
+        filteredTasks = allTasks.filter(task => 
+          task.name.toLowerCase().includes(searchLower) ||
+          task.description?.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      logger.info('Found tasks in space', { 
+        spaceId, 
+        total: allTasks.length, 
+        filtered: filteredTasks.length,
+        searchQuery 
+      });
+      
+      return filteredTasks;
+    } catch (error) {
+      logger.error('Error searching tasks in space:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Search tasks across entire workspace
+   * @param {string} workspaceId - Workspace ID
+   * @param {string} searchQuery - Search query for task name
+   * @param {string} userId - User identifier
+   * @returns {Promise<Array>} Matching tasks
+   */
+  async searchAllTasks(workspaceId, searchQuery = '', userId = 'default') {
+    try {
+      const client = await this.getAuthorizedClient(userId);
+      
+      // Use ClickUp's task search endpoint
+      const params = {
+        archived: false,
+        subtasks: false
+      };
+      
+      if (searchQuery) {
+        params.search = searchQuery;
+      }
+      
+      const response = await client.get(`/team/${workspaceId}/task`, {
+        params
       });
       
       const tasks = response.data.tasks || [];
       
-      // Filter for tasks with Task Type = "Property" (native ClickUp feature)
-      const propertyTasks = tasks.filter(task => {
-        // Check task_type field (native ClickUp Task Types)
-        const taskType = task.task_type;
-        const isProperty = taskType?.name?.toLowerCase() === 'property';
-        
-        // Apply search filter if provided
-        if (searchQuery && isProperty) {
-          return task.name.toLowerCase().includes(searchQuery.toLowerCase());
-        }
-        
-        return isProperty;
-      });
-      
-      logger.info('Found property tasks', { 
-        listId, 
-        total: tasks.length, 
-        properties: propertyTasks.length,
+      logger.info('Searched all tasks in workspace', { 
+        workspaceId, 
+        count: tasks.length,
         searchQuery 
       });
       
-      return propertyTasks;
+      return tasks;
     } catch (error) {
-      logger.error('Error searching property tasks:', error.response?.data || error.message);
+      logger.error('Error searching all tasks:', error.response?.data || error.message);
       throw error;
     }
   }

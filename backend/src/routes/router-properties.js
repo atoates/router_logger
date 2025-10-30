@@ -300,15 +300,15 @@ router.get('/stats', async (req, res) => {
 });
 
 /**
- * GET /api/router-properties/search-properties/:listId
- * Search for property tasks in ClickUp (Type = "property")
+ * GET /api/router-properties/search-properties/:spaceId
+ * Search for property tasks in a ClickUp space (e.g., "Active Accounts")
  */
-router.get('/search-properties/:listId', async (req, res) => {
+router.get('/search-properties/:spaceId', async (req, res) => {
   try {
-    const { listId } = req.params;
+    const { spaceId } = req.params;
     const { search = '' } = req.query;
 
-    const propertyTasks = await clickupClient.searchPropertyTasks(listId, search, 'default');
+    const propertyTasks = await clickupClient.searchPropertyTasks(spaceId, search, 'default');
 
     // Format for easy selection in UI
     const properties = propertyTasks.map(task => ({
@@ -318,6 +318,8 @@ router.get('/search-properties/:listId', async (req, res) => {
       url: task.url,
       description: task.description,
       tags: task.tags?.map(t => t.name) || [],
+      listName: task.list_name,
+      listId: task.list_id,
       // Include any property-specific custom fields
       customFields: task.custom_fields?.reduce((acc, field) => {
         if (field.name && field.value !== null && field.value !== undefined) {
@@ -330,11 +332,52 @@ router.get('/search-properties/:listId', async (req, res) => {
     res.json({
       properties,
       count: properties.length,
-      listId
+      spaceId
     });
 
   } catch (error) {
     logger.error('Error searching property tasks:', error);
+    
+    let status = 500;
+    if (error.message.includes('No ClickUp token')) {
+      status = 401;
+    }
+    
+    res.status(status).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/router-properties/search-all/:workspaceId
+ * Search all tasks across workspace
+ */
+router.get('/search-all/:workspaceId', async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    const { search = '' } = req.query;
+
+    const tasks = await clickupClient.searchAllTasks(workspaceId, search, 'default');
+
+    // Format for easy selection
+    const formattedTasks = tasks.map(task => ({
+      id: task.id,
+      name: task.name,
+      status: task.status?.status,
+      url: task.url,
+      description: task.description,
+      tags: task.tags?.map(t => t.name) || [],
+      list: task.list ? { id: task.list.id, name: task.list.name } : null,
+      space: task.space ? { id: task.space.id, name: task.space.name } : null
+    }));
+
+    res.json({
+      tasks: formattedTasks,
+      count: formattedTasks.length,
+      workspaceId
+    });
+
+  } catch (error) {
+    logger.error('Error searching all tasks:', error);
     
     let status = 500;
     if (error.message.includes('No ClickUp token')) {

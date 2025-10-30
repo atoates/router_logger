@@ -158,6 +158,21 @@ router.get('/workspaces', async (req, res) => {
 });
 
 /**
+ * GET /api/clickup/spaces/:workspaceId
+ * Get spaces in a workspace
+ */
+router.get('/spaces/:workspaceId', async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    const spaces = await clickupClient.getSpaces(workspaceId, 'default');
+    res.json({ spaces });
+  } catch (error) {
+    logger.error('Error getting spaces:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/clickup/lists/:workspaceId
  * Get "Routers" list in workspace
  */
@@ -426,6 +441,8 @@ router.get('/properties/:listId', async (req, res) => {
       url: task.url,
       description: task.description,
       tags: task.tags?.map(t => t.name),
+      list_name: task.list_name,
+      list_id: task.list_id,
       custom_fields: task.custom_fields
     }));
 
@@ -435,6 +452,40 @@ router.get('/properties/:listId', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error searching property tasks:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/clickup/search-tasks/:workspaceId
+ * Search tasks across entire workspace
+ */
+router.get('/search-tasks/:workspaceId', async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    const { search = '' } = req.query;
+
+    const tasks = await clickupClient.searchAllTasks(workspaceId, search, 'default');
+
+    // Format for easy consumption
+    const formattedTasks = tasks.map(task => ({
+      id: task.id,
+      name: task.name,
+      status: task.status?.status,
+      url: task.url,
+      description: task.description,
+      tags: task.tags?.map(t => t.name) || [],
+      list: task.list ? { id: task.list.id, name: task.list.name } : null,
+      space: task.space ? { id: task.space.id, name: task.space.name } : null,
+      folder: task.folder ? { id: task.folder.id, name: task.folder.name } : null
+    }));
+
+    res.json({ 
+      tasks: formattedTasks,
+      count: formattedTasks.length 
+    });
+  } catch (error) {
+    logger.error('Error searching tasks:', error);
     res.status(500).json({ error: error.message });
   }
 });
