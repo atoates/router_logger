@@ -211,23 +211,16 @@ router.get('/tasks/:listId', async (req, res) => {
 router.post('/tasks/:listId', async (req, res) => {
   try {
     const { listId } = req.params;
-    const { name, description, routerId, routerName } = req.body;
+    const taskData = req.body;
 
-    if (!name) {
+    if (!taskData.name) {
       return res.status(400).json({ error: 'Task name is required' });
     }
 
-    const taskData = {
-      name,
-      description: description || `Router: ${routerName || routerId}`,
-      markdown_description: description || `**Router:** ${routerName || routerId}`,
-      tags: ['router'],
-      priority: 3, // Normal priority
-    };
-
+    // Pass all task data through to ClickUp (including custom_fields)
     const task = await clickupClient.createTask(listId, taskData, 'default');
     
-    logger.info('Created ClickUp task', { taskId: task.id, routerId });
+    logger.info('Created ClickUp task', { taskId: task.id, name: taskData.name });
 
     res.json({ task });
   } catch (error) {
