@@ -263,23 +263,40 @@ class ClickUpClient {
       const lists = listsResponse.data.lists || [];
       let allTasks = [];
       
-      // Get tasks from each list
+      // Get tasks from each list (with pagination)
       for (const list of lists) {
         try {
-          const tasksResponse = await client.get(`/list/${list.id}/task`, {
-            params: {
-              archived: false,
-              subtasks: false,
-              include_closed: false
-            }
-          });
+          let page = 0;
+          let hasMore = true;
           
-          const tasks = tasksResponse.data.tasks || [];
-          allTasks = allTasks.concat(tasks.map(task => ({
-            ...task,
-            list_name: list.name,
-            list_id: list.id
-          })));
+          while (hasMore) {
+            const tasksResponse = await client.get(`/list/${list.id}/task`, {
+              params: {
+                archived: false,
+                subtasks: false,
+                include_closed: false,
+                page
+              }
+            });
+            
+            const tasks = tasksResponse.data.tasks || [];
+            if (tasks.length === 0) {
+              hasMore = false;
+            } else {
+              allTasks = allTasks.concat(tasks.map(task => ({
+                ...task,
+                list_name: list.name,
+                list_id: list.id
+              })));
+              
+              // ClickUp returns up to 100 tasks per page
+              if (tasks.length < 100) {
+                hasMore = false;
+              } else {
+                page++;
+              }
+            }
+          }
         } catch (error) {
           logger.warn(`Error getting tasks from list ${list.id}:`, error.message);
         }
@@ -336,23 +353,40 @@ class ClickUpClient {
           
           const lists = listsResponse.data.lists || [];
           
-          // Get tasks from each list
+          // Get tasks from each list (with pagination)
           for (const list of lists) {
             try {
-              const tasksResponse = await client.get(`/list/${list.id}/task`, {
-                params: {
-                  archived: false,
-                  subtasks: false,
-                  include_closed: false
-                }
-              });
+              let page = 0;
+              let hasMore = true;
               
-              const tasks = tasksResponse.data.tasks || [];
-              allTasks = allTasks.concat(tasks.map(task => ({
-                ...task,
-                list: { id: list.id, name: list.name },
-                space: { id: space.id, name: space.name }
-              })));
+              while (hasMore) {
+                const tasksResponse = await client.get(`/list/${list.id}/task`, {
+                  params: {
+                    archived: false,
+                    subtasks: false,
+                    include_closed: false,
+                    page
+                  }
+                });
+                
+                const tasks = tasksResponse.data.tasks || [];
+                if (tasks.length === 0) {
+                  hasMore = false;
+                } else {
+                  allTasks = allTasks.concat(tasks.map(task => ({
+                    ...task,
+                    list: { id: list.id, name: list.name },
+                    space: { id: space.id, name: space.name }
+                  })));
+                  
+                  // ClickUp returns up to 100 tasks per page
+                  if (tasks.length < 100) {
+                    hasMore = false;
+                  } else {
+                    page++;
+                  }
+                }
+              }
             } catch (error) {
               logger.warn(`Error getting tasks from list ${list.id}:`, error.message);
             }
