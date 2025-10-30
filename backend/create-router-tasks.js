@@ -70,18 +70,21 @@ async function createRouterTasks() {
         // Prepare custom fields
         const customFields = [];
         
-        // Router ID (text)
+        // Router ID (text) - always present
         customFields.push({
           id: CUSTOM_FIELDS.ROUTER_ID,
           value: router.router_id.toString()
         });
         
-        // IMEI (number)
+        // IMEI (number) - always present
         if (router.imei) {
-          customFields.push({
-            id: CUSTOM_FIELDS.IMEI,
-            value: parseInt(router.imei) || 0
-          });
+          const imeiNum = parseInt(router.imei);
+          if (!isNaN(imeiNum)) {
+            customFields.push({
+              id: CUSTOM_FIELDS.IMEI,
+              value: imeiNum
+            });
+          }
         }
         
         // Firmware (long text)
@@ -92,33 +95,24 @@ async function createRouterTasks() {
           });
         }
         
-        // Last Online (date) - convert to timestamp in milliseconds
-        if (router.last_connection) {
-          const lastOnline = new Date(router.last_connection).getTime();
+        // Last Online (date) - use last_seen field, convert to timestamp in milliseconds
+        if (router.last_seen) {
+          const lastOnline = new Date(router.last_seen).getTime();
           customFields.push({
             id: CUSTOM_FIELDS.LAST_ONLINE,
             value: lastOnline
           });
         }
         
-        // Data Usage (number) - total in MB
-        if (router.total_data_sent || router.total_data_received) {
-          const totalData = (router.total_data_sent || 0) + (router.total_data_received || 0);
-          const dataMB = Math.round(totalData / 1024 / 1024);
-          customFields.push({
-            id: CUSTOM_FIELDS.DATA_USAGE,
-            value: dataMB
-          });
-        }
-        
-        // Operational Status (dropdown) - based on last connection
+        // Operational Status (dropdown) - based on current_status or last_seen
         let statusValue = STATUS_OPTIONS.OFFLINE;
-        if (router.last_connection) {
-          const lastSeen = new Date(router.last_connection);
+        if (router.current_status === 'online') {
+          statusValue = STATUS_OPTIONS.ONLINE;
+        } else if (router.last_seen) {
+          const lastSeen = new Date(router.last_seen);
           const now = new Date();
-          const hoursSinceLastSeen = (now - lastSeen) / (1000 * 60 * 60);
-          
-          if (hoursSinceLastSeen < 24) {
+          const hoursSince = (now - lastSeen) / (1000 * 60 * 60);
+          if (hoursSince < 24) {
             statusValue = STATUS_OPTIONS.ONLINE;
           }
         }
@@ -148,7 +142,8 @@ async function createRouterTasks() {
         console.log(`   - IMEI: ${router.imei || 'N/A'}`);
         console.log(`   - Firmware: ${router.firmware_version || 'N/A'}`);
         console.log(`   - Status: ${statusValue === STATUS_OPTIONS.ONLINE ? 'Online' : 'Offline'}`);
-        console.log(`   - Data Usage: ${customFields.find(f => f.id === CUSTOM_FIELDS.DATA_USAGE)?.value || 0} MB`);
+        console.log(`   - Last Seen: ${router.last_seen || 'N/A'}`);
+
         
         // Link task to router
         await axios.post(`${BACKEND_URL}/api/clickup/link-router`, {
@@ -164,7 +159,12 @@ async function createRouterTasks() {
         await new Promise(resolve => setTimeout(resolve, 300));
         
       } catch (error) {
-        console.error(`❌ Error creating task for router ${router.router_id}:`, error.response?.data || error.message);
+        console.error(`❌ Error creating task for router ${router.router_id}:`);
+        if (error.response?.data) {
+          console.error('   Response:', JSON.stringify(error.response.data, null, 2));
+        } else {
+          console.error('   Error:', error.message);
+        }
         errors++;
       }
     }
