@@ -237,6 +237,26 @@ router.post('/tasks/:listId', async (req, res) => {
 });
 
 /**
+ * PUT /api/clickup/task/:taskId
+ * Update a ClickUp task (including custom fields)
+ */
+router.put('/task/:taskId', async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const updateData = req.body;
+
+    const updatedTask = await clickupClient.updateTask(taskId, updateData, 'default');
+    
+    logger.info('Updated ClickUp task', { taskId });
+
+    res.json({ task: updatedTask });
+  } catch (error) {
+    logger.error('Error updating task:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/clickup/link-router
  * Link a router to a ClickUp task
  */
