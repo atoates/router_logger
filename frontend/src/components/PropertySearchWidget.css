@@ -1,0 +1,245 @@
+/* Property Search Widget Styles */
+.property-search-widget {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.psw-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.psw-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.psw-status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f0f0f0;
+  color: #666;
+}
+
+.psw-status-badge.success {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.psw-status-badge.warning {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+/* Current Property Display */
+.psw-current-property {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #4caf50;
+}
+
+.psw-property-info {
+  flex: 1;
+}
+
+.psw-property-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.psw-property-name strong {
+  font-size: 15px;
+  color: #333;
+}
+
+.psw-clickup-link {
+  font-size: 13px;
+  color: #1976d2;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.psw-clickup-link:hover {
+  text-decoration: underline;
+}
+
+.psw-property-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+  color: #666;
+}
+
+.psw-remove-btn {
+  padding: 6px 16px;
+  background: #fff;
+  border: 1px solid #dc3545;
+  color: #dc3545;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.psw-remove-btn:hover:not(:disabled) {
+  background: #dc3545;
+  color: white;
+}
+
+.psw-remove-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Search Container */
+.psw-search-container {
+  position: relative;
+}
+
+.psw-search-input-wrapper {
+  position: relative;
+}
+
+.psw-search-input {
+  width: 100%;
+  padding: 10px 12px;
+  padding-right: 36px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.psw-search-input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+}
+
+.psw-search-input:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.psw-spinner {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+}
+
+/* Dropdown */
+.psw-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.psw-dropdown-item {
+  padding: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.15s;
+}
+
+.psw-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.psw-dropdown-item:hover {
+  background-color: #f8f9fa;
+}
+
+.psw-result-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 6px;
+}
+
+.psw-result-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.psw-badge {
+  padding: 2px 8px;
+  background: #e3f2fd;
+  color: #1565c0;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.psw-badge-status {
+  padding: 2px 8px;
+  background: #f3e5f5;
+  color: #6a1b9a;
+  border-radius: 4px;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+/* Hints and Messages */
+.psw-hint {
+  font-size: 13px;
+  color: #999;
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+.psw-no-results {
+  padding: 16px;
+  text-align: center;
+  font-size: 14px;
+  color: #666;
+  background: #f8f9fa;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+/* Scrollbar styling for dropdown */
+.psw-dropdown::-webkit-scrollbar {
+  width: 8px;
+}
+
+.psw-dropdown::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.psw-dropdown::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.psw-dropdown::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

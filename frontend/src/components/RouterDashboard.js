@@ -6,6 +6,7 @@ import { getLogs, getUsageStats, getUptimeData, logInspection, getInspectionHist
 import { exportUptimeReportToPDF } from '../utils/exportUtils';
 import { toast } from 'react-toastify';
 import ClickUpTaskWidget from './ClickUpTaskWidget';
+import PropertySearchWidget from './PropertySearchWidget';
 import './RouterDashboard.css';
 
 function formatBytes(bytes) {
@@ -247,6 +248,12 @@ export default function RouterDashboard({ router }) {
 
       {/* ClickUp Task Widget */}
       <ClickUpTaskWidget router={router} />
+
+      {/* Property Search Widget */}
+      <PropertySearchWidget router={router} onAssigned={() => {
+        // Optionally reload data when property is assigned
+        console.log('Property assigned to router');
+      }} />
 
       {/* Hero metrics */}
       <div className="rd-metrics">
