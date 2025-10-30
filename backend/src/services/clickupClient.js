@@ -175,6 +175,16 @@ class ClickUpClient {
   async createTask(listId, taskData, userId = 'default') {
     try {
       const client = await this.getAuthorizedClient(userId);
+      
+      // Debug log the task data being sent
+      logger.info('Creating ClickUp task with data:', { 
+        listId, 
+        taskName: taskData.name,
+        hasCustomFields: !!taskData.custom_fields,
+        customFieldsCount: taskData.custom_fields?.length || 0,
+        customFields: taskData.custom_fields
+      });
+      
       const response = await client.post(`/list/${listId}/task`, taskData);
       
       logger.info('Created ClickUp task', { listId, taskId: response.data.id });
