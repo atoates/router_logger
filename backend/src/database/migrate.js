@@ -221,6 +221,62 @@ async function initializeDatabase() {
         ON clickup_oauth_tokens(user_id);
     `);
 
+    // Migration 008: Router-Property tracking
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS router_property_assignments (
+        id SERIAL PRIMARY KEY,
+        router_id VARCHAR(50) NOT NULL,
+        property_clickup_task_id VARCHAR(50) NOT NULL,
+        property_name VARCHAR(255),
+        installed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        removed_at TIMESTAMP,
+        notes TEXT,
+        installed_by VARCHAR(100),
+        removed_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_router_property_router 
+          FOREIGN KEY (router_id) 
+          REFERENCES routers(router_id) 
+          ON DELETE CASCADE,
+        CONSTRAINT check_property_dates 
+          CHECK (removed_at IS NULL OR removed_at >= installed_at)
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_property_assignments_router 
+        ON router_property_assignments(router_id);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_property_assignments_property 
+        ON router_property_assignments(property_clickup_task_id);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_property_assignments_current 
+        ON router_property_assignments(router_id, removed_at);
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_assignment 
+        ON router_property_assignments(router_id) 
+        WHERE removed_at IS NULL;
+    `);
+
+    await client.query(`
+      ALTER TABLE routers 
+        ADD COLUMN IF NOT EXISTS current_property_task_id VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS current_property_name VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS property_installed_at TIMESTAMP;
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_routers_current_property 
+        ON routers(current_property_task_id);
+    `);
+
     console.log('Database tables created successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
