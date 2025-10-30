@@ -320,29 +320,67 @@ class ClickUpClient {
     try {
       const client = await this.getAuthorizedClient(userId);
       
-      // Use ClickUp's task search endpoint
-      const params = {
-        archived: false,
-        subtasks: false
-      };
+      // Get all spaces in the workspace
+      const spacesResponse = await this.getSpaces(workspaceId, userId);
+      const spaces = spacesResponse || [];
       
-      if (searchQuery) {
-        params.search = searchQuery;
+      let allTasks = [];
+      
+      // Get tasks from each space
+      for (const space of spaces) {
+        try {
+          // Get all lists in the space
+          const listsResponse = await client.get(`/space/${space.id}/list`, {
+            params: { archived: false }
+          });
+          
+          const lists = listsResponse.data.lists || [];
+          
+          // Get tasks from each list
+          for (const list of lists) {
+            try {
+              const tasksResponse = await client.get(`/list/${list.id}/task`, {
+                params: {
+                  archived: false,
+                  subtasks: false,
+                  include_closed: false
+                }
+              });
+              
+              const tasks = tasksResponse.data.tasks || [];
+              allTasks = allTasks.concat(tasks.map(task => ({
+                ...task,
+                list: { id: list.id, name: list.name },
+                space: { id: space.id, name: space.name }
+              })));
+            } catch (error) {
+              logger.warn(`Error getting tasks from list ${list.id}:`, error.message);
+            }
+          }
+        } catch (error) {
+          logger.warn(`Error getting lists from space ${space.id}:`, error.message);
+        }
       }
       
-      const response = await client.get(`/team/${workspaceId}/task`, {
-        params
-      });
-      
-      const tasks = response.data.tasks || [];
+      // Apply search filter if provided
+      let filteredTasks = allTasks;
+      if (searchQuery) {
+        const searchLower = searchQuery.toLowerCase();
+        filteredTasks = allTasks.filter(task => 
+          task.name.toLowerCase().includes(searchLower) ||
+          task.description?.toLowerCase().includes(searchLower) ||
+          task.list?.name?.toLowerCase().includes(searchLower)
+        );
+      }
       
       logger.info('Searched all tasks in workspace', { 
-        workspaceId, 
-        count: tasks.length,
+        workspaceId,
+        totalTasks: allTasks.length,
+        filteredTasks: filteredTasks.length,
         searchQuery 
       });
       
-      return tasks;
+      return filteredTasks;
     } catch (error) {
       logger.error('Error searching all tasks:', error.response?.data || error.message);
       throw error;
