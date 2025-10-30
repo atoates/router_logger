@@ -245,7 +245,7 @@ class ClickUpClient {
   }
 
   /**
-   * Search for property tasks (tasks with Type = "property")
+   * Search for property tasks (tasks with Task Type = "Property")
    * @param {string} listId - List ID to search in
    * @param {string} searchQuery - Optional search query for task name
    * @param {string} userId - User identifier
@@ -255,7 +255,7 @@ class ClickUpClient {
     try {
       const client = await this.getAuthorizedClient(userId);
       
-      // Get all tasks from the list (ClickUp doesn't support filtering by custom fields in the API)
+      // Get all tasks from the list
       const response = await client.get(`/list/${listId}/task`, {
         params: {
           archived: false,
@@ -266,18 +266,11 @@ class ClickUpClient {
       
       const tasks = response.data.tasks || [];
       
-      // Filter for tasks with Type = "property"
+      // Filter for tasks with Task Type = "Property" (native ClickUp feature)
       const propertyTasks = tasks.filter(task => {
-        // Check if task has Type custom field set to "property"
-        const typeField = task.custom_fields?.find(field => 
-          field.name?.toLowerCase() === 'type'
-        );
-        
-        // Handle dropdown custom fields
-        const fieldValue = typeField?.value || typeField?.type_config?.default;
-        const isProperty = fieldValue === 'property' || 
-                          fieldValue?.toLowerCase() === 'property' ||
-                          typeField?.value?.name?.toLowerCase() === 'property';
+        // Check task_type field (native ClickUp Task Types)
+        const taskType = task.task_type;
+        const isProperty = taskType?.name?.toLowerCase() === 'property';
         
         // Apply search filter if provided
         if (searchQuery && isProperty) {

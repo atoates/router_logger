@@ -7,7 +7,7 @@ const { pool, logger } = require('../config/database');
 const clickupClient = require('./clickupClient');
 
 /**
- * Validate that a property task exists in ClickUp and has Type = "property"
+ * Validate that a property task exists in ClickUp and has Task Type = "Property"
  * @param {string} propertyTaskId - ClickUp task ID
  * @returns {Promise<Object>} Task details if valid
  */
@@ -15,26 +15,21 @@ async function validatePropertyTask(propertyTaskId) {
   try {
     const task = await clickupClient.getTask(propertyTaskId, 'default');
     
-    // Check if task has Type = "property"
-    const typeField = task.custom_fields?.find(field => 
-      field.name?.toLowerCase() === 'type'
-    );
-    
-    const fieldValue = typeField?.value || typeField?.type_config?.default;
-    const isProperty = fieldValue === 'property' || 
-                      fieldValue?.toLowerCase() === 'property' ||
-                      typeField?.value?.name?.toLowerCase() === 'property';
+    // Check if task has Task Type = "Property" (native ClickUp Task Types)
+    const taskType = task.task_type;
+    const isProperty = taskType?.name?.toLowerCase() === 'property';
     
     if (!isProperty) {
+      const currentType = taskType?.name || 'Task (default)';
       throw new Error(
-        `Task ${propertyTaskId} is not a property task. ` +
-        `Please select a task with Type = "property".`
+        `Task "${task.name}" has Task Type "${currentType}" but needs to be "Property". ` +
+        `Please select a task with Task Type = "Property".`
       );
     }
     
     return task;
   } catch (error) {
-    if (error.message.includes('not a property task')) {
+    if (error.message.includes('Task Type')) {
       throw error;
     }
     throw new Error(`Failed to validate property task: ${error.message}`);

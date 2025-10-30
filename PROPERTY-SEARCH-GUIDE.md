@@ -1,12 +1,12 @@
 # Property Search and Assignment Guide
 
 ## Overview
-Routers can now be assigned to properties by searching ClickUp tasks that have **Type = "property"**. This ensures only valid property tasks are used for router assignments.
+Routers can now be assigned to properties by searching ClickUp tasks that have **Task Type = "Property"**. This uses ClickUp's native Task Types feature to ensure only valid property tasks are used for router assignments.
 
 ## Prerequisites
 1. ClickUp OAuth must be authorized
-2. Your ClickUp workspace must have tasks with a custom field called "Type"
-3. Property tasks must have the "Type" field set to "property"
+2. Your ClickUp workspace has the "Property" task type available (built-in)
+3. Property tasks must have their Task Type set to "Property"
 
 ## API Endpoints
 
@@ -14,7 +14,7 @@ Routers can now be assigned to properties by searching ClickUp tasks that have *
 
 **GET** `/api/clickup/properties/:listId?search=beach`
 
-Returns all tasks where Type = "property" from the specified list.
+Returns all tasks where Task Type = "Property" from the specified list.
 
 **Parameters:**
 - `listId` (required) - The ClickUp list ID to search in
@@ -33,8 +33,7 @@ Returns all tasks where Type = "property" from the specified list.
       "tags": ["beachfront", "luxury"],
       "custom_fields": {
         "Address": "123 Ocean Drive",
-        "Beds": 4,
-        "Type": "property"
+        "Beds": 4
       }
     }
   ],
@@ -72,7 +71,7 @@ Alternative endpoint specifically for router-property assignment workflow.
 
 **POST** `/api/router-properties/assign`
 
-Assigns a router to a property. By default, validates that the task exists in ClickUp and has Type = "property".
+Assigns a router to a property. By default, validates that the task exists in ClickUp and has Task Type = "Property".
 
 **Request Body:**
 ```json
@@ -113,10 +112,10 @@ Assigns a router to a property. By default, validates that the task exists in Cl
 ```
 Status: 409 Conflict
 
-*Not a property task:*
+*Wrong task type:*
 ```json
 {
-  "error": "Task abc123 is not a property task. Please select a task with Type = \"property\"."
+  "error": "Task \"Router #15\" has Task Type \"Task (default)\" but needs to be \"Property\". Please select a task with Task Type = \"Property\"."
 }
 ```
 Status: 400 Bad Request
@@ -187,8 +186,8 @@ Assign multiple routers to the same property. Validates property once before pro
 ### Automatic Validation (Default)
 When `validateClickUp: true` (default), the system:
 1. Fetches the task from ClickUp API
-2. Checks if the task has a "Type" custom field
-3. Verifies the Type value equals "property"
+2. Checks the task's `task_type` field (native ClickUp Task Types)
+3. Verifies the Task Type name equals "Property" (case-insensitive)
 4. Uses the official task name from ClickUp (ignoring provided `propertyName`)
 
 ### Skip Validation
@@ -199,19 +198,20 @@ Set `validateClickUp: false` to skip ClickUp validation:
 
 ## Setting Up Property Tasks in ClickUp
 
-### 1. Create "Type" Custom Field
-1. Go to your ClickUp List settings
-2. Create a new custom field named "Type"
-3. Set the field type to "Dropdown" or "Labels"
-4. Add option "property"
+### 1. Use "Property" Task Type
+ClickUp has a built-in "Property" task type:
+1. Create a new task (or open existing task)
+2. Click the task type icon (usually shows a circle for "Task")
+3. Select "Property" from the dropdown
+4. Save the task
 
 ### 2. Create Property Tasks
 1. Create a new task for each property
-2. Name it descriptively (e.g., "Beach House #1", "Sunset Villa")
-3. Set the "Type" field to "property"
-4. Add other relevant fields (Address, Beds, etc.)
+2. Set Task Type to "Property"
+3. Name it descriptively (e.g., "Beach House #1", "Sunset Villa")
+4. Add other relevant custom fields (Address, Beds, etc.)
 
-### 3. Recommended Additional Fields
+### 3. Recommended Additional Custom Fields
 - **Address** (Text) - Property address
 - **Property Manager** (People) - Who manages this property
 - **Beds** (Number) - Number of bedrooms
@@ -332,7 +332,7 @@ function PropertySearch({ listId, onSelect }) {
 | Error | Cause | Solution |
 |-------|-------|----------|
 | "No ClickUp token found" | Not authenticated | Click "Connect ClickUp" button |
-| "Task X is not a property task" | Selected task doesn't have Type = "property" | Choose a different task or update the task's Type field |
+| "Task X has Task Type Y but needs to be Property" | Selected task has wrong task type | Change task's Task Type to "Property" |
 | "Router already assigned to Y" | Router is at another property | Remove from current property first, or use `/move` endpoint |
 | "List not found" | Invalid list ID | Verify you're using the correct list ID |
 

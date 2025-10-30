@@ -1,108 +1,87 @@
-# Setting Up Property Type Field in ClickUp
+# Setting Up Property Task Type in ClickUp
 
 ## Overview
-To use the property search and validation feature, you need to create a "Type" custom field in your ClickUp list. This field will distinguish property tasks from router tasks.
+ClickUp has a built-in **Task Types** feature that allows you to categorize tasks. To use the property search and validation feature, you need to set certain tasks to use the "Property" task type.
 
 ## Step-by-Step Setup
 
-### 1. Create the "Type" Custom Field
+### 1. Verify "Property" Task Type Exists
 
-1. **Open ClickUp** and navigate to your "Routers" list
-2. **Click the "+" next to custom fields** in the list view
-3. **Select "Dropdown" as the field type**
-4. **Name the field:** `Type`
-5. **Add the following options:**
-   - `router` (for router tasks)
-   - `property` (for property tasks)
-6. **Save the field**
+The "Property" task type should already be available in your workspace. To check:
 
-### 2. Update Existing Tasks
+1. **Open ClickUp** and navigate to your workspace
+2. **Click Settings** → **ClickUps** → **Task Types**
+3. **Look for "Property"** in the list of task types
 
-#### For Router Tasks (99 existing):
-1. Select all router tasks (the ones created by `create-all-tasks.js`)
-2. Bulk edit the "Type" field to `router`
+If you see "Property" ✅, you're all set! If not, you can create it:
+- Click "Create Task Type"
+- Name: `Property`
+- Icon: 🏠 (building/property icon)
+- Save
 
-#### For Property Tasks:
-1. Create new tasks for each property (or update existing ones)
-2. Set the "Type" field to `property`
-3. Name them descriptively (e.g., "Beach House #1", "Sunset Villa #2")
+### 2. Create Property Tasks
 
-### 3. Create Sample Property Tasks
+#### Method 1: Create New Tasks
+1. In your "Routers" list, click **"+ New Task"**
+2. Name it descriptively (e.g., "Beach House #1", "Sunset Villa #2")
+3. **Click the task type icon** (usually shows circle for "Task")
+4. **Select "Property"** from the dropdown
+5. Add other details (address, status, etc.)
+6. Save
 
-Here are some example property tasks to create:
+#### Method 2: Convert Existing Tasks
+If you already have property tasks created as regular tasks:
+1. Open the task
+2. Click the task type icon (top left, near task name)
+3. Select "Property"
+4. Save
+
+### 3. Organize Your Tasks
+
+**Recommended Structure:**
+- **Router tasks** → Keep as "Task" (default) or create "Router" task type
+- **Property tasks** → Set to "Property" task type
+- **Other tasks** → Use appropriate task types
+
+### 4. Example Property Tasks
+
+Create these example properties to test:
 
 **Example 1: Beach House #1**
 - Name: `Beach House #1`
-- Type: `property` ✅
-- Additional fields:
+- Task Type: **Property** ✅
+- Custom fields:
   - Address: "123 Ocean Drive"
   - Status: "Active"
-  - Tags: ["beachfront", "luxury"]
+- Tags: ["beachfront", "luxury"]
 
 **Example 2: Mountain Cabin**
 - Name: `Mountain Cabin`
-- Type: `property` ✅
-- Additional fields:
+- Task Type: **Property** ✅
+- Custom fields:
   - Address: "456 Pine Trail"
   - Status: "Maintenance"
 
 **Example 3: City Apartment**
 - Name: `City Apartment`
-- Type: `property` ✅
-- Additional fields:
+- Task Type: **Property** ✅
+- Custom fields:
   - Address: "789 Main Street, Unit 401"
   - Status: "Active"
 
-## Alternative: Using Labels Instead
-
-If you prefer using labels (tags) instead of dropdown:
-
-1. Create labels:
-   - `type:router`
-   - `type:property`
-2. Update the search logic to look for labels instead of custom fields
-
-However, **dropdown is recommended** because:
-- Enforces single value per task
-- Easier to filter and search
-- Better for reporting
-
 ## Verification
 
-After setting up, verify the field exists:
+After setting up property tasks, verify they appear correctly:
 
 ```bash
-curl -s "https://routerlogger-production.up.railway.app/api/clickup/custom-fields/901517043586" | jq '.fields | map(select(.name == "Type"))'
+curl -s "https://routerlogger-production.up.railway.app/api/router-properties/search-properties/901517043586" | jq
 ```
 
-You should see:
-```json
-[
-  {
-    "id": "...",
-    "name": "Type",
-    "type": "drop_down",
-    "type_config": {
-      "options": [
-        {
-          "id": "...",
-          "label": "router",
-          "color": "..."
-        },
-        {
-          "id": "...",
-          "label": "property",
-          "color": "..."
-        }
-      ]
-    }
-  }
-]
-```
+You should see your property tasks listed.
 
 ## Testing Property Search
 
-Once you've created property tasks with Type = "property":
+Once you've created property tasks with Task Type = "Property":
 
 ```bash
 # Search all properties
@@ -119,13 +98,13 @@ curl -s "https://routerlogger-production.up.railway.app/api/router-properties/se
 
 ### Assign Router with Validation
 
-Once you have property tasks, you can assign routers:
+Once you have property tasks:
 
 ```bash
 # Get a property task ID from search results
 PROPERTY_ID="<clickup-task-id>"
 
-# Assign router to property (validates Type = "property")
+# Assign router to property (validates Task Type = "Property")
 curl -X POST "https://routerlogger-production.up.railway.app/api/router-properties/assign" \
   -H "Content-Type: application/json" \
   -d '{
@@ -141,46 +120,65 @@ curl -X POST "https://routerlogger-production.up.railway.app/api/router-properti
 When you assign a router to a property with `validateClickUp: true` (default):
 
 1. ✅ Fetches the task from ClickUp API
-2. ✅ Checks for "Type" custom field
-3. ✅ Verifies Type = "property"
+2. ✅ Checks task_type field
+3. ✅ Verifies Task Type = "Property"
 4. ✅ Uses official task name from ClickUp
 5. ✅ Creates assignment in database
 
 If validation fails:
 - ❌ Returns 400 Bad Request
-- ❌ Error: "Task X is not a property task. Please select a task with Type = 'property'."
+- ❌ Error: "Task 'XYZ' has Task Type 'Task (default)' but needs to be 'Property'. Please select a task with Task Type = 'Property'."
 
-## Benefits of Type Field
+## Benefits of Task Types
 
-1. **Data Integrity** - Prevents assigning routers to wrong task types
-2. **Clear Organization** - Easy to filter routers vs properties
-3. **Better Reporting** - Can count tasks by type
-4. **Scalability** - Can add more types later (e.g., "gateway", "sensor")
+1. **Native ClickUp Feature** - No custom fields needed
+2. **Visual Organization** - Different icons for different task types
+3. **Better Filtering** - ClickUp UI filters by task type
+4. **Data Integrity** - Prevents assigning routers to wrong task types
+5. **Scalability** - Can add more task types later (e.g., "Gateway", "Sensor")
+
+## Available Task Types
+
+Based on your screenshot, you have these task types available:
+- Task (default)
+- Milestone
+- Account
+- Asset
+- Camera Log
+- Contact
+- Email
+- Form Response
+- Meeting Note
+- Payment
+- **Property** ✅ (use this for property tasks)
+- Verification
+
+You can also create custom task types for routers if desired (e.g., "Router" task type).
 
 ## Next Steps
 
-After setting up the Type field:
+After setting up property task types:
 
-1. ✅ Create property tasks
-2. ✅ Set Type = "property" on each
-3. ✅ Test property search API
-4. ✅ Assign routers to properties
-5. 🔲 Build frontend UI with property search dropdown
-6. 🔲 Set up ClickUp relationship fields (optional)
+1. ✅ Create property tasks with Task Type = "Property"
+2. ✅ Test property search API
+3. ✅ Assign routers to properties
+4. 🔲 Build frontend UI with property search dropdown
+5. 🔲 Set up ClickUp relationship fields (optional)
 
 ## Troubleshooting
 
 ### "No properties found"
-- Ensure tasks have Type field set to exactly "property" (lowercase)
+- Ensure tasks have Task Type set to "Property" (not "Task" default)
 - Check that tasks are not archived
 - Verify you're searching in the correct list
+- Task type name is case-insensitive but must be exactly "Property"
 
-### "Task is not a property task"
-- The task doesn't have a Type field, or
-- Type field is not set to "property", or
-- Using labels instead of dropdown field
+### "Task has Task Type 'X' but needs to be 'Property'"
+- The task is using a different task type
+- Click the task type icon in the task and select "Property"
+- Make sure you're selecting a task that represents a physical property
 
-### Custom field not showing
-- Refresh ClickUp UI
-- Check field is added to the list (not just the workspace)
-- Try creating a new task to verify field appears
+### Task type not available
+- Check workspace settings → ClickUps → Task Types
+- "Property" should be in the default task types
+- If missing, create a custom task type named "Property"
