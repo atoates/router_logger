@@ -35,6 +35,11 @@ async function createRouterTasks() {
     const routers = routersRes.data;
     console.log(`Found ${routers.length} routers`);
     
+    const forceRecreate = process.argv.includes('--force');
+    if (forceRecreate) {
+      console.log('🔄 FORCE MODE: Will recreate all tasks even if they exist in database');
+    }
+    
     // Get workspace and list info
     console.log('\nGetting ClickUp workspace info...');
     const workspacesRes = await axios.get(`${BACKEND_URL}/api/clickup/workspaces`);
@@ -51,7 +56,7 @@ async function createRouterTasks() {
     let errors = 0;
     
     for (const router of routers) {
-      if (router.clickup_task_id) {
+      if (router.clickup_task_id && !forceRecreate) {
         console.log(`⏭️  Router ${router.router_id} already has task ${router.clickup_task_id}`);
         skipped++;
         continue;
