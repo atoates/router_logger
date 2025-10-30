@@ -13,6 +13,7 @@ const oauthService = require('./services/oauthService');
 const routerRoutes = require('./routes/router');
 const rmsRoutes = require('./routes/rms');
 const authRoutes = require('./routes/auth');
+const clickupRoutes = require('./routes/clickup');
 const { router: monitoringRoutes } = require('./routes/monitoring');
 
 const app = express();
@@ -66,6 +67,7 @@ app.get('/', (req, res) => {
 app.use('/api', routerRoutes);
 app.use('/api/rms', rmsRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/clickup', clickupRoutes);
 app.use(monitoringRoutes);
 
 // Error handling middleware

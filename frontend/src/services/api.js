@@ -56,6 +56,19 @@ export const getInspectionHistory = (routerId) => api.get(`/inspections/${router
 // Monitoring
 export const getRMSUsage = () => api.get('/monitoring/rms-usage');
 
+// ClickUp Integration
+export const getClickUpAuthStatus = () => api.get('/clickup/auth/status');
+export const getClickUpAuthUrl = () => api.get('/clickup/auth/url');
+export const clickUpAuthCallback = (code, state) => api.get('/clickup/auth/callback', { params: { code, state } });
+export const disconnectClickUp = () => api.post('/clickup/auth/disconnect');
+export const getClickUpWorkspaces = () => api.get('/clickup/workspaces');
+export const getClickUpRoutersList = (workspaceId) => api.get(`/clickup/lists/${workspaceId}`);
+export const getClickUpTasks = (listId, search = '') => api.get(`/clickup/tasks/${listId}`, { params: { search } });
+export const createClickUpTask = (listId, taskData) => api.post(`/clickup/tasks/${listId}`, taskData);
+export const linkRouterToTask = (routerId, taskId, listId) => api.post('/clickup/link-router', { routerId, taskId, listId });
+export const unlinkRouterFromTask = (routerId) => api.delete(`/clickup/link-router/${routerId}`);
+export const getRouterTask = (routerId) => api.get(`/clickup/router-task/${routerId}`);
+
 // Submit log (for testing)
 export const submitLog = (data) => api.post('/log', data);
 

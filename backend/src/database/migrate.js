@@ -189,6 +189,38 @@ async function initializeDatabase() {
       ON inspection_logs (router_id, inspected_at DESC);
     `);
 
+    // Migration 007: ClickUp integration support
+    await client.query(`
+      ALTER TABLE routers 
+        ADD COLUMN IF NOT EXISTS clickup_task_id VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS clickup_task_url TEXT,
+        ADD COLUMN IF NOT EXISTS clickup_list_id VARCHAR(50);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_routers_clickup_task 
+        ON routers(clickup_task_id);
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS clickup_oauth_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(100) NOT NULL,
+        access_token TEXT NOT NULL,
+        token_type VARCHAR(50) DEFAULT 'Bearer',
+        workspace_id VARCHAR(50),
+        workspace_name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id)
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_clickup_tokens_user 
+        ON clickup_oauth_tokens(user_id);
+    `);
+
     console.log('Database tables created successfully');
   } catch (error) {
     console.error('Error initializing database:', error);

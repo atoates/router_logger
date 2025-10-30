@@ -5,6 +5,7 @@ import { AreaChart, Area, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, R
 import { getLogs, getUsageStats, getUptimeData, logInspection, getInspectionHistory } from '../services/api';
 import { exportUptimeReportToPDF } from '../utils/exportUtils';
 import { toast } from 'react-toastify';
+import ClickUpTaskWidget from './ClickUpTaskWidget';
 import './RouterDashboard.css';
 
 function formatBytes(bytes) {
@@ -243,6 +244,9 @@ export default function RouterDashboard({ router }) {
           <span className="muted" style={{ marginLeft: 8 }}>{label}</span>
         </div>
       </div>
+
+      {/* ClickUp Task Widget */}
+      <ClickUpTaskWidget router={router} />
 
       {/* Hero metrics */}
       <div className="rd-metrics">

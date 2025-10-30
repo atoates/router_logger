@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { getRouters, getNetworkUsageRolling, getNetworkUsage, getTopRoutersRolling, getTopRouters, getOperators, getStorageStats, getInspectionStatus, getRMSUsage } from '../services/api';
 import api from '../services/api';
 import { AreaChart, Area, BarChart, Bar, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
+import ClickUpAuthButton from './ClickUpAuthButton';
 import '../DashboardV3.css';
 
 function formatBytes(bytes) {
@@ -253,6 +254,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
           <p>Analytical, blazing-fast, and dark-mode ready</p>
         </div>
         <div className="v3-controls">
+          <ClickUpAuthButton />
           <TimeControls mode={mode} value={value} onChange={updateTime} />
           <div className="toggle" onClick={()=>setDark(!dark)} title="Toggle dark mode">{dark ? '🌙' : '🌞'}</div>
         </div>
