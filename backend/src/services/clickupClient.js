@@ -255,12 +255,32 @@ class ClickUpClient {
     try {
       const client = await this.getAuthorizedClient(userId);
       
-      // Get all lists in the space
+      // Get all folderless lists in the space
       const listsResponse = await client.get(`/space/${spaceId}/list`, {
         params: { archived: false }
       });
       
-      const lists = listsResponse.data.lists || [];
+      let lists = listsResponse.data.lists || [];
+      
+      // Also get lists from folders
+      const foldersResponse = await client.get(`/space/${spaceId}/folder`, {
+        params: { archived: false }
+      });
+      const folders = foldersResponse.data.folders || [];
+      
+      // Get lists from each folder
+      for (const folder of folders) {
+        try {
+          const folderListsResponse = await client.get(`/folder/${folder.id}/list`, {
+            params: { archived: false }
+          });
+          const folderLists = folderListsResponse.data.lists || [];
+          lists = lists.concat(folderLists);
+        } catch (error) {
+          logger.warn(`Error getting lists from folder ${folder.id}:`, error.message);
+        }
+      }
+      
       logger.info('Lists in space', { spaceId, listCount: lists.length, listNames: lists.map(l => l.name) });
       let allTasks = [];
       
