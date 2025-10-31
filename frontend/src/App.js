@@ -75,14 +75,31 @@ function AppContent() {
     toast.success(`Opening ${label}`);
   };
 
+  // Handle logo click - navigate to V3 dashboard
+  const handleLogoClick = () => {
+    setDashboardVersion('v3');
+    setActiveTab('network');
+    setSelectedRouter(null);
+    navigate('/');
+  };
+
   // V3 Dashboard - if selected, render just the V3 component
   if (dashboardVersion === 'v3') {
     return (
       <div className={`app ${darkMode ? 'dark-mode' : ''}`}>
         <div className="container">
-          <div className="header" style={{ display: 'flex', justifyContent: 'flex-end', alignItems:'center', gap:16, padding: '16px 0' }}>
-            <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
-            <RMSAuthButton variant="header" />
+          <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', gap:16, padding: '16px 0' }}>
+            <img 
+              src="/Logo.png" 
+              alt="RouterLogger" 
+              style={{ height: '40px', cursor: 'pointer' }}
+              onClick={handleLogoClick}
+              title="Back to Dashboard"
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
+              <RMSAuthButton variant="header" />
+            </div>
           </div>
           <ErrorBoundary>
             <DashboardV3 onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
@@ -97,9 +114,18 @@ function AppContent() {
   return (
     <div className={`app ${darkMode ? 'dark-mode' : ''}`}>
       <div className="container">
-        <div className="header" style={{ display: 'flex', justifyContent: 'flex-end', alignItems:'center', gap:16, padding: '16px 0' }}>
-          <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
-          <RMSAuthButton variant="header" />
+        <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', gap:16, padding: '16px 0' }}>
+          <img 
+            src="/Logo.png" 
+            alt="RouterLogger" 
+            style={{ height: '40px', cursor: 'pointer' }}
+            onClick={handleLogoClick}
+            title="Back to Dashboard"
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
+            <RMSAuthButton variant="header" />
+          </div>
         </div>
 
         {/* Top-level network status removed as requested */}
