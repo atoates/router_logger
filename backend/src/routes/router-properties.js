@@ -388,4 +388,25 @@ router.get('/search-all/:workspaceId', async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/router-properties/assignment/:assignmentId
+ * Delete a property assignment history entry
+ */
+router.delete('/assignment/:assignmentId', async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    
+    const result = await propertyService.deleteAssignment(assignmentId);
+    
+    res.json({
+      success: true,
+      deletedId: assignmentId
+    });
+
+  } catch (error) {
+    logger.error('Error deleting property assignment:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

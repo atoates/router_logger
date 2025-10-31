@@ -372,6 +372,31 @@ async function getPropertyStats() {
   }
 }
 
+/**
+ * Delete a property assignment record
+ * @param {number} assignmentId - Assignment record ID
+ * @returns {Promise<Object>} Deleted record
+ */
+async function deleteAssignment(assignmentId) {
+  try {
+    const result = await pool.query(
+      'DELETE FROM router_property_assignments WHERE id = $1 RETURNING *',
+      [assignmentId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error(`Assignment ${assignmentId} not found`);
+    }
+
+    logger.info('Property assignment deleted', { assignmentId });
+    return result.rows[0];
+
+  } catch (error) {
+    logger.error('Error deleting property assignment:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   assignRouterToProperty,
   removeRouterFromProperty,
@@ -380,5 +405,6 @@ module.exports = {
   getPropertyHistory,
   getRoutersAtProperty,
   getPropertyStats,
-  validatePropertyTask
+  validatePropertyTask,
+  deleteAssignment
 };

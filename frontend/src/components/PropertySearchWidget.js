@@ -255,6 +255,36 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
     }
   }, [routerId, currentProperty]);
 
+  const deleteHistoryItem = useCallback(async (assignmentId) => {
+    if (!window.confirm('Delete this property history entry? This cannot be undone.')) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/router-properties/assignment/${assignmentId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        // Reload history
+        const historyRes = await fetch(`${API_BASE}/api/router-properties/${routerId}/history`);
+        const historyData = await historyRes.json();
+        setPropertyHistory(Array.isArray(historyData.history) ? historyData.history : []);
+        
+        toast.success('History entry deleted');
+      } else {
+        toast.error(data.error || 'Failed to delete history entry');
+      }
+    } catch (error) {
+      console.error('Error deleting history entry:', error);
+      toast.error('Failed to delete history entry');
+    } finally {
+      setLoading(false);
+    }
+  }, [routerId]);
+
   const handleSelectProperty = (property) => {
     // If there's a current property, move to new one. Otherwise, assign.
     if (currentProperty) {
@@ -418,23 +448,35 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
             {propertyHistory.map((item) => (
               <div key={item.id} className="psw-history-item">
                 <div className="psw-history-property">
-                  <strong>{item.property_name}</strong>
-                  {item.removed_at ? (
-                    <span className="psw-history-status removed">Removed</span>
+                  <strong>{item.propertyName || 'Unknown Property'}</strong>
+                  {item.current ? (
+                    <span className="psw-history-status current">CURRENT</span>
                   ) : (
-                    <span className="psw-history-status current">Current</span>
+                    <span className="psw-history-status removed">
+                      {item.durationDays}d
+                    </span>
                   )}
+                  <button 
+                    onClick={() => deleteHistoryItem(item.id)}
+                    className="psw-history-delete"
+                    title="Delete history entry"
+                    disabled={loading}
+                  >
+                    ×
+                  </button>
                 </div>
                 <div className="psw-history-dates">
-                  <span>📥 {new Date(item.installed_at).toLocaleDateString()}</span>
-                  {item.removed_at && (
-                    <span>📤 {new Date(item.removed_at).toLocaleDateString()}</span>
+                  {item.installedAt && (
+                    <span>📥 {new Date(item.installedAt).toLocaleDateString()}</span>
+                  )}
+                  {item.removedAt && (
+                    <span>📤 {new Date(item.removedAt).toLocaleDateString()}</span>
                   )}
                 </div>
-                {(item.installed_by || item.removed_by) && (
+                {(item.installedBy || item.removedBy) && (
                   <div className="psw-history-users">
-                    {item.installed_by && <span>By: {item.installed_by}</span>}
-                    {item.removed_by && <span>Removed by: {item.removed_by}</span>}
+                    {item.installedBy && <span>Assigned via {item.installedBy}</span>}
+                    {item.removedBy && <span>Removed via {item.removedBy}</span>}
                   </div>
                 )}
                 {item.notes && (
