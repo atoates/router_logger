@@ -332,43 +332,6 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
         </div>
 
         <div className="col">
-          {/* Storage Card */}
-          <div className="v3-card">
-            <div className="v3-card-title">Storage</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              <div style={{ display:'flex', justifyContent:'space-between' }}>
-                <span>Total DB</span>
-                <strong>{dbSize ? formatBytes(dbSize.db_bytes) : '—'}</strong>
-              </div>
-              {dbSize && dbSize.tables && dbSize.tables.map(t => (
-                <div key={t.name} style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
-                    <span style={{ fontWeight:600 }}>{t.name}</span>
-                    <span style={{ color:'#64748b', fontSize:12 }}>{t.row_count?.toLocaleString()} rows</span>
-                  </div>
-                  {/* simple stacked bar: table/index/toast */}
-                  {(() => {
-                    const total = (t.total_bytes||1);
-                    const tb = (t.table_bytes||0)/total*100;
-                    const ib = (t.index_bytes||0)/total*100;
-                    const ob = (t.toast_bytes||0)/total*100;
-                    return (
-                      <div style={{ height:10, width:'100%', background:'#e5e7eb', borderRadius:6, overflow:'hidden', display:'flex' }}>
-                        <div style={{ width:`${tb}%`, height:'100%', background:'#6366f1' }} title={`Table: ${formatBytes(t.table_bytes)}`} />
-                        <div style={{ width:`${ib}%`, height:'100%', background:'#10b981' }} title={`Indexes: ${formatBytes(t.index_bytes)}`} />
-                        <div style={{ width:`${ob}%`, height:'100%', background:'#f59e0b' }} title={`TOAST: ${formatBytes(t.toast_bytes)}`} />
-                      </div>
-                    );
-                  })()}
-                  <div style={{ display:'flex', justifyContent:'space-between', color:'#64748b', fontSize:12 }}>
-                    <span>Total</span>
-                    <span>{formatBytes(t.total_bytes)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
           <div className="v3-card">
             <div className="v3-card-title">Top 5 Routers</div>
             <div style={{ height: 240 }}>
@@ -450,93 +413,6 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
-              </div>
-            </div>
-          )}
-          
-          {/* Overdue Inspections Card */}
-          {(() => {
-            const overdue = inspections.filter(i => i.overdue);
-            if (overdue.length === 0) return null;
-            return (
-              <div className="v3-card">
-                <div className="v3-card-title" style={{ color: '#ef4444' }}>⚠️ Overdue Inspections ({overdue.length})</div>
-                <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:300, overflowY:'auto' }}>
-                  {overdue.map(insp => {
-                    const createdDate = insp.created_at ? new Date(insp.created_at) : null;
-                    const inspectionDue = insp.inspection_due ? new Date(insp.inspection_due) : null;
-                    return (
-                      <div 
-                        key={insp.router_id} 
-                        style={{ 
-                          display:'flex', 
-                          justifyContent:'space-between', 
-                          alignItems:'center',
-                          padding: 8,
-                          background: dark ? '#1f2937' : '#fee2e2',
-                          borderRadius: 6,
-                          cursor: onOpenRouter ? 'pointer' : 'default',
-                          borderLeft: '3px solid #ef4444'
-                        }}
-                        onClick={() => {
-                          if (!onOpenRouter) return;
-                          const router = routers.find(r => String(r.router_id) === String(insp.router_id)) || { router_id: insp.router_id, name: insp.name };
-                          onOpenRouter(router);
-                        }}
-                      >
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600 }}>{insp.name}</div>
-                          <div style={{ fontSize: 12, color: '#64748b' }}>{insp.location || 'No location'}</div>
-                          {createdDate && inspectionDue && (
-                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-                              First: {createdDate.toLocaleDateString()} | Due: {inspectionDue.toLocaleDateString()}
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ textAlign: 'right', marginLeft: 12 }}>
-                          <div style={{ fontWeight: 600, color: '#ef4444' }}>{Math.abs(insp.days_remaining)} days</div>
-                          <div style={{ fontSize: 11, color: '#64748b' }}>overdue</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
-          
-          {/* RMS API Usage Monitoring */}
-          {rmsUsage && (
-            <div className="v3-card">
-              <div className="v3-card-title">📊 RMS API Usage</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
-                  <span style={{ fontSize:13, color:'#64748b' }}>Total Requests</span>
-                  <strong>{fmtNum(rmsUsage.apiUsage?.total || 0)}</strong>
-                </div>
-                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
-                  <span style={{ fontSize:13, color:'#64748b' }}>Daily Estimate</span>
-                  <strong>{fmtNum(rmsUsage.apiUsage?.estimates?.dailyRate || 0)}</strong>
-                </div>
-                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
-                  <span style={{ fontSize:13, color:'#64748b' }}>Monthly Estimate</span>
-                  <strong>{fmtNum(rmsUsage.apiUsage?.estimates?.monthlyRate || 0)}</strong>
-                </div>
-                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : (parseFloat(rmsUsage.apiUsage?.estimates?.percentOfQuota || '0') > 80 ? '#fee2e2' : '#f0fdf4'), borderRadius:6, borderLeft: `3px solid ${parseFloat(rmsUsage.apiUsage?.estimates?.percentOfQuota || '0') > 80 ? '#ef4444' : '#10b981'}` }}>
-                  <span style={{ fontSize:13, color:'#64748b' }}>Quota Usage</span>
-                  <strong>{rmsUsage.apiUsage?.estimates?.percentOfQuota || '0%'}</strong>
-                </div>
-                {rmsUsage.apiUsage?.rateLimitHits > 0 && (
-                  <div style={{ padding:8, background:'#fef2f2', borderRadius:6, borderLeft:'3px solid #ef4444', fontSize:12 }}>
-                    <div style={{ fontWeight:600, color:'#991b1b', marginBottom:4 }}>⚠️ Rate Limit Hits: {rmsUsage.apiUsage.rateLimitHits}</div>
-                    {rmsUsage.apiUsage.lastRateLimit && (
-                      <div style={{ color:'#64748b' }}>Last: {new Date(rmsUsage.apiUsage.lastRateLimit).toLocaleString()}</div>
-                    )}
-                  </div>
-                )}
-                <div style={{ fontSize:11, color:'#94a3b8', paddingTop:8, borderTop: `1px solid ${dark ? '#334155' : '#e5e7eb'}` }}>
-                  Tracked since: {new Date(rmsUsage.apiUsage?.since).toLocaleString()}
-                </div>
               </div>
             </div>
           )}
