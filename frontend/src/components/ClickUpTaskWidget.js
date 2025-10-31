@@ -237,7 +237,7 @@ const ClickUpTaskWidget = ({ router, onMoveProperty, onOutOfService }) => {
                   onClick={onMoveProperty}
                   className="task-btn task-btn-secondary"
                 >
-                  Move Property
+                  Installed in location
                 </button>
               )}
               {onOutOfService && (
@@ -245,7 +245,7 @@ const ClickUpTaskWidget = ({ router, onMoveProperty, onOutOfService }) => {
                   onClick={onOutOfService}
                   className="task-btn task-btn-warning"
                 >
-                  Out of Service
+                  Uninstalled from location
                 </button>
               )}
             </div>
