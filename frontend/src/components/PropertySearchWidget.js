@@ -305,9 +305,17 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
       return;
     }
 
+    if (selectedAssignees.length === 0) {
+      toast.error('Please select at least one user');
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/clickup/tasks/${router.clickup_task_id}`, {
+      console.log('Updating assignees for task:', router.clickup_task_id);
+      console.log('Selected assignees:', selectedAssignees);
+      
+      const res = await fetch(`${API_BASE}/api/clickup/task/${router.clickup_task_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -318,16 +326,20 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
         })
       });
 
+      const data = await res.json();
+      console.log('Update response:', data);
+
       if (res.ok) {
         toast.success(`Assignees updated successfully`);
         setShowStoredWithModal(false);
         setSelectedAssignees([]);
       } else {
-        toast.error('Failed to update assignees');
+        console.error('Update failed:', data);
+        toast.error(data.error || 'Failed to update assignees');
       }
     } catch (error) {
       console.error('Error updating assignees:', error);
-      toast.error('Failed to update assignees');
+      toast.error('Failed to update assignees: ' + error.message);
     } finally {
       setLoading(false);
     }
