@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { toast } from 'react-toastify';
 import './PropertySearchWidget.css';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'https://routerlogger-production.up.railway.app';
 
-export default function PropertySearchWidget({ router, onAssigned }) {
+const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -16,7 +16,6 @@ export default function PropertySearchWidget({ router, onAssigned }) {
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [serviceForm, setServiceForm] = useState({
     stored_with: 'Jordan',
-    reason: '',
     notes: ''
   });
   const [workspaceId, setWorkspaceId] = useState(null);
@@ -263,8 +262,8 @@ export default function PropertySearchWidget({ router, onAssigned }) {
   const handleMarkOutOfService = async () => {
     if (!routerId) return;
     
-    if (!serviceForm.stored_with || !serviceForm.reason.trim()) {
-      toast.error('Please select who is storing the router and provide a reason');
+    if (!serviceForm.stored_with) {
+      toast.error('Please select who is storing the router');
       return;
     }
 
@@ -281,7 +280,7 @@ export default function PropertySearchWidget({ router, onAssigned }) {
       if (res.ok && data.success) {
         toast.success(`Router marked as out-of-service (stored with ${serviceForm.stored_with})`);
         setShowServiceModal(false);
-        setServiceForm({ stored_with: 'Jordan', reason: '', notes: '' });
+        setServiceForm({ stored_with: 'Jordan', notes: '' });
         
         // Optionally reload router data
         if (onAssigned) onAssigned(data.router);
@@ -326,6 +325,16 @@ export default function PropertySearchWidget({ router, onAssigned }) {
     }
   };
 
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    openMovePropertyModal: () => {
+      handleOpenSearchModal();
+    },
+    openOutOfServiceModal: () => {
+      setShowServiceModal(true);
+    }
+  }));
+
   if (!workspaceId) {
     return (
       <div className="property-search-widget">
@@ -361,26 +370,11 @@ export default function PropertySearchWidget({ router, onAssigned }) {
             </a>
             <div className="psw-button-group">
               <button 
-                onClick={handleOpenSearchModal}
-                className="psw-btn"
-                disabled={loading}
-              >
-                Move Property
-              </button>
-              <button 
                 onClick={removeProperty}
                 disabled={loading}
                 className="psw-btn danger"
               >
-                Remove
-              </button>
-              <button 
-                onClick={() => setShowServiceModal(true)}
-                className="psw-btn warning"
-                disabled={loading}
-                title="Mark router as out of service"
-              >
-                Out of Service
+                Remove from Property
               </button>
             </div>
           </div>
@@ -394,14 +388,6 @@ export default function PropertySearchWidget({ router, onAssigned }) {
                 disabled={loading || !workspaceId}
               >
                 Assign Property
-              </button>
-              <button 
-                onClick={() => setShowServiceModal(true)}
-                className="psw-btn warning"
-                disabled={loading}
-                title="Mark router as out of service"
-              >
-                Out of Service
               </button>
             </div>
           </div>
@@ -535,20 +521,7 @@ export default function PropertySearchWidget({ router, onAssigned }) {
               </div>
 
               <div className="psw-form-group">
-                <label htmlFor="reason">Reason *</label>
-                <input
-                  id="reason"
-                  type="text"
-                  placeholder="e.g., Faulty hardware, Needs configuration, Spare unit"
-                  value={serviceForm.reason}
-                  onChange={(e) => setServiceForm({...serviceForm, reason: e.target.value})}
-                  className="psw-form-input"
-                  required
-                />
-              </div>
-
-              <div className="psw-form-group">
-                <label htmlFor="notes">Additional Notes</label>
+                <label htmlFor="notes">Notes (Optional)</label>
                 <textarea
                   id="notes"
                   placeholder="Any additional information..."
@@ -570,7 +543,7 @@ export default function PropertySearchWidget({ router, onAssigned }) {
                 <button 
                   onClick={handleMarkOutOfService}
                   className="psw-modal-btn warning"
-                  disabled={loading || !serviceForm.reason.trim()}
+                  disabled={loading}
                 >
                   {loading ? 'Saving...' : 'Mark Out of Service'}
                 </button>
@@ -581,4 +554,8 @@ export default function PropertySearchWidget({ router, onAssigned }) {
       )}
     </>
   );
-}
+});
+
+PropertySearchWidget.displayName = 'PropertySearchWidget';
+
+export default PropertySearchWidget;

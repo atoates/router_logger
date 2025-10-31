@@ -13,7 +13,12 @@
 .widgets-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 
 /* Three column layout for ClickUp Task | Current Property | Property History */
-.widgets-row-three{display:grid;grid-template-columns:1fr 2fr;gap:16px}
+.widgets-row-three{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:16px;
+  align-items:start;
+}
 
 .rd-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
 .metric{background:#fff;border:1px solid #e5e7eb;border-left:4px solid #6366f1;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);transition:all 0.2s ease}

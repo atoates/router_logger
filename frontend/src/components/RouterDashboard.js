@@ -41,6 +41,7 @@ export default function RouterDashboard({ router }) {
   const [stats, setStats] = useState(null);
   const [uptime, setUptime] = useState([]);
   const [inspections, setInspections] = useState([]);
+  const propertyWidgetRef = useRef(null);
 
   const routerId = router?.router_id;
 
@@ -248,11 +249,19 @@ export default function RouterDashboard({ router }) {
 
       {/* Three column layout: ClickUp Task | Current Property | Property History */}
       <div className="widgets-row-three">
-        <ClickUpTaskWidget router={router} />
-        <PropertySearchWidget router={router} onAssigned={() => {
-          // Optionally reload data when property is assigned
-          console.log('Property assigned to router');
-        }} />
+        <ClickUpTaskWidget 
+          router={router} 
+          onMoveProperty={() => propertyWidgetRef.current?.openMovePropertyModal()}
+          onOutOfService={() => propertyWidgetRef.current?.openOutOfServiceModal()}
+        />
+        <PropertySearchWidget 
+          ref={propertyWidgetRef}
+          router={router} 
+          onAssigned={() => {
+            // Optionally reload data when property is assigned
+            console.log('Property assigned to router');
+          }} 
+        />
       </div>
 
       {/* Hero metrics */}

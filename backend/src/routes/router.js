@@ -339,7 +339,7 @@ router.get('/out-of-service', async (req, res) => {
 router.post('/routers/:routerId/out-of-service', async (req, res) => {
   try {
     const { routerId } = req.params;
-    const { stored_with, reason, notes } = req.body;
+    const { stored_with, notes } = req.body;
     
     if (!stored_with || !['Jordan', 'Ali', 'Karl'].includes(stored_with)) {
       return res.status(400).json({ 
@@ -354,11 +354,10 @@ router.post('/routers/:routerId/out-of-service', async (req, res) => {
         service_status = 'out-of-service',
         stored_with = $1,
         out_of_service_date = CURRENT_TIMESTAMP,
-        out_of_service_reason = $2,
-        out_of_service_notes = $3
-      WHERE router_id = $4
+        out_of_service_notes = $2
+      WHERE router_id = $3
       RETURNING *
-    `, [stored_with, reason, notes, routerId]);
+    `, [stored_with, notes, routerId]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Router not found' });
@@ -384,7 +383,6 @@ router.post('/routers/:routerId/return-to-service', async (req, res) => {
         service_status = 'in-service',
         stored_with = NULL,
         out_of_service_date = NULL,
-        out_of_service_reason = NULL,
         out_of_service_notes = NULL
       WHERE router_id = $1
       RETURNING *

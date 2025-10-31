@@ -133,6 +133,24 @@
   border-color: #f87171;
 }
 
+.task-btn-warning {
+  background: #fff;
+  border-color: #fcd34d;
+  color: #f59e0b;
+}
+
+.task-btn-warning:hover {
+  background: #fffbeb;
+  border-color: #f59e0b;
+}
+
+.task-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .task-not-linked {
   display: flex;
   flex-direction: column;
