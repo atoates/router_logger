@@ -21,7 +21,7 @@ const {
   getInspectionHistory
 } = require('../models/router');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
-const { logger } = require('../config/database');
+const { logger, pool } = require('../config/database');
 
 // POST endpoint for routers to send data (HTTPS Data to Server)
 router.post('/log', async (req, res) => {
@@ -296,8 +296,7 @@ router.get('/inspections/:routerId', async (req, res) => {
 // POST clear all ClickUp task associations
 router.post('/clear-clickup-tasks', async (req, res) => {
   try {
-    const db = require('../config/database');
-    await db.query(
+    await pool.query(
       'UPDATE routers SET clickup_task_id = NULL, clickup_task_url = NULL, clickup_list_id = NULL'
     );
     logger.info('Cleared all ClickUp task associations');
@@ -311,8 +310,7 @@ router.post('/clear-clickup-tasks', async (req, res) => {
 // GET routers that are out of service
 router.get('/out-of-service', async (req, res) => {
   try {
-    const db = require('../config/database');
-    const result = await db.query(`
+    const result = await pool.query(`
       SELECT 
         router_id,
         name,
@@ -347,8 +345,7 @@ router.post('/routers/:routerId/out-of-service', async (req, res) => {
       });
     }
     
-    const db = require('../config/database');
-    const result = await db.query(`
+    const result = await pool.query(`
       UPDATE routers
       SET 
         service_status = 'out-of-service',
@@ -377,8 +374,7 @@ router.post('/routers/:routerId/return-to-service', async (req, res) => {
   try {
     const { routerId } = req.params;
     
-    const db = require('../config/database');
-    const result = await db.query(`
+    const result = await pool.query(`
       UPDATE routers
       SET 
         service_status = 'in-service',
