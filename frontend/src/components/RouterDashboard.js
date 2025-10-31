@@ -224,7 +224,7 @@ export default function RouterDashboard({ router }) {
     <div className="router-dash">
       <div className="rd-header">
         <div>
-          <h2>{router?.name || routerId}</h2>
+          <h2 className="router-title">{router?.name || routerId}</h2>
           <div className="rd-sub">
             <StatusPill status={router?.current_status} />
             {latest?.timestamp && <span className="muted">Last seen {new Date(latest.timestamp).toLocaleString()}</span>}
@@ -246,14 +246,14 @@ export default function RouterDashboard({ router }) {
         </div>
       </div>
 
-      {/* ClickUp Task Widget */}
-      <ClickUpTaskWidget router={router} />
-
-      {/* Property Search Widget */}
-      <PropertySearchWidget router={router} onAssigned={() => {
-        // Optionally reload data when property is assigned
-        console.log('Property assigned to router');
-      }} />
+      {/* ClickUp Task Widget and Property Search Widget side by side */}
+      <div className="widgets-row">
+        <ClickUpTaskWidget router={router} />
+        <PropertySearchWidget router={router} onAssigned={() => {
+          // Optionally reload data when property is assigned
+          console.log('Property assigned to router');
+        }} />
+      </div>
 
       {/* Hero metrics */}
       <div className="rd-metrics">
@@ -342,14 +342,12 @@ export default function RouterDashboard({ router }) {
       <div className="rd-grid">
         <div className="col">
           <div className="card">
-            <div className="card-title">Latest</div>
+            <div className="card-title latest-title">Latest</div>
             <div className="kv">
               <div><span>IMEI</span><strong>{router?.imei || latest?.imei || '—'}</strong></div>
               <div><span>Operator</span><strong>{latest?.operator || '—'}</strong></div>
               <div><span>Network</span><strong>{latest?.network_type || '—'}</strong></div>
               <div><span>Firmware</span><strong>{latest?.firmware_version || router?.firmware_version || '—'}</strong></div>
-              <div><span>Cell</span><strong>{latest?.cell_id || '—'}</strong></div>
-              <div><span>Location</span><strong>{router?.location || '—'}</strong></div>
               <div><span>WAN IP</span><strong>{latest?.wan_ip || '—'}</strong></div>
             </div>
           </div>
@@ -357,7 +355,7 @@ export default function RouterDashboard({ router }) {
 
         <div className="col">
           <div className="card">
-            <div className="card-title">Uptime samples</div>
+            <div className="card-title uptime-title">Uptime samples</div>
             <div style={{ height: 140 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={(uptime||[]).slice(-120)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>

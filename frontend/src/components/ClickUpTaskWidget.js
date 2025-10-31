@@ -201,11 +201,6 @@ const ClickUpTaskWidget = ({ router }) => {
   return (
     <>
       <div className="clickup-task-widget">
-        <h4>
-          <span className="icon">🔗</span>
-          ClickUp Task
-        </h4>
-
         {linkedTask ? (
           <div className="task-linked">
             <div className="task-info">
@@ -237,9 +232,6 @@ const ClickUpTaskWidget = ({ router }) => {
               >
                 View in ClickUp
               </a>
-              <button className="task-btn task-btn-danger" onClick={handleUnlink}>
-                Unlink
-              </button>
             </div>
           </div>
         ) : (
