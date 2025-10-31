@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './OutOfServiceRouters.css';
 
+const API_BASE = process.env.REACT_APP_API_URL || 'https://routerlogger-production.up.railway.app';
+
 const OutOfServiceRouters = () => {
   const [outOfServiceRouters, setOutOfServiceRouters] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,7 +15,7 @@ const OutOfServiceRouters = () => {
   const fetchOutOfServiceRouters = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/out-of-service');
+      const response = await fetch(`${API_BASE}/api/out-of-service`);
       if (!response.ok) throw new Error('Failed to fetch out-of-service routers');
       const data = await response.json();
       setOutOfServiceRouters(data);
@@ -30,7 +32,7 @@ const OutOfServiceRouters = () => {
     if (!window.confirm(`Return router ${routerId} to service?`)) return;
     
     try {
-      const response = await fetch(`/api/routers/${routerId}/return-to-service`, {
+      const response = await fetch(`${API_BASE}/api/routers/${routerId}/return-to-service`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
