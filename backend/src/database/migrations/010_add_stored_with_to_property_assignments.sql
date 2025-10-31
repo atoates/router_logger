@@ -1,5 +1,9 @@
 -- Migration 010: Add stored_with tracking to property assignments
 
+-- Drop old constraint that restricts stored_with values
+ALTER TABLE routers 
+  DROP CONSTRAINT IF EXISTS check_stored_with;
+
 -- Make property_clickup_task_id nullable first (before adding constraints)
 ALTER TABLE router_property_assignments
   ALTER COLUMN property_clickup_task_id DROP NOT NULL;
