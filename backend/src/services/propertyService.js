@@ -349,6 +349,46 @@ async function getRoutersAtProperty(propertyTaskId) {
 }
 
 /**
+ * Get all routers currently installed (assigned to properties)
+ * @returns {Promise<Array>} List of all currently installed routers
+ */
+async function getAllInstalledRouters() {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        rpa.*,
+        r.name as router_name,
+        r.imei,
+        r.firmware_version,
+        r.current_status,
+        r.last_seen
+      FROM router_property_assignments rpa
+      JOIN routers r ON r.router_id = rpa.router_id
+      WHERE rpa.removed_at IS NULL
+      ORDER BY rpa.installed_at DESC
+    `);
+
+    return result.rows.map(row => ({
+      routerId: row.router_id,
+      routerName: row.router_name,
+      imei: row.imei,
+      propertyName: row.property_name,
+      propertyTaskId: row.property_clickup_task_id,
+      installedAt: row.installed_at,
+      installedBy: row.installed_by,
+      daysSinceInstalled: Math.floor(
+        (Date.now() - new Date(row.installed_at).getTime()) / (1000 * 60 * 60 * 24)
+      ),
+      notes: row.notes
+    }));
+
+  } catch (error) {
+    logger.error('Error getting all installed routers:', error);
+    throw error;
+  }
+}
+
+/**
  * Get property assignment statistics
  * @returns {Promise<Object>} Statistics about property assignments
  */
@@ -404,6 +444,7 @@ module.exports = {
   getCurrentProperty,
   getPropertyHistory,
   getRoutersAtProperty,
+  getAllInstalledRouters,
   getPropertyStats,
   validatePropertyTask,
   deleteAssignment

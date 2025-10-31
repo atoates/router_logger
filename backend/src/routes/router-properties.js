@@ -54,6 +54,22 @@ router.get('/:routerId/history', async (req, res) => {
 });
 
 /**
+ * GET /api/router-properties/installed-routers
+ * Get all routers currently installed (assigned to properties)
+ */
+router.get('/installed-routers', async (req, res) => {
+  try {
+    const routers = await propertyService.getAllInstalledRouters();
+    
+    res.json(routers);
+
+  } catch (error) {
+    logger.error('Error getting installed routers:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/router-properties/assign
  * Assign router to a property
  */
