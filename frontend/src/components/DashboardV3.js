@@ -3,6 +3,7 @@ import { getRouters, getNetworkUsageRolling, getNetworkUsage, getTopRoutersRolli
 import api from '../services/api';
 import { AreaChart, Area, BarChart, Bar, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
 import ClickUpAuthButton from './ClickUpAuthButton';
+import OutOfServiceRouters from './OutOfServiceRouters';
 import '../DashboardV3.css';
 
 function formatBytes(bytes) {
@@ -513,6 +514,9 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
               </div>
             </div>
           )}
+          
+          {/* Out of Service Routers */}
+          <OutOfServiceRouters />
         </div>
       </div>
 

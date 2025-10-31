@@ -111,6 +111,16 @@
   border-color: #dc2626;
 }
 
+.psw-compact-btn.warning {
+  color: #f59e0b;
+  border-color: #fcd34d;
+}
+
+.psw-compact-btn.warning:hover:not(:disabled) {
+  background: #fffbeb;
+  border-color: #f59e0b;
+}
+
 .psw-compact-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -488,3 +498,84 @@
 .psw-dropdown::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+/* Form Styles for Out of Service Modal */
+.psw-form-group {
+  margin-bottom: 16px;
+}
+
+.psw-form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 6px;
+}
+
+.psw-form-select,
+.psw-form-input,
+.psw-form-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.psw-form-select:focus,
+.psw-form-input:focus,
+.psw-form-textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.psw-form-textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.psw-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.psw-modal-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.psw-modal-btn.secondary {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.psw-modal-btn.secondary:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.psw-modal-btn.warning {
+  background: #f59e0b;
+  color: white;
+}
+
+.psw-modal-btn.warning:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.psw-modal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+

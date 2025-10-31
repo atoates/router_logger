@@ -308,5 +308,99 @@ router.post('/clear-clickup-tasks', async (req, res) => {
   }
 });
 
+// GET routers that are out of service
+router.get('/out-of-service', async (req, res) => {
+  try {
+    const db = require('../config/database');
+    const result = await db.query(`
+      SELECT 
+        router_id,
+        name,
+        imei,
+        service_status,
+        stored_with,
+        out_of_service_date,
+        out_of_service_reason,
+        out_of_service_notes,
+        current_property_name,
+        last_seen
+      FROM routers
+      WHERE service_status = 'out-of-service'
+      ORDER BY out_of_service_date DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    logger.error('Error fetching out-of-service routers:', error);
+    res.status(500).json({ error: 'Failed to fetch out-of-service routers' });
+  }
+});
+
+// POST mark router as out of service
+router.post('/routers/:routerId/out-of-service', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const { stored_with, reason, notes } = req.body;
+    
+    if (!stored_with || !['Jordan', 'Ali', 'Karl'].includes(stored_with)) {
+      return res.status(400).json({ 
+        error: 'stored_with must be one of: Jordan, Ali, Karl' 
+      });
+    }
+    
+    const db = require('../config/database');
+    const result = await db.query(`
+      UPDATE routers
+      SET 
+        service_status = 'out-of-service',
+        stored_with = $1,
+        out_of_service_date = CURRENT_TIMESTAMP,
+        out_of_service_reason = $2,
+        out_of_service_notes = $3
+      WHERE router_id = $4
+      RETURNING *
+    `, [stored_with, reason, notes, routerId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Router not found' });
+    }
+    
+    logger.info(`Router ${routerId} marked as out-of-service (stored with ${stored_with})`);
+    res.json({ success: true, router: result.rows[0] });
+  } catch (error) {
+    logger.error('Error marking router as out-of-service:', error);
+    res.status(500).json({ error: 'Failed to update router status' });
+  }
+});
+
+// POST return router to service
+router.post('/routers/:routerId/return-to-service', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    
+    const db = require('../config/database');
+    const result = await db.query(`
+      UPDATE routers
+      SET 
+        service_status = 'in-service',
+        stored_with = NULL,
+        out_of_service_date = NULL,
+        out_of_service_reason = NULL,
+        out_of_service_notes = NULL
+      WHERE router_id = $1
+      RETURNING *
+    `, [routerId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Router not found' });
+    }
+    
+    logger.info(`Router ${routerId} returned to service`);
+    res.json({ success: true, router: result.rows[0] });
+  } catch (error) {
+    logger.error('Error returning router to service:', error);
+    res.status(500).json({ error: 'Failed to update router status' });
+  }
+});
+
 module.exports = router;
 

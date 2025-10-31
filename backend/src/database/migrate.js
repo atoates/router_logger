@@ -277,6 +277,49 @@ async function initializeDatabase() {
         ON routers(current_property_task_id);
     `);
 
+    // Migration 009: Out-of-service tracking
+    await client.query(`
+      ALTER TABLE routers 
+        ADD COLUMN IF NOT EXISTS service_status VARCHAR(50) DEFAULT 'in-service',
+        ADD COLUMN IF NOT EXISTS stored_with VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS out_of_service_date TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS out_of_service_reason TEXT,
+        ADD COLUMN IF NOT EXISTS out_of_service_notes TEXT;
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_routers_service_status 
+        ON routers(service_status);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_routers_stored_with 
+        ON routers(stored_with) 
+        WHERE service_status = 'out-of-service';
+    `);
+
+    // Note: Cannot add constraints with IF NOT EXISTS in PostgreSQL
+    // These will fail silently if they already exist
+    try {
+      await client.query(`
+        ALTER TABLE routers 
+          ADD CONSTRAINT check_service_status 
+          CHECK (service_status IN ('in-service', 'out-of-service'));
+      `);
+    } catch (e) {
+      // Constraint might already exist
+    }
+
+    try {
+      await client.query(`
+        ALTER TABLE routers 
+          ADD CONSTRAINT check_stored_with 
+          CHECK (stored_with IS NULL OR stored_with IN ('Jordan', 'Ali', 'Karl'));
+      `);
+    } catch (e) {
+      // Constraint might already exist
+    }
+
     console.log('Database tables created successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
