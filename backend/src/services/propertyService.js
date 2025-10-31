@@ -36,7 +36,7 @@ async function assignRouterToProperty(assignment, validateClickUp = true) {
     routerId,
     propertyTaskId,
     propertyName,
-    installedAt = new Date(),
+    installedAt = null, // Will use ClickUp task start_date if not provided
     installedBy = null,
     notes = null
   } = assignment;
@@ -44,6 +44,52 @@ async function assignRouterToProperty(assignment, validateClickUp = true) {
   const client = await pool.connect();
   
   try {
+    // Get router's ClickUp task to fetch the start_date
+    const routerResult = await client.query(
+      'SELECT clickup_task_id FROM routers WHERE router_id = $1',
+      [routerId]
+    );
+
+    if (routerResult.rows.length === 0) {
+      throw new Error(`Router ${routerId} not found`);
+    }
+
+    const routerTaskId = routerResult.rows[0].clickup_task_id;
+    if (!routerTaskId) {
+      throw new Error(`Router ${routerId} does not have a linked ClickUp task`);
+    }
+
+    // Fetch the router's ClickUp task to get the start_date
+    let actualInstalledAt = installedAt;
+    if (!installedAt) {
+      try {
+        const clickupTask = await clickupClient.getTask(routerTaskId);
+        if (clickupTask.start_date) {
+          // ClickUp returns timestamps in milliseconds
+          actualInstalledAt = new Date(parseInt(clickupTask.start_date));
+          logger.info('Using ClickUp task start_date as installed_at', { 
+            routerId, 
+            taskId: routerTaskId,
+            startDate: actualInstalledAt 
+          });
+        } else {
+          // No start date in ClickUp, use current date
+          actualInstalledAt = new Date();
+          logger.warn('ClickUp task has no start_date, using current date', { 
+            routerId, 
+            taskId: routerTaskId 
+          });
+        }
+      } catch (error) {
+        logger.error('Error fetching ClickUp task start_date, using current date', { 
+          routerId, 
+          taskId: routerTaskId,
+          error: error.message 
+        });
+        actualInstalledAt = new Date();
+      }
+    }
+
     // Validate property task in ClickUp if requested
     let validatedPropertyName = propertyName;
     if (validateClickUp) {
@@ -79,7 +125,7 @@ async function assignRouterToProperty(assignment, validateClickUp = true) {
        (router_id, property_clickup_task_id, property_name, installed_at, installed_by, notes)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [routerId, propertyTaskId, validatedPropertyName, installedAt, installedBy, notes]
+      [routerId, propertyTaskId, validatedPropertyName, actualInstalledAt, installedBy, notes]
     );
 
     const newAssignment = assignmentResult.rows[0];
@@ -91,7 +137,7 @@ async function assignRouterToProperty(assignment, validateClickUp = true) {
            current_property_name = $2,
            property_installed_at = $3
        WHERE router_id = $4`,
-      [propertyTaskId, validatedPropertyName, installedAt, routerId]
+      [propertyTaskId, validatedPropertyName, actualInstalledAt, routerId]
     );
 
     await client.query('COMMIT');
@@ -99,7 +145,8 @@ async function assignRouterToProperty(assignment, validateClickUp = true) {
     logger.info('Router assigned to property', { 
       routerId, 
       propertyTaskId, 
-      propertyName: validatedPropertyName 
+      propertyName: validatedPropertyName,
+      installedAt: actualInstalledAt
     });
 
     // TODO: Sync with ClickUp - update property's "Installed Routers" relationship field
