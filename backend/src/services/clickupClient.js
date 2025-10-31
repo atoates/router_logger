@@ -245,11 +245,12 @@ class ClickUpClient {
   }
 
   /**
-   * Search for property tasks across a space
+   * Search for property lists (not tasks) across a space
+   * In Active Accounts, each property is a LIST (e.g., "#70 | 56 Burleigh Street, Cambridge")
    * @param {string} spaceId - Space ID to search in
-   * @param {string} searchQuery - Optional search query for task name
+   * @param {string} searchQuery - Optional search query for list name
    * @param {string} userId - User identifier
-   * @returns {Promise<Array>} Tasks from the space
+   * @returns {Promise<Array>} Property lists from the space
    */
   async searchPropertyTasks(spaceId, searchQuery = '', userId = 'default') {
     try {
@@ -275,95 +276,64 @@ class ClickUpClient {
             params: { archived: false }
           });
           const folderLists = folderListsResponse.data.lists || [];
-          lists = lists.concat(folderLists);
+          lists = lists.concat(folderLists.map(list => ({
+            ...list,
+            folder_name: folder.name,
+            folder_id: folder.id
+          })));
         } catch (error) {
           logger.warn(`Error getting lists from folder ${folder.id}:`, error.message);
         }
       }
       
-      logger.info('Lists in space', { spaceId, listCount: lists.length, listNames: lists.map(l => l.name) });
-      let allTasks = [];
+      logger.info('All lists in space', { spaceId, listCount: lists.length });
       
-      // Get tasks from each list (with pagination)
-      for (const list of lists) {
-        try {
-          let page = 0;
-          let hasMore = true;
-          
-          while (hasMore) {
-            const tasksResponse = await client.get(`/list/${list.id}/task`, {
-              params: {
-                archived: false,
-                subtasks: false,
-                include_closed: false,
-                page
-              }
-            });
-            
-            const tasks = tasksResponse.data.tasks || [];
-            if (tasks.length === 0) {
-              hasMore = false;
-            } else {
-              allTasks = allTasks.concat(tasks.map(task => ({
-                ...task,
-                list_name: list.name,
-                list_id: list.id
-              })));
-              
-              // ClickUp returns up to 100 tasks per page
-              if (tasks.length < 100) {
-                hasMore = false;
-              } else {
-                page++;
-              }
-            }
-          }
-        } catch (error) {
-          logger.warn(`Error getting tasks from list ${list.id}:`, error.message);
+      // Filter out "Routers" list and archived/template lists
+      let filteredLists = lists.filter(list => {
+        const name = list.name.toLowerCase();
+        // Exclude Routers list, templates, and archived
+        if (name === 'routers' || 
+            name.includes('template') || 
+            name === 'list' ||
+            list.folder_name?.toLowerCase() === 'archived') {
+          return false;
         }
-      }
-      
-      // Apply search filter if provided and exclude router tasks
-      let filteredTasks = allTasks;
-      
-      // Log sample of list names to debug filtering
-      const uniqueListNames = [...new Set(allTasks.map(t => t.list_name))];
-      logger.info('Lists found in space', { spaceId, listNames: uniqueListNames });
-      
-      if (searchQuery) {
-        const searchLower = searchQuery.toLowerCase();
-        filteredTasks = allTasks.filter(task => {
-          // Exclude tasks from "Routers" list
-          if (task.list_name?.toLowerCase() === 'routers') {
-            logger.debug('Excluding router task', { taskName: task.name, listName: task.list_name });
-            return false;
-          }
-          
-          return task.name.toLowerCase().includes(searchLower) ||
-                 task.description?.toLowerCase().includes(searchLower);
-        });
-      } else {
-        // Even without search query, exclude router tasks
-        filteredTasks = allTasks.filter(task => {
-          if (task.list_name?.toLowerCase() === 'routers') {
-            logger.debug('Excluding router task (no search)', { taskName: task.name, listName: task.list_name });
-            return false;
-          }
-          return true;
-        });
-      }
-      
-      logger.info('Found tasks in space', { 
-        spaceId, 
-        total: allTasks.length, 
-        filtered: filteredTasks.length,
-        searchQuery,
-        sampleTasks: filteredTasks.slice(0, 3).map(t => ({ name: t.name, list: t.list_name }))
+        return true;
       });
       
-      return filteredTasks;
+      // Apply search filter if provided
+      if (searchQuery && searchQuery.length >= 2) {
+        const searchLower = searchQuery.toLowerCase();
+        filteredLists = filteredLists.filter(list => 
+          list.name.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      // Format as "property tasks" for backward compatibility with frontend
+      const propertyTasks = filteredLists.map(list => ({
+        id: list.id,
+        name: list.name,
+        url: `https://app.clickup.com/${list.id}`,
+        status: list.status,
+        task_count: list.task_count,
+        folder_name: list.folder_name,
+        folder_id: list.folder_id,
+        // Add these for frontend compatibility
+        list_name: list.name,
+        list_id: list.id
+      }));
+      
+      logger.info('Found property lists in space', { 
+        spaceId, 
+        total: lists.length, 
+        filtered: propertyTasks.length,
+        searchQuery,
+        sampleLists: propertyTasks.slice(0, 3).map(p => p.name)
+      });
+      
+      return propertyTasks;
     } catch (error) {
-      logger.error('Error searching tasks in space:', error.response?.data || error.message);
+      logger.error('Error searching property lists in space:', error.response?.data || error.message);
       throw error;
     }
   }

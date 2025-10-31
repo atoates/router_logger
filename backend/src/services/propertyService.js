@@ -7,17 +7,21 @@ const { pool, logger } = require('../config/database');
 const clickupClient = require('./clickupClient');
 
 /**
- * Validate that a property task exists in ClickUp
- * @param {string} propertyTaskId - ClickUp task ID
- * @returns {Promise<Object>} Task details if valid
+ * Validate that a property (list) exists in ClickUp
+ * @param {string} propertyListId - ClickUp list ID (each property is a list)
+ * @returns {Promise<Object>} List details if valid
  */
-async function validatePropertyTask(propertyTaskId) {
+async function validatePropertyTask(propertyListId) {
   try {
-    const task = await clickupClient.getTask(propertyTaskId, 'default');
-    logger.info('Property task validated', { taskId: propertyTaskId, name: task.name });
-    return task;
+    // Properties are lists, not tasks - get list details instead
+    const client = await clickupClient.getAuthorizedClient('default');
+    const response = await client.get(`/list/${propertyListId}`);
+    const list = response.data;
+    
+    logger.info('Property list validated', { listId: propertyListId, name: list.name });
+    return { id: list.id, name: list.name, url: `https://app.clickup.com/${list.id}` };
   } catch (error) {
-    throw new Error(`Failed to validate property task: ${error.message}`);
+    throw new Error(`Failed to validate property: ${error.message}`);
   }
 }
 
