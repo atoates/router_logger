@@ -158,6 +158,21 @@ router.get('/workspaces', async (req, res) => {
 });
 
 /**
+ * GET /api/clickup/workspaces/:workspaceId/members
+ * Get workspace members
+ */
+router.get('/workspaces/:workspaceId/members', async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    const members = await clickupClient.getWorkspaceMembers(workspaceId, 'default');
+    res.json({ members });
+  } catch (error) {
+    logger.error('Error getting workspace members:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/clickup/spaces/:workspaceId
  * Get spaces in a workspace
  */

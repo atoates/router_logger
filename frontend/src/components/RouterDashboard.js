@@ -251,8 +251,7 @@ export default function RouterDashboard({ router }) {
       <div className="widgets-row-three">
         <ClickUpTaskWidget 
           router={router} 
-          onMoveProperty={() => propertyWidgetRef.current?.openMovePropertyModal()}
-          onOutOfService={() => propertyWidgetRef.current?.openOutOfServiceModal()}
+          onStoredWith={() => propertyWidgetRef.current?.openStoredWithModal()}
         />
         <PropertySearchWidget 
           ref={propertyWidgetRef}

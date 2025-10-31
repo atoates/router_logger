@@ -13,11 +13,9 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
   const [propertyHistory, setPropertyHistory] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
-  const [showServiceModal, setShowServiceModal] = useState(false);
-  const [serviceForm, setServiceForm] = useState({
-    stored_with: 'Jordan',
-    notes: ''
-  });
+  const [showStoredWithModal, setShowStoredWithModal] = useState(false);
+  const [selectedAssignees, setSelectedAssignees] = useState([]);
+  const [availableUsers, setAvailableUsers] = useState([]);
   const [workspaceId, setWorkspaceId] = useState(null);
   const [spaceId, setSpaceId] = useState(null);
 
@@ -301,37 +299,35 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
     setShowSearchModal(true);
   };
 
-  const handleMarkOutOfService = async () => {
-    if (!routerId) return;
-    
-    if (!serviceForm.stored_with) {
-      toast.error('Please select who is storing the router');
+  const handleUpdateStoredWith = async () => {
+    if (!router?.clickup_task_id) {
+      toast.error('Router has no linked ClickUp task');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/routers/${routerId}/out-of-service`, {
-        method: 'POST',
+      const res = await fetch(`${API_BASE}/api/clickup/tasks/${router.clickup_task_id}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(serviceForm)
+        body: JSON.stringify({
+          assignees: {
+            add: selectedAssignees.map(u => parseInt(u)),
+            rem: [] // For now, we'll add assignees only. Could extend to remove specific ones
+          }
+        })
       });
 
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        toast.success(`Router marked as out-of-service (stored with ${serviceForm.stored_with})`);
-        setShowServiceModal(false);
-        setServiceForm({ stored_with: 'Jordan', notes: '' });
-        
-        // Optionally reload router data
-        if (onAssigned) onAssigned(data.router);
+      if (res.ok) {
+        toast.success(`Assignees updated successfully`);
+        setShowStoredWithModal(false);
+        setSelectedAssignees([]);
       } else {
-        toast.error(data.error || 'Failed to mark router as out-of-service');
+        toast.error('Failed to update assignees');
       }
     } catch (error) {
-      console.error('Error marking router as out-of-service:', error);
-      toast.error('Failed to update service status');
+      console.error('Error updating assignees:', error);
+      toast.error('Failed to update assignees');
     } finally {
       setLoading(false);
     }
@@ -367,13 +363,25 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
     }
   };
 
-  // Expose methods to parent via ref
+    // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     openMovePropertyModal: () => {
-      handleOpenSearchModal();
+      setShowSearchModal(true);
     },
-    openOutOfServiceModal: () => {
-      setShowServiceModal(true);
+    openStoredWithModal: async () => {
+      // Load workspace members when opening modal
+      if (workspaceId) {
+        try {
+          const res = await fetch(`${API_BASE}/api/clickup/workspaces/${workspaceId}/members`);
+          const data = await res.json();
+          if (data.members) {
+            setAvailableUsers(data.members);
+          }
+        } catch (error) {
+          console.error('Error loading workspace members:', error);
+        }
+      }
+      setShowStoredWithModal(true);
     }
   }));
 
@@ -561,56 +569,59 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
         </div>
       )}
 
-      {/* Out of Service Modal */}
-      {showServiceModal && (
-        <div className="psw-modal-overlay" onClick={() => setShowServiceModal(false)}>
+      {/* Stored With Modal */}
+      {showStoredWithModal && (
+        <div className="psw-modal-overlay" onClick={() => setShowStoredWithModal(false)}>
           <div className="psw-modal" onClick={(e) => e.stopPropagation()}>
             <div className="psw-modal-header">
-              <h3>Mark Router as Out of Service</h3>
-              <button className="psw-modal-close" onClick={() => setShowServiceModal(false)}>×</button>
+              <h3>Update Router Storage</h3>
+              <button className="psw-modal-close" onClick={() => setShowStoredWithModal(false)}>×</button>
             </div>
             
             <div className="psw-modal-body">
               <div className="psw-form-group">
-                <label htmlFor="stored-with">Stored With</label>
-                <select
-                  id="stored-with"
-                  value={serviceForm.stored_with}
-                  onChange={(e) => setServiceForm({...serviceForm, stored_with: e.target.value})}
-                  className="psw-form-select"
-                >
-                  <option value="Jordan">Jordan</option>
-                  <option value="Ali">Ali</option>
-                  <option value="Karl">Karl</option>
-                </select>
-              </div>
-
-              <div className="psw-form-group">
-                <label htmlFor="notes">Notes (Optional)</label>
-                <textarea
-                  id="notes"
-                  placeholder="Any additional information..."
-                  value={serviceForm.notes}
-                  onChange={(e) => setServiceForm({...serviceForm, notes: e.target.value})}
-                  className="psw-form-textarea"
-                  rows="3"
-                />
+                <label>Assign to ClickUp Users (Stored With)</label>
+                <div className="psw-user-list">
+                  {availableUsers.length > 0 ? (
+                    availableUsers.map(user => (
+                      <label key={user.id} className="psw-user-checkbox">
+                        <input
+                          type="checkbox"
+                          value={user.id}
+                          checked={selectedAssignees.includes(user.id.toString())}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedAssignees([...selectedAssignees, user.id.toString()]);
+                            } else {
+                              setSelectedAssignees(selectedAssignees.filter(id => id !== user.id.toString()));
+                            }
+                          }}
+                        />
+                        <span className="psw-user-name">
+                          {user.username || user.email}
+                        </span>
+                      </label>
+                    ))
+                  ) : (
+                    <p className="psw-hint">Loading users...</p>
+                  )}
+                </div>
               </div>
 
               <div className="psw-modal-actions">
                 <button 
-                  onClick={() => setShowServiceModal(false)}
+                  onClick={() => setShowStoredWithModal(false)}
                   className="psw-modal-btn secondary"
                   disabled={loading}
                 >
                   Cancel
                 </button>
                 <button 
-                  onClick={handleMarkOutOfService}
-                  className="psw-modal-btn warning"
-                  disabled={loading}
+                  onClick={handleUpdateStoredWith}
+                  className="psw-modal-btn primary"
+                  disabled={loading || selectedAssignees.length === 0}
                 >
-                  {loading ? 'Saving...' : 'Mark Out of Service'}
+                  {loading ? 'Updating...' : 'Update Assignees'}
                 </button>
               </div>
             </div>

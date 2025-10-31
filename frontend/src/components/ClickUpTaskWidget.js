@@ -11,7 +11,7 @@ import {
 } from '../services/api';
 import './ClickUpTaskWidget.css';
 
-const ClickUpTaskWidget = ({ router, onMoveProperty, onOutOfService }) => {
+const ClickUpTaskWidget = ({ router, onStoredWith }) => {
   const [authorized, setAuthorized] = useState(false);
   const [linkedTask, setLinkedTask] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -232,20 +232,12 @@ const ClickUpTaskWidget = ({ router, onMoveProperty, onOutOfService }) => {
               >
                 View in ClickUp
               </a>
-              {onMoveProperty && (
+              {onStoredWith && (
                 <button 
-                  onClick={onMoveProperty}
+                  onClick={onStoredWith}
                   className="task-btn task-btn-secondary"
                 >
-                  Installed in location
-                </button>
-              )}
-              {onOutOfService && (
-                <button 
-                  onClick={onOutOfService}
-                  className="task-btn task-btn-warning"
-                >
-                  Uninstalled from location
+                  Stored with
                 </button>
               )}
             </div>

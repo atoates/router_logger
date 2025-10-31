@@ -51,6 +51,26 @@ class ClickUpClient {
   }
 
   /**
+   * Get workspace/team members
+   * @param {string} workspaceId - Workspace/Team ID
+   * @param {string} userId - User identifier
+   * @returns {Promise<Array>} List of workspace members
+   */
+  async getWorkspaceMembers(workspaceId, userId = 'default') {
+    try {
+      const client = await this.getAuthorizedClient(userId);
+      const response = await client.get(`/team/${workspaceId}`);
+      
+      const members = response.data.team?.members || [];
+      logger.info('Retrieved workspace members', { workspaceId, count: members.length });
+      return members;
+    } catch (error) {
+      logger.error('Error getting workspace members:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Get spaces in a workspace
    * @param {string} workspaceId - Workspace/Team ID
    * @param {string} userId - User identifier
