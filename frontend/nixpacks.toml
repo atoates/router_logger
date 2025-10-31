@@ -9,4 +9,4 @@ cmds = ["npm install"]
 cmds = ["CI=false npm run build"]
 
 [phases.start]
-cmd = "serve -s build -l ${PORT}"
+cmd = "serve -s build -l ${PORT} --single"

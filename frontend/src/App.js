@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
 import './App.css';
 import ErrorBoundary from './components/ErrorBoundary';
 import RMSAuthButton from './components/RMSAuthButton';
@@ -8,15 +9,49 @@ import DashboardV3 from './components/DashboardV3';
 import RouterDashboard from './components/RouterDashboard';
 import HeaderRouterSelect from './components/HeaderRouterSelect';
 import { ToastContainer, toast } from 'react-toastify';
+import { getRouters } from './services/api';
 import 'react-toastify/dist/ReactToastify.css';
 // import { subDays, startOfDay, endOfDay } from 'date-fns';
 
-function App() {
+function AppContent() {
   const [selectedRouter, setSelectedRouter] = useState(null);
   const [activeTab, setActiveTab] = useState('network'); // 'network' | 'router'
   const [timePreset] = useState({ type: 'rolling', value: 24 }); // rolling hours or calendar days
   const [dashboardVersion, setDashboardVersion] = useState('v3'); // 'v1' | 'v3'
   const [darkMode] = useState(true); // Dark mode enabled by default
+  const navigate = useNavigate();
+  const params = useParams();
+  
+  // Load router from URL if present
+  useEffect(() => {
+    const loadRouterFromUrl = async () => {
+      if (params.routerId) {
+        try {
+          const response = await getRouters();
+          const routers = response.data || [];
+          const router = routers.find(r => r.router_id === params.routerId);
+          
+          if (router) {
+            setSelectedRouter(router);
+            setActiveTab('router');
+            setDashboardVersion('v1');
+            const label = router.name ? `${router.name} (ID ${router.router_id})` : `ID ${router.router_id}`;
+            toast.success(`Opening ${label}`);
+          } else {
+            toast.error(`Router ${params.routerId} not found`);
+            navigate('/');
+          }
+        } catch (error) {
+          console.error('Error loading router:', error);
+          toast.error('Failed to load router');
+          navigate('/');
+        }
+      }
+    };
+    
+    loadRouterFromUrl();
+  }, [params.routerId, navigate]);
+  
   // Deprecated V1 date range state (no longer used)
   // const [dateRange, setDateRange] = useState({
   //   startDate: startOfDay(subDays(new Date(), 7)).toISOString(),
@@ -35,6 +70,7 @@ function App() {
     setSelectedRouter(router);
     setActiveTab('router');
     if (dashboardVersion !== 'v1') setDashboardVersion('v1');
+    navigate(`/router/${router.router_id}`);
     const label = router.name ? `${router.name} (ID ${router.router_id})` : `ID ${router.router_id}`;
     toast.success(`Opening ${label}`);
   };
@@ -61,7 +97,10 @@ function App() {
                 </button>
                 <button 
                   className={`btn ${dashboardVersion === 'v3' ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setDashboardVersion('v3')}
+                  onClick={() => {
+                    setDashboardVersion('v3');
+                    navigate('/');
+                  }}
                   style={{ fontSize: 12 }}
                 >
                   Dashboard
@@ -101,7 +140,10 @@ function App() {
               </button>
               <button 
                 className={`btn ${dashboardVersion === 'v3' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setDashboardVersion('v3')}
+                onClick={() => {
+                  setDashboardVersion('v3');
+                  navigate('/');
+                }}
                 style={{ fontSize: 12 }}
               >
                 Dashboard
@@ -149,6 +191,17 @@ function App() {
       </div>
       <ToastContainer position="bottom-right" autoClose={3000} />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<AppContent />} />
+        <Route path="/router/:routerId" element={<AppContent />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
