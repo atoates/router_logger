@@ -132,9 +132,19 @@ export default function RouterDashboard({ router }) {
 
   const totalBytes = useMemo(() => (series.txrx || []).reduce((s,d)=> s + (Number(d.total_bytes)||0), 0), [series]);
   const onlinePct = useMemo(() => {
-    if (!uptime || uptime.length === 0) return null;
+    if (!uptime || uptime.length === 0) {
+      console.log('RouterDashboard - No uptime data available');
+      return null;
+    }
     const on = uptime.filter(u => (u.status === 'online' || u.status === 1 || u.status === '1' || u.status === true)).length;
-    return Math.round(on / uptime.length * 100);
+    const pct = Math.round(on / uptime.length * 100);
+    console.log('RouterDashboard - Uptime calculation:', { 
+      total: uptime.length, 
+      online: on, 
+      percentage: pct,
+      sampleStatuses: uptime.slice(0, 5).map(u => u.status)
+    });
+    return pct;
   }, [uptime]);
 
   const yMax = useMemo(() => {
@@ -370,7 +380,7 @@ export default function RouterDashboard({ router }) {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis 
                     dataKey="timestamp" 
-                    tickFormatter={(t)=> { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }}
+                    tickFormatter={(t)=> { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleDateString([], { month: 'short', day: 'numeric' }); }}
                     tick={{ fontSize: 10 }}
                     interval="preserveStartEnd"
                     minTickGap={12}
@@ -459,7 +469,7 @@ export default function RouterDashboard({ router }) {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="date" tickFormatter={(t)=> new Date(t).toLocaleTimeString()} tick={{ fontSize: 11 }} />
+              <XAxis dataKey="date" tickFormatter={(t)=> new Date(t).toLocaleDateString()} tick={{ fontSize: 11 }} />
               <YAxis domain={[0, yMax]} tickFormatter={(v)=>formatBytes(v)} tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v)=>formatBytes(v)} labelFormatter={(t)=> new Date(t).toLocaleString()} />
               <Legend />
