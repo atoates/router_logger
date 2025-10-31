@@ -491,6 +491,26 @@ router.get('/search-tasks/:workspaceId', async (req, res) => {
 });
 
 /**
+ * GET /api/clickup/debug/space-lists/:spaceId
+ * Debug endpoint to check what lists are in a space
+ */
+router.get('/debug/space-lists/:spaceId', async (req, res) => {
+  try {
+    const { spaceId } = req.params;
+    const lists = await clickupClient.getLists(spaceId, 'default');
+    
+    res.json({ 
+      spaceId,
+      listCount: lists.length,
+      lists: lists.map(l => ({ id: l.id, name: l.name, task_count: l.task_count }))
+    });
+  } catch (error) {
+    logger.error('Error getting space lists:', error);
+    res.status(500).json({ error: error.message, details: error.response?.data });
+  }
+});
+
+/**
  * GET /api/clickup/custom-fields/:listId
  * Get custom fields configuration for a list
  */
