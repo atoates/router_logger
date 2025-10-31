@@ -13,6 +13,7 @@ export default function PropertySearchWidget({ router, onAssigned }) {
   const [propertyHistory, setPropertyHistory] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
   const [workspaceId, setWorkspaceId] = useState(null);
   const [spaceId, setSpaceId] = useState(null);
 
@@ -245,6 +246,13 @@ export default function PropertySearchWidget({ router, onAssigned }) {
     } else {
       assignProperty(property.id, property.name);
     }
+    setShowSearchModal(false);
+  };
+
+  const handleOpenSearchModal = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowSearchModal(true);
   };
 
   if (!workspaceId) {
@@ -260,138 +268,157 @@ export default function PropertySearchWidget({ router, onAssigned }) {
   }
 
   return (
-    <div className="property-search-widget">
-      <div className="psw-header">
-        <h4>📍 Property Assignment</h4>
-        {spaceId ? (
-          <span className="psw-status-badge success">Active Accounts</span>
-        ) : (
-          <span className="psw-status-badge">All Workspace</span>
-        )}
-      </div>
-
-      {/* Current Property */}
-      {currentProperty && (
-        <div className="psw-current-property">
-          <div className="psw-property-info">
-            <div className="psw-property-name">
-              <strong>{currentProperty.name}</strong>
-              <a 
-                href={`https://app.clickup.com/${currentProperty.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="psw-clickup-link"
-              >
-                View in ClickUp ↗
-              </a>
-            </div>
-            <div className="psw-property-meta">
-              <span>📅 Installed: {new Date(currentProperty.installedAt).toLocaleDateString()}</span>
-              <span>⏱️ {currentProperty.daysSinceInstalled} days ago</span>
-              {currentProperty.installedBy && (
-                <span>👤 {currentProperty.installedBy}</span>
-              )}
-            </div>
-          </div>
-          <button 
-            onClick={removeProperty}
-            disabled={loading}
-            className="psw-remove-btn"
-          >
-            {loading ? 'Removing...' : 'Remove'}
-          </button>
-        </div>
-      )}
-
-      {/* Search for New Property */}
-      <div className="psw-search-container">
-        <div className="psw-search-label">
-          {currentProperty ? 'Move to new property:' : 'Assign to property:'}
-        </div>
-        <div className="psw-search-input-wrapper">
-          <input
-            type="text"
-            placeholder={spaceId ? "Search properties (e.g., Cambridge, Colchester)..." : "Search property locations..."}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
-            className="psw-search-input"
-            disabled={loading}
-          />
-          {searching && <span className="psw-spinner">⏳</span>}
-        </div>
-
-        {showDropdown && searchResults.length > 0 && (
-          <div className="psw-dropdown">
-            {searchResults.map(result => (
-              <div
-                key={result.id}
-                className="psw-dropdown-item"
-                onClick={() => handleSelectProperty(result)}
-              >
-                <div className="psw-result-name">{result.name}</div>
-                <div className="psw-result-meta">
-                  {result.folder_name && <span className="psw-badge">{result.folder_name}</span>}
-                  {result.task_count !== undefined && <span className="psw-badge-count">{result.task_count} tasks</span>}
-                </div>
+    <>
+      <div className="property-search-widget">
+        {/* Compact Header Row */}
+        <div className="psw-compact-row">
+          <div className="psw-section-label">Property Assignment</div>
+          
+          {currentProperty ? (
+            <div className="psw-compact-current">
+              <span className="psw-compact-name">{currentProperty.name}</span>
+              <span className="psw-compact-meta">
+                Installed {new Date(currentProperty.installedAt).toLocaleDateString()}
+                {currentProperty.daysSinceInstalled !== undefined && ` (${currentProperty.daysSinceInstalled}d ago)`}
+              </span>
+              <div className="psw-compact-actions">
+                <a 
+                  href={`https://app.clickup.com/${currentProperty.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="psw-compact-link"
+                >
+                  View in ClickUp ↗
+                </a>
+                <button 
+                  onClick={handleOpenSearchModal}
+                  className="psw-compact-btn"
+                  disabled={loading}
+                >
+                  Move Property
+                </button>
+                <button 
+                  onClick={removeProperty}
+                  disabled={loading}
+                  className="psw-compact-btn danger"
+                >
+                  Remove
+                </button>
               </div>
-            ))}
-          </div>
-        )}
-
-        {searchQuery.length >= 2 && !searching && searchResults.length === 0 && (
-          <div className="psw-no-results">
-            No properties found for "{searchQuery}"
-          </div>
-        )}
-
-        {searchQuery.length < 2 && !currentProperty && (
-          <div className="psw-hint">
-            Type to search property locations (excludes router tasks)...
-          </div>
-        )}
-      </div>
-
-      {/* Property History */}
-      {propertyHistory.length > 0 && (
-        <div className="psw-history">
-          <div className="psw-history-header" onClick={() => setShowHistory(!showHistory)}>
-            <span>📜 Property History ({propertyHistory.length})</span>
-            <span className="psw-history-toggle">{showHistory ? '▼' : '▶'}</span>
-          </div>
-          {showHistory && (
-            <div className="psw-history-list">
-              {propertyHistory.map((item, index) => (
-                <div key={item.id} className="psw-history-item">
-                  <div className="psw-history-property">
-                    <strong>{item.property_name}</strong>
-                    {item.removed_at ? (
-                      <span className="psw-history-status removed">Removed</span>
-                    ) : (
-                      <span className="psw-history-status current">Current</span>
-                    )}
-                  </div>
-                  <div className="psw-history-dates">
-                    <span>📥 Installed: {new Date(item.installed_at).toLocaleDateString()}</span>
-                    {item.removed_at && (
-                      <span>📤 Removed: {new Date(item.removed_at).toLocaleDateString()}</span>
-                    )}
-                  </div>
-                  {(item.installed_by || item.removed_by) && (
-                    <div className="psw-history-users">
-                      {item.installed_by && <span>Installed by: {item.installed_by}</span>}
-                      {item.removed_by && <span>Removed by: {item.removed_by}</span>}
-                    </div>
-                  )}
-                  {item.notes && (
-                    <div className="psw-history-notes">{item.notes}</div>
-                  )}
-                </div>
-              ))}
+            </div>
+          ) : (
+            <div className="psw-compact-empty">
+              <span>No property assigned</span>
+              <button 
+                onClick={handleOpenSearchModal}
+                className="psw-compact-btn primary"
+                disabled={loading || !workspaceId}
+              >
+                Assign Property
+              </button>
             </div>
           )}
         </div>
+
+        {/* Property History - Full Width Below */}
+        {propertyHistory.length > 0 && (
+          <div className="psw-history">
+            <div className="psw-history-header" onClick={() => setShowHistory(!showHistory)}>
+              <span>📜 Property History ({propertyHistory.length})</span>
+              <span className="psw-history-toggle">{showHistory ? '▼' : '▶'}</span>
+            </div>
+            {showHistory && (
+              <div className="psw-history-list">
+                {propertyHistory.map((item) => (
+                  <div key={item.id} className="psw-history-item">
+                    <div className="psw-history-property">
+                      <strong>{item.property_name}</strong>
+                      {item.removed_at ? (
+                        <span className="psw-history-status removed">Removed</span>
+                      ) : (
+                        <span className="psw-history-status current">Current</span>
+                      )}
+                    </div>
+                    <div className="psw-history-dates">
+                      <span>📥 Installed: {new Date(item.installed_at).toLocaleDateString()}</span>
+                      {item.removed_at && (
+                        <span>📤 Removed: {new Date(item.removed_at).toLocaleDateString()}</span>
+                      )}
+                    </div>
+                    {(item.installed_by || item.removed_by) && (
+                      <div className="psw-history-users">
+                        {item.installed_by && <span>Installed by: {item.installed_by}</span>}
+                        {item.removed_by && <span>Removed by: {item.removed_by}</span>}
+                      </div>
+                    )}
+                    {item.notes && (
+                      <div className="psw-history-notes">{item.notes}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Search Modal */}
+      {showSearchModal && (
+        <div className="psw-modal-overlay" onClick={() => setShowSearchModal(false)}>
+          <div className="psw-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="psw-modal-header">
+              <h3>{currentProperty ? 'Move to New Property' : 'Assign to Property'}</h3>
+              <button className="psw-modal-close" onClick={() => setShowSearchModal(false)}>×</button>
+            </div>
+            
+            <div className="psw-modal-body">
+              <div className="psw-search-input-wrapper">
+                <input
+                  type="text"
+                  placeholder="Search properties (e.g., Cambridge, Colchester)..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
+                  className="psw-search-input"
+                  disabled={loading}
+                  autoFocus
+                />
+                {searching && <span className="psw-spinner">⏳</span>}
+              </div>
+
+              {showDropdown && searchResults.length > 0 && (
+                <div className="psw-modal-results">
+                  {searchResults.map(result => (
+                    <div
+                      key={result.id}
+                      className="psw-result-item"
+                      onClick={() => handleSelectProperty(result)}
+                    >
+                      <div className="psw-result-name">{result.name}</div>
+                      <div className="psw-result-meta">
+                        {result.folder_name && <span className="psw-badge">{result.folder_name}</span>}
+                        {result.task_count !== undefined && <span className="psw-badge-count">{result.task_count} tasks</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {searchQuery.length >= 2 && !searching && searchResults.length === 0 && (
+                <div className="psw-no-results">
+                  No properties found for "{searchQuery}"
+                </div>
+              )}
+
+              {searchQuery.length < 2 && (
+                <div className="psw-hint">
+                  Type at least 2 characters to search property locations...
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
-    </div>
+    </>
   );
 }
