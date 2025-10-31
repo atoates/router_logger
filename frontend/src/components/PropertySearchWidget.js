@@ -10,7 +10,9 @@ export default function PropertySearchWidget({ router, onAssigned }) {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [currentProperty, setCurrentProperty] = useState(null);
+  const [propertyHistory, setPropertyHistory] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [workspaceId, setWorkspaceId] = useState(null);
   const [spaceId, setSpaceId] = useState(null);
 
@@ -43,32 +45,38 @@ export default function PropertySearchWidget({ router, onAssigned }) {
     getWorkspaceInfo();
   }, []);
 
-  // Load current property assignment
+  // Load current property assignment and history
   useEffect(() => {
-    const loadCurrentProperty = async () => {
+    const loadPropertyData = async () => {
       if (!routerId) return;
       
       try {
-        const res = await fetch(`${API_BASE}/api/router-properties/${routerId}/current`);
-        const data = await res.json();
+        // Load current property
+        const currentRes = await fetch(`${API_BASE}/api/router-properties/${routerId}/current`);
+        const currentData = await currentRes.json();
         
-        if (data.assigned) {
+        if (currentData.assigned) {
           setCurrentProperty({
-            id: data.property_clickup_task_id,
-            name: data.property_name,
-            installedAt: data.installed_at,
-            installedBy: data.installed_by,
-            daysSinceInstalled: data.daysSinceInstalled
+            id: currentData.property_clickup_task_id,
+            name: currentData.property_name,
+            installedAt: currentData.installed_at,
+            installedBy: currentData.installed_by,
+            daysSinceInstalled: currentData.daysSinceInstalled
           });
         } else {
           setCurrentProperty(null);
         }
+
+        // Load property history
+        const historyRes = await fetch(`${API_BASE}/api/router-properties/${routerId}/history`);
+        const historyData = await historyRes.json();
+        setPropertyHistory(Array.isArray(historyData) ? historyData : []);
       } catch (error) {
-        console.error('Error loading current property:', error);
+        console.error('Error loading property data:', error);
       }
     };
 
-    loadCurrentProperty();
+    loadPropertyData();
   }, [routerId]);
 
   // Search with debounce
@@ -104,6 +112,55 @@ export default function PropertySearchWidget({ router, onAssigned }) {
 
     return () => clearTimeout(timeout);
   }, [searchQuery, workspaceId, spaceId]);
+
+  const moveToNewProperty = useCallback(async (propertyId, propertyName) => {
+    if (!routerId) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/router-properties/move`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          routerId,
+          newPropertyTaskId: propertyId,
+          newPropertyName: propertyName,
+          movedBy: 'Dashboard User',
+          notes: 'Moved via dashboard'
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setCurrentProperty({
+          id: data.assignment.property_clickup_task_id,
+          name: data.assignment.property_name,
+          installedAt: data.assignment.installed_at,
+          installedBy: data.assignment.installed_by,
+          daysSinceInstalled: 0
+        });
+        
+        // Reload history to show the old property
+        const historyRes = await fetch(`${API_BASE}/api/router-properties/${routerId}/history`);
+        const historyData = await historyRes.json();
+        setPropertyHistory(Array.isArray(historyData) ? historyData : []);
+        
+        setSearchQuery('');
+        setShowDropdown(false);
+        toast.success(`Router moved to ${data.assignment.property_name}`);
+        
+        if (onAssigned) onAssigned(data.assignment);
+      } else {
+        toast.error(data.error || 'Failed to move property');
+      }
+    } catch (error) {
+      console.error('Error moving property:', error);
+      toast.error('Failed to move property');
+    } finally {
+      setLoading(false);
+    }
+  }, [routerId, onAssigned]);
 
   const assignProperty = useCallback(async (propertyId, propertyName) => {
     if (!routerId) return;
@@ -182,7 +239,12 @@ export default function PropertySearchWidget({ router, onAssigned }) {
   }, [routerId, currentProperty]);
 
   const handleSelectProperty = (property) => {
-    assignProperty(property.id, property.name);
+    // If there's a current property, move to new one. Otherwise, assign.
+    if (currentProperty) {
+      moveToNewProperty(property.id, property.name);
+    } else {
+      assignProperty(property.id, property.name);
+    }
   };
 
   if (!workspaceId) {
@@ -208,13 +270,14 @@ export default function PropertySearchWidget({ router, onAssigned }) {
         )}
       </div>
 
-      {currentProperty ? (
+      {/* Current Property */}
+      {currentProperty && (
         <div className="psw-current-property">
           <div className="psw-property-info">
             <div className="psw-property-name">
               <strong>{currentProperty.name}</strong>
               <a 
-                href={`https://app.clickup.com/t/${currentProperty.id}`}
+                href={`https://app.clickup.com/${currentProperty.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="psw-clickup-link"
@@ -223,9 +286,10 @@ export default function PropertySearchWidget({ router, onAssigned }) {
               </a>
             </div>
             <div className="psw-property-meta">
-              <span>Installed {currentProperty.daysSinceInstalled} days ago</span>
+              <span>📅 Installed: {new Date(currentProperty.installedAt).toLocaleDateString()}</span>
+              <span>⏱️ {currentProperty.daysSinceInstalled} days ago</span>
               {currentProperty.installedBy && (
-                <span>by {currentProperty.installedBy}</span>
+                <span>👤 {currentProperty.installedBy}</span>
               )}
             </div>
           </div>
@@ -237,49 +301,93 @@ export default function PropertySearchWidget({ router, onAssigned }) {
             {loading ? 'Removing...' : 'Remove'}
           </button>
         </div>
-      ) : (
-        <div className="psw-search-container">
-          <div className="psw-search-input-wrapper">
-            <input
-              type="text"
-              placeholder={spaceId ? "Search properties (e.g., Cambridge, Colchester)..." : "Search property locations..."}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
-              className="psw-search-input"
-              disabled={loading}
-            />
-            {searching && <span className="psw-spinner">⏳</span>}
-          </div>
+      )}
 
-          {showDropdown && searchResults.length > 0 && (
-            <div className="psw-dropdown">
-              {searchResults.map(result => (
-                <div
-                  key={result.id}
-                  className="psw-dropdown-item"
-                  onClick={() => handleSelectProperty(result)}
-                >
-                  <div className="psw-result-name">{result.name}</div>
-                  <div className="psw-result-meta">
-                    {result.listName && <span className="psw-badge">{result.listName}</span>}
-                    {result.list?.name && <span className="psw-badge">{result.list.name}</span>}
-                    {result.status && <span className="psw-badge-status">{result.status}</span>}
+      {/* Search for New Property */}
+      <div className="psw-search-container">
+        <div className="psw-search-label">
+          {currentProperty ? 'Move to new property:' : 'Assign to property:'}
+        </div>
+        <div className="psw-search-input-wrapper">
+          <input
+            type="text"
+            placeholder={spaceId ? "Search properties (e.g., Cambridge, Colchester)..." : "Search property locations..."}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
+            className="psw-search-input"
+            disabled={loading}
+          />
+          {searching && <span className="psw-spinner">⏳</span>}
+        </div>
+
+        {showDropdown && searchResults.length > 0 && (
+          <div className="psw-dropdown">
+            {searchResults.map(result => (
+              <div
+                key={result.id}
+                className="psw-dropdown-item"
+                onClick={() => handleSelectProperty(result)}
+              >
+                <div className="psw-result-name">{result.name}</div>
+                <div className="psw-result-meta">
+                  {result.folder_name && <span className="psw-badge">{result.folder_name}</span>}
+                  {result.task_count !== undefined && <span className="psw-badge-count">{result.task_count} tasks</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {searchQuery.length >= 2 && !searching && searchResults.length === 0 && (
+          <div className="psw-no-results">
+            No properties found for "{searchQuery}"
+          </div>
+        )}
+
+        {searchQuery.length < 2 && !currentProperty && (
+          <div className="psw-hint">
+            Type to search property locations (excludes router tasks)...
+          </div>
+        )}
+      </div>
+
+      {/* Property History */}
+      {propertyHistory.length > 0 && (
+        <div className="psw-history">
+          <div className="psw-history-header" onClick={() => setShowHistory(!showHistory)}>
+            <span>📜 Property History ({propertyHistory.length})</span>
+            <span className="psw-history-toggle">{showHistory ? '▼' : '▶'}</span>
+          </div>
+          {showHistory && (
+            <div className="psw-history-list">
+              {propertyHistory.map((item, index) => (
+                <div key={item.id} className="psw-history-item">
+                  <div className="psw-history-property">
+                    <strong>{item.property_name}</strong>
+                    {item.removed_at ? (
+                      <span className="psw-history-status removed">Removed</span>
+                    ) : (
+                      <span className="psw-history-status current">Current</span>
+                    )}
                   </div>
+                  <div className="psw-history-dates">
+                    <span>📥 Installed: {new Date(item.installed_at).toLocaleDateString()}</span>
+                    {item.removed_at && (
+                      <span>📤 Removed: {new Date(item.removed_at).toLocaleDateString()}</span>
+                    )}
+                  </div>
+                  {(item.installed_by || item.removed_by) && (
+                    <div className="psw-history-users">
+                      {item.installed_by && <span>Installed by: {item.installed_by}</span>}
+                      {item.removed_by && <span>Removed by: {item.removed_by}</span>}
+                    </div>
+                  )}
+                  {item.notes && (
+                    <div className="psw-history-notes">{item.notes}</div>
+                  )}
                 </div>
               ))}
-            </div>
-          )}
-
-          {searchQuery.length >= 2 && !searching && searchResults.length === 0 && (
-            <div className="psw-no-results">
-              No properties found for "{searchQuery}"
-            </div>
-          )}
-
-          {searchQuery.length < 2 && (
-            <div className="psw-hint">
-              Type to search property locations (excludes router tasks)...
             </div>
           )}
         </div>
