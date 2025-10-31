@@ -26,6 +26,167 @@ async function validatePropertyTask(propertyListId) {
 }
 
 /**
+ * Store router with a person (out of service)
+ * @param {Object} storage - Storage details
+ * @returns {Promise<Object>} Created storage record
+ */
+async function storeRouterWith(storage) {
+  const {
+    routerId,
+    storedWithUserId,
+    storedWithUsername,
+    storedAt = new Date(),
+    storedBy = null,
+    notes = null
+  } = storage;
+
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+
+    // Check if router is currently assigned to a property
+    const propertyCheck = await client.query(
+      `SELECT id, property_clickup_task_id, property_name, assignment_type 
+       FROM router_property_assignments 
+       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'property'`,
+      [routerId]
+    );
+
+    if (propertyCheck.rows.length > 0) {
+      const property = propertyCheck.rows[0];
+      throw new Error(
+        `Router ${routerId} is currently installed at property "${property.property_name}". ` +
+        `Remove from property before storing with a person.`
+      );
+    }
+
+    // Check if already stored with someone
+    const storageCheck = await client.query(
+      `SELECT id, stored_with_username 
+       FROM router_property_assignments 
+       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'storage'`,
+      [routerId]
+    );
+
+    if (storageCheck.rows.length > 0) {
+      const existing = storageCheck.rows[0];
+      throw new Error(
+        `Router ${routerId} is already stored with ${existing.stored_with_username}. ` +
+        `Clear current storage first.`
+      );
+    }
+
+    // Create storage record in property_assignments table
+    const storageResult = await client.query(
+      `INSERT INTO router_property_assignments 
+       (router_id, assignment_type, stored_with_user_id, stored_with_username, installed_at, installed_by, notes)
+       VALUES ($1, 'storage', $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [routerId, storedWithUserId, storedWithUsername, storedAt, storedBy, notes]
+    );
+
+    const newStorage = storageResult.rows[0];
+
+    // Update routers table with current storage info
+    await client.query(
+      `UPDATE routers 
+       SET stored_with_user_id = $1,
+           stored_with_username = $2,
+           service_status = 'out-of-service'
+       WHERE router_id = $3`,
+      [storedWithUserId, storedWithUsername, routerId]
+    );
+
+    await client.query('COMMIT');
+
+    logger.info('Router stored with user', { 
+      routerId, 
+      storedWithUserId,
+      storedWithUsername,
+      storedAt
+    });
+
+    return newStorage;
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    logger.error('Error storing router with user:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Clear router storage (bring back in service)
+ * @param {Object} clearance - Clearance details
+ * @returns {Promise<Object>} Updated storage record
+ */
+async function clearStoredWith(clearance) {
+  const {
+    routerId,
+    clearedAt = new Date(),
+    clearedBy = null,
+    notes = null
+  } = clearance;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Find current storage record
+    const currentResult = await client.query(
+      `SELECT * FROM router_property_assignments 
+       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'storage'`,
+      [routerId]
+    );
+
+    if (currentResult.rows.length === 0) {
+      throw new Error(`Router ${routerId} is not currently stored with anyone`);
+    }
+
+    const currentStorage = currentResult.rows[0];
+
+    // Update storage record with removal info
+    const updateResult = await client.query(
+      `UPDATE router_property_assignments 
+       SET removed_at = $1, removed_by = $2, notes = COALESCE($3, notes), updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4
+       RETURNING *`,
+      [clearedAt, clearedBy, notes, currentStorage.id]
+    );
+
+    // Clear storage info from routers table
+    await client.query(
+      `UPDATE routers 
+       SET stored_with_user_id = NULL,
+           stored_with_username = NULL,
+           service_status = 'operational'
+       WHERE router_id = $1`,
+      [routerId]
+    );
+
+    await client.query('COMMIT');
+
+    logger.info('Router storage cleared', { 
+      routerId,
+      storedWithUsername: currentStorage.stored_with_username
+    });
+
+    return updateResult.rows[0];
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    logger.error('Error clearing router storage:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Assign router to a property
  * @param {Object} assignment - Assignment details
  * @param {boolean} validateClickUp - Whether to validate property exists in ClickUp (default: true)
@@ -110,11 +271,27 @@ async function assignRouterToProperty(assignment, validateClickUp = true) {
 
     await client.query('BEGIN');
 
-    // Check if router already has an active assignment
+    // Check if router is currently stored with someone
+    const storageCheck = await client.query(
+      `SELECT id, stored_with_username 
+       FROM router_property_assignments 
+       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'storage'`,
+      [routerId]
+    );
+
+    if (storageCheck.rows.length > 0) {
+      const storage = storageCheck.rows[0];
+      throw new Error(
+        `Router ${routerId} is currently stored with ${storage.stored_with_username}. ` +
+        `Clear storage before assigning to a property.`
+      );
+    }
+
+    // Check if router already has an active property assignment
     const existingResult = await client.query(
       `SELECT id, property_clickup_task_id, property_name 
        FROM router_property_assignments 
-       WHERE router_id = $1 AND removed_at IS NULL`,
+       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'property'`,
       [routerId]
     );
 
@@ -129,8 +306,8 @@ async function assignRouterToProperty(assignment, validateClickUp = true) {
     // Create new assignment record
     const assignmentResult = await client.query(
       `INSERT INTO router_property_assignments 
-       (router_id, property_clickup_task_id, property_name, installed_at, installed_by, notes)
-       VALUES ($1, $2, $3, $4, $5, $6)
+       (router_id, assignment_type, property_clickup_task_id, property_name, installed_at, installed_by, notes)
+       VALUES ($1, 'property', $2, $3, $4, $5, $6)
        RETURNING *`,
       [routerId, propertyTaskId, validatedPropertyName, actualInstalledAt, installedBy, notes]
     );
@@ -188,10 +365,10 @@ async function removeRouterFromProperty(removal) {
   try {
     await client.query('BEGIN');
 
-    // Find current assignment
+    // Find current property assignment (not storage)
     const currentResult = await client.query(
       `SELECT * FROM router_property_assignments 
-       WHERE router_id = $1 AND removed_at IS NULL`,
+       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'property'`,
       [routerId]
     );
 
@@ -283,7 +460,7 @@ async function getCurrentProperty(routerId) {
   try {
     const result = await pool.query(
       `SELECT * FROM router_property_assignments 
-       WHERE router_id = $1 AND removed_at IS NULL`,
+       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'property'`,
       [routerId]
     );
 
@@ -308,6 +485,39 @@ async function getCurrentProperty(routerId) {
 }
 
 /**
+ * Get current storage status for a router
+ * @param {string} routerId - Router ID
+ * @returns {Promise<Object|null>} Current storage or null
+ */
+async function getCurrentStorage(routerId) {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM router_property_assignments 
+       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'storage'`,
+      [routerId]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const storage = result.rows[0];
+    const daysSinceStored = Math.floor(
+      (Date.now() - new Date(storage.installed_at).getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    return {
+      ...storage,
+      daysSinceStored
+    };
+
+  } catch (error) {
+    logger.error('Error getting current storage:', error);
+    throw error;
+  }
+}
+
+/**
  * Get property assignment history for a router
  * @param {string} routerId - Router ID
  * @returns {Promise<Object>} History with current and past assignments
@@ -327,10 +537,9 @@ async function getPropertyHistory(routerId) {
       const durationMs = removedAt - installedAt;
       const durationDays = Math.floor(durationMs / (1000 * 60 * 60 * 24));
 
-      return {
+      const baseRecord = {
         id: assignment.id,
-        propertyTaskId: assignment.property_clickup_task_id,
-        propertyName: assignment.property_name,
+        assignmentType: assignment.assignment_type,
         installedAt: assignment.installed_at,
         removedAt: assignment.removed_at,
         durationDays,
@@ -339,16 +548,34 @@ async function getPropertyHistory(routerId) {
         notes: assignment.notes,
         current: assignment.removed_at === null
       };
+
+      if (assignment.assignment_type === 'property') {
+        return {
+          ...baseRecord,
+          propertyTaskId: assignment.property_clickup_task_id,
+          propertyName: assignment.property_name
+        };
+      } else {
+        return {
+          ...baseRecord,
+          storedWithUserId: assignment.stored_with_user_id,
+          storedWithUsername: assignment.stored_with_username
+        };
+      }
     });
 
-    const currentProperty = assignments.find(a => a.current) || null;
-    const totalDaysDeployed = assignments.reduce((sum, a) => sum + a.durationDays, 0);
+    const currentProperty = assignments.find(a => a.current && a.assignmentType === 'property') || null;
+    const currentStorage = assignments.find(a => a.current && a.assignmentType === 'storage') || null;
+    const totalDaysDeployed = assignments
+      .filter(a => a.assignmentType === 'property')
+      .reduce((sum, a) => sum + a.durationDays, 0);
 
     return {
       routerId,
       currentProperty,
+      currentStorage,
       history: assignments,
-      totalProperties: assignments.length,
+      totalProperties: assignments.filter(a => a.assignmentType === 'property').length,
       totalDaysDeployed
     };
 
@@ -377,6 +604,7 @@ async function getRoutersAtProperty(propertyTaskId) {
        JOIN routers r ON r.router_id = rpa.router_id
        WHERE rpa.property_clickup_task_id = $1 
          AND rpa.removed_at IS NULL
+         AND rpa.assignment_type = 'property'
        ORDER BY rpa.installed_at DESC`,
       [propertyTaskId]
     );
@@ -418,6 +646,7 @@ async function getAllInstalledRouters() {
       FROM router_property_assignments rpa
       JOIN routers r ON r.router_id = rpa.router_id
       WHERE rpa.removed_at IS NULL
+        AND rpa.assignment_type = 'property'
       ORDER BY rpa.installed_at DESC
     `);
 
@@ -491,10 +720,13 @@ async function deleteAssignment(assignmentId) {
 }
 
 module.exports = {
+  storeRouterWith,
+  clearStoredWith,
   assignRouterToProperty,
   removeRouterFromProperty,
   moveRouterToProperty,
   getCurrentProperty,
+  getCurrentStorage,
   getPropertyHistory,
   getRoutersAtProperty,
   getAllInstalledRouters,

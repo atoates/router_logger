@@ -37,6 +37,33 @@ router.get('/:routerId/current', async (req, res) => {
 });
 
 /**
+ * GET /api/router-properties/:routerId/current-storage
+ * Get current storage status for a router
+ */
+router.get('/:routerId/current-storage', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const currentStorage = await propertyService.getCurrentStorage(routerId);
+
+    if (!currentStorage) {
+      return res.json({ 
+        stored: false,
+        routerId 
+      });
+    }
+
+    res.json({
+      stored: true,
+      ...currentStorage
+    });
+
+  } catch (error) {
+    logger.error('Error getting current storage:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/router-properties/:routerId/history
  * Get property assignment history for a router
  */

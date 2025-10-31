@@ -10,6 +10,7 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [currentProperty, setCurrentProperty] = useState(null);
+  const [currentStorage, setCurrentStorage] = useState(null);
   const [propertyHistory, setPropertyHistory] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
@@ -68,6 +69,21 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
           });
         } else {
           setCurrentProperty(null);
+        }
+
+        // Load current storage
+        const storageRes = await fetch(`${API_BASE}/api/router-properties/${routerId}/current-storage`);
+        const storageData = await storageRes.json();
+        
+        if (storageData.stored) {
+          setCurrentStorage({
+            storedWithUserId: storageData.stored_with_user_id,
+            storedWithUsername: storageData.stored_with_username,
+            storedAt: storageData.installed_at,
+            daysSinceStored: storageData.daysSinceStored
+          });
+        } else {
+          setCurrentStorage(null);
         }
 
         // Load property history
@@ -312,34 +328,91 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
 
     setLoading(true);
     try {
-      console.log('Updating assignees for task:', router.clickup_task_id);
+      console.log('Storing router with user');
       console.log('Selected assignees:', selectedAssignees);
       
-      const res = await fetch(`${API_BASE}/api/clickup/task/${router.clickup_task_id}`, {
-        method: 'PUT',
+      // Get the selected user details
+      const selectedUser = availableUsers.find(u => {
+        const userId = u?.user?.id || u?.id;
+        return String(userId) === String(selectedAssignees[0]);
+      });
+
+      if (!selectedUser) {
+        toast.error('Selected user not found');
+        return;
+      }
+
+      const userId = selectedUser?.user?.id || selectedUser?.id;
+      const username = selectedUser?.user?.username || selectedUser?.username || 
+                       selectedUser?.user?.email || selectedUser?.email || 'Unknown';
+
+      console.log('Storing with user:', { userId, username });
+
+      // Call backend to create storage record and update ClickUp assignees
+      const res = await fetch(`${API_BASE}/api/routers/${routerId}/out-of-service`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          assignees: {
-            add: selectedAssignees.map(u => parseInt(u)),
-            rem: [] // For now, we'll add assignees only. Could extend to remove specific ones
-          }
+          stored_with_user_id: String(userId),
+          stored_with_username: username,
+          notes: null
         })
       });
 
       const data = await res.json();
-      console.log('Update response:', data);
+      console.log('Storage response:', data);
 
       if (res.ok) {
-        toast.success(`Assignees updated successfully`);
+        // Also update ClickUp task assignees
+        try {
+          const clickupRes = await fetch(`${API_BASE}/api/clickup/task/${router.clickup_task_id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              assignees: {
+                add: [parseInt(userId)],
+                rem: []
+              }
+            })
+          });
+
+          if (!clickupRes.ok) {
+            console.warn('ClickUp assignee update failed, but storage record created');
+          }
+        } catch (clickupError) {
+          console.warn('ClickUp assignee update error:', clickupError);
+        }
+
+        toast.success(`Router stored with ${username}`);
         setShowStoredWithModal(false);
         setSelectedAssignees([]);
+        
+        // Reload property history to show the storage event
+        const historyRes = await fetch(`${API_BASE}/api/router-properties/${routerId}/history`);
+        const historyData = await historyRes.json();
+        setPropertyHistory(Array.isArray(historyData.history) ? historyData.history : []);
+        
+        // Reload current storage
+        const storageRes = await fetch(`${API_BASE}/api/router-properties/${routerId}/current-storage`);
+        const storageData = await storageRes.json();
+        if (storageData.stored) {
+          setCurrentStorage({
+            storedWithUserId: storageData.stored_with_user_id,
+            storedWithUsername: storageData.stored_with_username,
+            storedAt: storageData.installed_at,
+            daysSinceStored: storageData.daysSinceStored
+          });
+        }
+        
+        // Clear current property since router is now stored
+        setCurrentProperty(null);
       } else {
-        console.error('Update failed:', data);
-        toast.error(data.error || 'Failed to update assignees');
+        console.error('Storage failed:', data);
+        toast.error(data.error || 'Failed to store router');
       }
     } catch (error) {
-      console.error('Error updating assignees:', error);
-      toast.error('Failed to update assignees: ' + error.message);
+      console.error('Error storing router:', error);
+      toast.error('Failed to store router: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -362,8 +435,16 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
       if (res.ok && data.success) {
         toast.success('Router returned to service');
         
+        // Reload property history to show the cleared storage event
+        const historyRes = await fetch(`${API_BASE}/api/router-properties/${routerId}/history`);
+        const historyData = await historyRes.json();
+        setPropertyHistory(Array.isArray(historyData.history) ? historyData.history : []);
+        
+        // Clear current storage
+        setCurrentStorage(null);
+        
         // Optionally reload router data
-        if (onAssigned) onAssigned(data.router);
+        if (onAssigned) onAssigned(data.cleared);
       } else {
         toast.error(data.error || 'Failed to return router to service');
       }
@@ -423,7 +504,24 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
       <div className="property-search-widget psw-current-card">
         <div className="psw-section-label">Property Assignment</div>
         
-        {currentProperty ? (
+        {currentStorage ? (
+          <div className="psw-current-content" style={{ borderLeft: '4px solid #f59e0b' }}>
+            <div className="psw-property-name">🔧 Stored with {currentStorage.storedWithUsername}</div>
+            <div className="psw-property-meta">
+              Stored {new Date(currentStorage.storedAt).toLocaleDateString()}
+              {currentStorage.daysSinceStored !== undefined && ` • ${currentStorage.daysSinceStored}d ago`}
+            </div>
+            <div className="psw-button-group">
+              <button 
+                onClick={handleReturnToService}
+                disabled={loading}
+                className="psw-btn primary"
+              >
+                Return to Service
+              </button>
+            </div>
+          </div>
+        ) : currentProperty ? (
           <div className="psw-current-content">
             <div className="psw-property-name">{currentProperty.name}</div>
             <div className="psw-property-meta">
@@ -475,51 +573,95 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
           <div className="psw-history-list-scroll">
             {propertyHistory.map((item) => (
               <div key={item.id} className="psw-history-item">
-                <div className="psw-history-property">
-                  {workspaceId && item.propertyTaskId ? (
-                    <a 
-                      href={`https://app.clickup.com/${workspaceId}/v/li/${item.propertyTaskId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="psw-history-link"
-                    >
-                      <strong>{item.propertyName || 'Unknown Property'}</strong>
-                    </a>
-                  ) : (
-                    <strong>{item.propertyName || 'Unknown Property'}</strong>
-                  )}
-                  {item.current ? (
-                    <span className="psw-history-status current">CURRENT</span>
-                  ) : (
-                    <span className="psw-history-status removed">
-                      {item.durationDays}d
-                    </span>
-                  )}
-                  <button 
-                    onClick={() => deleteHistoryItem(item.id)}
-                    className="psw-history-delete"
-                    title="Delete history entry"
-                    disabled={loading}
-                  >
-                    ×
-                  </button>
-                </div>
-                <div className="psw-history-dates">
-                  {item.installedAt && (
-                    <span>📥 {new Date(item.installedAt).toLocaleDateString()}</span>
-                  )}
-                  {item.removedAt && (
-                    <span>📤 {new Date(item.removedAt).toLocaleDateString()}</span>
-                  )}
-                </div>
-                {(item.installedBy || item.removedBy) && (
-                  <div className="psw-history-users">
-                    {item.installedBy && <span>Assigned via {item.installedBy}</span>}
-                    {item.removedBy && <span>Removed via {item.removedBy}</span>}
-                  </div>
-                )}
-                {item.notes && (
-                  <div className="psw-history-notes">{item.notes}</div>
+                {item.assignmentType === 'storage' ? (
+                  // Storage event display
+                  <>
+                    <div className="psw-history-property">
+                      <strong>🔧 Stored with {item.storedWithUsername || 'Unknown'}</strong>
+                      {item.current ? (
+                        <span className="psw-history-status current">CURRENT</span>
+                      ) : (
+                        <span className="psw-history-status removed">
+                          {item.durationDays}d
+                        </span>
+                      )}
+                      <button 
+                        onClick={() => deleteHistoryItem(item.id)}
+                        className="psw-history-delete"
+                        title="Delete history entry"
+                        disabled={loading}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="psw-history-dates">
+                      {item.installedAt && (
+                        <span>🔧 {new Date(item.installedAt).toLocaleDateString()}</span>
+                      )}
+                      {item.removedAt && (
+                        <span>✅ {new Date(item.removedAt).toLocaleDateString()}</span>
+                      )}
+                    </div>
+                    {(item.installedBy || item.removedBy) && (
+                      <div className="psw-history-users">
+                        {item.installedBy && <span>Stored by {item.installedBy}</span>}
+                        {item.removedBy && <span>Cleared by {item.removedBy}</span>}
+                      </div>
+                    )}
+                    {item.notes && (
+                      <div className="psw-history-notes">{item.notes}</div>
+                    )}
+                  </>
+                ) : (
+                  // Property assignment display
+                  <>
+                    <div className="psw-history-property">
+                      {workspaceId && item.propertyTaskId ? (
+                        <a 
+                          href={`https://app.clickup.com/${workspaceId}/v/li/${item.propertyTaskId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="psw-history-link"
+                        >
+                          <strong>{item.propertyName || 'Unknown Property'}</strong>
+                        </a>
+                      ) : (
+                        <strong>{item.propertyName || 'Unknown Property'}</strong>
+                      )}
+                      {item.current ? (
+                        <span className="psw-history-status current">CURRENT</span>
+                      ) : (
+                        <span className="psw-history-status removed">
+                          {item.durationDays}d
+                        </span>
+                      )}
+                      <button 
+                        onClick={() => deleteHistoryItem(item.id)}
+                        className="psw-history-delete"
+                        title="Delete history entry"
+                        disabled={loading}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="psw-history-dates">
+                      {item.installedAt && (
+                        <span>📥 {new Date(item.installedAt).toLocaleDateString()}</span>
+                      )}
+                      {item.removedAt && (
+                        <span>📤 {new Date(item.removedAt).toLocaleDateString()}</span>
+                      )}
+                    </div>
+                    {(item.installedBy || item.removedBy) && (
+                      <div className="psw-history-users">
+                        {item.installedBy && <span>Assigned via {item.installedBy}</span>}
+                        {item.removedBy && <span>Removed via {item.removedBy}</span>}
+                      </div>
+                    )}
+                    {item.notes && (
+                      <div className="psw-history-notes">{item.notes}</div>
+                    )}
+                  </>
                 )}
               </div>
             ))}

@@ -20,6 +20,7 @@ const {
   logInspection,
   getInspectionHistory
 } = require('../models/router');
+const { storeRouterWith, clearStoredWith } = require('../services/propertyService');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger, pool } = require('../config/database');
 
@@ -333,68 +334,55 @@ router.get('/out-of-service', async (req, res) => {
   }
 });
 
-// POST mark router as out of service
+// POST mark router as out of service (stored with someone)
 router.post('/routers/:routerId/out-of-service', async (req, res) => {
   try {
     const { routerId } = req.params;
-    const { stored_with, notes } = req.body;
+    const { stored_with_user_id, stored_with_username, notes } = req.body;
     
-    if (!stored_with || !['Jordan', 'Ali', 'Karl'].includes(stored_with)) {
+    if (!stored_with_user_id || !stored_with_username) {
       return res.status(400).json({ 
-        error: 'stored_with must be one of: Jordan, Ali, Karl' 
+        error: 'stored_with_user_id and stored_with_username are required' 
       });
     }
     
-    const result = await pool.query(`
-      UPDATE routers
-      SET 
-        service_status = 'out-of-service',
-        stored_with = $1,
-        out_of_service_date = CURRENT_TIMESTAMP,
-        out_of_service_reason = NULL,
-        out_of_service_notes = $2
-      WHERE router_id = $3
-      RETURNING *
-    `, [stored_with, notes, routerId]);
+    // Use property service to create storage record
+    const storageRecord = await storeRouterWith({
+      routerId,
+      storedWithUserId: stored_with_user_id,
+      storedWithUsername: stored_with_username,
+      storedAt: new Date(),
+      storedBy: null, // TODO: Add auth to track who made the change
+      notes
+    });
     
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Router not found' });
-    }
-    
-    logger.info(`Router ${routerId} marked as out-of-service (stored with ${stored_with})`);
-    res.json({ success: true, router: result.rows[0] });
+    logger.info(`Router ${routerId} stored with ${stored_with_username}`);
+    res.json({ success: true, storage: storageRecord });
   } catch (error) {
     logger.error('Error marking router as out-of-service:', error);
-    res.status(500).json({ error: 'Failed to update router status' });
+    res.status(500).json({ error: error.message || 'Failed to update router status' });
   }
 });
 
-// POST return router to service
+// POST return router to service (clear storage)
 router.post('/routers/:routerId/return-to-service', async (req, res) => {
   try {
     const { routerId } = req.params;
+    const { notes } = req.body;
     
-    const result = await pool.query(`
-      UPDATE routers
-      SET 
-        service_status = 'in-service',
-        stored_with = NULL,
-        out_of_service_date = NULL,
-        out_of_service_reason = NULL,
-        out_of_service_notes = NULL
-      WHERE router_id = $1
-      RETURNING *
-    `, [routerId]);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Router not found' });
-    }
+    // Use property service to clear storage
+    const clearedRecord = await clearStoredWith({
+      routerId,
+      clearedAt: new Date(),
+      clearedBy: null, // TODO: Add auth to track who made the change
+      notes
+    });
     
     logger.info(`Router ${routerId} returned to service`);
-    res.json({ success: true, router: result.rows[0] });
+    res.json({ success: true, cleared: clearedRecord });
   } catch (error) {
     logger.error('Error returning router to service:', error);
-    res.status(500).json({ error: 'Failed to update router status' });
+    res.status(500).json({ error: error.message || 'Failed to update router status' });
   }
 });
 
