@@ -75,7 +75,7 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
         // Load property history
         const historyRes = await fetch(`${API_BASE}/api/router-properties/${routerId}/history`);
         const historyData = await historyRes.json();
-        setPropertyHistory(Array.isArray(historyData) ? historyData : []);
+        setPropertyHistory(Array.isArray(historyData.history) ? historyData.history : []);
       } catch (error) {
         console.error('Error loading property data:', error);
       }
@@ -149,7 +149,7 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
         // Reload history to show the old property
         const historyRes = await fetch(`${API_BASE}/api/router-properties/${routerId}/history`);
         const historyData = await historyRes.json();
-        setPropertyHistory(Array.isArray(historyData) ? historyData : []);
+        setPropertyHistory(Array.isArray(historyData.history) ? historyData.history : []);
         
         setSearchQuery('');
         setShowDropdown(false);
@@ -198,7 +198,7 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
         // Reload history in case there was previous history
         const historyRes = await fetch(`${API_BASE}/api/router-properties/${routerId}/history`);
         const historyData = await historyRes.json();
-        setPropertyHistory(Array.isArray(historyData) ? historyData : []);
+        setPropertyHistory(Array.isArray(historyData.history) ? historyData.history : []);
         
         setSearchQuery('');
         setShowDropdown(false);
@@ -241,7 +241,7 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
         // Reload history to show the removed property
         const historyRes = await fetch(`${API_BASE}/api/router-properties/${routerId}/history`);
         const historyData = await historyRes.json();
-        setPropertyHistory(Array.isArray(historyData) ? historyData : []);
+        setPropertyHistory(Array.isArray(historyData.history) ? historyData.history : []);
         
         toast.success('Router removed from property');
       } else {
