@@ -354,6 +354,7 @@ router.post('/routers/:routerId/out-of-service', async (req, res) => {
         service_status = 'out-of-service',
         stored_with = $1,
         out_of_service_date = CURRENT_TIMESTAMP,
+        out_of_service_reason = NULL,
         out_of_service_notes = $2
       WHERE router_id = $3
       RETURNING *
@@ -383,6 +384,7 @@ router.post('/routers/:routerId/return-to-service', async (req, res) => {
         service_status = 'in-service',
         stored_with = NULL,
         out_of_service_date = NULL,
+        out_of_service_reason = NULL,
         out_of_service_notes = NULL
       WHERE router_id = $1
       RETURNING *
