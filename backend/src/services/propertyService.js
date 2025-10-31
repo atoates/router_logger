@@ -70,14 +70,15 @@ async function storeRouterWith(storage) {
       // Migration hasn't run yet - use old stored_with column
       logger.warn('assignment_type column does not exist yet - using legacy stored_with column');
       
+      // Don't use stored_with column to avoid constraint violation
+      // Just update service_status and notes
       await client.query(
         `UPDATE routers 
-         SET stored_with = $1,
-             service_status = 'out-of-service',
-             out_of_service_date = $2,
-             out_of_service_notes = $3
-         WHERE router_id = $4`,
-        [storedWithUsername, storedAt, notes, routerId]
+         SET service_status = 'out-of-service',
+             out_of_service_date = $1,
+             out_of_service_notes = $2
+         WHERE router_id = $3`,
+        [storedAt, `Stored with ${storedWithUsername}. ${notes || ''}`.trim(), routerId]
       );
       
       await client.query('COMMIT');
