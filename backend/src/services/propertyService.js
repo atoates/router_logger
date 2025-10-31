@@ -360,7 +360,6 @@ async function getAllInstalledRouters() {
         r.name as router_name,
         r.imei,
         r.firmware_version,
-        r.current_status,
         r.last_seen
       FROM router_property_assignments rpa
       JOIN routers r ON r.router_id = rpa.router_id
