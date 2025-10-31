@@ -20,14 +20,6 @@ COMMENT ON COLUMN router_property_assignments.assignment_type IS 'Type of assign
 COMMENT ON COLUMN router_property_assignments.stored_with_user_id IS 'ClickUp user ID of person storing the router (for storage type)';
 COMMENT ON COLUMN router_property_assignments.stored_with_username IS 'Username of person storing the router (for storage type)';
 
--- Add check constraint: storage type must have stored_with fields, property type must have property fields
-ALTER TABLE router_property_assignments
-  ADD CONSTRAINT IF NOT EXISTS check_assignment_type_fields
-  CHECK (
-    (assignment_type = 'property' AND property_clickup_task_id IS NOT NULL AND stored_with_user_id IS NULL) OR
-    (assignment_type = 'storage' AND stored_with_user_id IS NOT NULL AND property_clickup_task_id IS NULL)
-  );
-
 -- Drop the old unique constraint that only allowed one active property assignment
 DROP INDEX IF EXISTS idx_unique_active_assignment;
 
