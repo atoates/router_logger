@@ -292,7 +292,6 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
           <div className="v3-metrics">
         <Metric label="Network Health" value={`${total ? Math.round(online/total*100) : 0}%`} sub={`${online}/${total} online`} color="#10b981" />
         <Metric label={`${mode==='rolling'?value+'h':'Last '+value+'d'} Data`} value={formatBytes(totalNow)} sub={<DeltaBadge current={totalNow} previous={totalPrev} />} color="#6366f1" />
-        <Metric label="Storage (est.)" value={storage ? formatBytes(storage.estimatedCurrentJsonBytes) : '—'} sub={storage ? `${fmtNum(storage.totalLogs)} records` : ''} color="#8b5cf6" />
         <Metric label="Top Router Share" value={`${top.length? Math.round((top[0].total_bytes||0)/Math.max(totalNow,1)*100):0}%`} sub={top.length? top[0].name: ''} color="#f59e0b" />
       </div>
 
