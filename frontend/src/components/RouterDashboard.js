@@ -246,8 +246,8 @@ export default function RouterDashboard({ router }) {
         </div>
       </div>
 
-      {/* ClickUp Task Widget and Property Search Widget side by side */}
-      <div className="widgets-row">
+      {/* Three column layout: ClickUp Task | Current Property | Property History */}
+      <div className="widgets-row-three">
         <ClickUpTaskWidget router={router} />
         <PropertySearchWidget router={router} onAssigned={() => {
           // Optionally reload data when property is assigned

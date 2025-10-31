@@ -12,7 +12,6 @@ export default function PropertySearchWidget({ router, onAssigned }) {
   const [currentProperty, setCurrentProperty] = useState(null);
   const [propertyHistory, setPropertyHistory] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [serviceForm, setServiceForm] = useState({
@@ -341,111 +340,114 @@ export default function PropertySearchWidget({ router, onAssigned }) {
 
   return (
     <>
-      <div className="property-search-widget">
-        {/* Compact Header Row */}
-        <div className="psw-compact-row">
-          <div className="psw-section-label">Property Assignment</div>
-          
-          {currentProperty ? (
-            <div className="psw-compact-current">
-              <span className="psw-compact-name">{currentProperty.name}</span>
-              <span className="psw-compact-meta">
-                Installed {new Date(currentProperty.installedAt).toLocaleDateString()}
-                {currentProperty.daysSinceInstalled !== undefined && ` (${currentProperty.daysSinceInstalled}d ago)`}
-              </span>
-              <div className="psw-compact-actions">
-                <a 
-                  href={`https://app.clickup.com/${workspaceId}/v/li/${currentProperty.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="psw-compact-link"
-                >
-                  View in ClickUp ↗
-                </a>
-                <button 
-                  onClick={handleOpenSearchModal}
-                  className="psw-compact-btn"
-                  disabled={loading}
-                >
-                  Move Property
-                </button>
-                <button 
-                  onClick={removeProperty}
-                  disabled={loading}
-                  className="psw-compact-btn danger"
-                >
-                  Remove
-                </button>
-                <button 
-                  onClick={() => setShowServiceModal(true)}
-                  className="psw-compact-btn warning"
-                  disabled={loading}
-                  title="Mark router as out of service"
-                >
-                  Out of Service
-                </button>
-              </div>
+      {/* Current Property Card (Middle Column) */}
+      <div className="property-search-widget psw-current-card">
+        <div className="psw-section-label">Property Assignment</div>
+        
+        {currentProperty ? (
+          <div className="psw-current-content">
+            <div className="psw-property-name">{currentProperty.name}</div>
+            <div className="psw-property-meta">
+              Installed {new Date(currentProperty.installedAt).toLocaleDateString()}
+              {currentProperty.daysSinceInstalled !== undefined && ` • ${currentProperty.daysSinceInstalled}d ago`}
             </div>
-          ) : (
-            <div className="psw-compact-empty">
-              <span>No property assigned</span>
+            <a 
+              href={`https://app.clickup.com/${workspaceId}/v/li/${currentProperty.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="psw-clickup-link"
+            >
+              View in ClickUp ↗
+            </a>
+            <div className="psw-button-group">
               <button 
                 onClick={handleOpenSearchModal}
-                className="psw-compact-btn primary"
-                disabled={loading || !workspaceId}
+                className="psw-btn"
+                disabled={loading}
               >
-                Assign Property
+                Move Property
+              </button>
+              <button 
+                onClick={removeProperty}
+                disabled={loading}
+                className="psw-btn danger"
+              >
+                Remove
               </button>
               <button 
                 onClick={() => setShowServiceModal(true)}
-                className="psw-compact-btn warning"
+                className="psw-btn warning"
                 disabled={loading}
                 title="Mark router as out of service"
               >
                 Out of Service
               </button>
             </div>
-          )}
-        </div>
-
-        {/* Property History - Full Width Below */}
-        {propertyHistory.length > 0 && (
-          <div className="psw-history">
-            <div className="psw-history-header" onClick={() => setShowHistory(!showHistory)}>
-              <span>📜 Property History ({propertyHistory.length})</span>
-              <span className="psw-history-toggle">{showHistory ? '▼' : '▶'}</span>
+          </div>
+        ) : (
+          <div className="psw-empty-state">
+            <div className="psw-empty-text">No property assigned</div>
+            <div className="psw-button-group">
+              <button 
+                onClick={handleOpenSearchModal}
+                className="psw-btn primary"
+                disabled={loading || !workspaceId}
+              >
+                Assign Property
+              </button>
+              <button 
+                onClick={() => setShowServiceModal(true)}
+                className="psw-btn warning"
+                disabled={loading}
+                title="Mark router as out of service"
+              >
+                Out of Service
+              </button>
             </div>
-            {showHistory && (
-              <div className="psw-history-list">
-                {propertyHistory.map((item) => (
-                  <div key={item.id} className="psw-history-item">
-                    <div className="psw-history-property">
-                      <strong>{item.property_name}</strong>
-                      {item.removed_at ? (
-                        <span className="psw-history-status removed">Removed</span>
-                      ) : (
-                        <span className="psw-history-status current">Current</span>
-                      )}
-                    </div>
-                    <div className="psw-history-dates">
-                      <span>📥 Installed: {new Date(item.installed_at).toLocaleDateString()}</span>
-                      {item.removed_at && (
-                        <span>📤 Removed: {new Date(item.removed_at).toLocaleDateString()}</span>
-                      )}
-                    </div>
-                    {(item.installed_by || item.removed_by) && (
-                      <div className="psw-history-users">
-                        {item.installed_by && <span>Installed by: {item.installed_by}</span>}
-                        {item.removed_by && <span>Removed by: {item.removed_by}</span>}
-                      </div>
-                    )}
-                    {item.notes && (
-                      <div className="psw-history-notes">{item.notes}</div>
-                    )}
+          </div>
+        )}
+      </div>
+
+      {/* Property History Card (Right Column) */}
+      <div className="property-search-widget psw-history-card">
+        <div className="psw-section-label">
+          Property History
+          <span className="psw-history-count">{propertyHistory.length}</span>
+        </div>
+        
+        {propertyHistory.length > 0 ? (
+          <div className="psw-history-list-scroll">
+            {propertyHistory.map((item) => (
+              <div key={item.id} className="psw-history-item">
+                <div className="psw-history-property">
+                  <strong>{item.property_name}</strong>
+                  {item.removed_at ? (
+                    <span className="psw-history-status removed">Removed</span>
+                  ) : (
+                    <span className="psw-history-status current">Current</span>
+                  )}
+                </div>
+                <div className="psw-history-dates">
+                  <span>📥 {new Date(item.installed_at).toLocaleDateString()}</span>
+                  {item.removed_at && (
+                    <span>📤 {new Date(item.removed_at).toLocaleDateString()}</span>
+                  )}
+                </div>
+                {(item.installed_by || item.removed_by) && (
+                  <div className="psw-history-users">
+                    {item.installed_by && <span>By: {item.installed_by}</span>}
+                    {item.removed_by && <span>Removed by: {item.removed_by}</span>}
                   </div>
-                ))}
+                )}
+                {item.notes && (
+                  <div className="psw-history-notes">{item.notes}</div>
+                )}
               </div>
-            )}
+            ))}
+          </div>
+        ) : (
+          <div className="psw-empty-history">
+            No property history
           </div>
         )}
       </div>
