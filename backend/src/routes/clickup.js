@@ -497,15 +497,49 @@ router.get('/search-tasks/:workspaceId', async (req, res) => {
 router.get('/debug/space-lists/:spaceId', async (req, res) => {
   try {
     const { spaceId } = req.params;
-    const lists = await clickupClient.getLists(spaceId, 'default');
+    const client = await clickupClient.getAuthorizedClient('default');
+    
+    // Get space details
+    const spaceResponse = await client.get(`/space/${spaceId}`);
+    const space = spaceResponse.data;
+    
+    // Get lists (folderless)
+    const listsResponse = await client.get(`/space/${spaceId}/list`, {
+      params: { archived: false }
+    });
+    const lists = listsResponse.data.lists || [];
+    
+    // Get folders
+    const foldersResponse = await client.get(`/space/${spaceId}/folder`, {
+      params: { archived: false }
+    });
+    const folders = foldersResponse.data.folders || [];
+    
+    // Get lists from each folder
+    const folderLists = [];
+    for (const folder of folders) {
+      const folderListsResponse = await client.get(`/folder/${folder.id}/list`, {
+        params: { archived: false }
+      });
+      const fLists = folderListsResponse.data.lists || [];
+      folderLists.push({
+        folder: { id: folder.id, name: folder.name },
+        lists: fLists.map(l => ({ id: l.id, name: l.name, task_count: l.task_count }))
+      });
+    }
     
     res.json({ 
-      spaceId,
-      listCount: lists.length,
-      lists: lists.map(l => ({ id: l.id, name: l.name, task_count: l.task_count }))
+      space: { id: space.id, name: space.name },
+      folderlessLists: lists.map(l => ({ id: l.id, name: l.name, task_count: l.task_count })),
+      folders: folderLists,
+      summary: {
+        folderlessListCount: lists.length,
+        folderCount: folders.length,
+        totalListsInFolders: folderLists.reduce((sum, f) => sum + f.lists.length, 0)
+      }
     });
   } catch (error) {
-    logger.error('Error getting space lists:', error);
+    logger.error('Error getting space structure:', error);
     res.status(500).json({ error: error.message, details: error.response?.data });
   }
 });
