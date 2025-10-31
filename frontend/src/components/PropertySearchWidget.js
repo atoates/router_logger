@@ -194,6 +194,12 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
           installedBy: data.assignment.installed_by,
           daysSinceInstalled: 0
         });
+        
+        // Reload history in case there was previous history
+        const historyRes = await fetch(`${API_BASE}/api/router-properties/${routerId}/history`);
+        const historyData = await historyRes.json();
+        setPropertyHistory(Array.isArray(historyData) ? historyData : []);
+        
         setSearchQuery('');
         setShowDropdown(false);
         toast.success(`Router assigned to ${data.assignment.property_name}`);
@@ -231,6 +237,12 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
 
       if (res.ok && data.success) {
         setCurrentProperty(null);
+        
+        // Reload history to show the removed property
+        const historyRes = await fetch(`${API_BASE}/api/router-properties/${routerId}/history`);
+        const historyData = await historyRes.json();
+        setPropertyHistory(Array.isArray(historyData) ? historyData : []);
+        
         toast.success('Router removed from property');
       } else {
         toast.error(data.error || 'Failed to remove property');
