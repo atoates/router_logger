@@ -304,11 +304,17 @@ class ClickUpClient {
       
       // Apply search filter if provided and exclude router tasks
       let filteredTasks = allTasks;
+      
+      // Log sample of list names to debug filtering
+      const uniqueListNames = [...new Set(allTasks.map(t => t.list_name))];
+      logger.info('Lists found in space', { spaceId, listNames: uniqueListNames });
+      
       if (searchQuery) {
         const searchLower = searchQuery.toLowerCase();
         filteredTasks = allTasks.filter(task => {
           // Exclude tasks from "Routers" list
           if (task.list_name?.toLowerCase() === 'routers') {
+            logger.debug('Excluding router task', { taskName: task.name, listName: task.list_name });
             return false;
           }
           
@@ -317,16 +323,21 @@ class ClickUpClient {
         });
       } else {
         // Even without search query, exclude router tasks
-        filteredTasks = allTasks.filter(task => 
-          task.list_name?.toLowerCase() !== 'routers'
-        );
+        filteredTasks = allTasks.filter(task => {
+          if (task.list_name?.toLowerCase() === 'routers') {
+            logger.debug('Excluding router task (no search)', { taskName: task.name, listName: task.list_name });
+            return false;
+          }
+          return true;
+        });
       }
       
       logger.info('Found tasks in space', { 
         spaceId, 
         total: allTasks.length, 
         filtered: filteredTasks.length,
-        searchQuery 
+        searchQuery,
+        sampleTasks: filteredTasks.slice(0, 3).map(t => ({ name: t.name, list: t.list_name }))
       });
       
       return filteredTasks;
