@@ -80,35 +80,9 @@ function AppContent() {
     return (
       <div className={`app ${darkMode ? 'dark-mode' : ''}`}>
         <div className="container">
-          <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', gap:16 }}>
-            <div>
-              <h1>🌐 RUT200 Router Logger Dashboard</h1>
-              <p>Monitor and analyze your RUT200 router network in real-time</p>
-            </div>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <img src={process.env.PUBLIC_URL + '/Logo.png'} alt="Logo" style={{ height: 28, width: 'auto', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.15)' }} />
-              <div style={{ display: 'flex', gap: 8, background: 'rgba(255,255,255,0.2)', padding: 4, borderRadius: 8 }}>
-                <button 
-                  className={`btn ${dashboardVersion === 'v1' ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setDashboardVersion('v1')}
-                  style={{ fontSize: 12 }}
-                >
-                  Router Log
-                </button>
-                <button 
-                  className={`btn ${dashboardVersion === 'v3' ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => {
-                    setDashboardVersion('v3');
-                    navigate('/');
-                  }}
-                  style={{ fontSize: 12 }}
-                >
-                  Dashboard
-                </button>
-              </div>
-              <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
-              <RMSAuthButton variant="header" />
-            </div>
+          <div className="header" style={{ display: 'flex', justifyContent: 'flex-end', alignItems:'center', gap:16, padding: '16px 0' }}>
+            <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
+            <RMSAuthButton variant="header" />
           </div>
           <ErrorBoundary>
             <DashboardV3 onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
@@ -123,35 +97,9 @@ function AppContent() {
   return (
     <div className={`app ${darkMode ? 'dark-mode' : ''}`}>
       <div className="container">
-        <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', gap:16 }}>
-          <div>
-            <h1>🌐 RUT200 Router Logger Dashboard</h1>
-            <p>Monitor and analyze your RUT200 router network in real-time</p>
-          </div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <img src={process.env.PUBLIC_URL + '/Logo.png'} alt="Logo" style={{ height: 28, width: 'auto', borderRadius: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.15)' }} />
-            <div style={{ display: 'flex', gap: 8, background: 'rgba(255,255,255,0.2)', padding: 4, borderRadius: 8 }}>
-              <button 
-                className={`btn ${dashboardVersion === 'v1' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setDashboardVersion('v1')}
-                style={{ fontSize: 12 }}
-              >
-                Router Log
-              </button>
-              <button 
-                className={`btn ${dashboardVersion === 'v3' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => {
-                  setDashboardVersion('v3');
-                  navigate('/');
-                }}
-                style={{ fontSize: 12 }}
-              >
-                Dashboard
-              </button>
-            </div>
-            <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
-            <RMSAuthButton variant="header" />
-          </div>
+        <div className="header" style={{ display: 'flex', justifyContent: 'flex-end', alignItems:'center', gap:16, padding: '16px 0' }}>
+          <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
+          <RMSAuthButton variant="header" />
         </div>
 
         {/* Top-level network status removed as requested */}
