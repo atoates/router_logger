@@ -313,7 +313,16 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke={dark?'#334155':'#e5e7eb'} />
-                  <XAxis dataKey="date" tickFormatter={(t)=>{ const d=new Date(t); return mode==='rolling'? d.getHours()+':00' : (t||'').slice(5,10); }} tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} />
+                  <XAxis 
+                    dataKey="date" 
+                    tickFormatter={(t)=> { 
+                      const d = new Date(t); 
+                      return mode === 'rolling' 
+                        ? d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+                        : (t || '').slice(5, 10); 
+                    }} 
+                    tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} 
+                  />
                   <YAxis domain={[0, Math.ceil(yMax * 1.1)]} tickFormatter={(v)=> formatBytes(v)} tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} />
                   <Tooltip formatter={(v)=>formatBytes(v)} labelFormatter={(t)=> new Date(t).toLocaleString()} />
                   <Legend />
