@@ -866,7 +866,7 @@ module.exports.getOperatorDistributionRolling = getOperatorDistributionRolling;
  */
 async function getDatabaseSizeStats() {
   try {
-    const rels = ['routers', 'router_logs'];
+    // Get all user tables, not just specific ones
     const sizesQuery = `
       SELECT
         c.relname AS name,
@@ -876,15 +876,19 @@ async function getDatabaseSizeStats() {
         pg_total_relation_size(c.oid) AS total_bytes
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname = ANY($1::text[])
+      WHERE n.nspname = 'public' AND c.relkind = 'r'
       ORDER BY total_bytes DESC;`;
-    const sizesRes = await pool.query(sizesQuery, [rels]);
+    const sizesRes = await pool.query(sizesQuery);
 
-    const countsRes = await pool.query(`
-      SELECT 'routers' AS name, COUNT(*)::bigint AS row_count FROM routers
-      UNION ALL
-      SELECT 'router_logs' AS name, COUNT(*)::bigint AS row_count FROM router_logs;
-    `);
+    // Get row counts for all tables dynamically
+    const tableNames = (sizesRes.rows || []).map(r => r.name);
+    const countQueries = tableNames.map(name => 
+      `SELECT '${name}' AS name, COUNT(*)::bigint AS row_count FROM ${name}`
+    ).join(' UNION ALL ');
+    
+    const countsRes = countQueries 
+      ? await pool.query(countQueries)
+      : { rows: [] };
 
     const dbSizeRes = await pool.query(`SELECT pg_database_size(current_database()) AS db_bytes;`);
 

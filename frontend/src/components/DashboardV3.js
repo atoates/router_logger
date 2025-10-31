@@ -652,7 +652,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
                   <span style={{ fontSize:13, color:'#64748b' }}>Total Calls (period)</span>
-                  <strong>{fmtNum(rmsUsage.apiUsage?.callCount || 0)}</strong>
+                  <strong>{fmtNum(rmsUsage.apiUsage?.total || 0)}</strong>
                 </div>
                 <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
                   <span style={{ fontSize:13, color:'#64748b' }}>Daily Average</span>
