@@ -36,7 +36,7 @@ async function assignRouterToProperty(assignment, validateClickUp = true) {
     routerId,
     propertyTaskId,
     propertyName,
-    installedAt = null, // Will use ClickUp task start_date if not provided
+    installedAt = null, // Will use ClickUp "Date installed" custom field if not provided
     installedBy = null,
     notes = null
   } = assignment;
@@ -44,7 +44,7 @@ async function assignRouterToProperty(assignment, validateClickUp = true) {
   const client = await pool.connect();
   
   try {
-    // Get router's ClickUp task to fetch the start_date
+    // Get router's ClickUp task to fetch the "Date installed" custom field
     const routerResult = await client.query(
       'SELECT clickup_task_id FROM routers WHERE router_id = $1',
       [routerId]
@@ -59,29 +59,36 @@ async function assignRouterToProperty(assignment, validateClickUp = true) {
       throw new Error(`Router ${routerId} does not have a linked ClickUp task`);
     }
 
-    // Fetch the router's ClickUp task to get the start_date
+    // Fetch the router's ClickUp task to get the "Date installed" custom field
     let actualInstalledAt = installedAt;
-    if (!installedAt) {
+    if (!actualInstalledAt) {
       try {
         const clickupTask = await clickupClient.getTask(routerTaskId);
-        if (clickupTask.start_date) {
-          // ClickUp returns timestamps in milliseconds
-          actualInstalledAt = new Date(parseInt(clickupTask.start_date));
-          logger.info('Using ClickUp task start_date as installed_at', { 
+        
+        // Look for "Date installed" custom field
+        const dateInstalledField = clickupTask.custom_fields?.find(
+          field => field.name === 'Date installed' || field.name === 'date installed'
+        );
+        
+        if (dateInstalledField && dateInstalledField.value) {
+          // ClickUp date fields return timestamps in milliseconds
+          actualInstalledAt = new Date(parseInt(dateInstalledField.value));
+          logger.info('Using ClickUp "Date installed" custom field as installed_at', { 
             routerId, 
             taskId: routerTaskId,
-            startDate: actualInstalledAt 
+            dateInstalled: actualInstalledAt 
           });
         } else {
-          // No start date in ClickUp, use current date
+          // No "Date installed" field, use current date
           actualInstalledAt = new Date();
-          logger.warn('ClickUp task has no start_date, using current date', { 
+          logger.warn('ClickUp task has no "Date installed" custom field, using current date', { 
             routerId, 
-            taskId: routerTaskId 
+            taskId: routerTaskId,
+            availableFields: clickupTask.custom_fields?.map(f => f.name) || []
           });
         }
       } catch (error) {
-        logger.error('Error fetching ClickUp task start_date, using current date', { 
+        logger.error('Error fetching ClickUp task custom fields, using current date', { 
           routerId, 
           taskId: routerTaskId,
           error: error.message 
