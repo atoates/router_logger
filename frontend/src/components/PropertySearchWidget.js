@@ -355,7 +355,7 @@ export default function PropertySearchWidget({ router, onAssigned }) {
               </span>
               <div className="psw-compact-actions">
                 <a 
-                  href={`https://app.clickup.com/${currentProperty.id}`}
+                  href={`https://app.clickup.com/${workspaceId}/v/li/${currentProperty.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="psw-compact-link"
