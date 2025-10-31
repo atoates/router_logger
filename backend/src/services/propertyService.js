@@ -7,6 +7,24 @@ const { pool, logger } = require('../config/database');
 const clickupClient = require('./clickupClient');
 
 /**
+ * Check if assignment_type column exists (for migration compatibility)
+ */
+async function hasAssignmentTypeColumn() {
+  try {
+    const result = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'router_property_assignments' 
+        AND column_name = 'assignment_type'
+    `);
+    return result.rows.length > 0;
+  } catch (error) {
+    logger.warn('Error checking for assignment_type column:', error);
+    return false;
+  }
+}
+
+/**
  * Validate that a property (list) exists in ClickUp
  * @param {string} propertyListId - ClickUp list ID (each property is a list)
  * @returns {Promise<Object>} List details if valid
@@ -44,6 +62,33 @@ async function storeRouterWith(storage) {
   
   try {
     await client.query('BEGIN');
+
+    // Check if migration has run
+    const hasMigration = await hasAssignmentTypeColumn();
+    
+    if (!hasMigration) {
+      // Migration hasn't run yet - use old stored_with column
+      logger.warn('assignment_type column does not exist yet - using legacy stored_with column');
+      
+      await client.query(
+        `UPDATE routers 
+         SET stored_with = $1,
+             service_status = 'out-of-service',
+             out_of_service_date = $2,
+             out_of_service_notes = $3
+         WHERE router_id = $4`,
+        [storedWithUsername, storedAt, notes, routerId]
+      );
+      
+      await client.query('COMMIT');
+      
+      return {
+        router_id: routerId,
+        stored_with_username: storedWithUsername,
+        installed_at: storedAt,
+        notes
+      };
+    }
 
     // Check if router is currently assigned to a property
     const propertyCheck = await client.query(
@@ -135,6 +180,31 @@ async function clearStoredWith(clearance) {
 
   try {
     await client.query('BEGIN');
+
+    // Check if migration has run
+    const hasMigration = await hasAssignmentTypeColumn();
+    
+    if (!hasMigration) {
+      // Migration hasn't run yet - use old stored_with column
+      logger.warn('assignment_type column does not exist yet - using legacy stored_with column');
+      
+      await client.query(
+        `UPDATE routers 
+         SET stored_with = NULL,
+             service_status = 'operational',
+             out_of_service_date = NULL,
+             out_of_service_notes = NULL
+         WHERE router_id = $1`,
+        [routerId]
+      );
+      
+      await client.query('COMMIT');
+      
+      return {
+        router_id: routerId,
+        removed_at: clearedAt
+      };
+    }
 
     // Find current storage record
     const currentResult = await client.query(
@@ -271,46 +341,75 @@ async function assignRouterToProperty(assignment, validateClickUp = true) {
 
     await client.query('BEGIN');
 
-    // Check if router is currently stored with someone
-    const storageCheck = await client.query(
-      `SELECT id, stored_with_username 
-       FROM router_property_assignments 
-       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'storage'`,
-      [routerId]
-    );
-
-    if (storageCheck.rows.length > 0) {
-      const storage = storageCheck.rows[0];
-      throw new Error(
-        `Router ${routerId} is currently stored with ${storage.stored_with_username}. ` +
-        `Clear storage before assigning to a property.`
+    // Check if migration has run
+    const hasMigration = await hasAssignmentTypeColumn();
+    
+    if (hasMigration) {
+      // Check if router is currently stored with someone
+      const storageCheck = await client.query(
+        `SELECT id, stored_with_username 
+         FROM router_property_assignments 
+         WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'storage'`,
+        [routerId]
       );
-    }
 
-    // Check if router already has an active property assignment
-    const existingResult = await client.query(
-      `SELECT id, property_clickup_task_id, property_name 
-       FROM router_property_assignments 
-       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'property'`,
-      [routerId]
-    );
+      if (storageCheck.rows.length > 0) {
+        const storage = storageCheck.rows[0];
+        throw new Error(
+          `Router ${routerId} is currently stored with ${storage.stored_with_username}. ` +
+          `Clear storage before assigning to a property.`
+        );
+      }
 
-    if (existingResult.rows.length > 0) {
-      const existing = existingResult.rows[0];
-      throw new Error(
-        `Router ${routerId} is already assigned to property "${existing.property_name}" (${existing.property_clickup_task_id}). ` +
-        `Remove from current property first.`
+      // Check if router already has an active property assignment
+      const existingResult = await client.query(
+        `SELECT id, property_clickup_task_id, property_name 
+         FROM router_property_assignments 
+         WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'property'`,
+        [routerId]
       );
+
+      if (existingResult.rows.length > 0) {
+        const existing = existingResult.rows[0];
+        throw new Error(
+          `Router ${routerId} is already assigned to property "${existing.property_name}" (${existing.property_clickup_task_id}). ` +
+          `Remove from current property first.`
+        );
+      }
+    } else {
+      // Old migration - just check for any active assignment
+      const existingResult = await client.query(
+        `SELECT id, property_clickup_task_id, property_name 
+         FROM router_property_assignments 
+         WHERE router_id = $1 AND removed_at IS NULL`,
+        [routerId]
+      );
+
+      if (existingResult.rows.length > 0) {
+        const existing = existingResult.rows[0];
+        throw new Error(
+          `Router ${routerId} is already assigned to property "${existing.property_name}" (${existing.property_clickup_task_id}). ` +
+          `Remove from current property first.`
+        );
+      }
     }
 
     // Create new assignment record
-    const assignmentResult = await client.query(
-      `INSERT INTO router_property_assignments 
-       (router_id, assignment_type, property_clickup_task_id, property_name, installed_at, installed_by, notes)
-       VALUES ($1, 'property', $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [routerId, propertyTaskId, validatedPropertyName, actualInstalledAt, installedBy, notes]
-    );
+    const insertQuery = hasMigration
+      ? `INSERT INTO router_property_assignments 
+         (router_id, assignment_type, property_clickup_task_id, property_name, installed_at, installed_by, notes)
+         VALUES ($1, 'property', $2, $3, $4, $5, $6)
+         RETURNING *`
+      : `INSERT INTO router_property_assignments 
+         (router_id, property_clickup_task_id, property_name, installed_at, installed_by, notes)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`;
+    
+    const insertParams = hasMigration
+      ? [routerId, propertyTaskId, validatedPropertyName, actualInstalledAt, installedBy, notes]
+      : [routerId, propertyTaskId, validatedPropertyName, actualInstalledAt, installedBy, notes];
+    
+    const assignmentResult = await client.query(insertQuery, insertParams);
 
     const newAssignment = assignmentResult.rows[0];
 
@@ -636,19 +735,32 @@ async function getRoutersAtProperty(propertyTaskId) {
  */
 async function getAllInstalledRouters() {
   try {
-    const result = await pool.query(`
-      SELECT 
-        rpa.*,
-        r.name as router_name,
-        r.imei,
-        r.firmware_version,
-        r.last_seen
-      FROM router_property_assignments rpa
-      JOIN routers r ON r.router_id = rpa.router_id
-      WHERE rpa.removed_at IS NULL
-        AND rpa.assignment_type = 'property'
-      ORDER BY rpa.installed_at DESC
-    `);
+    const hasMigration = await hasAssignmentTypeColumn();
+    
+    const query = hasMigration
+      ? `SELECT 
+           rpa.*,
+           r.name as router_name,
+           r.imei,
+           r.firmware_version,
+           r.last_seen
+         FROM router_property_assignments rpa
+         JOIN routers r ON r.router_id = rpa.router_id
+         WHERE rpa.removed_at IS NULL
+           AND rpa.assignment_type = 'property'
+         ORDER BY rpa.installed_at DESC`
+      : `SELECT 
+           rpa.*,
+           r.name as router_name,
+           r.imei,
+           r.firmware_version,
+           r.last_seen
+         FROM router_property_assignments rpa
+         JOIN routers r ON r.router_id = rpa.router_id
+         WHERE rpa.removed_at IS NULL
+         ORDER BY rpa.installed_at DESC`;
+    
+    const result = await pool.query(query);
 
     return result.rows.map(row => ({
       routerId: row.router_id,
