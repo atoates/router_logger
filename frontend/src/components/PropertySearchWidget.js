@@ -448,7 +448,18 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
             {propertyHistory.map((item) => (
               <div key={item.id} className="psw-history-item">
                 <div className="psw-history-property">
-                  <strong>{item.propertyName || 'Unknown Property'}</strong>
+                  {workspaceId && item.propertyTaskId ? (
+                    <a 
+                      href={`https://app.clickup.com/${workspaceId}/v/li/${item.propertyTaskId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="psw-history-link"
+                    >
+                      <strong>{item.propertyName || 'Unknown Property'}</strong>
+                    </a>
+                  ) : (
+                    <strong>{item.propertyName || 'Unknown Property'}</strong>
+                  )}
                   {item.current ? (
                     <span className="psw-history-status current">CURRENT</span>
                   ) : (

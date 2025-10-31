@@ -191,6 +191,23 @@
   flex: 1;
 }
 
+.psw-history-link {
+  flex: 1;
+  text-decoration: none;
+  color: inherit;
+  transition: color 0.15s;
+}
+
+.psw-history-link:hover {
+  color: #6366f1;
+}
+
+.psw-history-link strong {
+  font-size: 14px;
+  color: inherit;
+  flex: 1;
+}
+
 .psw-history-delete {
   width: 24px;
   height: 24px;
