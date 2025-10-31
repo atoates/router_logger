@@ -374,12 +374,20 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
         try {
           const res = await fetch(`${API_BASE}/api/clickup/workspaces/${workspaceId}/members`);
           const data = await res.json();
+          console.log('Workspace members response:', data);
           if (data.members) {
+            console.log('Setting available users:', data.members);
             setAvailableUsers(data.members);
+          } else {
+            console.warn('No members in response:', data);
+            toast.error('No workspace members found');
           }
         } catch (error) {
           console.error('Error loading workspace members:', error);
+          toast.error('Failed to load workspace members');
         }
+      } else {
+        toast.error('Workspace not connected');
       }
       setShowStoredWithModal(true);
     }
@@ -583,25 +591,32 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
                 <label>Assign to ClickUp Users (Stored With)</label>
                 <div className="psw-user-list">
                   {availableUsers.length > 0 ? (
-                    availableUsers.map(user => (
-                      <label key={user.id} className="psw-user-checkbox">
-                        <input
-                          type="checkbox"
-                          value={user.id}
-                          checked={selectedAssignees.includes(user.id.toString())}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedAssignees([...selectedAssignees, user.id.toString()]);
-                            } else {
-                              setSelectedAssignees(selectedAssignees.filter(id => id !== user.id.toString()));
-                            }
-                          }}
-                        />
-                        <span className="psw-user-name">
-                          {user.username || user.email}
-                        </span>
-                      </label>
-                    ))
+                    availableUsers.map(user => {
+                      const userId = user?.user?.id || user?.id;
+                      const userName = user?.user?.username || user?.username || user?.user?.email || user?.email || 'Unknown';
+                      
+                      if (!userId) return null;
+                      
+                      return (
+                        <label key={userId} className="psw-user-checkbox">
+                          <input
+                            type="checkbox"
+                            value={userId}
+                            checked={selectedAssignees.includes(userId.toString())}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedAssignees([...selectedAssignees, userId.toString()]);
+                              } else {
+                                setSelectedAssignees(selectedAssignees.filter(id => id !== userId.toString()));
+                              }
+                            }}
+                          />
+                          <span className="psw-user-name">
+                            {userName}
+                          </span>
+                        </label>
+                      );
+                    })
                   ) : (
                     <p className="psw-hint">Loading users...</p>
                   )}
