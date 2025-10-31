@@ -261,6 +261,7 @@ class ClickUpClient {
       });
       
       const lists = listsResponse.data.lists || [];
+      logger.info('Lists in space', { spaceId, listCount: lists.length, listNames: lists.map(l => l.name) });
       let allTasks = [];
       
       // Get tasks from each list (with pagination)
