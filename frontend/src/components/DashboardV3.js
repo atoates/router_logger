@@ -141,6 +141,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
   const [value, setValue] = useState(24);
   const [dark, setDark] = useState(defaultDarkMode);
   const [hoveredPill, setHoveredPill] = useState(null);
+  const [currentPage, setCurrentPage] = useState('network'); // 'network', 'routers', 'status'
   const [routers, setRouters] = useState([]);
   const [usage, setUsage] = useState([]);
   const [usagePrev, setUsagePrev] = useState([]);
@@ -252,8 +253,8 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
     <div className={className}>
       <div className="v3-header">
         <div>
-          <h1>🚀 Dashboard V3</h1>
-          <p>Analytical, blazing-fast, and dark-mode ready</p>
+          <h1>� VacatAd Dashboard</h1>
+          <p>Monitor router network and property assignments</p>
         </div>
         <div className="v3-controls">
           <ClickUpAuthButton />
@@ -262,8 +263,33 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
         </div>
       </div>
 
-      {/* Metrics */}
-      <div className="v3-metrics">
+      {/* Page Navigation */}
+      <div className="v3-page-nav">
+        <button 
+          className={`v3-page-btn ${currentPage === 'network' ? 'active' : ''}`}
+          onClick={() => setCurrentPage('network')}
+        >
+          📊 Network Analytics
+        </button>
+        <button 
+          className={`v3-page-btn ${currentPage === 'routers' ? 'active' : ''}`}
+          onClick={() => setCurrentPage('routers')}
+        >
+          📍 Router Assignments
+        </button>
+        <button 
+          className={`v3-page-btn ${currentPage === 'status' ? 'active' : ''}`}
+          onClick={() => setCurrentPage('status')}
+        >
+          ⚙️ System Status
+        </button>
+      </div>
+
+      {/* Network Analytics Page */}
+      {currentPage === 'network' && (
+        <>
+          {/* Metrics */}
+          <div className="v3-metrics">
         <Metric label="Network Health" value={`${total ? Math.round(online/total*100) : 0}%`} sub={`${online}/${total} online`} color="#10b981" />
         <Metric label={`${mode==='rolling'?value+'h':'Last '+value+'d'} Data`} value={formatBytes(totalNow)} sub={<DeltaBadge current={totalNow} previous={totalPrev} />} color="#6366f1" />
         <Metric label="Storage (est.)" value={storage ? formatBytes(storage.estimatedCurrentJsonBytes) : '—'} sub={storage ? `${fmtNum(storage.totalLogs)} records` : ''} color="#8b5cf6" />
@@ -515,14 +541,147 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
               </div>
             </div>
           )}
-          
-          {/* Installed Routers */}
-          <InstalledRouters />
-          
-          {/* Out of Service Routers */}
-          <OutOfServiceRouters />
         </div>
       </div>
+        </>
+      )}
+
+      {/* Router Assignments Page */}
+      {currentPage === 'routers' && (
+        <div className="v3-full-width-content">
+          <InstalledRouters />
+          <OutOfServiceRouters />
+          
+          {/* Overdue Inspections */}
+          {(() => {
+            const overdue = inspections.filter(i => i.overdue);
+            if (overdue.length === 0) return null;
+            return (
+              <div className="v3-card">
+                <div className="v3-card-title" style={{ color: '#ef4444' }}>⚠️ Overdue Inspections ({overdue.length})</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:300, overflowY:'auto' }}>
+                  {overdue.map(insp => {
+                    const createdDate = insp.created_at ? new Date(insp.created_at) : null;
+                    const inspectionDue = insp.inspection_due ? new Date(insp.inspection_due) : null;
+                    return (
+                      <div 
+                        key={insp.router_id} 
+                        style={{ 
+                          display:'flex', 
+                          justifyContent:'space-between', 
+                          alignItems:'center',
+                          padding: 8,
+                          background: dark ? '#1f2937' : '#fee2e2',
+                          borderRadius: 6,
+                          cursor: onOpenRouter ? 'pointer' : 'default',
+                          borderLeft: '3px solid #ef4444'
+                        }}
+                        onClick={() => {
+                          if (!onOpenRouter) return;
+                          const router = routers.find(r => String(r.router_id) === String(insp.router_id)) || { router_id: insp.router_id, name: insp.name };
+                          onOpenRouter(router);
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600 }}>{insp.name}</div>
+                          <div style={{ fontSize: 12, color: '#64748b' }}>{insp.location || 'No location'}</div>
+                          {createdDate && inspectionDue && (
+                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                              First: {createdDate.toLocaleDateString()} | Due: {inspectionDue.toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ textAlign: 'right', marginLeft: 12 }}>
+                          <div style={{ fontWeight: 600, color: '#ef4444' }}>{Math.abs(insp.days_remaining)} days</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>overdue</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* System Status Page */}
+      {currentPage === 'status' && (
+        <div className="v3-full-width-content">
+          {/* Storage Card */}
+          <div className="v3-card">
+            <div className="v3-card-title">💾 Storage</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={{ display:'flex', justifyContent:'space-between' }}>
+                <span>Total DB</span>
+                <strong>{dbSize ? formatBytes(dbSize.db_bytes) : '—'}</strong>
+              </div>
+              {dbSize && dbSize.tables && dbSize.tables.map(t => (
+                <div key={t.name} style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
+                    <span style={{ fontWeight:600 }}>{t.name}</span>
+                    <span style={{ color:'#64748b', fontSize:12 }}>{t.row_count?.toLocaleString()} rows</span>
+                  </div>
+                  {(() => {
+                    const total = (t.total_bytes||1);
+                    const tb = (t.table_bytes||0)/total*100;
+                    const ib = (t.index_bytes||0)/total*100;
+                    const ob = (t.toast_bytes||0)/total*100;
+                    return (
+                      <div style={{ display:'flex', gap:2, height:20, background:'#e5e7eb', borderRadius:4, overflow:'hidden' }}>
+                        <div style={{ width: `${tb}%`, background:'#6366f1' }} title={`Table: ${formatBytes(t.table_bytes)}`} />
+                        <div style={{ width: `${ib}%`, background:'#10b981' }} title={`Indexes: ${formatBytes(t.index_bytes)}`} />
+                        <div style={{ width: `${ob}%`, background:'#f59e0b' }} title={`TOAST: ${formatBytes(t.toast_bytes)}`} />
+                      </div>
+                    );
+                  })()}
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'#64748b' }}>
+                    <span>Table: {formatBytes(t.table_bytes)}</span>
+                    <span>Index: {formatBytes(t.index_bytes)}</span>
+                    <span>TOAST: {formatBytes(t.toast_bytes)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* RMS API Usage */}
+          {rmsUsage && rmsUsage.apiUsage && (
+            <div className="v3-card">
+              <div className="v3-card-title">📊 RMS API Usage</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Total Calls (period)</span>
+                  <strong>{fmtNum(rmsUsage.apiUsage?.callCount || 0)}</strong>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Daily Average</span>
+                  <strong>{fmtNum(rmsUsage.apiUsage?.estimates?.dailyRate || 0)}</strong>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Monthly Estimate</span>
+                  <strong>{fmtNum(rmsUsage.apiUsage?.estimates?.monthlyRate || 0)}</strong>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : (parseFloat(rmsUsage.apiUsage?.estimates?.percentOfQuota || '0') > 80 ? '#fee2e2' : '#f0fdf4'), borderRadius:6, borderLeft: `3px solid ${parseFloat(rmsUsage.apiUsage?.estimates?.percentOfQuota || '0') > 80 ? '#ef4444' : '#10b981'}` }}>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Quota Usage</span>
+                  <strong>{rmsUsage.apiUsage?.estimates?.percentOfQuota || '0%'}</strong>
+                </div>
+                {rmsUsage.apiUsage?.rateLimitHits > 0 && (
+                  <div style={{ padding:8, background:'#fef2f2', borderRadius:6, borderLeft:'3px solid #ef4444', fontSize:12 }}>
+                    <div style={{ fontWeight:600, color:'#991b1b', marginBottom:4 }}>⚠️ Rate Limit Hits: {rmsUsage.apiUsage.rateLimitHits}</div>
+                    {rmsUsage.apiUsage.lastRateLimit && (
+                      <div style={{ color:'#64748b' }}>Last: {new Date(rmsUsage.apiUsage.lastRateLimit).toLocaleString()}</div>
+                    )}
+                  </div>
+                )}
+                <div style={{ fontSize:11, color:'#94a3b8', paddingTop:8, borderTop: `1px solid ${dark ? '#334155' : '#e5e7eb'}` }}>
+                  Tracked since: {new Date(rmsUsage.apiUsage?.since).toLocaleString()}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="v3-footer-note">Auto-refreshes when you change time range. Dark mode is local to V3.</div>
     </div>
