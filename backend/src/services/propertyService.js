@@ -7,19 +7,19 @@ const { pool, logger } = require('../config/database');
 const clickupClient = require('./clickupClient');
 
 /**
- * Check if assignment_type column exists (for migration compatibility)
+ * Check if event_type column exists (for migration compatibility)
  */
-async function hasAssignmentTypeColumn() {
+async function hasEventTypeColumn() {
   try {
     const result = await pool.query(`
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_name = 'router_property_assignments' 
-        AND column_name = 'assignment_type'
+        AND column_name = 'event_type'
     `);
     return result.rows.length > 0;
   } catch (error) {
-    logger.warn('Error checking for assignment_type column:', error);
+    logger.warn('Error checking for event_type column:', error);
     return false;
   }
 }
@@ -46,7 +46,7 @@ async function validatePropertyTask(propertyListId) {
 /**
  * Store router with a person (out of service)
  * @param {Object} storage - Storage details
- * @returns {Promise<Object>} Created storage record
+ * @returns {Promise<Object>} Created storage event
  */
 async function storeRouterWith(storage) {
   const {
@@ -63,15 +63,13 @@ async function storeRouterWith(storage) {
   try {
     await client.query('BEGIN');
 
-    // Check if migration has run
-    const hasMigration = await hasAssignmentTypeColumn();
+    // Check if event-based system is in place
+    const hasEvents = await hasEventTypeColumn();
     
-    if (!hasMigration) {
-      // Migration hasn't run yet - can't create storage records in property_assignments
-      // because stored_with_user_id and stored_with_username columns don't exist
-      logger.warn('assignment_type column does not exist yet - only updating routers table');
+    if (!hasEvents) {
+      // Legacy: just update routers table
+      logger.warn('event_type column does not exist yet - using legacy approach');
       
-      // Just update routers table for now
       await client.query(
         `UPDATE routers 
          SET service_status = 'out-of-service',
@@ -86,74 +84,87 @@ async function storeRouterWith(storage) {
       return {
         router_id: routerId,
         stored_with_username: storedWithUsername,
-        installed_at: storedAt,
+        event_date: storedAt,
         notes
       };
     }
 
-    // Check if router is currently assigned to a property
+    // Modern event-based approach:
+    // 1. If router is at a property, create a property_remove event
+    // 2. Create a storage_assign event
+    // 3. Update router current state
+
+    // Check if router is currently at a property
     const propertyCheck = await client.query(
-      `SELECT id, property_clickup_task_id, property_name, assignment_type 
-       FROM router_property_assignments 
-       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'property'`,
+      `SELECT * FROM router_property_assignments 
+       WHERE router_id = $1 
+         AND event_type = 'property_assign'
+       ORDER BY event_date DESC
+       LIMIT 1`,
       [routerId]
     );
 
+    // Check if there's a more recent remove event
     if (propertyCheck.rows.length > 0) {
-      const property = propertyCheck.rows[0];
-      throw new Error(
-        `Router ${routerId} is currently installed at property "${property.property_name}". ` +
-        `Remove from property before storing with a person.`
+      const lastAssign = propertyCheck.rows[0];
+      
+      const removeCheck = await client.query(
+        `SELECT * FROM router_property_assignments 
+         WHERE router_id = $1 
+           AND event_type = 'property_remove'
+           AND event_date > $2
+         ORDER BY event_date DESC
+         LIMIT 1`,
+        [routerId, lastAssign.event_date]
       );
+
+      // If no remove event after the last assign, router is still at property
+      if (removeCheck.rows.length === 0) {
+        // Create property_remove event first
+        await client.query(
+          `INSERT INTO router_property_assignments 
+           (router_id, event_type, event_date, property_clickup_task_id, property_name, removed_by, notes)
+           VALUES ($1, 'property_remove', $2, $3, $4, $5, $6)`,
+          [routerId, storedAt, lastAssign.property_clickup_task_id, lastAssign.property_name, storedBy, 'Removed to store with person']
+        );
+      }
     }
 
-    // Check if already stored with someone
-    const storageCheck = await client.query(
-      `SELECT id, stored_with_username 
-       FROM router_property_assignments 
-       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'storage'`,
-      [routerId]
-    );
-
-    if (storageCheck.rows.length > 0) {
-      const existing = storageCheck.rows[0];
-      throw new Error(
-        `Router ${routerId} is already stored with ${existing.stored_with_username}. ` +
-        `Clear current storage first.`
-      );
-    }
-
-    // Create storage record in property_assignments table
+    // Create storage_assign event
     const storageResult = await client.query(
       `INSERT INTO router_property_assignments 
-       (router_id, assignment_type, stored_with_user_id, stored_with_username, installed_at, installed_by, notes)
-       VALUES ($1, 'storage', $2, $3, $4, $5, $6)
+       (router_id, event_type, event_date, stored_with_user_id, stored_with_username, installed_by, notes)
+       VALUES ($1, 'storage_assign', $2, $3, $4, $5, $6)
        RETURNING *`,
-      [routerId, storedWithUserId, storedWithUsername, storedAt, storedBy, notes]
+      [routerId, storedAt, storedWithUserId, storedWithUsername, storedBy, notes]
     );
 
-    const newStorage = storageResult.rows[0];
-
-    // Update routers table with current storage info
+    // Update routers table current state
     await client.query(
       `UPDATE routers 
-       SET stored_with_user_id = $1,
-           stored_with_username = $2,
-           service_status = 'out-of-service'
-       WHERE router_id = $3`,
-      [storedWithUserId, storedWithUsername, routerId]
+       SET current_state = 'stored',
+           current_property_task_id = NULL,
+           current_property_name = NULL,
+           current_stored_with_user_id = $1,
+           current_stored_with_username = $2,
+           state_updated_at = $3,
+           service_status = 'out-of-service',
+           out_of_service_date = $3,
+           out_of_service_notes = $4
+       WHERE router_id = $5`,
+      [storedWithUserId, storedWithUsername, storedAt, `Stored with ${storedWithUsername}. ${notes || ''}`.trim(), routerId]
     );
 
     await client.query('COMMIT');
 
-    logger.info('Router stored with user', { 
+    logger.info('Router stored with user (event created)', { 
       routerId, 
       storedWithUserId,
       storedWithUsername,
       storedAt
     });
 
-    return newStorage;
+    return storageResult.rows[0];
 
   } catch (error) {
     await client.query('ROLLBACK');
@@ -167,7 +178,7 @@ async function storeRouterWith(storage) {
 /**
  * Clear router storage (bring back in service)
  * @param {Object} clearance - Clearance details
- * @returns {Promise<Object>} Updated storage record
+ * @returns {Promise<Object>} Storage remove event
  */
 async function clearStoredWith(clearance) {
   const {
@@ -182,14 +193,13 @@ async function clearStoredWith(clearance) {
   try {
     await client.query('BEGIN');
 
-    // Check if migration has run
-    const hasMigration = await hasAssignmentTypeColumn();
+    // Check if event-based system is in place
+    const hasEvents = await hasEventTypeColumn();
     
-    if (!hasMigration) {
-      // Migration hasn't run yet - just update routers table
-      logger.warn('assignment_type column does not exist yet - only updating routers table');
+    if (!hasEvents) {
+      // Legacy: just update routers table
+      logger.warn('event_type column does not exist yet - only updating routers table');
       
-      // Just update routers table
       await client.query(
         `UPDATE routers 
          SET service_status = 'operational',
@@ -203,50 +213,74 @@ async function clearStoredWith(clearance) {
       
       return {
         router_id: routerId,
-        removed_at: clearedAt
+        event_date: clearedAt
       };
     }
 
-    // Find current storage record
-    const currentResult = await client.query(
+    // Modern event-based approach: Create storage_remove event
+
+    // Verify router is actually stored
+    const storageCheck = await client.query(
       `SELECT * FROM router_property_assignments 
-       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'storage'`,
+       WHERE router_id = $1 
+         AND event_type = 'storage_assign'
+       ORDER BY event_date DESC
+       LIMIT 1`,
       [routerId]
     );
 
-    if (currentResult.rows.length === 0) {
+    if (storageCheck.rows.length === 0) {
+      throw new Error(`Router ${routerId} has no storage assignment record`);
+    }
+
+    const lastStorageAssign = storageCheck.rows[0];
+
+    // Check if there's already a storage_remove event after this assign
+    const removeCheck = await client.query(
+      `SELECT * FROM router_property_assignments 
+       WHERE router_id = $1 
+         AND event_type = 'storage_remove'
+         AND event_date > $2
+       ORDER BY event_date DESC
+       LIMIT 1`,
+      [routerId, lastStorageAssign.event_date]
+    );
+
+    if (removeCheck.rows.length > 0) {
       throw new Error(`Router ${routerId} is not currently stored with anyone`);
     }
 
-    const currentStorage = currentResult.rows[0];
-
-    // Update storage record with removal info
-    const updateResult = await client.query(
-      `UPDATE router_property_assignments 
-       SET removed_at = $1, removed_by = $2, notes = COALESCE($3, notes), updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4
+    // Create storage_remove event
+    const removeResult = await client.query(
+      `INSERT INTO router_property_assignments 
+       (router_id, event_type, event_date, stored_with_user_id, stored_with_username, removed_by, notes)
+       VALUES ($1, 'storage_remove', $2, $3, $4, $5, $6)
        RETURNING *`,
-      [clearedAt, clearedBy, notes, currentStorage.id]
+      [routerId, clearedAt, lastStorageAssign.stored_with_user_id, lastStorageAssign.stored_with_username, clearedBy, notes]
     );
 
-    // Clear storage info from routers table
+    // Update routers table current state
     await client.query(
       `UPDATE routers 
-       SET stored_with_user_id = NULL,
-           stored_with_username = NULL,
-           service_status = 'operational'
-       WHERE router_id = $1`,
-      [routerId]
+       SET current_state = 'unassigned',
+           current_stored_with_user_id = NULL,
+           current_stored_with_username = NULL,
+           state_updated_at = $1,
+           service_status = 'operational',
+           out_of_service_date = NULL,
+           out_of_service_notes = NULL
+       WHERE router_id = $2`,
+      [clearedAt, routerId]
     );
 
     await client.query('COMMIT');
 
-    logger.info('Router storage cleared', { 
+    logger.info('Router storage cleared (event created)', { 
       routerId,
-      storedWithUsername: currentStorage.stored_with_username
+      storedWithUsername: lastStorageAssign.stored_with_username
     });
 
-    return updateResult.rows[0];
+    return removeResult.rows[0];
 
   } catch (error) {
     await client.query('ROLLBACK');
@@ -624,75 +658,82 @@ async function getCurrentStorage(routerId) {
  */
 async function getPropertyHistory(routerId) {
   try {
-    const hasMigration = await hasAssignmentTypeColumn();
+    const hasEvents = await hasEventTypeColumn();
     
+    if (!hasEvents) {
+      // Legacy: use old removed_at based system
+      const result = await pool.query(
+        `SELECT * FROM router_property_assignments 
+         WHERE router_id = $1 
+         ORDER BY installed_at DESC`,
+        [routerId]
+      );
+
+      const assignments = result.rows.map(assignment => ({
+        id: assignment.id,
+        eventType: assignment.removed_at ? 'property_remove' : 'property_assign',
+        eventDate: assignment.removed_at || assignment.installed_at,
+        propertyTaskId: assignment.property_clickup_task_id,
+        propertyName: assignment.property_name,
+        notes: assignment.notes,
+        by: assignment.removed_at ? assignment.removed_by : assignment.installed_by
+      }));
+
+      return {
+        routerId,
+        history: assignments,
+        totalEvents: assignments.length
+      };
+    }
+
+    // Modern event-based system: Just fetch all events chronologically
     const result = await pool.query(
       `SELECT * FROM router_property_assignments 
        WHERE router_id = $1 
-       ORDER BY installed_at DESC`,
+       ORDER BY event_date DESC`,
       [routerId]
     );
 
-    const assignments = result.rows.map(assignment => {
-      const installedAt = new Date(assignment.installed_at);
-      const removedAt = assignment.removed_at ? new Date(assignment.removed_at) : new Date();
-      const durationMs = removedAt - installedAt;
-      const durationDays = Math.floor(durationMs / (1000 * 60 * 60 * 24));
-
-      // Determine assignment type - if migration hasn't run, assignment_type will be null
-      // In that case, check if it has a property_clickup_task_id (property) or stored_with fields (storage)
-      let assignmentType = assignment.assignment_type;
-      if (!hasMigration || !assignmentType) {
-        // Pre-migration: determine type by which fields are populated
-        if (assignment.stored_with_user_id || assignment.stored_with_username) {
-          assignmentType = 'storage';
-        } else if (assignment.property_clickup_task_id) {
-          assignmentType = 'property';
-        } else {
-          assignmentType = 'property'; // default for old records
-        }
-      }
-
-      const baseRecord = {
-        id: assignment.id,
-        assignmentType: assignmentType,
-        installedAt: assignment.installed_at,
-        removedAt: assignment.removed_at,
-        durationDays,
-        installedBy: assignment.installed_by,
-        removedBy: assignment.removed_by,
-        notes: assignment.notes,
-        current: assignment.removed_at === null
+    const events = result.rows.map(event => {
+      const baseEvent = {
+        id: event.id,
+        eventType: event.event_type,
+        eventDate: event.event_date,
+        notes: event.notes
       };
 
-      if (assignmentType === 'property') {
+      // Add type-specific fields
+      if (event.event_type === 'property_assign' || event.event_type === 'property_remove') {
         return {
-          ...baseRecord,
-          propertyTaskId: assignment.property_clickup_task_id,
-          propertyName: assignment.property_name
+          ...baseEvent,
+          propertyTaskId: event.property_clickup_task_id,
+          propertyName: event.property_name,
+          by: event.event_type === 'property_assign' ? event.installed_by : event.removed_by
         };
-      } else {
+      } else if (event.event_type === 'storage_assign' || event.event_type === 'storage_remove') {
         return {
-          ...baseRecord,
-          storedWithUserId: assignment.stored_with_user_id,
-          storedWithUsername: assignment.stored_with_username
+          ...baseEvent,
+          storedWithUserId: event.stored_with_user_id,
+          storedWithUsername: event.stored_with_username,
+          by: event.event_type === 'storage_assign' ? event.installed_by : event.removed_by
         };
       }
+
+      return baseEvent;
     });
 
-    const currentProperty = assignments.find(a => a.current && a.assignmentType === 'property') || null;
-    const currentStorage = assignments.find(a => a.current && a.assignmentType === 'storage') || null;
-    const totalDaysDeployed = assignments
-      .filter(a => a.assignmentType === 'property')
-      .reduce((sum, a) => sum + a.durationDays, 0);
+    // Calculate some summary stats
+    const propertyAssignments = events.filter(e => e.eventType === 'property_assign').length;
+    const storageAssignments = events.filter(e => e.eventType === 'storage_assign').length;
+    const currentEvent = events.length > 0 ? events[0] : null;
 
     return {
       routerId,
-      currentProperty,
-      currentStorage,
-      history: assignments,
-      totalProperties: assignments.filter(a => a.assignmentType === 'property').length,
-      totalDaysDeployed
+      history: events,
+      totalEvents: events.length,
+      totalPropertyAssignments: propertyAssignments,
+      totalStorageAssignments: storageAssignments,
+      currentEvent
     };
 
   } catch (error) {

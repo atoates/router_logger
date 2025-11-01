@@ -571,22 +571,18 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
         
         {propertyHistory.length > 0 ? (
           <div className="psw-history-list-scroll">
-            {propertyHistory.map((item) => (
-              <div key={item.id} className="psw-history-item">
-                {item.assignmentType === 'storage' ? (
-                  // Storage event display
-                  <>
+            {propertyHistory.map((event) => {
+              const eventDate = new Date(event.eventDate || event.installedAt).toLocaleDateString();
+              
+              // Handle event-based display
+              if (event.eventType === 'storage_assign') {
+                return (
+                  <div key={event.id} className="psw-history-item">
                     <div className="psw-history-property">
-                      <strong>🔧 Stored with {item.storedWithUsername || 'Unknown'}</strong>
-                      {item.current ? (
-                        <span className="psw-history-status current">CURRENT</span>
-                      ) : (
-                        <span className="psw-history-status removed">
-                          {item.durationDays}d
-                        </span>
-                      )}
+                      <strong>🔧 Stored with {event.storedWithUsername || 'Unknown'}</strong>
+                      <span className="psw-history-status assign">STORED</span>
                       <button 
-                        onClick={() => deleteHistoryItem(item.id)}
+                        onClick={() => deleteHistoryItem(event.id)}
                         className="psw-history-delete"
                         title="Delete history entry"
                         disabled={loading}
@@ -595,48 +591,57 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
                       </button>
                     </div>
                     <div className="psw-history-dates">
-                      {item.installedAt && (
-                        <span>🔧 {new Date(item.installedAt).toLocaleDateString()}</span>
-                      )}
-                      {item.removedAt && (
-                        <span>✅ {new Date(item.removedAt).toLocaleDateString()}</span>
-                      )}
+                      <span>🔧 {eventDate}</span>
+                      {event.by && <span className="psw-history-by">by {event.by}</span>}
                     </div>
-                    {(item.installedBy || item.removedBy) && (
-                      <div className="psw-history-users">
-                        {item.installedBy && <span>Stored by {item.installedBy}</span>}
-                        {item.removedBy && <span>Cleared by {item.removedBy}</span>}
-                      </div>
+                    {event.notes && (
+                      <div className="psw-history-notes">{event.notes}</div>
                     )}
-                    {item.notes && (
-                      <div className="psw-history-notes">{item.notes}</div>
-                    )}
-                  </>
-                ) : (
-                  // Property assignment display
-                  <>
+                  </div>
+                );
+              } else if (event.eventType === 'storage_remove') {
+                return (
+                  <div key={event.id} className="psw-history-item">
                     <div className="psw-history-property">
-                      {workspaceId && item.propertyTaskId ? (
+                      <strong>✅ Returned from {event.storedWithUsername || 'storage'}</strong>
+                      <span className="psw-history-status remove">RETURNED</span>
+                      <button 
+                        onClick={() => deleteHistoryItem(event.id)}
+                        className="psw-history-delete"
+                        title="Delete history entry"
+                        disabled={loading}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="psw-history-dates">
+                      <span>✅ {eventDate}</span>
+                      {event.by && <span className="psw-history-by">by {event.by}</span>}
+                    </div>
+                    {event.notes && (
+                      <div className="psw-history-notes">{event.notes}</div>
+                    )}
+                  </div>
+                );
+              } else if (event.eventType === 'property_assign') {
+                return (
+                  <div key={event.id} className="psw-history-item">
+                    <div className="psw-history-property">
+                      {workspaceId && event.propertyTaskId ? (
                         <a 
-                          href={`https://app.clickup.com/${workspaceId}/v/li/${item.propertyTaskId}`}
+                          href={`https://app.clickup.com/${workspaceId}/v/li/${event.propertyTaskId}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="psw-history-link"
                         >
-                          <strong>{item.propertyName || 'Unknown Property'}</strong>
+                          <strong>📥 {event.propertyName || 'Unknown Property'}</strong>
                         </a>
                       ) : (
-                        <strong>{item.propertyName || 'Unknown Property'}</strong>
+                        <strong>📥 {event.propertyName || 'Unknown Property'}</strong>
                       )}
-                      {item.current ? (
-                        <span className="psw-history-status current">CURRENT</span>
-                      ) : (
-                        <span className="psw-history-status removed">
-                          {item.durationDays}d
-                        </span>
-                      )}
+                      <span className="psw-history-status assign">INSTALLED</span>
                       <button 
-                        onClick={() => deleteHistoryItem(item.id)}
+                        onClick={() => deleteHistoryItem(event.id)}
                         className="psw-history-delete"
                         title="Delete history entry"
                         disabled={loading}
@@ -645,26 +650,43 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
                       </button>
                     </div>
                     <div className="psw-history-dates">
-                      {item.installedAt && (
-                        <span>📥 {new Date(item.installedAt).toLocaleDateString()}</span>
-                      )}
-                      {item.removedAt && (
-                        <span>📤 {new Date(item.removedAt).toLocaleDateString()}</span>
-                      )}
+                      <span>📥 {eventDate}</span>
+                      {event.by && <span className="psw-history-by">by {event.by}</span>}
                     </div>
-                    {(item.installedBy || item.removedBy) && (
-                      <div className="psw-history-users">
-                        {item.installedBy && <span>Assigned via {item.installedBy}</span>}
-                        {item.removedBy && <span>Removed via {item.removedBy}</span>}
-                      </div>
+                    {event.notes && (
+                      <div className="psw-history-notes">{event.notes}</div>
                     )}
-                    {item.notes && (
-                      <div className="psw-history-notes">{item.notes}</div>
+                  </div>
+                );
+              } else if (event.eventType === 'property_remove') {
+                return (
+                  <div key={event.id} className="psw-history-item">
+                    <div className="psw-history-property">
+                      <strong>📤 Removed from {event.propertyName || 'property'}</strong>
+                      <span className="psw-history-status remove">REMOVED</span>
+                      <button 
+                        onClick={() => deleteHistoryItem(event.id)}
+                        className="psw-history-delete"
+                        title="Delete history entry"
+                        disabled={loading}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="psw-history-dates">
+                      <span>📤 {eventDate}</span>
+                      {event.by && <span className="psw-history-by">by {event.by}</span>}
+                    </div>
+                    {event.notes && (
+                      <div className="psw-history-notes">{event.notes}</div>
                     )}
-                  </>
-                )}
-              </div>
-            ))}
+                  </div>
+                );
+              }
+              
+              // Fallback for old format
+              return null;
+            })}
           </div>
         ) : (
           <div className="psw-empty-history">
