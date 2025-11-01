@@ -9,6 +9,7 @@ const { logger } = require('./config/database');
 const { initializeDatabase } = require('./database/migrate');
 const { initMQTT, closeMQTT } = require('./services/mqttService');
 const { startRMSSync } = require('./services/rmsSync');
+const { startClickUpSync } = require('./services/clickupSync');
 const oauthService = require('./services/oauthService');
 const routerRoutes = require('./routes/router');
 const rmsRoutes = require('./routes/rms');
@@ -106,6 +107,11 @@ async function startServer() {
       startRMSSync(parseInt(rmsSyncInterval));
       logger.info('RMS sync scheduler started');
     }
+    
+    // Start ClickUp sync (every 30 minutes by default)
+    const clickupSyncInterval = process.env.CLICKUP_SYNC_INTERVAL_MINUTES || 30;
+    startClickUpSync(parseInt(clickupSyncInterval));
+    logger.info(`ClickUp sync scheduler started (every ${clickupSyncInterval} minutes)`);
     
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);

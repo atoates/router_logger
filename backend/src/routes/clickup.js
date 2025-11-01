@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const clickupOAuthService = require('../services/clickupOAuthService');
 const clickupClient = require('../services/clickupClient');
+const { syncAllRoutersToClickUp, getSyncStats } = require('../services/clickupSync');
 const { pool } = require('../config/database');
 const logger = require('../config/database').logger;
 
@@ -571,6 +572,38 @@ router.get('/custom-fields/:listId', async (req, res) => {
     res.json({ fields });
   } catch (error) {
     logger.error('Error getting custom fields:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/clickup/sync
+ * Manually trigger ClickUp sync for all routers
+ */
+router.post('/sync', async (req, res) => {
+  try {
+    logger.info('Manual ClickUp sync triggered');
+    const result = await syncAllRoutersToClickUp();
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    logger.error('Error during manual ClickUp sync:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/clickup/sync/stats
+ * Get ClickUp sync statistics
+ */
+router.get('/sync/stats', (req, res) => {
+  try {
+    const stats = getSyncStats();
+    res.json(stats);
+  } catch (error) {
+    logger.error('Error getting sync stats:', error);
     res.status(500).json({ error: error.message });
   }
 });
