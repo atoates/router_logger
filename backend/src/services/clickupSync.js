@@ -81,9 +81,14 @@ async function syncRouterToClickUp(router) {
     }
 
     // Operational Status (dropdown: use UUID option IDs)
-    const statusValue = router.current_status === 'online' 
-      ? STATUS_OPTIONS.ONLINE 
-      : STATUS_OPTIONS.OFFLINE;
+    // Status is 'online' or 'offline' from most recent log, or null if no logs
+    // Consider router offline if: no status, status is explicitly 'offline', or last seen > 24h ago
+    const isOnline = router.current_status === 'online' && 
+                     router.last_seen && 
+                     (Date.now() - new Date(router.last_seen).getTime()) < 24 * 60 * 60 * 1000;
+    
+    const statusValue = isOnline ? STATUS_OPTIONS.ONLINE : STATUS_OPTIONS.OFFLINE;
+    
     customFields.push({
       id: CUSTOM_FIELDS.OPERATIONAL_STATUS,
       value: statusValue
@@ -100,6 +105,8 @@ async function syncRouterToClickUp(router) {
     await clickupClient.updateTask(router.clickup_task_id, {
       custom_fields: customFields
     }, 'default');
+
+    logger.debug(`Synced router ${router.router_id}: dbStatus=${router.current_status}, isOnline=${isOnline}, lastSeen=${router.last_seen}, clickupStatus=${statusValue}`);
 
     return { success: true };
 
