@@ -318,6 +318,7 @@ router.get('/out-of-service', async (req, res) => {
         imei,
         service_status,
         stored_with,
+        stored_with_username,
         out_of_service_date,
         out_of_service_reason,
         out_of_service_notes,

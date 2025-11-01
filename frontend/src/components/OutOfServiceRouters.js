@@ -104,13 +104,15 @@ const OutOfServiceRouters = () => {
                 <th>Stored With</th>
                 <th>Out Since</th>
                 <th>Days</th>
-                <th>Reason</th>
+                <th>Location</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {outOfServiceRouters.map((router) => {
                 const days = getDaysOutOfService(router.out_of_service_date);
+                const storedWith = router.stored_with_username || router.stored_with || 'Not specified';
+                
                 return (
                   <tr key={router.router_id}>
                     <td>
@@ -123,8 +125,8 @@ const OutOfServiceRouters = () => {
                     </td>
                     <td className="oos-imei">{router.imei || 'N/A'}</td>
                     <td>
-                      <span className={`oos-person-badge oos-person-${router.stored_with?.toLowerCase()}`}>
-                        {router.stored_with || 'Unknown'}
+                      <span className={`oos-person-badge oos-person-${storedWith?.toLowerCase()}`}>
+                        {storedWith}
                       </span>
                     </td>
                     <td>{formatDate(router.out_of_service_date)}</td>
@@ -136,7 +138,7 @@ const OutOfServiceRouters = () => {
                       )}
                     </td>
                     <td className="oos-reason">
-                      {router.out_of_service_reason || 'Not specified'}
+                      {router.current_property_name || 'Not specified'}
                       {router.out_of_service_notes && (
                         <div className="oos-notes">{router.out_of_service_notes}</div>
                       )}
