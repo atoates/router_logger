@@ -222,7 +222,7 @@ async function clearStoredWith(clearance) {
       
       await client.query(
         `UPDATE routers 
-         SET service_status = 'operational',
+         SET service_status = 'in-service',
              out_of_service_date = NULL,
              out_of_service_notes = NULL
          WHERE router_id = $1`,
@@ -286,7 +286,7 @@ async function clearStoredWith(clearance) {
            current_stored_with_user_id = NULL,
            current_stored_with_username = NULL,
            state_updated_at = $1,
-           service_status = 'operational',
+           service_status = 'in-service',
            out_of_service_date = NULL,
            out_of_service_notes = NULL
        WHERE router_id = $2`,
