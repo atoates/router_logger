@@ -640,11 +640,14 @@ async function removeRouterFromProperty(removal) {
     }
 
     // Legacy path with assignment_type/removed_at
-    const currentResult = await client.query(
-      `SELECT * FROM router_property_assignments 
-       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'property'`,
-      [routerId]
-    );
+    const hasAssignType = await hasAssignmentTypeColumn();
+    const query = hasAssignType
+      ? `SELECT * FROM router_property_assignments 
+         WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'property'`
+      : `SELECT * FROM router_property_assignments 
+         WHERE router_id = $1 AND removed_at IS NULL`;
+    
+    const currentResult = await client.query(query, [routerId]);
 
     if (currentResult.rows.length === 0) {
       throw new Error(`Router ${routerId} is not currently assigned to any property`);
@@ -746,12 +749,15 @@ async function getCurrentProperty(routerId) {
       return { ...a, installed_at: a.event_date, daysSinceInstalled };
     }
 
-    // Legacy
-    const result = await pool.query(
-      `SELECT * FROM router_property_assignments 
-       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'property'`,
-      [routerId]
-    );
+    // Legacy - check if assignment_type exists
+    const hasAssignType = await hasAssignmentTypeColumn();
+    const query = hasAssignType
+      ? `SELECT * FROM router_property_assignments 
+         WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'property'`
+      : `SELECT * FROM router_property_assignments 
+         WHERE router_id = $1 AND removed_at IS NULL`;
+    
+    const result = await pool.query(query, [routerId]);
     if (result.rows.length === 0) return null;
     const assignment = result.rows[0];
     const daysSinceInstalled = Math.floor((Date.now() - new Date(assignment.installed_at).getTime()) / (1000 * 60 * 60 * 24));
@@ -790,12 +796,15 @@ async function getCurrentStorage(routerId) {
       return { ...a, installed_at: a.event_date, daysSinceStored };
     }
 
-    // Legacy
-    const result = await pool.query(
-      `SELECT * FROM router_property_assignments 
-       WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'storage'`,
-      [routerId]
-    );
+    // Legacy - check if assignment_type exists
+    const hasAssignType = await hasAssignmentTypeColumn();
+    const query = hasAssignType
+      ? `SELECT * FROM router_property_assignments 
+         WHERE router_id = $1 AND removed_at IS NULL AND assignment_type = 'storage'`
+      : `SELECT * FROM router_property_assignments 
+         WHERE router_id = $1 AND removed_at IS NULL`;
+    
+    const result = await pool.query(query, [routerId]);
     if (result.rows.length === 0) return null;
     const storage = result.rows[0];
     const daysSinceStored = Math.floor((Date.now() - new Date(storage.installed_at).getTime()) / (1000 * 60 * 60 * 24));
@@ -927,23 +936,36 @@ async function getRoutersAtProperty(propertyTaskId) {
         [propertyTaskId]
       );
     } else {
-      // Legacy
-      result = await pool.query(
-        `SELECT 
-           rpa.*,
-           r.name as router_name,
-           r.imei,
-           r.firmware_version,
-           r.current_status,
-           r.last_seen
-         FROM router_property_assignments rpa
-         JOIN routers r ON r.router_id = rpa.router_id
-         WHERE rpa.property_clickup_task_id = $1 
-           AND rpa.removed_at IS NULL
-           AND rpa.assignment_type = 'property'
-         ORDER BY rpa.installed_at DESC`,
-        [propertyTaskId]
-      );
+      // Legacy - check if assignment_type exists
+      const hasAssignType = await hasAssignmentTypeColumn();
+      const query = hasAssignType
+        ? `SELECT 
+             rpa.*,
+             r.name as router_name,
+             r.imei,
+             r.firmware_version,
+             r.current_status,
+             r.last_seen
+           FROM router_property_assignments rpa
+           JOIN routers r ON r.router_id = rpa.router_id
+           WHERE rpa.property_clickup_task_id = $1 
+             AND rpa.removed_at IS NULL
+             AND rpa.assignment_type = 'property'
+           ORDER BY rpa.installed_at DESC`
+        : `SELECT 
+             rpa.*,
+             r.name as router_name,
+             r.imei,
+             r.firmware_version,
+             r.current_status,
+             r.last_seen
+           FROM router_property_assignments rpa
+           JOIN routers r ON r.router_id = rpa.router_id
+           WHERE rpa.property_clickup_task_id = $1 
+             AND rpa.removed_at IS NULL
+           ORDER BY rpa.installed_at DESC`;
+      
+      result = await pool.query(query, [propertyTaskId]);
     }
 
     return result.rows.map(row => ({
