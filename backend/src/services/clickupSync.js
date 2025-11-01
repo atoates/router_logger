@@ -119,11 +119,17 @@ async function syncAllRoutersToClickUp() {
   try {
     // Get all routers with ClickUp tasks
     const result = await pool.query(
-      `SELECT router_id, clickup_task_id, imei, firmware_version, 
-              last_seen, current_status, name
-       FROM routers 
-       WHERE clickup_task_id IS NOT NULL
-       ORDER BY router_id`
+      `SELECT 
+         r.router_id, 
+         r.clickup_task_id, 
+         r.imei, 
+         r.firmware_version, 
+         r.last_seen, 
+         r.name,
+         (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status
+       FROM routers r
+       WHERE r.clickup_task_id IS NOT NULL
+       ORDER BY r.router_id`
     );
 
     const routers = result.rows;
