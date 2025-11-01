@@ -67,11 +67,36 @@ async function storeRouterWith(storage) {
     const hasMigration = await hasAssignmentTypeColumn();
     
     if (!hasMigration) {
-      // Migration hasn't run yet - use old stored_with column
-      logger.warn('assignment_type column does not exist yet - using legacy stored_with column');
+      // Migration hasn't run yet - create record WITHOUT assignment_type column
+      logger.warn('assignment_type column does not exist yet - using legacy approach');
       
-      // Don't use stored_with column to avoid constraint violation
-      // Just update service_status and notes
+      // Check if router is currently assigned to a property (can't store if assigned)
+      const propertyCheck = await client.query(
+        `SELECT id, property_clickup_task_id, property_name 
+         FROM router_property_assignments 
+         WHERE router_id = $1 AND removed_at IS NULL`,
+        [routerId]
+      );
+
+      if (propertyCheck.rows.length > 0) {
+        const property = propertyCheck.rows[0];
+        throw new Error(
+          `Router ${routerId} is currently installed at property "${property.property_name}". ` +
+          `Remove from property before storing with a person.`
+        );
+      }
+
+      // Create storage record in property_assignments table (without assignment_type)
+      // Store the user info in the stored_with columns if they exist
+      const storageResult = await client.query(
+        `INSERT INTO router_property_assignments 
+         (router_id, property_clickup_task_id, property_name, stored_with_user_id, stored_with_username, installed_at, installed_by, notes)
+         VALUES ($1, NULL, $2, $3, $4, $5, $6, $7)
+         RETURNING *`,
+        [routerId, `Stored with ${storedWithUsername}`, storedWithUserId, storedWithUsername, storedAt, storedBy, notes]
+      );
+      
+      // Also update routers table for backward compatibility
       await client.query(
         `UPDATE routers 
          SET service_status = 'out-of-service',
@@ -83,12 +108,7 @@ async function storeRouterWith(storage) {
       
       await client.query('COMMIT');
       
-      return {
-        router_id: routerId,
-        stored_with_username: storedWithUsername,
-        installed_at: storedAt,
-        notes
-      };
+      return storageResult.rows[0];
     }
 
     // Check if router is currently assigned to a property
@@ -186,13 +206,39 @@ async function clearStoredWith(clearance) {
     const hasMigration = await hasAssignmentTypeColumn();
     
     if (!hasMigration) {
-      // Migration hasn't run yet - use old stored_with column
-      logger.warn('assignment_type column does not exist yet - using legacy stored_with column');
+      // Migration hasn't run yet - find and close the storage record
+      logger.warn('assignment_type column does not exist yet - using legacy approach');
       
+      // Find current storage record (look for records with stored_with_user_id/username)
+      const currentResult = await client.query(
+        `SELECT * FROM router_property_assignments 
+         WHERE router_id = $1 
+           AND removed_at IS NULL 
+           AND (stored_with_user_id IS NOT NULL OR stored_with_username IS NOT NULL)
+         ORDER BY installed_at DESC
+         LIMIT 1`,
+        [routerId]
+      );
+
+      if (currentResult.rows.length === 0) {
+        throw new Error(`Router ${routerId} is not currently stored with anyone`);
+      }
+
+      const currentStorage = currentResult.rows[0];
+
+      // Update storage record with removal info
+      const updateResult = await client.query(
+        `UPDATE router_property_assignments 
+         SET removed_at = $1, removed_by = $2, notes = COALESCE($3, notes), updated_at = CURRENT_TIMESTAMP
+         WHERE id = $4
+         RETURNING *`,
+        [clearedAt, clearedBy, notes, currentStorage.id]
+      );
+      
+      // Also update routers table
       await client.query(
         `UPDATE routers 
-         SET stored_with = NULL,
-             service_status = 'operational',
+         SET service_status = 'operational',
              out_of_service_date = NULL,
              out_of_service_notes = NULL
          WHERE router_id = $1`,
@@ -201,10 +247,7 @@ async function clearStoredWith(clearance) {
       
       await client.query('COMMIT');
       
-      return {
-        router_id: routerId,
-        removed_at: clearedAt
-      };
+      return updateResult.rows[0];
     }
 
     // Find current storage record
@@ -624,6 +667,8 @@ async function getCurrentStorage(routerId) {
  */
 async function getPropertyHistory(routerId) {
   try {
+    const hasMigration = await hasAssignmentTypeColumn();
+    
     const result = await pool.query(
       `SELECT * FROM router_property_assignments 
        WHERE router_id = $1 
@@ -637,9 +682,23 @@ async function getPropertyHistory(routerId) {
       const durationMs = removedAt - installedAt;
       const durationDays = Math.floor(durationMs / (1000 * 60 * 60 * 24));
 
+      // Determine assignment type - if migration hasn't run, assignment_type will be null
+      // In that case, check if it has a property_clickup_task_id (property) or stored_with fields (storage)
+      let assignmentType = assignment.assignment_type;
+      if (!hasMigration || !assignmentType) {
+        // Pre-migration: determine type by which fields are populated
+        if (assignment.stored_with_user_id || assignment.stored_with_username) {
+          assignmentType = 'storage';
+        } else if (assignment.property_clickup_task_id) {
+          assignmentType = 'property';
+        } else {
+          assignmentType = 'property'; // default for old records
+        }
+      }
+
       const baseRecord = {
         id: assignment.id,
-        assignmentType: assignment.assignment_type,
+        assignmentType: assignmentType,
         installedAt: assignment.installed_at,
         removedAt: assignment.removed_at,
         durationDays,
@@ -649,7 +708,7 @@ async function getPropertyHistory(routerId) {
         current: assignment.removed_at === null
       };
 
-      if (assignment.assignment_type === 'property') {
+      if (assignmentType === 'property') {
         return {
           ...baseRecord,
           propertyTaskId: assignment.property_clickup_task_id,
