@@ -67,36 +67,11 @@ async function storeRouterWith(storage) {
     const hasMigration = await hasAssignmentTypeColumn();
     
     if (!hasMigration) {
-      // Migration hasn't run yet - create record WITHOUT assignment_type column
-      logger.warn('assignment_type column does not exist yet - using legacy approach');
+      // Migration hasn't run yet - can't create storage records in property_assignments
+      // because stored_with_user_id and stored_with_username columns don't exist
+      logger.warn('assignment_type column does not exist yet - only updating routers table');
       
-      // Check if router is currently assigned to a property (can't store if assigned)
-      const propertyCheck = await client.query(
-        `SELECT id, property_clickup_task_id, property_name 
-         FROM router_property_assignments 
-         WHERE router_id = $1 AND removed_at IS NULL`,
-        [routerId]
-      );
-
-      if (propertyCheck.rows.length > 0) {
-        const property = propertyCheck.rows[0];
-        throw new Error(
-          `Router ${routerId} is currently installed at property "${property.property_name}". ` +
-          `Remove from property before storing with a person.`
-        );
-      }
-
-      // Create storage record in property_assignments table (without assignment_type)
-      // Store the user info in the stored_with columns if they exist
-      const storageResult = await client.query(
-        `INSERT INTO router_property_assignments 
-         (router_id, property_clickup_task_id, property_name, stored_with_user_id, stored_with_username, installed_at, installed_by, notes)
-         VALUES ($1, NULL, $2, $3, $4, $5, $6, $7)
-         RETURNING *`,
-        [routerId, `Stored with ${storedWithUsername}`, storedWithUserId, storedWithUsername, storedAt, storedBy, notes]
-      );
-      
-      // Also update routers table for backward compatibility
+      // Just update routers table for now
       await client.query(
         `UPDATE routers 
          SET service_status = 'out-of-service',
@@ -108,7 +83,12 @@ async function storeRouterWith(storage) {
       
       await client.query('COMMIT');
       
-      return storageResult.rows[0];
+      return {
+        router_id: routerId,
+        stored_with_username: storedWithUsername,
+        installed_at: storedAt,
+        notes
+      };
     }
 
     // Check if router is currently assigned to a property
@@ -206,36 +186,10 @@ async function clearStoredWith(clearance) {
     const hasMigration = await hasAssignmentTypeColumn();
     
     if (!hasMigration) {
-      // Migration hasn't run yet - find and close the storage record
-      logger.warn('assignment_type column does not exist yet - using legacy approach');
+      // Migration hasn't run yet - just update routers table
+      logger.warn('assignment_type column does not exist yet - only updating routers table');
       
-      // Find current storage record (look for records with stored_with_user_id/username)
-      const currentResult = await client.query(
-        `SELECT * FROM router_property_assignments 
-         WHERE router_id = $1 
-           AND removed_at IS NULL 
-           AND (stored_with_user_id IS NOT NULL OR stored_with_username IS NOT NULL)
-         ORDER BY installed_at DESC
-         LIMIT 1`,
-        [routerId]
-      );
-
-      if (currentResult.rows.length === 0) {
-        throw new Error(`Router ${routerId} is not currently stored with anyone`);
-      }
-
-      const currentStorage = currentResult.rows[0];
-
-      // Update storage record with removal info
-      const updateResult = await client.query(
-        `UPDATE router_property_assignments 
-         SET removed_at = $1, removed_by = $2, notes = COALESCE($3, notes), updated_at = CURRENT_TIMESTAMP
-         WHERE id = $4
-         RETURNING *`,
-        [clearedAt, clearedBy, notes, currentStorage.id]
-      );
-      
-      // Also update routers table
+      // Just update routers table
       await client.query(
         `UPDATE routers 
          SET service_status = 'operational',
@@ -247,7 +201,10 @@ async function clearStoredWith(clearance) {
       
       await client.query('COMMIT');
       
-      return updateResult.rows[0];
+      return {
+        router_id: routerId,
+        removed_at: clearedAt
+      };
     }
 
     // Find current storage record

@@ -311,23 +311,49 @@ router.post('/clear-clickup-tasks', async (req, res) => {
 // GET routers that are out of service
 router.get('/out-of-service', async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT 
-        router_id,
-        name,
-        imei,
-        service_status,
-        stored_with,
-        stored_with_username,
-        out_of_service_date,
-        out_of_service_reason,
-        out_of_service_notes,
-        current_property_name,
-        last_seen
-      FROM routers
-      WHERE service_status = 'out-of-service'
-      ORDER BY out_of_service_date DESC
+    // Check if stored_with_username column exists
+    const columnCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'routers' 
+        AND column_name = 'stored_with_username'
     `);
+    
+    const hasStoredWithUsername = columnCheck.rows.length > 0;
+    
+    const query = hasStoredWithUsername
+      ? `SELECT 
+          router_id,
+          name,
+          imei,
+          service_status,
+          stored_with,
+          stored_with_username,
+          out_of_service_date,
+          out_of_service_reason,
+          out_of_service_notes,
+          current_property_name,
+          last_seen
+        FROM routers
+        WHERE service_status = 'out-of-service'
+        ORDER BY out_of_service_date DESC`
+      : `SELECT 
+          router_id,
+          name,
+          imei,
+          service_status,
+          stored_with,
+          NULL as stored_with_username,
+          out_of_service_date,
+          out_of_service_reason,
+          out_of_service_notes,
+          current_property_name,
+          last_seen
+        FROM routers
+        WHERE service_status = 'out-of-service'
+        ORDER BY out_of_service_date DESC`;
+    
+    const result = await pool.query(query);
     res.json(result.rows);
   } catch (error) {
     logger.error('Error fetching out-of-service routers:', error);
