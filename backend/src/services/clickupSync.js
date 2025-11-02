@@ -19,11 +19,11 @@ const CUSTOM_FIELDS = {
   ROUTER_DASHBOARD: 'b9cf2e41-dc79-4768-985a-bda52b9dad1f'
 };
 
-// Operational status options (dropdown UUIDs)
+// Operational status options (dropdown orderindex values)
 const STATUS_OPTIONS = {
-  ONLINE: 'b256bad4-2f9e-4e98-89b1-77a2a5443337',
-  OFFLINE: '7149ad8d-db43-48ab-a038-a17162c7495d',
-  MAINTENANCE: '38342970-fdd4-4c9f-bcea-738be4f6e2c5'
+  ONLINE: 0,
+  OFFLINE: 1,
+  MAINTENANCE: 2
 };
 
 let syncIntervalId = null;
