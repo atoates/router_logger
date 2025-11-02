@@ -266,6 +266,48 @@ class ClickUpClient {
   }
 
   /**
+   * Update a single custom field value
+   * @param {string} taskId - Task ID
+   * @param {string} fieldId - Custom field ID
+   * @param {any} value - New value for the field
+   * @param {string} userId - User identifier
+   * @returns {Promise<Object>} Response
+   */
+  async updateCustomField(taskId, fieldId, value, userId = 'default') {
+    try {
+      const client = await this.getAuthorizedClient(userId);
+      
+      logger.info('ClickUp updateCustomField request:', {
+        taskId,
+        fieldId,
+        value,
+        valueType: typeof value
+      });
+      
+      const response = await client.post(`/task/${taskId}/field/${fieldId}`, { value });
+      
+      logger.info('ClickUp updateCustomField response:', {
+        taskId,
+        fieldId,
+        status: response.status,
+        hasData: !!response.data
+      });
+      
+      return response.data;
+    } catch (error) {
+      logger.error('Error updating custom field:', {
+        taskId,
+        fieldId,
+        value,
+        status: error.response?.status,
+        errorData: error.response?.data,
+        message: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Search tasks across workspace
    * @param {string} workspaceId - Workspace ID
    * @param {Object} filters - Search filters

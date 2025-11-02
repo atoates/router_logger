@@ -77,19 +77,12 @@ async function syncRouterToClickUp(router) {
       });
     }
 
-    // Operational Status (dropdown: use UUID option IDs)
-    // Use the current_status from the most recent log entry
-    // This is already computed correctly by the database query
+    // Operational Status (dropdown) - will be updated separately via individual field API
+    // Calculate the value but don't add to customFields array
     const isOnline = router.current_status === 'online';
-    
     const statusValue = isOnline ? STATUS_OPTIONS.ONLINE : STATUS_OPTIONS.OFFLINE;
     
     logger.info(`Router ${router.router_id}: current_status="${router.current_status}", sending ClickUp status="${isOnline ? 'ONLINE' : 'OFFLINE'}" (${statusValue})`);
-    
-    customFields.push({
-      id: CUSTOM_FIELDS.OPERATIONAL_STATUS,
-      value: statusValue
-    });
 
     // Router Dashboard (URL) - direct link to router's page
     const dashboardUrl = `${frontendUrl}/router/${router.router_id}`;
@@ -98,7 +91,7 @@ async function syncRouterToClickUp(router) {
       value: dashboardUrl
     });
 
-    // Update task via ClickUp client
+    // Update all custom fields EXCEPT Operational Status first
     const updatePayload = {
       custom_fields: customFields
     };
@@ -109,6 +102,21 @@ async function syncRouterToClickUp(router) {
     }
     
     await clickupClient.updateTask(router.clickup_task_id, updatePayload, 'default');
+
+    // Update Operational Status separately using the individual field API
+    // This is more reliable for dropdown fields
+    try {
+      await clickupClient.updateCustomField(
+        router.clickup_task_id,
+        CUSTOM_FIELDS.OPERATIONAL_STATUS,
+        statusValue,
+        'default'
+      );
+      logger.debug(`Updated Operational Status for router ${router.router_id} to ${statusValue} (${isOnline ? 'ONLINE' : 'OFFLINE'})`);
+    } catch (fieldError) {
+      logger.error(`Failed to update Operational Status for router ${router.router_id}:`, fieldError.message);
+      // Don't fail the whole sync if just the status field fails
+    }
 
     logger.debug(`Synced router ${router.router_id}: dbStatus=${router.current_status}, isOnline=${isOnline}, lastSeen=${router.last_seen}, clickupStatus=${statusValue}`);
 
