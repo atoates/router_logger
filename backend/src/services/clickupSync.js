@@ -87,6 +87,8 @@ async function syncRouterToClickUp(router) {
     
     const statusValue = isOnline ? STATUS_OPTIONS.ONLINE : STATUS_OPTIONS.OFFLINE;
     
+    logger.info(`Router ${router.router_id}: current_status="${router.current_status}", sending ClickUp status="${isOnline ? 'ONLINE' : 'OFFLINE'}" (${statusValue})`);
+    
     customFields.push({
       id: CUSTOM_FIELDS.OPERATIONAL_STATUS,
       value: statusValue
@@ -100,9 +102,16 @@ async function syncRouterToClickUp(router) {
     });
 
     // Update task via ClickUp client
-    await clickupClient.updateTask(router.clickup_task_id, {
+    const updatePayload = {
       custom_fields: customFields
-    }, 'default');
+    };
+    
+    // Log the exact payload for Router #58 to debug
+    if (router.router_id === '6004928162') {
+      logger.info(`Router #58 ClickUp update payload:`, JSON.stringify(updatePayload, null, 2));
+    }
+    
+    await clickupClient.updateTask(router.clickup_task_id, updatePayload, 'default');
 
     logger.debug(`Synced router ${router.router_id}: dbStatus=${router.current_status}, isOnline=${isOnline}, lastSeen=${router.last_seen}, clickupStatus=${statusValue}`);
 
