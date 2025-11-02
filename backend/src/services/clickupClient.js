@@ -278,17 +278,19 @@ class ClickUpClient {
     try {
       const client = await this.getAuthorizedClient(userId);
       
-      const payload = {};
+      // Build assignees payload
+      const payload = { assignees: {} };
+      
       if (add.length > 0) {
-        payload.assignees = { add };
+        payload.assignees.add = add;
       }
       if (rem.length > 0) {
-        payload.assignees = payload.assignees || {};
         payload.assignees.rem = rem;
       }
       
       logger.info('ClickUp updateTaskAssignees request:', {
         taskId,
+        payload,
         add,
         rem
       });
