@@ -27,16 +27,48 @@
   gap: 10px;
 }
 
+.task-assigned-to {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  color: #fff;
+}
+
+.assigned-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.assigned-info {
+  flex: 1;
+}
+
+.assigned-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.9;
+  margin-bottom: 2px;
+}
+
+.assigned-name {
+  font-size: 16px;
+  font-weight: 600;
+}
+
 .task-info {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .task-name {
+  font-size: 14px;
   font-weight: 600;
-  font-size: 15px;
-  color: #0f172a;
+  color: #1e293b;
 }
 
 .task-meta {

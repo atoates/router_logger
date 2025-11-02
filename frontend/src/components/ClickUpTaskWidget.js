@@ -203,17 +203,23 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
       <div className="clickup-task-widget">
         {linkedTask ? (
           <div className="task-linked">
+            {/* Show assignee prominently if router is assigned to someone */}
+            {linkedTask.assignees && linkedTask.assignees.length > 0 && (
+              <div className="task-assigned-to">
+                <div className="assigned-icon">👤</div>
+                <div className="assigned-info">
+                  <div className="assigned-label">Assigned To</div>
+                  <div className="assigned-name">{linkedTask.assignees[0].username}</div>
+                </div>
+              </div>
+            )}
+            
             <div className="task-info">
               <div className="task-name">{linkedTask.name}</div>
               <div className="task-meta">
                 {linkedTask.status && (
                   <span className={`task-status ${linkedTask.status.toLowerCase().replace(/\s+/g, '-')}`}>
                     {linkedTask.status}
-                  </span>
-                )}
-                {linkedTask.assignees && linkedTask.assignees.length > 0 && (
-                  <span className="task-assignees">
-                    👤 {linkedTask.assignees.map(a => a.username).join(', ')}
                   </span>
                 )}
                 {linkedTask.due_date && (
@@ -237,7 +243,9 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
                   onClick={onStoredWith}
                   className="task-btn task-btn-secondary"
                 >
-                  Stored with
+                  {linkedTask.assignees && linkedTask.assignees.length > 0 
+                    ? 'Change Assignment' 
+                    : 'Assign Router'}
                 </button>
               )}
             </div>
