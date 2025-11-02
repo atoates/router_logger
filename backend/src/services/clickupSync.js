@@ -12,8 +12,8 @@ const CUSTOM_FIELDS = {
   ROUTER_MODEL: 'f2cbe126-4e68-4be0-9c3b-fa230d289f51',
   FIRMWARE: '845f6619-e3ee-4634-b92a-a117f14fb8c7',
   LAST_MAINTENANCE_DATE: '49551d31-6e57-4620-af95-32c701e93488',
-  IMEI: '8b278eb1-ba02-43c7-81d6-0b739c089e7c',
-  ROUTER_ID: 'dfe0016c-4ab0-4dd9-bb38-b338411e9b47',
+  IMEI: '687faa85-01c0-48c4-8f6e-60a78a570cab', // Updated: was wrong ID
+  ROUTER_ID: 'dfe0016c-4ab0-4dd9-bb38-b338411e9b47', // This is actually "Serial" in ClickUp
   LAST_ONLINE: '684e19a1-06c3-4bfd-94dd-6aca4a9b85fe',
   DATA_USAGE: 'c58206db-e995-4717-8e62-d36e15d0a3e2',
   ROUTER_DASHBOARD: 'b9cf2e41-dc79-4768-985a-bda52b9dad1f'
@@ -53,15 +53,12 @@ async function syncRouterToClickUp(router) {
       value: router.router_id.toString()
     });
 
-    // IMEI (number)
+    // IMEI (text - NOT number in ClickUp!)
     if (router.imei) {
-      const imeiNum = parseInt(router.imei);
-      if (!isNaN(imeiNum)) {
-        customFields.push({
-          id: CUSTOM_FIELDS.IMEI,
-          value: imeiNum
-        });
-      }
+      customFields.push({
+        id: CUSTOM_FIELDS.IMEI,
+        value: router.imei.toString()
+      });
     }
 
     // Firmware (text)
