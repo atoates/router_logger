@@ -577,6 +577,21 @@ router.get('/custom-fields/:listId', async (req, res) => {
 });
 
 /**
+ * GET /api/clickup/sync/stats
+ * Get ClickUp sync statistics
+ * Note: Must be before /sync/:routerId to avoid matching "stats" as a router ID
+ */
+router.get('/sync/stats', (req, res) => {
+  try {
+    const stats = getSyncStats();
+    res.json(stats);
+  } catch (error) {
+    logger.error('Error getting sync stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/clickup/sync
  * Manually trigger ClickUp sync for all routers
  */
@@ -641,20 +656,6 @@ router.post('/sync/:routerId', async (req, res) => {
   } catch (error) {
     logger.error('Error syncing single router:', error);
     res.status(500).json({ error: error.message, stack: error.stack });
-  }
-});
-
-/**
- * GET /api/clickup/sync/stats
- * Get ClickUp sync statistics
- */
-router.get('/sync/stats', (req, res) => {
-  try {
-    const stats = getSyncStats();
-    res.json(stats);
-  } catch (error) {
-    logger.error('Error getting sync stats:', error);
-    res.status(500).json({ error: error.message });
   }
 });
 
