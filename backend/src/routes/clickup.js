@@ -595,6 +595,56 @@ router.post('/sync', async (req, res) => {
 });
 
 /**
+ * POST /api/clickup/sync/:routerId
+ * Manually sync a single router to ClickUp (for debugging)
+ */
+router.post('/sync/:routerId', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const { pool } = require('../config/database');
+    const { syncRouterToClickUp } = require('../services/clickupSync');
+    
+    // Get router data
+    const result = await pool.query(
+      `SELECT 
+         r.router_id, 
+         r.clickup_task_id, 
+         r.imei, 
+         r.firmware_version, 
+         r.last_seen, 
+         r.name,
+         (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status
+       FROM routers r
+       WHERE r.router_id = $1`,
+      [routerId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Router not found' });
+    }
+    
+    const router = result.rows[0];
+    logger.info(`Syncing single router ${routerId}:`, router);
+    
+    const syncResult = await syncRouterToClickUp(router);
+    
+    res.json({
+      success: syncResult.success,
+      router: {
+        id: router.router_id,
+        name: router.name,
+        current_status: router.current_status,
+        clickup_task_id: router.clickup_task_id
+      },
+      result: syncResult
+    });
+  } catch (error) {
+    logger.error('Error syncing single router:', error);
+    res.status(500).json({ error: error.message, stack: error.stack });
+  }
+});
+
+/**
  * GET /api/clickup/sync/stats
  * Get ClickUp sync statistics
  */
