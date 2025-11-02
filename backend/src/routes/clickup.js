@@ -608,6 +608,30 @@ router.get('/sync/stats', (req, res) => {
   }
 });
 
+/**
+ * GET /api/clickup/debug/task/:taskId
+ * Get full task details including custom fields for debugging
+ */
+router.get('/debug/task/:taskId', async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const task = await clickupClient.getTask(taskId, 'default');
+    
+    // Focus on custom fields
+    const opStatus = task.custom_fields?.find(f => f.name === 'Operational Status');
+    
+    res.json({
+      taskId: task.id,
+      name: task.name,
+      operationalStatus: opStatus,
+      allCustomFields: task.custom_fields
+    });
+  } catch (error) {
+    logger.error('Error getting task details:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Clean up expired OAuth states periodically
 setInterval(() => {
   const now = Date.now();
