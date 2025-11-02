@@ -290,7 +290,7 @@ class ClickUpClient {
       
       logger.info('ClickUp updateTaskAssignees request:', {
         taskId,
-        payload,
+        payloadStringified: JSON.stringify(payload),
         add,
         rem
       });
