@@ -668,6 +668,11 @@ router.get('/debug/task/:taskId', async (req, res) => {
     const { taskId } = req.params;
     const task = await clickupClient.getTask(taskId, 'default');
     
+    // Return raw task if requested
+    if (req.query.raw === 'true') {
+      return res.json(task);
+    }
+    
     // Focus on custom fields
     const opStatus = task.custom_fields?.find(f => f.name === 'Operational Status');
     
