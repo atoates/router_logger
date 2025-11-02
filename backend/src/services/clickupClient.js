@@ -232,12 +232,35 @@ class ClickUpClient {
   async updateTask(taskId, updates, userId = 'default') {
     try {
       const client = await this.getAuthorizedClient(userId);
+      
+      // Log detailed request info
+      logger.info('ClickUp updateTask request:', {
+        taskId,
+        updateKeys: Object.keys(updates),
+        hasCustomFields: !!updates.custom_fields,
+        customFieldsCount: updates.custom_fields?.length || 0,
+        customFields: updates.custom_fields
+      });
+      
       const response = await client.put(`/task/${taskId}`, updates);
       
-      logger.info('Updated ClickUp task', { taskId });
+      // Log response
+      logger.info('ClickUp updateTask response:', {
+        taskId,
+        status: response.status,
+        statusText: response.statusText,
+        hasData: !!response.data
+      });
+      
       return response.data;
     } catch (error) {
-      logger.error('Error updating ClickUp task:', error.response?.data || error.message);
+      logger.error('Error updating ClickUp task:', {
+        taskId,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        errorData: error.response?.data,
+        message: error.message
+      });
       throw error;
     }
   }
