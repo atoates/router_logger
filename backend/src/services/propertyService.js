@@ -64,9 +64,10 @@ async function validatePropertyTask(propertyListId) {
 }
 
 /**
- * Store router with a person (out of service)
+ * Store router with a person (mark as out of service)
+ * Also updates the ClickUp task assignee to reflect who has the router
  * @param {Object} storage - Storage details
- * @returns {Promise<Object>} Created storage event
+ * @returns {Promise<Object>} Storage assignment event
  */
 async function storeRouterWith(storage) {
   const {
@@ -82,6 +83,14 @@ async function storeRouterWith(storage) {
   
   try {
     await client.query('BEGIN');
+
+    // Get router's ClickUp task ID for assignee update
+    const routerResult = await client.query(
+      'SELECT clickup_task_id FROM routers WHERE router_id = $1',
+      [routerId]
+    );
+    
+    const clickupTaskId = routerResult.rows[0]?.clickup_task_id;
 
     // Check if event-based system is in place
     const hasEvents = await hasEventTypeColumn();
@@ -184,6 +193,35 @@ async function storeRouterWith(storage) {
       storedAt
     });
 
+    // Update ClickUp task assignee (after commit, so DB is consistent even if this fails)
+    if (clickupTaskId && storedWithUserId) {
+      try {
+        const clickupClient = require('./clickupClient');
+        
+        // Convert storedWithUserId to number (ClickUp user IDs are numeric)
+        const userId = parseInt(storedWithUserId);
+        if (!isNaN(userId)) {
+          await clickupClient.updateTaskAssignees(
+            clickupTaskId,
+            { add: [userId] },
+            'default'
+          );
+          logger.info('Updated ClickUp task assignee', { 
+            routerId, 
+            clickupTaskId, 
+            assignee: storedWithUsername 
+          });
+        }
+      } catch (clickupError) {
+        // Don't fail the whole operation if ClickUp update fails
+        logger.warn('Failed to update ClickUp task assignee (storage still recorded)', {
+          routerId,
+          clickupTaskId,
+          error: clickupError.message
+        });
+      }
+    }
+
     return storageResult.rows[0];
 
   } catch (error) {
@@ -197,6 +235,7 @@ async function storeRouterWith(storage) {
 
 /**
  * Clear router storage (bring back in service)
+ * Also removes the assignee from the ClickUp task
  * @param {Object} clearance - Clearance details
  * @returns {Promise<Object>} Storage remove event
  */
@@ -212,6 +251,14 @@ async function clearStoredWith(clearance) {
 
   try {
     await client.query('BEGIN');
+
+    // Get router's ClickUp task ID for assignee update
+    const routerResult = await client.query(
+      'SELECT clickup_task_id FROM routers WHERE router_id = $1',
+      [routerId]
+    );
+    
+    const clickupTaskId = routerResult.rows[0]?.clickup_task_id;
 
     // Check if event-based system is in place
     const hasEvents = await hasEventTypeColumn();
@@ -299,6 +346,35 @@ async function clearStoredWith(clearance) {
       routerId,
       storedWithUsername: lastStorageAssign.stored_with_username
     });
+
+    // Remove ClickUp task assignee (after commit, so DB is consistent even if this fails)
+    if (clickupTaskId && lastStorageAssign.stored_with_user_id) {
+      try {
+        const clickupClient = require('./clickupClient');
+        
+        // Convert storedWithUserId to number (ClickUp user IDs are numeric)
+        const userId = parseInt(lastStorageAssign.stored_with_user_id);
+        if (!isNaN(userId)) {
+          await clickupClient.updateTaskAssignees(
+            clickupTaskId,
+            { rem: [userId] },
+            'default'
+          );
+          logger.info('Removed ClickUp task assignee', { 
+            routerId, 
+            clickupTaskId, 
+            assignee: lastStorageAssign.stored_with_username
+          });
+        }
+      } catch (clickupError) {
+        // Don't fail the whole operation if ClickUp update fails
+        logger.warn('Failed to remove ClickUp task assignee (storage cleared in DB)', {
+          routerId,
+          clickupTaskId,
+          error: clickupError.message
+        });
+      }
+    }
 
     return removeResult.rows[0];
 

@@ -9,7 +9,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const clickupOAuthService = require('../services/clickupOAuthService');
 const clickupClient = require('../services/clickupClient');
-const { syncAllRoutersToClickUp, getSyncStats } = require('../services/clickupSync');
+const { syncAllRoutersToClickUp, getSyncStats, syncAssigneesFromClickUp } = require('../services/clickupSync');
 const { pool } = require('../config/database');
 const logger = require('../config/database').logger;
 
@@ -605,6 +605,24 @@ router.post('/sync', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error during manual ClickUp sync:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/clickup/sync/assignees
+ * Sync assignees from ClickUp to local database
+ */
+router.post('/sync/assignees', async (req, res) => {
+  try {
+    logger.info('Manual ClickUp assignee sync triggered');
+    const result = await syncAssigneesFromClickUp();
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    logger.error('Error during assignee sync:', error);
     res.status(500).json({ error: error.message });
   }
 });

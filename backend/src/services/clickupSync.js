@@ -217,6 +217,101 @@ async function syncAllRoutersToClickUp() {
 }
 
 /**
+ * Sync ClickUp task assignees to local database
+ * Updates the stored_with fields based on task assignees
+ */
+async function syncAssigneesFromClickUp() {
+  const startTime = Date.now();
+  logger.info('Starting ClickUp assignee sync...');
+
+  try {
+    // Get all routers with ClickUp tasks
+    const result = await pool.query(
+      `SELECT router_id, clickup_task_id, current_stored_with_user_id, current_stored_with_username
+       FROM routers 
+       WHERE clickup_task_id IS NOT NULL
+       ORDER BY router_id`
+    );
+
+    const routers = result.rows;
+    logger.info(`Found ${routers.length} routers with ClickUp tasks`);
+
+    let syncedCount = 0;
+    let errorCount = 0;
+
+    for (const router of routers) {
+      try {
+        // Get task from ClickUp
+        const task = await clickupClient.getTask(router.clickup_task_id, 'default');
+        
+        // Check if task has assignees
+        const assignees = task.assignees || [];
+        
+        if (assignees.length > 0) {
+          // Take first assignee as the one storing the router
+          const assignee = assignees[0];
+          const assigneeId = String(assignee.id);
+          const assigneeName = assignee.username;
+
+          // Only update if different from current
+          if (router.current_stored_with_user_id !== assigneeId || 
+              router.current_stored_with_username !== assigneeName) {
+            
+            await pool.query(
+              `UPDATE routers 
+               SET current_stored_with_user_id = $1,
+                   current_stored_with_username = $2,
+                   service_status = 'out-of-service'
+               WHERE router_id = $3`,
+              [assigneeId, assigneeName, router.router_id]
+            );
+
+            logger.info(`Synced assignee for router ${router.router_id}: ${assigneeName}`);
+            syncedCount++;
+          }
+        } else {
+          // No assignees - clear stored_with if it was set
+          if (router.current_stored_with_user_id) {
+            await pool.query(
+              `UPDATE routers 
+               SET current_stored_with_user_id = NULL,
+                   current_stored_with_username = NULL,
+                   service_status = 'in-service'
+               WHERE router_id = $1`,
+              [router.router_id]
+            );
+
+            logger.info(`Cleared assignee for router ${router.router_id}`);
+            syncedCount++;
+          }
+        }
+      } catch (error) {
+        logger.error(`Error syncing assignee for router ${router.router_id}:`, error.message);
+        errorCount++;
+      }
+
+      // Small delay between requests
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+
+    const duration = Date.now() - startTime;
+    logger.info(`ClickUp assignee sync completed: ${syncedCount} updated, ${errorCount} errors, ${duration}ms`);
+
+    return {
+      success: true,
+      totalRouters: routers.length,
+      syncedCount,
+      errorCount,
+      duration
+    };
+
+  } catch (error) {
+    logger.error('Error during ClickUp assignee sync:', error);
+    throw error;
+  }
+}
+
+/**
  * Start scheduled ClickUp sync (idempotent)
  */
 function startClickUpSync(intervalMinutes = 30) {
@@ -267,6 +362,7 @@ function getSyncStats() {
 module.exports = {
   syncRouterToClickUp,
   syncAllRoutersToClickUp,
+  syncAssigneesFromClickUp,
   startClickUpSync,
   stopClickUpSync,
   getSyncStats

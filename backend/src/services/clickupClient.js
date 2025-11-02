@@ -266,6 +266,56 @@ class ClickUpClient {
   }
 
   /**
+   * Update task assignees
+   * @param {string} taskId - Task ID
+   * @param {Object} options - Assignee options
+   * @param {Array<number>} options.add - User IDs to add as assignees
+   * @param {Array<number>} options.rem - User IDs to remove as assignees
+   * @param {string} userId - User identifier
+   * @returns {Promise<Object>} Updated task
+   */
+  async updateTaskAssignees(taskId, { add = [], rem = [] }, userId = 'default') {
+    try {
+      const client = await this.getAuthorizedClient(userId);
+      
+      const payload = {};
+      if (add.length > 0) {
+        payload.assignees = { add };
+      }
+      if (rem.length > 0) {
+        payload.assignees = payload.assignees || {};
+        payload.assignees.rem = rem;
+      }
+      
+      logger.info('ClickUp updateTaskAssignees request:', {
+        taskId,
+        add,
+        rem
+      });
+      
+      const response = await client.put(`/task/${taskId}`, payload);
+      
+      logger.info('ClickUp updateTaskAssignees response:', {
+        taskId,
+        status: response.status,
+        assignees: response.data.assignees?.map(a => a.username)
+      });
+      
+      return response.data;
+    } catch (error) {
+      logger.error('Error updating task assignees:', {
+        taskId,
+        add,
+        rem,
+        status: error.response?.status,
+        errorData: error.response?.data,
+        message: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Update a single custom field value
    * @param {string} taskId - Task ID
    * @param {string} fieldId - Custom field ID
