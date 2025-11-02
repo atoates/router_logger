@@ -81,11 +81,9 @@ async function syncRouterToClickUp(router) {
     }
 
     // Operational Status (dropdown: use UUID option IDs)
-    // Status is 'online' or 'offline' from most recent log, or null if no logs
-    // Consider router offline if: no status, status is explicitly 'offline', or last seen > 24h ago
-    const isOnline = router.current_status === 'online' && 
-                     router.last_seen && 
-                     (Date.now() - new Date(router.last_seen).getTime()) < 24 * 60 * 60 * 1000;
+    // Use the current_status from the most recent log entry
+    // This is already computed correctly by the database query
+    const isOnline = router.current_status === 'online';
     
     const statusValue = isOnline ? STATUS_OPTIONS.ONLINE : STATUS_OPTIONS.OFFLINE;
     
