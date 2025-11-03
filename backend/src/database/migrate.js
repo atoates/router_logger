@@ -310,15 +310,129 @@ async function initializeDatabase() {
       // Constraint might already exist
     }
 
+    // Drop old stored_with constraint (Migration 010)
+    try {
+      await client.query(`ALTER TABLE routers DROP CONSTRAINT IF EXISTS check_stored_with;`);
+    } catch (e) {
+      // Constraint might not exist
+    }
+
+    // Migration 010: Add stored_with tracking to property assignments
+    await client.query(`
+      ALTER TABLE router_property_assignments
+        ALTER COLUMN property_clickup_task_id DROP NOT NULL;
+    `);
+
+    await client.query(`
+      ALTER TABLE router_property_assignments
+        ADD COLUMN IF NOT EXISTS assignment_type VARCHAR(20) DEFAULT 'property',
+        ADD COLUMN IF NOT EXISTS stored_with_user_id VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS stored_with_username VARCHAR(100);
+    `);
+
     try {
       await client.query(`
-        ALTER TABLE routers 
-          ADD CONSTRAINT check_stored_with 
-          CHECK (stored_with IS NULL OR stored_with IN ('Jordan', 'Ali', 'Karl'));
+        ALTER TABLE router_property_assignments
+          ADD CONSTRAINT check_assignment_type_values 
+          CHECK (assignment_type IN ('property', 'storage'));
       `);
     } catch (e) {
       // Constraint might already exist
     }
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_property_assignments_type 
+        ON router_property_assignments(assignment_type);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_property_assignments_stored_with 
+        ON router_property_assignments(stored_with_user_id) 
+        WHERE stored_with_user_id IS NOT NULL;
+    `);
+
+    await client.query(`
+      ALTER TABLE routers
+        ADD COLUMN IF NOT EXISTS stored_with_user_id VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS stored_with_username VARCHAR(100);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_routers_stored_with_user 
+        ON routers(stored_with_user_id);
+    `);
+
+    // Migration 011: Convert to event-based tracking
+    await client.query(`
+      ALTER TABLE router_property_assignments
+        ADD COLUMN IF NOT EXISTS event_type VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS event_date TIMESTAMP;
+    `);
+
+    try {
+      await client.query(`
+        ALTER TABLE router_property_assignments
+          DROP CONSTRAINT IF EXISTS check_event_type;
+      `);
+      
+      await client.query(`
+        ALTER TABLE router_property_assignments
+          ADD CONSTRAINT check_event_type 
+          CHECK (event_type IN ('property_assign', 'property_remove', 'storage_assign', 'storage_remove'));
+      `);
+    } catch (e) {
+      // Constraint might already exist or fail
+    }
+
+    await client.query(`
+      ALTER TABLE routers
+        ADD COLUMN IF NOT EXISTS current_state VARCHAR(20) DEFAULT 'unassigned',
+        ADD COLUMN IF NOT EXISTS state_updated_at TIMESTAMP;
+    `);
+
+    try {
+      await client.query(`
+        ALTER TABLE routers
+          DROP CONSTRAINT IF EXISTS check_current_state;
+      `);
+      
+      await client.query(`
+        ALTER TABLE routers
+          ADD CONSTRAINT check_current_state 
+          CHECK (current_state IN ('installed', 'stored', 'unassigned'));
+      `);
+    } catch (e) {
+      // Constraint might already exist
+    }
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_router_events_router_date 
+        ON router_property_assignments(router_id, event_date DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_router_events_type 
+        ON router_property_assignments(event_type);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_routers_current_state 
+        ON routers(current_state);
+    `);
+
+    // Migration 012: Location task tracking
+    await client.query(`
+      ALTER TABLE routers
+        ADD COLUMN IF NOT EXISTS clickup_location_task_id VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS clickup_location_task_name VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS location_linked_at TIMESTAMP;
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_routers_location_task
+        ON routers(clickup_location_task_id)
+        WHERE clickup_location_task_id IS NOT NULL;
+    `);
 
     console.log('Database tables created successfully');
   } catch (error) {
