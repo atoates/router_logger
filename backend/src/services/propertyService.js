@@ -1221,6 +1221,216 @@ async function deleteAssignment(assignmentId) {
   }
 }
 
+/**
+ * Link router to a ClickUp location task
+ * When linked: Remove assignee from router task (if any)
+ * @param {Object} linkage - Location linkage details
+ * @returns {Promise<Object>} Update result
+ */
+async function linkRouterToLocation(linkage) {
+  const {
+    routerId,
+    locationTaskId,
+    locationTaskName,
+    linkedBy = null,
+    notes = null
+  } = linkage;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Get router's ClickUp task ID
+    const routerResult = await client.query(
+      'SELECT clickup_task_id, current_stored_with_user_id FROM routers WHERE router_id = $1',
+      [routerId]
+    );
+
+    if (routerResult.rows.length === 0) {
+      throw new Error(`Router ${routerId} not found`);
+    }
+
+    const clickupTaskId = routerResult.rows[0].clickup_task_id;
+    const currentAssigneeId = routerResult.rows[0].current_stored_with_user_id;
+
+    // Validate location task exists in ClickUp
+    try {
+      const locationTask = await clickupClient.getTask(locationTaskId);
+      logger.info('Location task validated', { 
+        locationTaskId, 
+        name: locationTask.name 
+      });
+    } catch (error) {
+      throw new Error(`Invalid location task ID ${locationTaskId}: ${error.message}`);
+    }
+
+    // Update router with location task info
+    const result = await client.query(
+      `UPDATE routers 
+       SET clickup_location_task_id = $1,
+           clickup_location_task_name = $2,
+           location_linked_at = $3,
+           current_stored_with_user_id = NULL,
+           current_stored_with_username = NULL
+       WHERE router_id = $4
+       RETURNING *`,
+      [locationTaskId, locationTaskName, new Date(), routerId]
+    );
+
+    await client.query('COMMIT');
+
+    logger.info('Router linked to location task', { 
+      routerId, 
+      locationTaskId,
+      locationTaskName
+    });
+
+    // Remove assignee from router task (after commit, so DB is consistent even if this fails)
+    if (clickupTaskId && currentAssigneeId) {
+      try {
+        const userId = parseInt(currentAssigneeId);
+        if (!isNaN(userId)) {
+          await clickupClient.updateTaskAssignees(
+            clickupTaskId,
+            { rem: [userId] },
+            'default'
+          );
+          logger.info('Removed ClickUp task assignee (router now at location)', { 
+            routerId, 
+            clickupTaskId, 
+            locationTaskId
+          });
+        }
+      } catch (clickupError) {
+        logger.warn('Failed to remove ClickUp task assignee (location link still recorded)', {
+          routerId,
+          clickupTaskId,
+          error: clickupError.message
+        });
+      }
+    }
+
+    return result.rows[0];
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    logger.error('Error linking router to location:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Unlink router from ClickUp location task
+ * When unlinked: Add assignee back IF router is out-of-service
+ * @param {Object} unlinkage - Location unlinkage details
+ * @returns {Promise<Object>} Update result
+ */
+async function unlinkRouterFromLocation(unlinkage) {
+  const {
+    routerId,
+    unlinkedBy = null,
+    notes = null,
+    reassignToUserId = null, // Optional: Specific user to assign to
+    reassignToUsername = null
+  } = unlinkage;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Get router's current state
+    const routerResult = await client.query(
+      `SELECT clickup_task_id, clickup_location_task_id, service_status
+       FROM routers WHERE router_id = $1`,
+      [routerId]
+    );
+
+    if (routerResult.rows.length === 0) {
+      throw new Error(`Router ${routerId} not found`);
+    }
+
+    const router = routerResult.rows[0];
+    const clickupTaskId = router.clickup_task_id;
+    const wasLinkedToLocation = router.clickup_location_task_id;
+
+    if (!wasLinkedToLocation) {
+      throw new Error(`Router ${routerId} is not linked to any location`);
+    }
+
+    // Update router to remove location link
+    const result = await client.query(
+      `UPDATE routers 
+       SET clickup_location_task_id = NULL,
+           clickup_location_task_name = NULL,
+           location_linked_at = NULL
+       WHERE router_id = $1
+       RETURNING *`,
+      [routerId]
+    );
+
+    await client.query('COMMIT');
+
+    logger.info('Router unlinked from location task', { 
+      routerId, 
+      wasLinkedTo: wasLinkedToLocation
+    });
+
+    // Add assignee back IF router is out-of-service
+    const isOutOfService = router.service_status === 'out-of-service';
+    
+    if (clickupTaskId && isOutOfService && reassignToUserId && reassignToUsername) {
+      try {
+        const userId = parseInt(reassignToUserId);
+        if (!isNaN(userId)) {
+          await clickupClient.updateTaskAssignees(
+            clickupTaskId,
+            { add: [userId] },
+            'default'
+          );
+          
+          // Also update the current_stored_with fields
+          await pool.query(
+            `UPDATE routers 
+             SET current_stored_with_user_id = $1,
+                 current_stored_with_username = $2
+             WHERE router_id = $3`,
+            [reassignToUserId, reassignToUsername, routerId]
+          );
+
+          logger.info('Added ClickUp task assignee (router unlinked from location, out-of-service)', { 
+            routerId, 
+            clickupTaskId,
+            assignee: reassignToUsername
+          });
+        }
+      } catch (clickupError) {
+        logger.warn('Failed to add ClickUp task assignee (location unlink still recorded)', {
+          routerId,
+          clickupTaskId,
+          error: clickupError.message
+        });
+      }
+    } else if (isOutOfService && !reassignToUserId) {
+      logger.warn('Router is out-of-service but no reassignment user specified', {
+        routerId
+      });
+    }
+
+    return result.rows[0];
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    logger.error('Error unlinking router from location:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   storeRouterWith,
   clearStoredWith,
@@ -1234,5 +1444,7 @@ module.exports = {
   getAllInstalledRouters,
   getPropertyStats,
   validatePropertyTask,
-  deleteAssignment
+  deleteAssignment,
+  linkRouterToLocation,
+  unlinkRouterFromLocation
 };

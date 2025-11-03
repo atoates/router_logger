@@ -20,7 +20,7 @@ const {
   logInspection,
   getInspectionHistory
 } = require('../models/router');
-const { storeRouterWith, clearStoredWith } = require('../services/propertyService');
+const { storeRouterWith, clearStoredWith, linkRouterToLocation, unlinkRouterFromLocation } = require('../services/propertyService');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger, pool } = require('../config/database');
 
@@ -410,6 +410,60 @@ router.post('/routers/:routerId/return-to-service', async (req, res) => {
   } catch (error) {
     logger.error('Error returning router to service:', error);
     res.status(500).json({ error: error.message || 'Failed to update router status' });
+  }
+});
+
+// POST link router to a location (ClickUp location task)
+// This will remove the assignee from the router task
+router.post('/routers/:routerId/link-location', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const { location_task_id, location_task_name, notes } = req.body;
+    
+    if (!location_task_id) {
+      return res.status(400).json({ 
+        error: 'location_task_id is required' 
+      });
+    }
+    
+    // Use property service to link location
+    const linkageRecord = await linkRouterToLocation({
+      routerId,
+      locationTaskId: location_task_id,
+      locationTaskName: location_task_name || 'Unknown Location',
+      linkedBy: null, // TODO: Add auth to track who made the change
+      notes
+    });
+    
+    logger.info(`Router ${routerId} linked to location ${location_task_id}`);
+    res.json({ success: true, router: linkageRecord });
+  } catch (error) {
+    logger.error('Error linking router to location:', error);
+    res.status(500).json({ error: error.message || 'Failed to link router to location' });
+  }
+});
+
+// POST unlink router from location
+// This will add assignee back if router is out-of-service
+router.post('/routers/:routerId/unlink-location', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const { reassign_to_user_id, reassign_to_username, notes } = req.body;
+    
+    // Use property service to unlink location
+    const unlinkageRecord = await unlinkRouterFromLocation({
+      routerId,
+      unlinkedBy: null, // TODO: Add auth to track who made the change
+      reassignToUserId: reassign_to_user_id,
+      reassignToUsername: reassign_to_username,
+      notes
+    });
+    
+    logger.info(`Router ${routerId} unlinked from location`);
+    res.json({ success: true, router: unlinkageRecord });
+  } catch (error) {
+    logger.error('Error unlinking router from location:', error);
+    res.status(500).json({ error: error.message || 'Failed to unlink router from location' });
   }
 });
 
