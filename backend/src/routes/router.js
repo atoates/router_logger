@@ -20,7 +20,7 @@ const {
   logInspection,
   getInspectionHistory
 } = require('../models/router');
-const { storeRouterWith, clearStoredWith, linkRouterToLocation, unlinkRouterFromLocation } = require('../services/propertyService');
+const { linkRouterToLocation, unlinkRouterFromLocation } = require('../services/propertyService');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger, pool } = require('../config/database');
 
@@ -305,111 +305,6 @@ router.post('/clear-clickup-tasks', async (req, res) => {
   } catch (error) {
     logger.error('Error clearing task associations:', error);
     res.status(500).json({ error: 'Failed to clear task associations' });
-  }
-});
-
-// GET routers that are out of service
-router.get('/out-of-service', async (req, res) => {
-  try {
-    // Check if stored_with_username column exists
-    const columnCheck = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'routers' 
-        AND column_name = 'stored_with_username'
-    `);
-    
-    const hasStoredWithUsername = columnCheck.rows.length > 0;
-    
-    const query = hasStoredWithUsername
-      ? `SELECT 
-          router_id,
-          name,
-          imei,
-          service_status,
-          stored_with,
-          stored_with_username,
-          out_of_service_date,
-          out_of_service_reason,
-          out_of_service_notes,
-          current_property_name,
-          last_seen
-        FROM routers
-        WHERE service_status = 'out-of-service'
-        ORDER BY out_of_service_date DESC`
-      : `SELECT 
-          router_id,
-          name,
-          imei,
-          service_status,
-          stored_with,
-          NULL as stored_with_username,
-          out_of_service_date,
-          out_of_service_reason,
-          out_of_service_notes,
-          current_property_name,
-          last_seen
-        FROM routers
-        WHERE service_status = 'out-of-service'
-        ORDER BY out_of_service_date DESC`;
-    
-    const result = await pool.query(query);
-    res.json(result.rows);
-  } catch (error) {
-    logger.error('Error fetching out-of-service routers:', error);
-    res.status(500).json({ error: 'Failed to fetch out-of-service routers' });
-  }
-});
-
-// POST mark router as out of service (stored with someone)
-router.post('/routers/:routerId/out-of-service', async (req, res) => {
-  try {
-    const { routerId } = req.params;
-    const { stored_with_user_id, stored_with_username, notes } = req.body;
-    
-    if (!stored_with_user_id || !stored_with_username) {
-      return res.status(400).json({ 
-        error: 'stored_with_user_id and stored_with_username are required' 
-      });
-    }
-    
-    // Use property service to create storage record
-    const storageRecord = await storeRouterWith({
-      routerId,
-      storedWithUserId: stored_with_user_id,
-      storedWithUsername: stored_with_username,
-      storedAt: new Date(),
-      storedBy: null, // TODO: Add auth to track who made the change
-      notes
-    });
-    
-    logger.info(`Router ${routerId} stored with ${stored_with_username}`);
-    res.json({ success: true, storage: storageRecord });
-  } catch (error) {
-    logger.error('Error marking router as out-of-service:', error);
-    res.status(500).json({ error: error.message || 'Failed to update router status' });
-  }
-});
-
-// POST return router to service (clear storage)
-router.post('/routers/:routerId/return-to-service', async (req, res) => {
-  try {
-    const { routerId } = req.params;
-    const { notes } = req.body;
-    
-    // Use property service to clear storage
-    const clearedRecord = await clearStoredWith({
-      routerId,
-      clearedAt: new Date(),
-      clearedBy: null, // TODO: Add auth to track who made the change
-      notes
-    });
-    
-    logger.info(`Router ${routerId} returned to service`);
-    res.json({ success: true, cleared: clearedRecord });
-  } catch (error) {
-    logger.error('Error returning router to service:', error);
-    res.status(500).json({ error: error.message || 'Failed to update router status' });
   }
 });
 

@@ -1,6 +1,6 @@
 const { pool } = require('../config/database');
 
-// Initialize database tables
+// Initialize database tables - SIMPLIFIED
 async function initializeDatabase() {
   const client = await pool.connect();
   
@@ -173,7 +173,7 @@ async function initializeDatabase() {
       ON router_logs(router_id, timestamp);
     `);
 
-    // Performance indexes for common query patterns (Migration 006)
+    // Performance indexes for common query patterns
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_router_logs_router_ts 
       ON router_logs (router_id, timestamp DESC);
@@ -189,7 +189,7 @@ async function initializeDatabase() {
       ON inspection_logs (router_id, inspected_at DESC);
     `);
 
-    // Migration 007: ClickUp integration support
+    // ClickUp integration support
     await client.query(`
       ALTER TABLE routers 
         ADD COLUMN IF NOT EXISTS clickup_task_id VARCHAR(50),
@@ -221,206 +221,7 @@ async function initializeDatabase() {
         ON clickup_oauth_tokens(user_id);
     `);
 
-    // Migration 008: Router-Property tracking
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS router_property_assignments (
-        id SERIAL PRIMARY KEY,
-        router_id VARCHAR(50) NOT NULL,
-        property_clickup_task_id VARCHAR(50) NOT NULL,
-        property_name VARCHAR(255),
-        installed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        removed_at TIMESTAMP,
-        notes TEXT,
-        installed_by VARCHAR(100),
-        removed_by VARCHAR(100),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT fk_router_property_router 
-          FOREIGN KEY (router_id) 
-          REFERENCES routers(router_id) 
-          ON DELETE CASCADE,
-        CONSTRAINT check_property_dates 
-          CHECK (removed_at IS NULL OR removed_at >= installed_at)
-      );
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_property_assignments_router 
-        ON router_property_assignments(router_id);
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_property_assignments_property 
-        ON router_property_assignments(property_clickup_task_id);
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_property_assignments_current 
-        ON router_property_assignments(router_id, removed_at);
-    `);
-
-    await client.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_assignment 
-        ON router_property_assignments(router_id) 
-        WHERE removed_at IS NULL;
-    `);
-
-    await client.query(`
-      ALTER TABLE routers 
-        ADD COLUMN IF NOT EXISTS current_property_task_id VARCHAR(50),
-        ADD COLUMN IF NOT EXISTS current_property_name VARCHAR(255),
-        ADD COLUMN IF NOT EXISTS property_installed_at TIMESTAMP;
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_routers_current_property 
-        ON routers(current_property_task_id);
-    `);
-
-    // Migration 009: Out-of-service tracking
-    await client.query(`
-      ALTER TABLE routers 
-        ADD COLUMN IF NOT EXISTS service_status VARCHAR(50) DEFAULT 'in-service',
-        ADD COLUMN IF NOT EXISTS stored_with VARCHAR(50),
-        ADD COLUMN IF NOT EXISTS out_of_service_date TIMESTAMP,
-        ADD COLUMN IF NOT EXISTS out_of_service_reason TEXT,
-        ADD COLUMN IF NOT EXISTS out_of_service_notes TEXT;
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_routers_service_status 
-        ON routers(service_status);
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_routers_stored_with 
-        ON routers(stored_with) 
-        WHERE service_status = 'out-of-service';
-    `);
-
-    // Note: Cannot add constraints with IF NOT EXISTS in PostgreSQL
-    // These will fail silently if they already exist
-    try {
-      await client.query(`
-        ALTER TABLE routers 
-          ADD CONSTRAINT check_service_status 
-          CHECK (service_status IN ('in-service', 'out-of-service'));
-      `);
-    } catch (e) {
-      // Constraint might already exist
-    }
-
-    // Drop old stored_with constraint (Migration 010)
-    try {
-      await client.query(`ALTER TABLE routers DROP CONSTRAINT IF EXISTS check_stored_with;`);
-    } catch (e) {
-      // Constraint might not exist
-    }
-
-    // Migration 010: Add stored_with tracking to property assignments
-    await client.query(`
-      ALTER TABLE router_property_assignments
-        ALTER COLUMN property_clickup_task_id DROP NOT NULL;
-    `);
-
-    await client.query(`
-      ALTER TABLE router_property_assignments
-        ADD COLUMN IF NOT EXISTS assignment_type VARCHAR(20) DEFAULT 'property',
-        ADD COLUMN IF NOT EXISTS stored_with_user_id VARCHAR(50),
-        ADD COLUMN IF NOT EXISTS stored_with_username VARCHAR(100);
-    `);
-
-    try {
-      await client.query(`
-        ALTER TABLE router_property_assignments
-          ADD CONSTRAINT check_assignment_type_values 
-          CHECK (assignment_type IN ('property', 'storage'));
-      `);
-    } catch (e) {
-      // Constraint might already exist
-    }
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_property_assignments_type 
-        ON router_property_assignments(assignment_type);
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_property_assignments_stored_with 
-        ON router_property_assignments(stored_with_user_id) 
-        WHERE stored_with_user_id IS NOT NULL;
-    `);
-
-    await client.query(`
-      ALTER TABLE routers
-        ADD COLUMN IF NOT EXISTS stored_with_user_id VARCHAR(50),
-        ADD COLUMN IF NOT EXISTS stored_with_username VARCHAR(100);
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_routers_stored_with_user 
-        ON routers(stored_with_user_id);
-    `);
-
-    // Migration 011: Convert to event-based tracking
-    await client.query(`
-      ALTER TABLE router_property_assignments
-        ADD COLUMN IF NOT EXISTS event_type VARCHAR(20),
-        ADD COLUMN IF NOT EXISTS event_date TIMESTAMP;
-    `);
-
-    try {
-      await client.query(`
-        ALTER TABLE router_property_assignments
-          DROP CONSTRAINT IF EXISTS check_event_type;
-      `);
-      
-      await client.query(`
-        ALTER TABLE router_property_assignments
-          ADD CONSTRAINT check_event_type 
-          CHECK (event_type IN ('property_assign', 'property_remove', 'storage_assign', 'storage_remove'));
-      `);
-    } catch (e) {
-      // Constraint might already exist or fail
-    }
-
-    await client.query(`
-      ALTER TABLE routers
-        ADD COLUMN IF NOT EXISTS current_state VARCHAR(20) DEFAULT 'unassigned',
-        ADD COLUMN IF NOT EXISTS state_updated_at TIMESTAMP;
-    `);
-
-    try {
-      await client.query(`
-        ALTER TABLE routers
-          DROP CONSTRAINT IF EXISTS check_current_state;
-      `);
-      
-      await client.query(`
-        ALTER TABLE routers
-          ADD CONSTRAINT check_current_state 
-          CHECK (current_state IN ('installed', 'stored', 'unassigned'));
-      `);
-    } catch (e) {
-      // Constraint might already exist
-    }
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_router_events_router_date 
-        ON router_property_assignments(router_id, event_date DESC);
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_router_events_type 
-        ON router_property_assignments(event_type);
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_routers_current_state 
-        ON routers(current_state);
-    `);
-
-    // Migration 012: Location task tracking
+    // Location task tracking ONLY (SIMPLIFIED - no stored_with, no property assignments, no events)
     await client.query(`
       ALTER TABLE routers
         ADD COLUMN IF NOT EXISTS clickup_location_task_id VARCHAR(50),
