@@ -226,13 +226,20 @@ async function initializeDatabase() {
       ALTER TABLE routers
         ADD COLUMN IF NOT EXISTS clickup_location_task_id VARCHAR(50),
         ADD COLUMN IF NOT EXISTS clickup_location_task_name VARCHAR(255),
-        ADD COLUMN IF NOT EXISTS location_linked_at TIMESTAMP;
+        ADD COLUMN IF NOT EXISTS location_linked_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS date_installed BIGINT;
     `);
 
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_routers_location_task
         ON routers(clickup_location_task_id)
         WHERE clickup_location_task_id IS NOT NULL;
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_routers_date_installed
+        ON routers(date_installed)
+        WHERE date_installed IS NOT NULL;
     `);
 
     console.log('Database tables created successfully');
