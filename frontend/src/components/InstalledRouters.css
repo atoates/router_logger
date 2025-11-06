@@ -167,3 +167,34 @@
 .ir-view-btn:active {
   transform: translateY(0);
 }
+
+/* Status indicator styles */
+.ir-status-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ir-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
+}
+
+.ir-status-dot.ir-status-online {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+}
+
+.ir-status-dot.ir-status-offline {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+/* Overdue date styling */
+.ir-date-overdue {
+  color: #dc2626;
+  font-weight: 600;
+}

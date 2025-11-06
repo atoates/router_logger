@@ -39,6 +39,9 @@ const InstalledRouters = () => {
     // Handle Unix timestamp (milliseconds)
     const date = typeof dateValue === 'number' ? new Date(dateValue) : new Date(dateValue);
     
+    // Check for invalid date
+    if (isNaN(date.getTime())) return 'N/A';
+    
     // Format as DD/MM/YYYY (UK format)
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -52,9 +55,38 @@ const InstalledRouters = () => {
     
     // Handle Unix timestamp (milliseconds)
     const date = typeof installedDate === 'number' ? new Date(installedDate) : new Date(installedDate);
+    
+    // Check for invalid date
+    if (isNaN(date.getTime())) return null;
+    
     const now = new Date();
     const days = Math.floor((now - date) / (1000 * 60 * 60 * 24));
-    return days;
+    return days >= 0 ? days : null;
+  };
+
+  const getUninstallDate = (installedDate) => {
+    if (!installedDate) return 'N/A';
+    
+    // Handle Unix timestamp (milliseconds)
+    const date = typeof installedDate === 'number' ? new Date(installedDate) : new Date(installedDate);
+    
+    // Check for invalid date
+    if (isNaN(date.getTime())) return 'N/A';
+    
+    // Add 92 days
+    const uninstallDate = new Date(date);
+    uninstallDate.setDate(uninstallDate.getDate() + 92);
+    
+    return formatDate(uninstallDate);
+  };
+
+  const isRouterOnline = (lastSeen) => {
+    if (!lastSeen) return false;
+    const lastSeenDate = new Date(lastSeen);
+    const now = new Date();
+    const minutesSinceLastSeen = (now - lastSeenDate) / (1000 * 60);
+    // Consider online if seen in last 10 minutes
+    return minutesSinceLastSeen < 10;
   };
 
   const handleRouterClick = (routerId) => {
@@ -97,8 +129,10 @@ const InstalledRouters = () => {
               <tr>
                 <th>Router</th>
                 <th>Location</th>
-                <th>Start Date</th>
+                <th>Status</th>
+                <th>Install Date</th>
                 <th>Days</th>
+                <th>Uninstall Date</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -107,6 +141,8 @@ const InstalledRouters = () => {
                 // Use date_installed if available, fallback to location_linked_at
                 const installDate = router.date_installed || router.location_linked_at;
                 const daysInstalled = getDaysInstalled(installDate);
+                const uninstallDate = getUninstallDate(installDate);
+                const online = isRouterOnline(router.last_seen);
                 
                 return (
                   <tr key={router.router_id}>
@@ -121,6 +157,14 @@ const InstalledRouters = () => {
                     <td>
                       <div className="ir-property-name">{router.clickup_location_task_name || 'Unknown'}</div>
                     </td>
+                    <td>
+                      <div className="ir-status-indicator">
+                        <span 
+                          className={`ir-status-dot ${online ? 'ir-status-online' : 'ir-status-offline'}`}
+                          title={online ? 'Online' : 'Offline'}
+                        ></span>
+                      </div>
+                    </td>
                     <td>{formatDate(installDate)}</td>
                     <td>
                       {daysInstalled !== null && (
@@ -128,6 +172,9 @@ const InstalledRouters = () => {
                           {daysInstalled}d
                         </span>
                       )}
+                    </td>
+                    <td>
+                      <span className={daysInstalled > 92 ? 'ir-date-overdue' : ''}>{uninstallDate}</span>
                     </td>
                     <td>
                       <button
