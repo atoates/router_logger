@@ -356,18 +356,25 @@ router.get('/routers/with-locations', async (req, res) => {
     
     const result = await pool.query(`
       SELECT 
-        router_id,
-        name,
-        last_seen,
-        current_state,
-        clickup_task_id,
-        clickup_task_url,
-        clickup_location_task_id,
-        clickup_location_task_name,
-        location_linked_at
-      FROM routers
-      WHERE clickup_location_task_id IS NOT NULL
-      ORDER BY name ASC
+        r.router_id,
+        r.name,
+        r.last_seen,
+        l.status as current_state,
+        r.clickup_task_id,
+        r.clickup_task_url,
+        r.clickup_location_task_id,
+        r.clickup_location_task_name,
+        r.location_linked_at
+      FROM routers r
+      LEFT JOIN LATERAL (
+        SELECT status
+        FROM router_logs
+        WHERE router_id = r.router_id
+        ORDER BY timestamp DESC
+        LIMIT 1
+      ) l ON true
+      WHERE r.clickup_location_task_id IS NOT NULL
+      ORDER BY r.name ASC
     `);
     
     // Fetch Date Installed custom field for each router SEQUENTIALLY with delay
