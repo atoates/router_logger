@@ -113,6 +113,25 @@ class ClickUpClient {
   }
 
   /**
+   * Get full list details including dates
+   * @param {string} listId - List ID
+   * @param {string} userId - User identifier
+   * @returns {Promise<Object>} List details
+   */
+  async getList(listId, userId = 'default') {
+    try {
+      const client = await this.getAuthorizedClient(userId);
+      const response = await client.get(`/list/${listId}`);
+      
+      logger.info('Retrieved ClickUp list details', { listId, name: response.data.name });
+      return response.data;
+    } catch (error) {
+      logger.error('Error getting ClickUp list details:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Find list by name across all spaces in workspace
    * @param {string} workspaceId - Workspace ID
    * @param {string} listName - List name to search for

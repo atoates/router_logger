@@ -561,6 +561,22 @@ router.get('/debug/space-lists/:spaceId', async (req, res) => {
 });
 
 /**
+ * GET /api/clickup/list/:listId
+ * Get full list details including dates
+ */
+router.get('/list/:listId', async (req, res) => {
+  try {
+    const { listId } = req.params;
+    const list = await clickupClient.getList(listId, 'default');
+    
+    res.json({ list });
+  } catch (error) {
+    logger.error('Error getting list details:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/clickup/custom-fields/:listId
  * Get custom fields configuration for a list
  */
