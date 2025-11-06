@@ -23,7 +23,20 @@ const StoredWithRouters = () => {
         throw new Error(errorData.error || `Failed to fetch routers by assignees (${response.status})`);
       }
       const data = await response.json();
-      setRoutersByAssignee(data);
+      
+      // Filter out routers that have location assignments
+      // Only show routers that are truly "stored with" someone (not installed at a location)
+      const filteredData = {};
+      Object.keys(data).forEach(assigneeName => {
+        const routersWithoutLocation = data[assigneeName].filter(
+          router => !router.clickup_location_task_id
+        );
+        if (routersWithoutLocation.length > 0) {
+          filteredData[assigneeName] = routersWithoutLocation;
+        }
+      });
+      
+      setRoutersByAssignee(filteredData);
       setError(null);
     } catch (err) {
       console.error('Error fetching routers by assignees:', err);
@@ -86,11 +99,6 @@ const StoredWithRouters = () => {
                       <span className="router-item-id">#{router.router_id}</span>
                       {router.name && <span className="router-item-name">{router.name}</span>}
                     </div>
-                    {router.clickup_location_task_name && (
-                      <div className="router-item-location">
-                        📍 {router.clickup_location_task_name}
-                      </div>
-                    )}
                     <button
                       className="router-item-view-btn"
                       onClick={() => handleRouterClick(router.router_id)}
