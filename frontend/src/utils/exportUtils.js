@@ -78,7 +78,7 @@ export function exportUsageStatsToPDF(stats, routerId, startDate, endDate) {
  * Export uptime report to PDF
  */
 export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, endDate, options = {}) {
-  const { logoDataUrl } = options;
+  const { logoDataUrl, router, stats } = options;
   const doc = new jsPDF();
 
   // Optional logo
@@ -92,15 +92,23 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
     }
   }
 
-  // Title
+  // Title - include router number/name if available
   doc.setFontSize(18);
-  doc.text('Router Uptime Report', 40, y + 8);
+  const routerName = router?.name || `#${routerId}`;
+  doc.text(`Router ${routerName} Uptime Report`, 40, y + 8);
 
   // Metadata
   doc.setFontSize(11);
   doc.text(`Router ID: ${routerId}`, 14, y + 24);
-  doc.text(`Period: ${format(new Date(startDate), 'yyyy-MM-dd HH:mm')} to ${format(new Date(endDate), 'yyyy-MM-dd HH:mm')}`, 14, y + 30);
-  doc.text(`Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`, 14, y + 36);
+  if (router?.imei) {
+    doc.text(`IMEI: ${router.imei}`, 14, y + 30);
+    doc.text(`Period: ${format(new Date(startDate), 'yyyy-MM-dd HH:mm')} to ${format(new Date(endDate), 'yyyy-MM-dd HH:mm')}`, 14, y + 36);
+    doc.text(`Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`, 14, y + 42);
+    y += 6; // Adjust for extra line
+  } else {
+    doc.text(`Period: ${format(new Date(startDate), 'yyyy-MM-dd HH:mm')} to ${format(new Date(endDate), 'yyyy-MM-dd HH:mm')}`, 14, y + 30);
+    doc.text(`Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`, 14, y + 36);
+  }
 
   // Sort uptime records ascending by timestamp for analysis
   const sorted = (uptimeData || []).slice().sort((a,b)=> new Date(a.timestamp) - new Date(b.timestamp));
@@ -170,6 +178,31 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
     theme: 'grid',
     headStyles: { fillColor: [102, 126, 234] },
   });
+
+  // Data Usage section (if stats available)
+  if (stats) {
+    const dataStartY = (doc.lastAutoTable?.finalY || (summaryStartY + 30)) + 10;
+    doc.setFontSize(14);
+    doc.text('Data Usage', 14, dataStartY);
+    
+    const totalTxBytes = Number(stats.period_tx_bytes) || 0;
+    const totalRxBytes = Number(stats.period_rx_bytes) || 0;
+    const totalDataBytes = totalTxBytes + totalRxBytes;
+    
+    const dataUsageData = [
+      ['Total Data Sent', `${(totalTxBytes / 1024 / 1024 / 1024).toFixed(2)} GB`],
+      ['Total Data Received', `${(totalRxBytes / 1024 / 1024 / 1024).toFixed(2)} GB`],
+      ['Total Data Usage', `${(totalDataBytes / 1024 / 1024 / 1024).toFixed(2)} GB`]
+    ];
+    
+    doc.autoTable({
+      startY: dataStartY + 4,
+      head: [['Metric', 'Value']],
+      body: dataUsageData,
+      theme: 'grid',
+      headStyles: { fillColor: [102, 126, 234] },
+    });
+  }
 
   // Daily breakdown table
   const dailyStartY = (doc.lastAutoTable?.finalY || (summaryStartY + 30)) + 10;

@@ -213,7 +213,11 @@ export default function RouterDashboard({ router }) {
 
   const handleExportUptime = async () => {
     const logoDataUrl = await loadLogoDataUrl();
-    await exportUptimeReportToPDF(uptime || [], routerId, start, end, { logoDataUrl });
+    await exportUptimeReportToPDF(uptime || [], routerId, start, end, { 
+      logoDataUrl,
+      router,
+      stats
+    });
   };
 
   const handleLogInspection = async () => {
