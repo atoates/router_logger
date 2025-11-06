@@ -106,21 +106,6 @@
   color: #374151;
 }
 
-.ir-days-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 12px;
-  background: #dbeafe;
-  color: #1e40af;
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.ir-days-badge.ir-days-warning {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
 .ir-review-info {
   display: flex;
   flex-direction: column;

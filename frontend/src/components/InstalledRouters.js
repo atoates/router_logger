@@ -36,8 +36,13 @@ const InstalledRouters = () => {
   const formatDate = (dateValue) => {
     if (!dateValue) return 'N/A';
     
-    // Handle Unix timestamp (milliseconds)
-    const date = typeof dateValue === 'number' ? new Date(dateValue) : new Date(dateValue);
+    // Handle Unix timestamp (milliseconds) - convert string to number if needed
+    let timestamp = dateValue;
+    if (typeof dateValue === 'string') {
+      timestamp = parseInt(dateValue, 10);
+    }
+    
+    const date = typeof timestamp === 'number' ? new Date(timestamp) : new Date(dateValue);
     
     // Check for invalid date
     if (isNaN(date.getTime())) return 'N/A';
@@ -50,25 +55,16 @@ const InstalledRouters = () => {
     return `${day}/${month}/${year}`;
   };
 
-  const getDaysInstalled = (installedDate) => {
-    if (!installedDate) return null;
-    
-    // Handle Unix timestamp (milliseconds)
-    const date = typeof installedDate === 'number' ? new Date(installedDate) : new Date(installedDate);
-    
-    // Check for invalid date
-    if (isNaN(date.getTime())) return null;
-    
-    const now = new Date();
-    const days = Math.floor((now - date) / (1000 * 60 * 60 * 24));
-    return days >= 0 ? days : null;
-  };
-
   const getUninstallDate = (installedDate) => {
     if (!installedDate) return 'N/A';
     
-    // Handle Unix timestamp (milliseconds)
-    const date = typeof installedDate === 'number' ? new Date(installedDate) : new Date(installedDate);
+    // Handle Unix timestamp (milliseconds) - convert string to number if needed
+    let timestamp = installedDate;
+    if (typeof installedDate === 'string') {
+      timestamp = parseInt(installedDate, 10);
+    }
+    
+    const date = typeof timestamp === 'number' ? new Date(timestamp) : new Date(installedDate);
     
     // Check for invalid date
     if (isNaN(date.getTime())) return 'N/A';
@@ -78,6 +74,25 @@ const InstalledRouters = () => {
     uninstallDate.setDate(uninstallDate.getDate() + 92);
     
     return formatDate(uninstallDate);
+  };
+
+  const isDueSoon = (installedDate) => {
+    if (!installedDate) return false;
+    
+    // Handle Unix timestamp (milliseconds) - convert string to number if needed
+    let timestamp = installedDate;
+    if (typeof installedDate === 'string') {
+      timestamp = parseInt(installedDate, 10);
+    }
+    
+    const date = typeof timestamp === 'number' ? new Date(timestamp) : new Date(installedDate);
+    
+    // Check for invalid date
+    if (isNaN(date.getTime())) return false;
+    
+    const now = new Date();
+    const days = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+    return days > 92;
   };
 
   const isRouterOnline = (lastSeen) => {
@@ -131,7 +146,6 @@ const InstalledRouters = () => {
                 <th>Location</th>
                 <th>Status</th>
                 <th>Install Date</th>
-                <th>Days</th>
                 <th>Uninstall Date</th>
                 <th>Actions</th>
               </tr>
@@ -140,9 +154,9 @@ const InstalledRouters = () => {
               {installedRouters.map((router) => {
                 // Use date_installed if available, fallback to location_linked_at
                 const installDate = router.date_installed || router.location_linked_at;
-                const daysInstalled = getDaysInstalled(installDate);
                 const uninstallDate = getUninstallDate(installDate);
                 const online = isRouterOnline(router.last_seen);
+                const overdue = isDueSoon(installDate);
                 
                 return (
                   <tr key={router.router_id}>
@@ -167,14 +181,7 @@ const InstalledRouters = () => {
                     </td>
                     <td>{formatDate(installDate)}</td>
                     <td>
-                      {daysInstalled !== null && (
-                        <span className={`ir-days-badge ${daysInstalled > 92 ? 'ir-days-warning' : ''}`}>
-                          {daysInstalled}d
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <span className={daysInstalled > 92 ? 'ir-date-overdue' : ''}>{uninstallDate}</span>
+                      <span className={overdue ? 'ir-date-overdue' : ''}>{uninstallDate}</span>
                     </td>
                     <td>
                       <button
