@@ -92,7 +92,7 @@ function AppContent() {
             <img 
               src="/Logo.png" 
               alt="RouterLogger" 
-              style={{ height: '40px', cursor: 'pointer' }}
+              style={{ height: '60px', cursor: 'pointer', padding: '8px' }}
               onClick={handleLogoClick}
               title="Back to Dashboard"
             />
@@ -118,7 +118,7 @@ function AppContent() {
           <img 
             src="/Logo.png" 
             alt="RouterLogger" 
-            style={{ height: '40px', cursor: 'pointer' }}
+            style={{ height: '60px', cursor: 'pointer', padding: '8px' }}
             onClick={handleLogoClick}
             title="Back to Dashboard"
           />

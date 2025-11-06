@@ -8,6 +8,8 @@
 .rd-range .seg button{padding:8px 14px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s ease}
 .rd-range .seg button:hover{background:#f8fafc;border-color:#cbd5e1}
 .rd-range .seg button.active{background:#6366f1;color:#fff;border-color:#6366f1;box-shadow:0 2px 4px rgba(99,102,241,0.2)}
+.rd-range .seg button.btn-primary{background:#667eea;color:#fff;border-color:#667eea}
+.rd-range .seg button.btn-primary:hover{background:#5568d3;border-color:#5568d3}
 
 /* Widgets row - side by side */
 .widgets-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -69,6 +71,8 @@ body.dark-mode .rd-sub{color:#94a3b8}
 body.dark-mode .rd-range .seg button{background:#1e293b;border-color:#334155;color:#e2e8f0}
 body.dark-mode .rd-range .seg button:hover{background:#334155;border-color:#475569}
 body.dark-mode .rd-range .seg button.active{background:#6366f1;color:#fff;border-color:#6366f1}
+body.dark-mode .rd-range .seg button.btn-primary{background:#667eea;color:#fff;border-color:#667eea}
+body.dark-mode .rd-range .seg button.btn-primary:hover{background:#5568d3;border-color:#5568d3}
 body.dark-mode .metric{background:#1e293b;border-color:#334155}
 body.dark-mode .metric .label{color:#94a3b8}
 body.dark-mode .metric .value{color:#f1f5f9}

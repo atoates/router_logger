@@ -124,7 +124,7 @@ function RMSAuthButton({ variant = 'panel' }) {
   if (authStatus.authenticated) {
     if (variant === 'header') {
       return (
-        <div className="rms-pill" title="Connected to RMS">
+        <div className="rms-pill" style={{ marginRight: '8px' }} title="Connected to RMS">
           <span>RMS</span>
           <span className="tick">✓</span>
         </div>
@@ -150,7 +150,7 @@ function RMSAuthButton({ variant = 'panel' }) {
 
   return (
     variant === 'header' ? (
-      <button onClick={handleLogin} className="rms-pill" style={{ background:'transparent', color:'#ffffff', border:'1.5px solid rgba(255,255,255,0.6)' }} title="Connect to RMS">
+      <button onClick={handleLogin} className="rms-pill" style={{ background:'transparent', color:'#ffffff', border:'1.5px solid rgba(255,255,255,0.6)', marginRight: '8px' }} title="Connect to RMS">
         <span>RMS</span>
         <span className="tick" style={{ background:'rgba(255,255,255,0.15)' }}>🔒</span>
       </button>

@@ -248,6 +248,7 @@ export default function RouterDashboard({ router }) {
             <button className={range.type==='hours'&&range.value===24?'active':''} onClick={()=>setRange({type:'hours', value:24})}>24h</button>
             <button className={range.type==='days'&&range.value===7?'active':''} onClick={()=>setRange({type:'days', value:7})}>7d</button>
             <button className={range.type==='days'&&range.value===30?'active':''} onClick={()=>setRange({type:'days', value:30})}>30d</button>
+            <button className={range.type==='days'&&range.value===92?'active':''} onClick={()=>setRange({type:'days', value:92})}>92d</button>
             <button className={range.type==='custom'?'active':''} onClick={()=>setRange({type:'custom'})}>Custom</button>
             <div style={{ marginLeft: 'auto' }}>
               <button className="btn btn-primary" onClick={handleExportUptime}>Export Uptime Report (PDF)</button>
