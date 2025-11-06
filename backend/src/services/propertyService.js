@@ -93,10 +93,23 @@ async function linkRouterToLocation(linkage) {
       locationTaskName
     });
 
-    // Get current assignees from router task to remove them
+    // Update ClickUp task status and remove assignees
     if (clickupTaskId) {
       try {
         const task = await clickupClient.getTask(clickupTaskId);
+        
+        // Update task status to "installed" (ClickUp statuses are case-insensitive)
+        await clickupClient.updateTask(
+          clickupTaskId,
+          { status: 'installed' },
+          'default'
+        );
+        logger.info('Updated ClickUp task status to INSTALLED', { 
+          routerId, 
+          clickupTaskId
+        });
+
+        // Remove assignees
         const assigneeIds = task.assignees?.map(a => a.id).filter(id => id) || [];
         
         if (assigneeIds.length > 0) {
@@ -113,7 +126,7 @@ async function linkRouterToLocation(linkage) {
           });
         }
       } catch (clickupError) {
-        logger.warn('Failed to remove ClickUp task assignees (location link still recorded)', {
+        logger.warn('Failed to update ClickUp task status/assignees (location link still recorded)', {
           routerId,
           clickupTaskId,
           error: clickupError.message
@@ -184,6 +197,27 @@ async function unlinkRouterFromLocation(unlinkage) {
       routerId, 
       wasLinkedTo: wasLinkedToLocation
     });
+
+    // Update ClickUp task status to "needs attention" when unlinked
+    if (router.clickup_task_id) {
+      try {
+        await clickupClient.updateTask(
+          router.clickup_task_id,
+          { status: 'needs attention' },
+          'default'
+        );
+        logger.info('Updated ClickUp task status to NEEDS ATTENTION', { 
+          routerId, 
+          clickupTaskId: router.clickup_task_id
+        });
+      } catch (clickupError) {
+        logger.warn('Failed to update ClickUp task status (unlink still recorded)', {
+          routerId,
+          clickupTaskId: router.clickup_task_id,
+          error: clickupError.message
+        });
+      }
+    }
 
     return result.rows[0];
 
