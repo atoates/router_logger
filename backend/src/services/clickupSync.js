@@ -84,14 +84,10 @@ async function syncRouterToClickUp(router) {
     
     logger.info(`Router ${router.router_id}: current_status="${router.current_status}", sending ClickUp status="${isOnline ? 'ONLINE' : 'OFFLINE'}" (${statusValue})`);
 
-    // Router Dashboard (URL) - direct link to router's page
+    // Router Dashboard (URL) - will be updated separately (URL fields require individual API)
     const dashboardUrl = `${frontendUrl}/router/${router.router_id}`;
-    customFields.push({
-      id: CUSTOM_FIELDS.ROUTER_DASHBOARD,
-      value: dashboardUrl
-    });
 
-    // Update all custom fields EXCEPT Operational Status first
+    // Update all custom fields EXCEPT Operational Status and Router Dashboard
     const updatePayload = {
       custom_fields: customFields
     };
@@ -116,6 +112,21 @@ async function syncRouterToClickUp(router) {
     } catch (fieldError) {
       logger.error(`Failed to update Operational Status for router ${router.router_id}:`, fieldError.message);
       // Don't fail the whole sync if just the status field fails
+    }
+
+    // Update Router Dashboard URL separately using the individual field API
+    // URL fields require the individual field endpoint
+    try {
+      await clickupClient.updateCustomField(
+        router.clickup_task_id,
+        CUSTOM_FIELDS.ROUTER_DASHBOARD,
+        dashboardUrl,
+        'default'
+      );
+      logger.debug(`Updated Router Dashboard URL for router ${router.router_id} to ${dashboardUrl}`);
+    } catch (urlError) {
+      logger.error(`Failed to update Router Dashboard URL for router ${router.router_id}:`, urlError.message);
+      // Don't fail the whole sync if just the URL field fails
     }
 
     logger.debug(`Synced router ${router.router_id}: dbStatus=${router.current_status}, isOnline=${isOnline}, lastSeen=${router.last_seen}, clickupStatus=${statusValue}`);
