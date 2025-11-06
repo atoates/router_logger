@@ -7,11 +7,20 @@
   margin-bottom: 20px;
 }
 
+.installed-routers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .installed-routers-title {
   font-size: 18px;
   font-weight: 600;
   color: #1f2937;
-  margin: 0 0 16px 0;
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -24,6 +33,44 @@
   border-radius: 12px;
   font-size: 14px;
   font-weight: 600;
+}
+
+.ir-filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ir-filter-btn {
+  padding: 8px 16px;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ir-filter-btn:hover {
+  border-color: #6366f1;
+  color: #6366f1;
+  background: #f5f3ff;
+}
+
+.ir-filter-btn.active {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border-color: #ef4444;
+}
+
+.ir-filter-btn.active:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  border-color: #dc2626;
 }
 
 .installed-routers-loading,

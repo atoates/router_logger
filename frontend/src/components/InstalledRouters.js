@@ -8,6 +8,7 @@ const InstalledRouters = () => {
   const [installedRouters, setInstalledRouters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showOfflineOnly, setShowOfflineOnly] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -134,49 +135,80 @@ const InstalledRouters = () => {
 
   return (
     <div className="installed-routers-card">
-      <h3 className="installed-routers-title">
-        Installed Routers
-        <span className="installed-routers-count">{installedRouters.length}</span>
-      </h3>
-      
-      {installedRouters.length === 0 ? (
-        <div className="installed-routers-empty">
-          No routers currently installed
+      <div className="installed-routers-header">
+        <h3 className="installed-routers-title">
+          Installed Routers
+          <span className="installed-routers-count">{installedRouters.length}</span>
+        </h3>
+        
+        <div className="ir-filter-controls">
+          <button
+            className={`ir-filter-btn ${showOfflineOnly ? 'active' : ''}`}
+            onClick={() => setShowOfflineOnly(!showOfflineOnly)}
+            title={showOfflineOnly ? 'Show all routers' : 'Show offline only'}
+          >
+            {showOfflineOnly ? '🔴 Offline Only' : 'Show All'}
+          </button>
         </div>
-      ) : (
-        <div className="installed-routers-table-wrap">
-          <table className="installed-routers-table">
-            <thead>
-              <tr>
-                <th>Router</th>
-                <th>Location</th>
-                <th>Status</th>
-                <th>Install Date</th>
-                <th>Uninstall Date</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {installedRouters.map((router) => {
-                // Use date_installed if available, fallback to location_linked_at
-                const installDate = router.date_installed || router.location_linked_at;
-                const uninstallDate = getUninstallDate(installDate);
-                const online = isRouterOnline(router.last_seen);
-                const overdue = isDueSoon(installDate);
-                
-                return (
-                  <tr key={router.router_id}>
-                    <td>
-                      <div className="ir-router-info">
-                        <div className="ir-router-id">#{router.router_id}</div>
-                        {router.name && (
-                          <div className="ir-router-name">{router.name}</div>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="ir-property-name">{router.clickup_location_task_name || 'Unknown'}</div>
-                    </td>
+      </div>
+      
+      {(() => {
+        const filteredRouters = installedRouters.filter((router) => {
+          if (!showOfflineOnly) return true;
+          const online = isRouterOnline(router.last_seen);
+          return !online;
+        });
+
+        if (installedRouters.length === 0) {
+          return (
+            <div className="installed-routers-empty">
+              No routers currently installed
+            </div>
+          );
+        }
+
+        if (filteredRouters.length === 0) {
+          return (
+            <div className="installed-routers-empty">
+              No offline routers found
+            </div>
+          );
+        }
+
+        return (
+          <div className="installed-routers-table-wrap">
+            <table className="installed-routers-table">
+              <thead>
+                <tr>
+                  <th>Router</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Install Date</th>
+                  <th>Uninstall Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRouters.map((router) => {
+                  // Use date_installed if available, fallback to location_linked_at
+                  const installDate = router.date_installed || router.location_linked_at;
+                  const uninstallDate = getUninstallDate(installDate);
+                  const online = isRouterOnline(router.last_seen);
+                  const overdue = isDueSoon(installDate);
+                  
+                  return (
+                    <tr key={router.router_id}>
+                      <td>
+                        <div className="ir-router-info">
+                          <div className="ir-router-id">#{router.router_id}</div>
+                          {router.name && (
+                            <div className="ir-router-name">{router.name}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="ir-property-name">{router.clickup_location_task_name || 'Unknown'}</div>
+                      </td>
                     <td>
                       <div className="ir-status-indicator">
                         <span 
@@ -204,7 +236,8 @@ const InstalledRouters = () => {
             </tbody>
           </table>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 };
