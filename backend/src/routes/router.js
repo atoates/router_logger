@@ -362,7 +362,10 @@ router.get('/routers/by-assignees', async (req, res) => {
         last_seen,
         current_status,
         clickup_task_id,
-        clickup_task_url
+        clickup_task_url,
+        clickup_location_task_id,
+        clickup_location_task_name,
+        location_linked_at
       FROM routers
       WHERE clickup_task_id IS NOT NULL
       ORDER BY name ASC
@@ -382,7 +385,11 @@ router.get('/routers/by-assignees', async (req, res) => {
             if (!routersByAssignee[assigneeName]) {
               routersByAssignee[assigneeName] = [];
             }
-            routersByAssignee[assigneeName].push(router);
+            // Check if router is already in this assignee's list (avoid duplicates)
+            const alreadyAdded = routersByAssignee[assigneeName].some(r => r.router_id === router.router_id);
+            if (!alreadyAdded) {
+              routersByAssignee[assigneeName].push(router);
+            }
           }
         } else {
           // Unassigned routers

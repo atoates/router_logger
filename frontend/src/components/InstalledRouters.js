@@ -18,7 +18,10 @@ const InstalledRouters = () => {
     try {
       setLoading(true);
       const response = await fetch(`${API_BASE}/api/routers/with-locations`);
-      if (!response.ok) throw new Error('Failed to fetch installed routers');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to fetch installed routers (${response.status})`);
+      }
       const data = await response.json();
       setInstalledRouters(data);
       setError(null);

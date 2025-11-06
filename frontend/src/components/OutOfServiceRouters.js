@@ -18,7 +18,10 @@ const StoredWithRouters = () => {
     try {
       setLoading(true);
       const response = await fetch(`${API_BASE}/api/routers/by-assignees`);
-      if (!response.ok) throw new Error('Failed to fetch routers by assignees');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to fetch routers by assignees (${response.status})`);
+      }
       const data = await response.json();
       setRoutersByAssignee(data);
       setError(null);
