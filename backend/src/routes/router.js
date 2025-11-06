@@ -25,9 +25,6 @@ const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger, pool } = require('../config/database');
 const clickupClient = require('../services/clickupClient');
 
-// Custom field ID for "Date Installed" in ClickUp
-const DATE_INSTALLED_FIELD_ID = '9f31c21a-630d-49f2-8a79-354de03e24d1';
-
 // POST endpoint for routers to send data (HTTPS Data to Server)
 router.post('/log', async (req, res) => {
   try {
@@ -364,7 +361,8 @@ router.get('/routers/with-locations', async (req, res) => {
         r.clickup_task_url,
         r.clickup_location_task_id,
         r.clickup_location_task_name,
-        r.location_linked_at
+        r.location_linked_at,
+        r.date_installed
       FROM routers r
       LEFT JOIN LATERAL (
         SELECT status
@@ -377,50 +375,16 @@ router.get('/routers/with-locations', async (req, res) => {
       ORDER BY r.name ASC
     `);
     
-    // Fetch Date Installed custom field for each router SEQUENTIALLY with delay
-    // to avoid ClickUp rate limits
-    const routersWithDates = [];
-    for (const router of result.rows) {
-      try {
-        const rawDate = await clickupClient.getListCustomFieldValue(
-          router.clickup_location_task_id,
-          DATE_INSTALLED_FIELD_ID,
-          'default'
-        );
-        // Convert string timestamp to number (ClickUp returns Unix timestamp in ms as string)
-        const dateInstalled = rawDate ? Number(rawDate) : null;
-        
-        routersWithDates.push({
-          ...router,
-          date_installed: dateInstalled // Unix timestamp in milliseconds or null
-        });
-      } catch (error) {
-        logger.error('Error fetching date installed for router:', { 
-          router_id: router.router_id, 
-          error: error.message 
-        });
-        routersWithDates.push({
-          ...router,
-          date_installed: null
-        });
-      }
-      
-      // Add 200ms delay between requests to avoid rate limits
-      if (result.rows.indexOf(router) < result.rows.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-    }
-    
     // Update cache
-    routersWithLocationsCache.data = routersWithDates;
+    routersWithLocationsCache.data = result.rows;
     routersWithLocationsCache.timestamp = Date.now();
     
     logger.info('Updated routers-with-locations cache', {
-      count: routersWithDates.length
+      count: result.rows.length
     });
     
     res.set('X-Cache', 'MISS');
-    res.json(routersWithDates);
+    res.json(result.rows);
   } catch (error) {
     logger.error('Error fetching routers with locations:', error);
     res.status(500).json({ error: 'Failed to fetch routers with locations' });

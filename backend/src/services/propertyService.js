@@ -59,6 +59,32 @@ async function linkRouterToLocation(linkage) {
       [locationTaskId, locationTaskName, new Date(), routerId]
     );
 
+    // Fetch and sync date_installed from ClickUp
+    const DATE_INSTALLED_FIELD_ID = '9f31c21a-630d-49f2-8a79-354de03e24d1';
+    try {
+      const rawDate = await clickupClient.getListCustomFieldValue(
+        locationTaskId,
+        DATE_INSTALLED_FIELD_ID,
+        'default'
+      );
+      const dateInstalled = rawDate ? Number(rawDate) : null;
+      
+      await client.query(
+        `UPDATE routers SET date_installed = $1 WHERE router_id = $2`,
+        [dateInstalled, routerId]
+      );
+      
+      logger.info('Synced date_installed from ClickUp', { 
+        routerId, 
+        dateInstalled: dateInstalled ? new Date(dateInstalled).toISOString() : null 
+      });
+    } catch (dateError) {
+      logger.warn('Failed to sync date_installed (location link still recorded)', {
+        routerId,
+        error: dateError.message
+      });
+    }
+
     await client.query('COMMIT');
 
     logger.info('Router linked to location task', { 
@@ -178,7 +204,7 @@ async function unlinkRouterFromLocation(unlinkage) {
 async function getCurrentLocation(routerId) {
   try {
     const result = await pool.query(
-      `SELECT clickup_location_task_id, clickup_location_task_name, location_linked_at
+      `SELECT clickup_location_task_id, clickup_location_task_name, location_linked_at, date_installed
        FROM routers 
        WHERE router_id = $1`,
       [routerId]
@@ -193,31 +219,11 @@ async function getCurrentLocation(routerId) {
       return null;
     }
 
-    // Fetch date_installed from ClickUp
-    const clickupClient = require('./clickupClient');
-    const DATE_INSTALLED_FIELD_ID = '9f31c21a-630d-49f2-8a79-354de03e24d1';
-    let dateInstalled = null;
-    
-    try {
-      const rawDate = await clickupClient.getListCustomFieldValue(
-        router.clickup_location_task_id,
-        DATE_INSTALLED_FIELD_ID,
-        'default'
-      );
-      // Convert string timestamp to number (ClickUp returns Unix timestamp in ms as string)
-      dateInstalled = rawDate ? Number(rawDate) : null;
-    } catch (error) {
-      logger.warn('Error fetching date_installed for router location:', { 
-        router_id: routerId, 
-        error: error.message 
-      });
-    }
-
     return {
       location_task_id: router.clickup_location_task_id,
       location_task_name: router.clickup_location_task_name,
       linked_at: router.location_linked_at,
-      date_installed: dateInstalled
+      date_installed: router.date_installed
     };
   } catch (error) {
     logger.error('Error getting current location:', error);
