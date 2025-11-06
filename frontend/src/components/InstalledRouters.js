@@ -34,7 +34,7 @@ const InstalledRouters = () => {
   };
 
   const formatDate = (dateValue) => {
-    if (!dateValue) return 'N/A';
+    if (!dateValue) return 'Date not set';
     
     // Handle Unix timestamp (milliseconds) - convert string to number if needed
     let timestamp = dateValue;
@@ -44,8 +44,10 @@ const InstalledRouters = () => {
     
     const date = typeof timestamp === 'number' ? new Date(timestamp) : new Date(dateValue);
     
-    // Check for invalid date
-    if (isNaN(date.getTime())) return 'N/A';
+    // Check for invalid date or Unix epoch (01/01/1970)
+    if (isNaN(date.getTime()) || date.getTime() === 0 || date.getFullYear() === 1970) {
+      return 'Date not set';
+    }
     
     // Format as DD/MM/YYYY (UK format)
     const day = String(date.getDate()).padStart(2, '0');
@@ -56,7 +58,7 @@ const InstalledRouters = () => {
   };
 
   const getUninstallDate = (installedDate) => {
-    if (!installedDate) return 'N/A';
+    if (!installedDate) return 'Date not set';
     
     // Handle Unix timestamp (milliseconds) - convert string to number if needed
     let timestamp = installedDate;
@@ -66,8 +68,10 @@ const InstalledRouters = () => {
     
     const date = typeof timestamp === 'number' ? new Date(timestamp) : new Date(installedDate);
     
-    // Check for invalid date
-    if (isNaN(date.getTime())) return 'N/A';
+    // Check for invalid date or Unix epoch (01/01/1970)
+    if (isNaN(date.getTime()) || date.getTime() === 0 || date.getFullYear() === 1970) {
+      return 'Date not set';
+    }
     
     // Add 92 days
     const uninstallDate = new Date(date);
@@ -87,8 +91,10 @@ const InstalledRouters = () => {
     
     const date = typeof timestamp === 'number' ? new Date(timestamp) : new Date(installedDate);
     
-    // Check for invalid date
-    if (isNaN(date.getTime())) return false;
+    // Check for invalid date or Unix epoch (01/01/1970) - don't flag as overdue
+    if (isNaN(date.getTime()) || date.getTime() === 0 || date.getFullYear() === 1970) {
+      return false;
+    }
     
     const now = new Date();
     const days = Math.floor((now - date) / (1000 * 60 * 60 * 24));
