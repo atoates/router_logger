@@ -257,8 +257,8 @@ export default function RouterDashboard({ router }) {
         </div>
       </div>
 
-      {/* ClickUp Task Widget - Single column */}
-      <div className="widgets-row-single">
+      {/* Two column layout: ClickUp Task | Location Assignment */}
+      <div className="widgets-row">
         <ClickUpTaskWidget 
           router={router} 
           onStoredWith={() => propertyWidgetRef.current?.openStoredWithModal()}
@@ -267,8 +267,8 @@ export default function RouterDashboard({ router }) {
           ref={propertyWidgetRef}
           router={router} 
           onAssigned={() => {
-            // Optionally reload data when property is assigned
-            console.log('Property assigned to router');
+            // Optionally reload data when location is assigned
+            console.log('Location assigned to router');
           }} 
         />
       </div>

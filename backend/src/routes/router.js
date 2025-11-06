@@ -20,7 +20,7 @@ const {
   logInspection,
   getInspectionHistory
 } = require('../models/router');
-const { linkRouterToLocation, unlinkRouterFromLocation, assignRouterToUsers, removeRouterAssignees } = require('../services/propertyService');
+const { linkRouterToLocation, unlinkRouterFromLocation, assignRouterToUsers, removeRouterAssignees, getCurrentLocation } = require('../services/propertyService');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger, pool } = require('../config/database');
 
@@ -305,6 +305,23 @@ router.post('/clear-clickup-tasks', async (req, res) => {
   } catch (error) {
     logger.error('Error clearing task associations:', error);
     res.status(500).json({ error: 'Failed to clear task associations' });
+  }
+});
+
+// GET current location for a router
+router.get('/routers/:routerId/current-location', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const location = await getCurrentLocation(routerId);
+    
+    if (location) {
+      res.json({ location });
+    } else {
+      res.json({ location: null });
+    }
+  } catch (error) {
+    logger.error('Error getting current location:', error);
+    res.status(500).json({ error: error.message || 'Failed to get current location' });
   }
 });
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import './PropertySearchWidget.css';
 
@@ -6,14 +6,21 @@ const API_BASE = process.env.REACT_APP_API_URL || 'https://routerlogger-producti
 
 const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
   const [showStoredWithModal, setShowStoredWithModal] = useState(false);
   const [selectedAssignees, setSelectedAssignees] = useState([]);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [workspaceId, setWorkspaceId] = useState(null);
+  const [spaceId, setSpaceId] = useState(null);
 
   const routerId = router?.router_id;
 
-  // Get workspace on mount
+  // Get workspace and Active Accounts space on mount
   useEffect(() => {
     const getWorkspaceInfo = async () => {
       try {
@@ -22,6 +29,15 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
         
         if (authData.authorized && authData.workspace) {
           setWorkspaceId(authData.workspace.workspace_id);
+          
+          // Get spaces to find Active Accounts
+          const spacesRes = await fetch(`${API_BASE}/api/clickup/spaces/${authData.workspace.workspace_id}`);
+          const spacesData = await spacesRes.json();
+          
+          const activeAccounts = spacesData.spaces?.find(s => s.name === 'Active Accounts');
+          if (activeAccounts) {
+            setSpaceId(activeAccounts.id);
+          }
         }
       } catch (error) {
         console.error('Error getting workspace info:', error);
@@ -30,6 +46,142 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
 
     getWorkspaceInfo();
   }, []);
+
+  // Load current location assignment
+  useEffect(() => {
+    const loadCurrentLocation = async () => {
+      if (!routerId) return;
+      
+      try {
+        const res = await fetch(`${API_BASE}/api/routers/${routerId}/current-location`);
+        const data = await res.json();
+        
+        if (data.location) {
+          setCurrentLocation({
+            id: data.location.location_task_id,
+            name: data.location.location_task_name,
+            linkedAt: data.location.linked_at
+          });
+        } else {
+          setCurrentLocation(null);
+        }
+      } catch (error) {
+        console.error('Error loading current location:', error);
+      }
+    };
+
+    loadCurrentLocation();
+  }, [routerId]);
+
+  // Debounced search for properties
+  useEffect(() => {
+    if (!spaceId || searchQuery.length < 2) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/clickup/search-properties?spaceId=${spaceId}&query=${encodeURIComponent(searchQuery)}`
+        );
+        const data = await res.json();
+        setSearchResults(data.results || []);
+        setShowDropdown(true);
+      } catch (error) {
+        console.error('Error searching properties:', error);
+        toast.error('Failed to search properties');
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, spaceId]);
+
+  const assignLocation = useCallback(async (locationId, locationName) => {
+    if (!routerId) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/routers/${routerId}/link-location`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          location_task_id: locationId,
+          location_task_name: locationName,
+          notes: 'Assigned via dashboard'
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setCurrentLocation({
+          id: locationId,
+          name: locationName,
+          linkedAt: new Date().toISOString()
+        });
+        
+        setSearchQuery('');
+        setShowDropdown(false);
+        toast.success(`Router linked to ${locationName}`);
+        
+        if (onAssigned) onAssigned(data.router);
+      } else {
+        toast.error(data.error || 'Failed to link location');
+      }
+    } catch (error) {
+      console.error('Error linking location:', error);
+      toast.error('Failed to link location');
+    } finally {
+      setLoading(false);
+    }
+  }, [routerId, onAssigned]);
+
+  const removeLocation = useCallback(async () => {
+    if (!routerId || !currentLocation) return;
+
+    if (!window.confirm(`Unlink router from ${currentLocation.name}?`)) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/routers/${routerId}/unlink-location`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          notes: 'Unlinked via dashboard'
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setCurrentLocation(null);
+        toast.success('Router unlinked from location');
+      } else {
+        toast.error(data.error || 'Failed to unlink location');
+      }
+    } catch (error) {
+      console.error('Error unlinking location:', error);
+      toast.error('Failed to unlink location');
+    } finally {
+      setLoading(false);
+    }
+  }, [routerId, currentLocation]);
+
+  const handleSelectProperty = (property) => {
+    assignLocation(property.id, property.name);
+    setShowSearchModal(false);
+  };
+
+  const handleOpenSearchModal = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowSearchModal(true);
+  };
 
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
@@ -122,11 +274,121 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
   };
 
   if (!workspaceId) {
-    return null; // Don't show anything if not connected
+    return (
+      <div className="property-search-widget">
+        <div className="psw-header">
+          <h4>📍 Location Assignment</h4>
+          <span className="psw-status-badge warning">ClickUp Not Connected</span>
+        </div>
+        <p className="psw-hint">Connect ClickUp to link routers to locations</p>
+      </div>
+    );
   }
 
   return (
     <>
+      {/* Current Location Card */}
+      <div className="property-search-widget psw-current-card">
+        <div className="psw-section-label">Location Assignment</div>
+        
+        {currentLocation ? (
+          <div className="psw-current-content">
+            <div className="psw-property-name">{currentLocation.name}</div>
+            <div className="psw-property-meta">
+              Linked {new Date(currentLocation.linkedAt).toLocaleDateString()}
+            </div>
+            <a 
+              href={`https://app.clickup.com/${workspaceId}/v/li/${currentLocation.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="psw-clickup-link"
+            >
+              View in ClickUp ↗
+            </a>
+            <div className="psw-button-group">
+              <button 
+                onClick={removeLocation}
+                disabled={loading}
+                className="psw-btn danger"
+              >
+                Unlink Location
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="psw-empty-state">
+            <div className="psw-empty-text">No location assigned</div>
+            <div className="psw-button-group">
+              <button 
+                onClick={handleOpenSearchModal}
+                className="psw-btn primary"
+                disabled={loading || !workspaceId}
+              >
+                Assign Location
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Search Modal */}
+      {showSearchModal && (
+        <div className="psw-modal-overlay" onClick={() => setShowSearchModal(false)}>
+          <div className="psw-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="psw-modal-header">
+              <h3>Assign to Location</h3>
+              <button className="psw-modal-close" onClick={() => setShowSearchModal(false)}>×</button>
+            </div>
+            
+            <div className="psw-modal-body">
+              <div className="psw-search-input-wrapper">
+                <input
+                  type="text"
+                  placeholder="Search locations (e.g., Cambridge, Colchester)..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
+                  className="psw-search-input"
+                  disabled={loading}
+                  autoFocus
+                />
+                {searching && <span className="psw-spinner">⏳</span>}
+              </div>
+
+              {showDropdown && searchResults.length > 0 && (
+                <div className="psw-modal-results">
+                  {searchResults.map(result => (
+                    <div
+                      key={result.id}
+                      className="psw-result-item"
+                      onClick={() => handleSelectProperty(result)}
+                    >
+                      <div className="psw-result-name">{result.name}</div>
+                      <div className="psw-result-meta">
+                        {result.folder_name && <span className="psw-badge">{result.folder_name}</span>}
+                        {result.task_count !== undefined && <span className="psw-badge-count">{result.task_count} tasks</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {searchQuery.length >= 2 && !searching && searchResults.length === 0 && (
+                <div className="psw-no-results">
+                  No locations found for "{searchQuery}"
+                </div>
+              )}
+
+              {searchQuery.length < 2 && (
+                <div className="psw-hint">
+                  Type at least 2 characters to search locations...
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stored With / Assign Router Modal */}
       {showStoredWithModal && (
         <div className="psw-modal-overlay" onClick={() => setShowStoredWithModal(false)}>
