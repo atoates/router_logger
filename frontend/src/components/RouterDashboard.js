@@ -257,8 +257,8 @@ export default function RouterDashboard({ router }) {
         </div>
       </div>
 
-      {/* Three column layout: ClickUp Task | Current Property | Property History */}
-      <div className="widgets-row-three">
+      {/* ClickUp Task Widget - Single column */}
+      <div className="widgets-row-single">
         <ClickUpTaskWidget 
           router={router} 
           onStoredWith={() => propertyWidgetRef.current?.openStoredWithModal()}

@@ -122,40 +122,11 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
   };
 
   if (!workspaceId) {
-    return (
-      <div className="property-search-widget">
-        <div className="psw-header">
-          <h4>📍 Property Assignment</h4>
-          <span className="psw-status-badge warning">ClickUp Not Connected</span>
-        </div>
-        <p className="psw-hint">Connect ClickUp to assign routers to properties</p>
-      </div>
-    );
+    return null; // Don't show anything if not connected
   }
 
   return (
     <>
-      {/* Property Assignment Card */}
-      <div className="property-search-widget psw-current-card">
-        <div className="psw-section-label">Property Assignment</div>
-        
-        <div className="psw-empty-state">
-          <div className="psw-empty-text">No property assigned</div>
-        </div>
-      </div>
-
-      {/* Property History Card - Removed */}
-      <div className="property-search-widget psw-history-card">
-        <div className="psw-section-label">
-          Property History
-          <span className="psw-history-count">0</span>
-        </div>
-        
-        <div className="psw-empty-history">
-          No property history
-        </div>
-      </div>
-
       {/* Stored With / Assign Router Modal */}
       {showStoredWithModal && (
         <div className="psw-modal-overlay" onClick={() => setShowStoredWithModal(false)}>

@@ -12,10 +12,10 @@
 /* Widgets row - side by side */
 .widgets-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 
-/* Three column layout for ClickUp Task | Current Property | Property History */
-.widgets-row-three{
+/* Single column layout for ClickUp Task Widget only */
+.widgets-row-single{
   display:grid;
-  grid-template-columns:1fr 1fr 1fr;
+  grid-template-columns:1fr;
   gap:16px;
   align-items:start;
 }
