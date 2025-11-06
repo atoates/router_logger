@@ -55,6 +55,7 @@ export const getInspectionHistory = (routerId) => api.get(`/inspections/${router
 
 // Monitoring
 export const getRMSUsage = () => api.get('/monitoring/rms-usage');
+export const getClickUpUsage = () => api.get('/monitoring/clickup-usage');
 
 // ClickUp Integration
 export const getClickUpAuthStatus = () => api.get('/clickup/auth/status');

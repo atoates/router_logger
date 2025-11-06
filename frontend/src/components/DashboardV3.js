@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getRouters, getNetworkUsageRolling, getNetworkUsage, getTopRoutersRolling, getTopRouters, getOperators, getStorageStats, getInspectionStatus, getRMSUsage } from '../services/api';
+import { getRouters, getNetworkUsageRolling, getNetworkUsage, getTopRoutersRolling, getTopRouters, getOperators, getStorageStats, getInspectionStatus, getRMSUsage, getClickUpUsage } from '../services/api';
 import api from '../services/api';
 import { AreaChart, Area, BarChart, Bar, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
 import ClickUpAuthButton from './ClickUpAuthButton';
@@ -150,6 +150,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
   const [dbSize, setDbSize] = useState(null);
   const [inspections, setInspections] = useState([]);
   const [rmsUsage, setRMSUsage] = useState(null);
+  const [clickupUsage, setClickUpUsage] = useState(null);
   const [, setLoading] = useState(true);
 
   const updateTime = (m, v) => { setMode(m); setValue(v); };
@@ -184,10 +185,16 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
           console.error('RMS usage fetch error:', err);
           return { data: null };
         });
+        // Also fetch ClickUp usage monitoring
+        const clickupUsagePromise = getClickUpUsage().catch((err)=>{
+          console.error('ClickUp usage fetch error:', err);
+          return { data: null };
+        });
         const [rRes, sRes, uRes, tRes, oRes] = await Promise.all(promises);
         const dbRes = await dbSizePromise;
         const inspRes = await inspectionPromise;
         const rmsRes = await rmsUsagePromise;
+        const clickupRes = await clickupUsagePromise;
         console.log('DB size response:', dbRes);
         setRouters(rRes.data || []);
         setStorage(sRes.data || null);
@@ -198,6 +205,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
         console.log('DB size state set to:', dbRes?.data);
         setInspections(inspRes?.data || []);
         setRMSUsage(rmsRes?.data || null);
+        setClickUpUsage(clickupRes?.data || null);
 
         // Previous period for network-level delta
         if (mode==='rolling') {
@@ -514,20 +522,24 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
               <div className="v3-card-title">📊 RMS API Usage</div>
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
-                  <span style={{ fontSize:13, color:'#64748b' }}>Total Calls (period)</span>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Total Calls</span>
                   <strong>{fmtNum(rmsUsage.apiUsage?.total || 0)}</strong>
                 </div>
                 <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
-                  <span style={{ fontSize:13, color:'#64748b' }}>Daily Average</span>
-                  <strong>{fmtNum(rmsUsage.apiUsage?.estimates?.dailyRate || 0)}</strong>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Hourly Rate</span>
+                  <strong>{fmtNum(rmsUsage.apiUsage?.estimates?.hourlyRate || 0)}/hr</strong>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Daily Estimate</span>
+                  <strong>{fmtNum(rmsUsage.apiUsage?.estimates?.dailyRate || 0)}/day</strong>
                 </div>
                 <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
                   <span style={{ fontSize:13, color:'#64748b' }}>Monthly Estimate</span>
-                  <strong>{fmtNum(rmsUsage.apiUsage?.estimates?.monthlyRate || 0)}</strong>
+                  <strong>{fmtNum(rmsUsage.apiUsage?.estimates?.monthlyRate || 0)}/mo</strong>
                 </div>
                 <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : (parseFloat(rmsUsage.apiUsage?.estimates?.percentOfQuota || '0') > 80 ? '#fee2e2' : '#f0fdf4'), borderRadius:6, borderLeft: `3px solid ${parseFloat(rmsUsage.apiUsage?.estimates?.percentOfQuota || '0') > 80 ? '#ef4444' : '#10b981'}` }}>
-                  <span style={{ fontSize:13, color:'#64748b' }}>Quota Usage</span>
-                  <strong>{rmsUsage.apiUsage?.estimates?.percentOfQuota || '0%'}</strong>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Monthly Quota Usage</span>
+                  <strong>{rmsUsage.apiUsage?.estimates?.percentOfQuota || '0%'} <span style={{ fontSize:11, color:'#94a3b8' }}>of 100k</span></strong>
                 </div>
                 {rmsUsage.apiUsage?.rateLimitHits > 0 && (
                   <div style={{ padding:8, background:'#fef2f2', borderRadius:6, borderLeft:'3px solid #ef4444', fontSize:12 }}>
@@ -538,7 +550,83 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
                   </div>
                 )}
                 <div style={{ fontSize:11, color:'#94a3b8', paddingTop:8, borderTop: `1px solid ${dark ? '#334155' : '#e5e7eb'}` }}>
-                  Tracked since: {new Date(rmsUsage.apiUsage?.since).toLocaleString()}
+                  Tracking since: {new Date(rmsUsage.apiUsage?.since).toLocaleString()}
+                  <div style={{ marginTop:4 }}>Elapsed: {rmsUsage.apiUsage?.hoursSinceReset || 0}h</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ClickUp API Usage */}
+          {clickupUsage && clickupUsage.apiUsage && (
+            <div className="v3-card">
+              <div className="v3-card-title">🎯 ClickUp API Usage</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Total Calls</span>
+                  <strong>{fmtNum(clickupUsage.apiUsage?.total || 0)}</strong>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Current Rate</span>
+                  <strong>{clickupUsage.apiUsage?.estimates?.currentRatePerMinute || '0'}/min <span style={{ fontSize:11, color:'#94a3b8' }}>of 100</span></strong>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Hourly Rate</span>
+                  <strong>{fmtNum(clickupUsage.apiUsage?.estimates?.hourlyRate || 0)}/hr</strong>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Daily Estimate</span>
+                  <strong>{fmtNum(clickupUsage.apiUsage?.estimates?.dailyRate || 0)}/day</strong>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : (parseFloat(clickupUsage.apiUsage?.estimates?.percentOfRateLimit || '0') > 80 ? '#fee2e2' : '#f0fdf4'), borderRadius:6, borderLeft: `3px solid ${parseFloat(clickupUsage.apiUsage?.estimates?.percentOfRateLimit || '0') > 80 ? '#ef4444' : '#10b981'}` }}>
+                  <span style={{ fontSize:13, color:'#64748b' }}>Rate Limit %</span>
+                  <strong>{clickupUsage.apiUsage?.estimates?.percentOfRateLimit || '0%'}</strong>
+                </div>
+                
+                {/* Call Breakdown */}
+                <div style={{ padding:8, background: dark ? '#0f172a' : '#f8fafc', borderRadius:6, borderTop: `1px solid ${dark ? '#334155' : '#e5e7eb'}` }}>
+                  <div style={{ fontSize:12, fontWeight:600, color:'#64748b', marginBottom:6 }}>Call Breakdown:</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, fontSize:11 }}>
+                    <div>Update Task: <strong>{fmtNum(clickupUsage.apiUsage?.callsByType?.updateTask || 0)}</strong></div>
+                    <div>Update Field: <strong>{fmtNum(clickupUsage.apiUsage?.callsByType?.updateCustomField || 0)}</strong></div>
+                    <div>Get Task: <strong>{fmtNum(clickupUsage.apiUsage?.callsByType?.getTask || 0)}</strong></div>
+                    <div>Create Task: <strong>{fmtNum(clickupUsage.apiUsage?.callsByType?.createTask || 0)}</strong></div>
+                  </div>
+                </div>
+
+                {/* Sync Stats */}
+                {clickupUsage.syncStats && (
+                  <div style={{ padding:8, background: dark ? '#0f172a' : '#f8fafc', borderRadius:6 }}>
+                    <div style={{ fontSize:12, fontWeight:600, color:'#64748b', marginBottom:6 }}>Last Sync:</div>
+                    <div style={{ fontSize:11, color:'#94a3b8' }}>
+                      <div>Updated: <strong>{clickupUsage.syncStats.lastSyncUpdated}</strong> routers</div>
+                      <div>Errors: <strong>{clickupUsage.syncStats.lastSyncErrors}</strong></div>
+                      <div>Duration: <strong>{(clickupUsage.syncStats.lastSyncDuration / 1000).toFixed(1)}s</strong></div>
+                      {clickupUsage.syncStats.lastSyncTime && (
+                        <div>Time: <strong>{new Date(clickupUsage.syncStats.lastSyncTime).toLocaleTimeString()}</strong></div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {clickupUsage.apiUsage?.retries > 0 && (
+                  <div style={{ padding:8, background:'#fef3c7', borderRadius:6, borderLeft:'3px solid #f59e0b', fontSize:12 }}>
+                    <div style={{ fontWeight:600, color:'#92400e' }}>🔄 Retries: {clickupUsage.apiUsage.retries}</div>
+                  </div>
+                )}
+
+                {clickupUsage.apiUsage?.rateLimitHits > 0 && (
+                  <div style={{ padding:8, background:'#fef2f2', borderRadius:6, borderLeft:'3px solid #ef4444', fontSize:12 }}>
+                    <div style={{ fontWeight:600, color:'#991b1b', marginBottom:4 }}>⚠️ Rate Limit Hits: {clickupUsage.apiUsage.rateLimitHits}</div>
+                    {clickupUsage.apiUsage.lastRateLimit && (
+                      <div style={{ color:'#64748b' }}>Last: {new Date(clickupUsage.apiUsage.lastRateLimit).toLocaleString()}</div>
+                    )}
+                  </div>
+                )}
+                <div style={{ fontSize:11, color:'#94a3b8', paddingTop:8, borderTop: `1px solid ${dark ? '#334155' : '#e5e7eb'}` }}>
+                  Tracking since: {new Date(clickupUsage.apiUsage?.since).toLocaleString()}
+                  <div style={{ marginTop:4 }}>Elapsed: {clickupUsage.apiUsage?.hoursSinceReset || 0}h</div>
+                  <div style={{ marginTop:2, fontSize:10, fontStyle:'italic' }}>Limit: 100 requests/minute</div>
                 </div>
               </div>
             </div>

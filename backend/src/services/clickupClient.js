@@ -6,6 +6,7 @@
 const axios = require('axios');
 const clickupOAuthService = require('./clickupOAuthService');
 const logger = require('../config/database').logger;
+const { trackClickUpCall } = require('../routes/monitoring');
 
 const CLICKUP_API_BASE = 'https://api.clickup.com/api/v2';
 
@@ -257,9 +258,11 @@ class ClickUpClient {
       const client = await this.getAuthorizedClient(userId);
       const response = await client.get(`/task/${taskId}`);
       
+      trackClickUpCall('getTask', response.status);
       logger.info('Retrieved ClickUp task', { taskId });
       return response.data;
     } catch (error) {
+      trackClickUpCall('getTask', error.response?.status || 500);
       logger.error('Error getting ClickUp task:', error.response?.data || error.message);
       throw error;
     }
@@ -287,9 +290,11 @@ class ClickUpClient {
       
       const response = await client.post(`/list/${listId}/task`, taskData);
       
+      trackClickUpCall('createTask', response.status);
       logger.info('Created ClickUp task', { listId, taskId: response.data.id });
       return response.data;
     } catch (error) {
+      trackClickUpCall('createTask', error.response?.status || 500);
       logger.error('Error creating ClickUp task:', error.response?.data || error.message);
       // Re-throw with ClickUp's actual error message
       if (error.response?.data) {
@@ -310,7 +315,11 @@ class ClickUpClient {
    * @returns {Promise<Object>} Updated task
    */
   async updateTask(taskId, updates, userId = 'default') {
+    let attempt = 0;
     return retryWithBackoff(async () => {
+      const isRetry = attempt > 0;
+      attempt++;
+      
       try {
         const client = await this.getAuthorizedClient(userId);
         
@@ -325,6 +334,8 @@ class ClickUpClient {
         
         const response = await client.put(`/task/${taskId}`, updates);
         
+        trackClickUpCall('updateTask', response.status, isRetry);
+        
         // Log response
         logger.info('ClickUp updateTask response:', {
           taskId,
@@ -335,6 +346,7 @@ class ClickUpClient {
         
         return response.data;
       } catch (error) {
+        trackClickUpCall('updateTask', error.response?.status || 500, isRetry);
         logger.error('Error updating ClickUp task:', {
           taskId,
           status: error.response?.status,
@@ -408,7 +420,11 @@ class ClickUpClient {
    * @returns {Promise<Object>} Response
    */
   async updateCustomField(taskId, fieldId, value, userId = 'default') {
+    let attempt = 0;
     return retryWithBackoff(async () => {
+      const isRetry = attempt > 0;
+      attempt++;
+      
       try {
         const client = await this.getAuthorizedClient(userId);
         
@@ -421,6 +437,8 @@ class ClickUpClient {
         
         const response = await client.post(`/task/${taskId}/field/${fieldId}`, { value });
         
+        trackClickUpCall('updateCustomField', response.status, isRetry);
+        
         logger.info('ClickUp updateCustomField response:', {
           taskId,
           fieldId,
@@ -430,6 +448,7 @@ class ClickUpClient {
         
         return response.data;
       } catch (error) {
+        trackClickUpCall('updateCustomField', error.response?.status || 500, isRetry);
         logger.error('Error updating custom field:', {
           taskId,
           fieldId,

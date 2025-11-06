@@ -11,6 +11,22 @@ let apiMetrics = {
   lastRateLimit: null
 };
 
+// Track ClickUp API call metrics
+let clickupMetrics = {
+  apiCalls: 0,
+  lastReset: new Date(),
+  callsByType: {
+    updateTask: 0,
+    updateCustomField: 0,
+    getTask: 0,
+    createTask: 0,
+    other: 0
+  },
+  rateLimitHits: 0,
+  lastRateLimit: null,
+  retries: 0
+};
+
 // Middleware to track RMS API calls (to be used in rmsClient)
 function trackRMSCall(endpoint, status) {
   apiMetrics.rmsApiCalls++;
@@ -26,6 +42,30 @@ function trackRMSCall(endpoint, status) {
   if (status === 429) {
     apiMetrics.rateLimitHits++;
     apiMetrics.lastRateLimit = new Date();
+  }
+}
+
+// Middleware to track ClickUp API calls
+function trackClickUpCall(callType, status, isRetry = false) {
+  clickupMetrics.apiCalls++;
+  
+  // Track by call type
+  const type = callType || 'other';
+  if (clickupMetrics.callsByType.hasOwnProperty(type)) {
+    clickupMetrics.callsByType[type]++;
+  } else {
+    clickupMetrics.callsByType.other++;
+  }
+  
+  // Track rate limits
+  if (status === 429) {
+    clickupMetrics.rateLimitHits++;
+    clickupMetrics.lastRateLimit = new Date();
+  }
+  
+  // Track retries
+  if (isRetry) {
+    clickupMetrics.retries++;
   }
 }
 
@@ -73,6 +113,7 @@ router.get('/api/monitoring/rms-usage', async (req, res) => {
     const hoursSinceReset = (now - apiMetrics.lastReset) / (1000 * 60 * 60);
     const dailyEstimate = hoursSinceReset > 0 ? Math.round((apiMetrics.rmsApiCalls / hoursSinceReset) * 24) : 0;
     const monthlyEstimate = dailyEstimate * 30;
+    const quotaLimit = 100000; // RMS API monthly limit
     
     // Get recent sync stats from logs
     const recentSyncs = await pool.query(`
@@ -107,11 +148,13 @@ router.get('/api/monitoring/rms-usage', async (req, res) => {
         callsByType: apiMetrics.callsByType,
         rateLimitHits: apiMetrics.rateLimitHits,
         lastRateLimit: apiMetrics.lastRateLimit,
+        quotaLimit,
         estimates: {
+          hourlyRate: hoursSinceReset > 0 ? Math.round(apiMetrics.rmsApiCalls / hoursSinceReset) : 0,
           dailyRate: dailyEstimate,
           monthlyRate: monthlyEstimate,
-          percentOfQuota: ((monthlyEstimate / 100000) * 100).toFixed(2) + '%',
-          quotaRemaining: 100000 - monthlyEstimate
+          percentOfQuota: ((monthlyEstimate / quotaLimit) * 100).toFixed(2) + '%',
+          quotaRemaining: quotaLimit - monthlyEstimate
         }
       },
       recentActivity: recentSyncs.rows,
@@ -120,6 +163,54 @@ router.get('/api/monitoring/rms-usage', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching monitoring data:', error);
     res.status(500).json({ error: 'Failed to fetch monitoring data' });
+  }
+});
+
+// Get ClickUp API usage metrics
+router.get('/api/monitoring/clickup-usage', async (req, res) => {
+  try {
+    const now = new Date();
+    const hoursSinceReset = (now - clickupMetrics.lastReset) / (1000 * 60 * 60);
+    const minutesSinceReset = (now - clickupMetrics.lastReset) / (1000 * 60);
+    const dailyEstimate = hoursSinceReset > 0 ? Math.round((clickupMetrics.apiCalls / hoursSinceReset) * 24) : 0;
+    const monthlyEstimate = dailyEstimate * 30;
+    const quotaLimit = 100; // ClickUp rate limit: 100 requests per minute
+    const currentRate = minutesSinceReset > 0 ? (clickupMetrics.apiCalls / minutesSinceReset) : 0;
+    
+    // Get ClickUp sync stats
+    const syncStats = require('../services/clickupSync').getSyncStats();
+    
+    res.json({
+      apiUsage: {
+        total: clickupMetrics.apiCalls,
+        since: clickupMetrics.lastReset,
+        hoursSinceReset: hoursSinceReset.toFixed(2),
+        minutesSinceReset: minutesSinceReset.toFixed(2),
+        callsByType: clickupMetrics.callsByType,
+        rateLimitHits: clickupMetrics.rateLimitHits,
+        lastRateLimit: clickupMetrics.lastRateLimit,
+        retries: clickupMetrics.retries,
+        quotaLimit, // Per minute limit
+        estimates: {
+          currentRatePerMinute: currentRate.toFixed(2),
+          hourlyRate: hoursSinceReset > 0 ? Math.round(clickupMetrics.apiCalls / hoursSinceReset) : 0,
+          dailyRate: dailyEstimate,
+          monthlyRate: monthlyEstimate,
+          percentOfRateLimit: ((currentRate / quotaLimit) * 100).toFixed(2) + '%'
+        }
+      },
+      syncStats: {
+        totalSyncs: syncStats.totalSyncs,
+        lastSyncUpdated: syncStats.lastSyncUpdated,
+        lastSyncErrors: syncStats.lastSyncErrors,
+        lastSyncDuration: syncStats.lastSyncDuration,
+        lastSyncTime: syncStats.lastSyncTime,
+        isRunning: syncStats.isRunning
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching ClickUp monitoring data:', error);
+    res.status(500).json({ error: 'Failed to fetch ClickUp monitoring data' });
   }
 });
 
@@ -165,4 +256,4 @@ router.get('/api/monitoring/db-health', async (req, res) => {
   }
 });
 
-module.exports = { router, trackRMSCall, apiMetrics, isApproachingQuota, getQuotaStatus };
+module.exports = { router, trackRMSCall, trackClickUpCall, apiMetrics, clickupMetrics, isApproachingQuota, getQuotaStatus };
