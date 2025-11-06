@@ -102,18 +102,10 @@ const InstalledRouters = () => {
     return days > 92;
   };
 
-  const isRouterOnline = (lastSeen) => {
-    if (!lastSeen) return false;
-    const lastSeenDate = new Date(lastSeen);
-    // Check if date is valid
-    if (isNaN(lastSeenDate.getTime())) {
-      console.warn('Invalid last_seen date:', lastSeen);
-      return false;
-    }
-    const now = new Date();
-    const minutesSinceLastSeen = (now - lastSeenDate) / (1000 * 60);
-    // Consider online if seen in last 60 minutes (1 hour)
-    return minutesSinceLastSeen < 60;
+  const isRouterOnline = (currentState) => {
+    // Use the current_state from the database (set by RMS sync)
+    // This is the same logic used in RouterDashboard
+    return currentState === 'online' || currentState === 1 || currentState === '1' || currentState === true;
   };
 
   const handleRouterClick = (routerId) => {
@@ -160,7 +152,7 @@ const InstalledRouters = () => {
       {(() => {
         const filteredRouters = installedRouters.filter((router) => {
           if (!showOfflineOnly) return true;
-          const online = isRouterOnline(router.last_seen);
+          const online = isRouterOnline(router.current_state);
           return !online;
         });
 
@@ -198,7 +190,7 @@ const InstalledRouters = () => {
                   // Use date_installed if available, fallback to location_linked_at
                   const installDate = router.date_installed || router.location_linked_at;
                   const uninstallDate = getUninstallDate(installDate);
-                  const online = isRouterOnline(router.last_seen);
+                  const online = isRouterOnline(router.current_state);
                   const overdue = isDueSoon(installDate);
                   
                   return (
