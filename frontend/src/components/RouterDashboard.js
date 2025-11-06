@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { AreaChart, Area, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
 import { getLogs, getUsageStats, getUptimeData, logInspection, getInspectionHistory } from '../services/api';
 import { exportUptimeReportToPDF } from '../utils/exportUtils';
 import { toast } from 'react-toastify';
@@ -381,31 +381,50 @@ export default function RouterDashboard({ router }) {
             <div className="card-title uptime-title">Uptime samples</div>
             <div style={{ height: 140 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={(uptime||[]).slice(-120)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <LineChart 
+                  data={(uptime||[]).map(d => ({
+                    ...d,
+                    statusValue: (d.status === 'online' || d.status === 1 || d.status === '1' || d.status === true) ? 1 : 0
+                  }))} 
+                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis 
                     dataKey="timestamp" 
                     tickFormatter={(t)=> { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleDateString([], { month: 'short', day: 'numeric' }); }}
                     tick={{ fontSize: 10 }}
                     interval="preserveStartEnd"
-                    minTickGap={12}
+                    minTickGap={20}
                   />
-                  <YAxis domain={[0,1]} hide />
+                  <YAxis 
+                    domain={[0, 1]} 
+                    ticks={[0, 1]} 
+                    tickFormatter={(v) => v === 1 ? 'Online' : 'Offline'}
+                    tick={{ fontSize: 10 }}
+                    width={50}
+                  />
                   <Tooltip 
                     labelFormatter={(t)=> new Date(t).toLocaleString()} 
-                    formatter={(_, __, p)=> {
-                      const s = p?.payload?.status; 
-                      const on = (s==='online'||s===1||s==='1'||s===true);
-                      return on ? ['online','Status'] : ['offline','Status'];
-                    }} 
+                    formatter={(value) => value === 1 ? 'Online' : 'Offline'}
+                    contentStyle={{ fontSize: '12px' }}
                   />
-                  <Bar dataKey={() => 1} name="Status">
-                    {(uptime||[]).slice(-120).map((d, i) => {
-                      const s = d?.status; const on = (s==='online'||s===1||s==='1'||s===true);
-                      return <Cell key={`cell-${i}`} fill={on ? '#10b981' : '#ef4444'} />
-                    })}
-                  </Bar>
-                </BarChart>
+                  <Line 
+                    type="stepAfter" 
+                    dataKey="statusValue" 
+                    stroke="#6366f1" 
+                    strokeWidth={2}
+                    dot={false}
+                    name="Status"
+                    isAnimationActive={false}
+                  />
+                  {/* Color the area under the line */}
+                  <defs>
+                    <linearGradient id="statusGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#ef4444" stopOpacity={0.3} />
+                    </linearGradient>
+                  </defs>
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
