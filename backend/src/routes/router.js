@@ -351,9 +351,23 @@ router.get('/routers/with-locations', async (req, res) => {
   }
 });
 
+// Cache for assignee data (5 minute TTL)
+const assigneeCache = {
+  data: null,
+  timestamp: null,
+  TTL: 5 * 60 * 1000 // 5 minutes
+};
+
 // GET all routers grouped by assignees (stored with)
 router.get('/routers/by-assignees', async (req, res) => {
   try {
+    // Check cache first
+    const now = Date.now();
+    if (assigneeCache.data && assigneeCache.timestamp && (now - assigneeCache.timestamp) < assigneeCache.TTL) {
+      logger.info('Returning cached assignee data');
+      return res.json(assigneeCache.data);
+    }
+
     // Get all routers with their ClickUp tasks
     const routersResult = await pool.query(`
       SELECT 
@@ -375,38 +389,55 @@ router.get('/routers/by-assignees', async (req, res) => {
     const routersByAssignee = {};
     const clickupClient = require('../services/clickupClient');
     
-    for (const router of routersResult.rows) {
-      try {
-        const task = await clickupClient.getTask(router.clickup_task_id);
-        
-        if (task.assignees && task.assignees.length > 0) {
-          for (const assignee of task.assignees) {
-            const assigneeName = assignee.username || assignee.email || 'Unknown';
-            if (!routersByAssignee[assigneeName]) {
-              routersByAssignee[assigneeName] = [];
+    // Batch process routers to limit concurrent API calls
+    const BATCH_SIZE = 10;
+    const routers = routersResult.rows;
+    
+    for (let i = 0; i < routers.length; i += BATCH_SIZE) {
+      const batch = routers.slice(i, i + BATCH_SIZE);
+      
+      await Promise.all(batch.map(async (router) => {
+        try {
+          const task = await clickupClient.getTask(router.clickup_task_id);
+          
+          if (task.assignees && task.assignees.length > 0) {
+            for (const assignee of task.assignees) {
+              const assigneeName = assignee.username || assignee.email || 'Unknown';
+              if (!routersByAssignee[assigneeName]) {
+                routersByAssignee[assigneeName] = [];
+              }
+              // Check if router is already in this assignee's list (avoid duplicates)
+              const alreadyAdded = routersByAssignee[assigneeName].some(r => r.router_id === router.router_id);
+              if (!alreadyAdded) {
+                routersByAssignee[assigneeName].push(router);
+              }
             }
-            // Check if router is already in this assignee's list (avoid duplicates)
-            const alreadyAdded = routersByAssignee[assigneeName].some(r => r.router_id === router.router_id);
-            if (!alreadyAdded) {
-              routersByAssignee[assigneeName].push(router);
+          } else {
+            // Unassigned routers
+            if (!routersByAssignee['Unassigned']) {
+              routersByAssignee['Unassigned'] = [];
             }
+            routersByAssignee['Unassigned'].push(router);
           }
-        } else {
-          // Unassigned routers
+        } catch (error) {
+          logger.warn(`Failed to get assignees for router ${router.router_id}:`, error.message);
+          // Add to unassigned if we can't get task info
           if (!routersByAssignee['Unassigned']) {
             routersByAssignee['Unassigned'] = [];
           }
           routersByAssignee['Unassigned'].push(router);
         }
-      } catch (error) {
-        logger.warn(`Failed to get assignees for router ${router.router_id}:`, error.message);
-        // Add to unassigned if we can't get task info
-        if (!routersByAssignee['Unassigned']) {
-          routersByAssignee['Unassigned'] = [];
-        }
-        routersByAssignee['Unassigned'].push(router);
+      }));
+      
+      // Small delay between batches to avoid rate limiting
+      if (i + BATCH_SIZE < routers.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
+    
+    // Cache the result
+    assigneeCache.data = routersByAssignee;
+    assigneeCache.timestamp = now;
     
     res.json(routersByAssignee);
   } catch (error) {
