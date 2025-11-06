@@ -199,11 +199,13 @@ async function getCurrentLocation(routerId) {
     let dateInstalled = null;
     
     try {
-      dateInstalled = await clickupClient.getListCustomFieldValue(
+      const rawDate = await clickupClient.getListCustomFieldValue(
         router.clickup_location_task_id,
         DATE_INSTALLED_FIELD_ID,
         'default'
       );
+      // Convert string timestamp to number (ClickUp returns Unix timestamp in ms as string)
+      dateInstalled = rawDate ? Number(rawDate) : null;
     } catch (error) {
       logger.warn('Error fetching date_installed for router location:', { 
         router_id: routerId, 

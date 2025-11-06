@@ -382,11 +382,13 @@ router.get('/routers/with-locations', async (req, res) => {
     const routersWithDates = [];
     for (const router of result.rows) {
       try {
-        const dateInstalled = await clickupClient.getListCustomFieldValue(
+        const rawDate = await clickupClient.getListCustomFieldValue(
           router.clickup_location_task_id,
           DATE_INSTALLED_FIELD_ID,
           'default'
         );
+        // Convert string timestamp to number (ClickUp returns Unix timestamp in ms as string)
+        const dateInstalled = rawDate ? Number(rawDate) : null;
         
         routersWithDates.push({
           ...router,
