@@ -103,12 +103,12 @@ const StoredWithRouters = () => {
                   const online = isRouterOnline(router.current_state);
                   
                   return (
-                    <div key={router.router_id} className="router-item">
+                    <div 
+                      key={router.router_id} 
+                      className={`router-item ${online ? 'router-item-online' : 'router-item-offline'}`}
+                      title={online ? 'Online' : 'Offline'}
+                    >
                       <div className="router-item-header">
-                        <span 
-                          className={`oos-status-dot ${online ? 'oos-status-online' : 'oos-status-offline'}`}
-                          title={online ? 'Online' : 'Offline'}
-                        ></span>
                         <span className="router-item-id">#{router.router_id}</span>
                         {router.name && <span className="router-item-name">{router.name}</span>}
                       </div>
