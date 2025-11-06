@@ -485,7 +485,7 @@ router.get('/routers/by-assignees', async (req, res) => {
       return res.json(assigneeCache.data);
     }
 
-    // Get all routers with their ClickUp tasks
+    // Get all routers with their ClickUp tasks and assignees from DATABASE (no API calls!)
     const routersResult = await pool.query(`
       SELECT 
         r.router_id,
@@ -496,7 +496,8 @@ router.get('/routers/by-assignees', async (req, res) => {
         r.clickup_task_url,
         r.clickup_location_task_id,
         r.clickup_location_task_name,
-        r.location_linked_at
+        r.location_linked_at,
+        r.clickup_assignees
       FROM routers r
       LEFT JOIN LATERAL (
         SELECT status
@@ -509,59 +510,49 @@ router.get('/routers/by-assignees', async (req, res) => {
       ORDER BY r.name ASC
     `);
 
-    // Group routers by their assignees from ClickUp
+    // Group routers by their assignees from DATABASE (no ClickUp API calls needed!)
     const routersByAssignee = {};
-    const clickupClient = require('../services/clickupClient');
-    
-    // Batch process routers to limit concurrent API calls
-    const BATCH_SIZE = 10;
     const routers = routersResult.rows;
     
-    for (let i = 0; i < routers.length; i += BATCH_SIZE) {
-      const batch = routers.slice(i, i + BATCH_SIZE);
-      
-      await Promise.all(batch.map(async (router) => {
-        try {
-          const task = await clickupClient.getTask(router.clickup_task_id);
-          
-          if (task.assignees && task.assignees.length > 0) {
-            for (const assignee of task.assignees) {
-              const assigneeName = assignee.username || assignee.email || 'Unknown';
-              if (!routersByAssignee[assigneeName]) {
-                routersByAssignee[assigneeName] = [];
-              }
-              // Check if router is already in this assignee's list (avoid duplicates)
-              const alreadyAdded = routersByAssignee[assigneeName].some(r => r.router_id === router.router_id);
-              if (!alreadyAdded) {
-                routersByAssignee[assigneeName].push(router);
-              }
+    for (const router of routers) {
+      try {
+        // Parse assignees from database
+        const assignees = router.clickup_assignees ? JSON.parse(router.clickup_assignees) : null;
+        
+        if (assignees && assignees.length > 0) {
+          for (const assignee of assignees) {
+            const assigneeName = assignee.username || assignee.email || 'Unknown';
+            if (!routersByAssignee[assigneeName]) {
+              routersByAssignee[assigneeName] = [];
             }
-          } else {
-            // Unassigned routers
-            if (!routersByAssignee['Unassigned']) {
-              routersByAssignee['Unassigned'] = [];
+            // Check if router is already in this assignee's list (avoid duplicates)
+            const alreadyAdded = routersByAssignee[assigneeName].some(r => r.router_id === router.router_id);
+            if (!alreadyAdded) {
+              routersByAssignee[assigneeName].push(router);
             }
-            routersByAssignee['Unassigned'].push(router);
           }
-        } catch (error) {
-          logger.warn(`Failed to get assignees for router ${router.router_id}:`, error.message);
-          // Add to unassigned if we can't get task info
+        } else {
+          // Unassigned routers
           if (!routersByAssignee['Unassigned']) {
             routersByAssignee['Unassigned'] = [];
           }
           routersByAssignee['Unassigned'].push(router);
         }
-      }));
-      
-      // Small delay between batches to avoid rate limiting
-      if (i + BATCH_SIZE < routers.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (parseError) {
+        logger.warn(`Failed to parse assignees for router ${router.router_id}:`, parseError.message);
+        // Add to unassigned if we can't parse
+        if (!routersByAssignee['Unassigned']) {
+          routersByAssignee['Unassigned'] = [];
+        }
+        routersByAssignee['Unassigned'].push(router);
       }
     }
     
     // Cache the result
     assigneeCache.data = routersByAssignee;
     assigneeCache.timestamp = now;
+    
+    logger.info(`Grouped ${routers.length} routers by assignees from DATABASE (0 API calls)`);
     
     res.json(routersByAssignee);
   } catch (error) {

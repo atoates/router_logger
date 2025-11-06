@@ -228,7 +228,8 @@ async function initializeDatabase() {
         ADD COLUMN IF NOT EXISTS clickup_location_task_name VARCHAR(255),
         ADD COLUMN IF NOT EXISTS location_linked_at TIMESTAMP,
         ADD COLUMN IF NOT EXISTS date_installed BIGINT,
-        ADD COLUMN IF NOT EXISTS last_clickup_sync_hash TEXT;
+        ADD COLUMN IF NOT EXISTS last_clickup_sync_hash TEXT,
+        ADD COLUMN IF NOT EXISTS clickup_assignees JSONB;
     `);
 
     await client.query(`

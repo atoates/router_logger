@@ -115,7 +115,19 @@ async function syncRouterToClickUp(router) {
       logger.info(`Router #58 ClickUp update payload:`, JSON.stringify(updatePayload, null, 2));
     }
     
-    await clickupClient.updateTask(router.clickup_task_id, updatePayload, 'default');
+    const updatedTask = await clickupClient.updateTask(router.clickup_task_id, updatePayload, 'default');
+
+    // Store assignee data in database for Stored With page (eliminates 99 API calls)
+    if (updatedTask && updatedTask.assignees) {
+      try {
+        await pool.query(
+          'UPDATE routers SET clickup_assignees = $1 WHERE router_id = $2',
+          [JSON.stringify(updatedTask.assignees), router.router_id]
+        );
+      } catch (assigneeError) {
+        logger.warn(`Failed to update assignees for router ${router.router_id}:`, assigneeError.message);
+      }
+    }
 
     // Update Operational Status separately using the individual field API
     // This is more reliable for dropdown fields
