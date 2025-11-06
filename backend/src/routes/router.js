@@ -25,6 +25,78 @@ const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger, pool } = require('../config/database');
 const clickupClient = require('../services/clickupClient');
 
+// Temporary endpoint to sync date_installed from ClickUp to database
+router.post('/admin/sync-dates', async (req, res) => {
+  const DATE_INSTALLED_FIELD_ID = '9f31c21a-630d-49f2-8a79-354de03e24d1';
+  
+  try {
+    // Get all routers with location assignments
+    const result = await pool.query(
+      `SELECT router_id, clickup_location_task_id 
+       FROM routers 
+       WHERE clickup_location_task_id IS NOT NULL`
+    );
+    
+    logger.info(`Syncing date_installed for ${result.rows.length} routers`);
+    
+    let updated = 0;
+    let failed = 0;
+    const results = [];
+    
+    for (const router of result.rows) {
+      try {
+        // Fetch date_installed from ClickUp
+        const rawDate = await clickupClient.getListCustomFieldValue(
+          router.clickup_location_task_id,
+          DATE_INSTALLED_FIELD_ID,
+          'default'
+        );
+        
+        const dateInstalled = rawDate ? Number(rawDate) : null;
+        
+        // Update database
+        await pool.query(
+          `UPDATE routers 
+           SET date_installed = $1 
+           WHERE router_id = $2`,
+          [dateInstalled, router.router_id]
+        );
+        
+        results.push({
+          router_id: router.router_id,
+          date_installed: dateInstalled ? new Date(dateInstalled).toISOString() : null,
+          status: 'success'
+        });
+        updated++;
+        
+        // Add 200ms delay to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+      } catch (error) {
+        logger.error(`Failed to sync date for router ${router.router_id}:`, error.message);
+        results.push({
+          router_id: router.router_id,
+          error: error.message,
+          status: 'failed'
+        });
+        failed++;
+      }
+    }
+    
+    logger.info('Date sync completed', { updated, failed, total: result.rows.length });
+    
+    res.json({
+      success: true,
+      summary: { updated, failed, total: result.rows.length },
+      results
+    });
+    
+  } catch (error) {
+    logger.error('Date sync failed:', error);
+    res.status(500).json({ error: 'Failed to sync dates', message: error.message });
+  }
+});
+
 // POST endpoint for routers to send data (HTTPS Data to Server)
 router.post('/log', async (req, res) => {
   try {
