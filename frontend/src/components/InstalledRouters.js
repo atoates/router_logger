@@ -106,8 +106,8 @@ const InstalledRouters = () => {
     const lastSeenDate = new Date(lastSeen);
     const now = new Date();
     const minutesSinceLastSeen = (now - lastSeenDate) / (1000 * 60);
-    // Consider online if seen in last 10 minutes
-    return minutesSinceLastSeen < 10;
+    // Consider online if seen in last 60 minutes (1 hour)
+    return minutesSinceLastSeen < 60;
   };
 
   const handleRouterClick = (routerId) => {
