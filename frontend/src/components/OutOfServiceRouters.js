@@ -46,6 +46,12 @@ const StoredWithRouters = () => {
     }
   };
 
+  const isRouterOnline = (currentState) => {
+    // Use the current_state from the database (set by RMS sync)
+    // This is the same logic used in RouterDashboard and InstalledRouters
+    return currentState === 'online' || currentState === 1 || currentState === '1' || currentState === true;
+  };
+
   const handleRouterClick = (routerId) => {
     navigate(`/router/${routerId}`);
   };
@@ -93,20 +99,28 @@ const StoredWithRouters = () => {
                 </span>
               </h4>
               <div className="assignee-routers">
-                {routersByAssignee[assigneeName].map((router) => (
-                  <div key={router.router_id} className="router-item">
-                    <div className="router-item-header">
-                      <span className="router-item-id">#{router.router_id}</span>
-                      {router.name && <span className="router-item-name">{router.name}</span>}
+                {routersByAssignee[assigneeName].map((router) => {
+                  const online = isRouterOnline(router.current_state);
+                  
+                  return (
+                    <div key={router.router_id} className="router-item">
+                      <div className="router-item-header">
+                        <span 
+                          className={`oos-status-dot ${online ? 'oos-status-online' : 'oos-status-offline'}`}
+                          title={online ? 'Online' : 'Offline'}
+                        ></span>
+                        <span className="router-item-id">#{router.router_id}</span>
+                        {router.name && <span className="router-item-name">{router.name}</span>}
+                      </div>
+                      <button
+                        className="router-item-view-btn"
+                        onClick={() => handleRouterClick(router.router_id)}
+                      >
+                        View Details
+                      </button>
                     </div>
-                    <button
-                      className="router-item-view-btn"
-                      onClick={() => handleRouterClick(router.router_id)}
-                    >
-                      View Details
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}

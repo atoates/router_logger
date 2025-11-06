@@ -267,3 +267,24 @@
 .router-item-view-btn:active {
   transform: scale(0.98);
 }
+
+/* Status indicator styles */
+.oos-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.oos-status-dot.oos-status-online {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+}
+
+.oos-status-dot.oos-status-offline {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
