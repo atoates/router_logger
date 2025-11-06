@@ -75,7 +75,7 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
 
   // Debounced search for properties
   useEffect(() => {
-    if (!spaceId || searchQuery.length < 2) {
+    if (!workspaceId || searchQuery.length < 2) {
       setSearchResults([]);
       setShowDropdown(false);
       return;
@@ -85,10 +85,24 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
       setSearching(true);
       try {
         const res = await fetch(
-          `${API_BASE}/api/clickup/search-properties?spaceId=${spaceId}&query=${encodeURIComponent(searchQuery)}`
+          `${API_BASE}/api/clickup/search-tasks/${workspaceId}?search=${encodeURIComponent(searchQuery)}`
         );
         const data = await res.json();
-        setSearchResults(data.results || []);
+        
+        // Filter results to only show tasks from Active Accounts space
+        const filteredTasks = data.tasks?.filter(task => 
+          task.space?.name === 'Active Accounts'
+        ) || [];
+        
+        // Format for the dropdown
+        const formattedResults = filteredTasks.map(task => ({
+          id: task.id,
+          name: task.name,
+          status: task.status,
+          list: task.list
+        }));
+        
+        setSearchResults(formattedResults);
         setShowDropdown(true);
       } catch (error) {
         console.error('Error searching properties:', error);
@@ -99,7 +113,7 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, spaceId]);
+  }, [searchQuery, workspaceId]);
 
   const assignLocation = useCallback(async (locationId, locationName) => {
     if (!routerId) return;
