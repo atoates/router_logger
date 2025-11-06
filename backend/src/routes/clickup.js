@@ -12,6 +12,7 @@ const clickupClient = require('../services/clickupClient');
 const { syncAllRoutersToClickUp, getSyncStats, syncAssigneesFromClickUp } = require('../services/clickupSync');
 const { pool } = require('../config/database');
 const logger = require('../config/database').logger;
+const { sanitizeError } = require('../utils/errorLogger');
 
 // Store OAuth states temporarily (in production, use Redis)
 const oauthStates = new Map();
@@ -38,7 +39,7 @@ router.get('/auth/status', async (req, res) => {
       workspace: workspaceInfo
     });
   } catch (error) {
-    logger.error('Error checking ClickUp auth status:', error);
+    logger.error('Error checking ClickUp auth status:', sanitizeError(error));
     res.status(500).json({ error: 'Failed to check authorization status' });
   }
 });
@@ -65,7 +66,7 @@ router.get('/auth/url', (req, res) => {
       state 
     });
   } catch (error) {
-    logger.error('Error generating auth URL:', error);
+    logger.error('Error generating auth URL:', sanitizeError(error));
     res.status(500).json({ error: 'Failed to generate authorization URL' });
   }
 });
@@ -123,7 +124,7 @@ router.get('/auth/callback', async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error('Error in OAuth callback:', error);
+    logger.error('Error in OAuth callback:', sanitizeError(error));
     res.status(500).json({ error: 'Authorization failed' });
   }
 });
@@ -138,7 +139,7 @@ router.post('/auth/disconnect', async (req, res) => {
     logger.info('ClickUp disconnected');
     res.json({ success: true });
   } catch (error) {
-    logger.error('Error disconnecting ClickUp:', error);
+    logger.error('Error disconnecting ClickUp:', sanitizeError(error));
     res.status(500).json({ error: 'Failed to disconnect' });
   }
 });
@@ -152,7 +153,7 @@ router.get('/workspaces', async (req, res) => {
     const workspaces = await clickupClient.getWorkspaces('default');
     res.json({ workspaces });
   } catch (error) {
-    logger.error('Error getting workspaces:', error);
+    logger.error('Error getting workspaces:', sanitizeError(error));
     res.status(error.message.includes('No ClickUp token') ? 401 : 500)
       .json({ error: error.message });
   }
@@ -168,7 +169,7 @@ router.get('/workspaces/:workspaceId/members', async (req, res) => {
     const members = await clickupClient.getWorkspaceMembers(workspaceId, 'default');
     res.json({ members });
   } catch (error) {
-    logger.error('Error getting workspace members:', error);
+    logger.error('Error getting workspace members:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -183,7 +184,7 @@ router.get('/spaces/:workspaceId', async (req, res) => {
     const spaces = await clickupClient.getSpaces(workspaceId, 'default');
     res.json({ spaces });
   } catch (error) {
-    logger.error('Error getting spaces:', error);
+    logger.error('Error getting spaces:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -203,7 +204,7 @@ router.get('/lists/:workspaceId', async (req, res) => {
 
     res.json({ list });
   } catch (error) {
-    logger.error('Error getting Routers list:', error);
+    logger.error('Error getting Routers list:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -230,7 +231,7 @@ router.get('/tasks/:listId', async (req, res) => {
 
     res.json({ tasks: filteredTasks });
   } catch (error) {
-    logger.error('Error getting tasks:', error);
+    logger.error('Error getting tasks:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -255,7 +256,7 @@ router.post('/tasks/:listId', async (req, res) => {
 
     res.json({ task });
   } catch (error) {
-    logger.error('Error creating task:', error);
+    logger.error('Error creating task:', sanitizeError(error));
     const errorMessage = error.clickupData?.err || error.clickupData?.error || error.message;
     res.status(error.status || 500).json({ 
       error: errorMessage,
@@ -279,7 +280,7 @@ router.put('/task/:taskId', async (req, res) => {
 
     res.json({ task: updatedTask });
   } catch (error) {
-    logger.error('Error updating task:', error);
+    logger.error('Error updating task:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -328,7 +329,7 @@ router.post('/link-router', async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error('Error linking router to task:', error);
+    logger.error('Error linking router to task:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -355,7 +356,7 @@ router.post('/reset-all-links', async (req, res) => {
       count: result.rows.length
     });
   } catch (error) {
-    logger.error('Error resetting ClickUp links:', error);
+    logger.error('Error resetting ClickUp links:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -389,7 +390,7 @@ router.delete('/link-router/:routerId', async (req, res) => {
       router: result.rows[0]
     });
   } catch (error) {
-    logger.error('Error unlinking router:', error);
+    logger.error('Error unlinking router:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -433,7 +434,7 @@ router.get('/router-task/:routerId', async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error('Error getting router task:', error);
+    logger.error('Error getting router task:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -467,7 +468,7 @@ router.get('/properties/:listId', async (req, res) => {
       count: properties.length 
     });
   } catch (error) {
-    logger.error('Error searching property tasks:', error);
+    logger.error('Error searching property tasks:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -501,7 +502,7 @@ router.get('/search-tasks/:workspaceId', async (req, res) => {
       count: formattedTasks.length 
     });
   } catch (error) {
-    logger.error('Error searching tasks:', error);
+    logger.error('Error searching tasks:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -555,7 +556,7 @@ router.get('/debug/space-lists/:spaceId', async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error('Error getting space structure:', error);
+    logger.error('Error getting space structure:', sanitizeError(error));
     res.status(500).json({ error: error.message, details: error.response?.data });
   }
 });
@@ -571,7 +572,7 @@ router.get('/list/:listId', async (req, res) => {
     
     res.json({ list });
   } catch (error) {
-    logger.error('Error getting list details:', error);
+    logger.error('Error getting list details:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -587,7 +588,7 @@ router.get('/custom-fields/:listId', async (req, res) => {
     
     res.json({ fields });
   } catch (error) {
-    logger.error('Error getting custom fields:', error);
+    logger.error('Error getting custom fields:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -602,7 +603,7 @@ router.get('/sync/stats', (req, res) => {
     const stats = getSyncStats();
     res.json(stats);
   } catch (error) {
-    logger.error('Error getting sync stats:', error);
+    logger.error('Error getting sync stats:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -620,7 +621,7 @@ router.post('/sync', async (req, res) => {
       ...result
     });
   } catch (error) {
-    logger.error('Error during manual ClickUp sync:', error);
+    logger.error('Error during manual ClickUp sync:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -638,7 +639,7 @@ router.post('/sync/assignees', async (req, res) => {
       ...result
     });
   } catch (error) {
-    logger.error('Error during assignee sync:', error);
+    logger.error('Error during assignee sync:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
@@ -688,7 +689,7 @@ router.post('/sync/:routerId', async (req, res) => {
       result: syncResult
     });
   } catch (error) {
-    logger.error('Error syncing single router:', error);
+    logger.error('Error syncing single router:', sanitizeError(error));
     res.status(500).json({ error: error.message, stack: error.stack });
   }
 });
@@ -717,7 +718,7 @@ router.get('/debug/task/:taskId', async (req, res) => {
       allCustomFields: task.custom_fields
     });
   } catch (error) {
-    logger.error('Error getting task details:', error);
+    logger.error('Error getting task details:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });
