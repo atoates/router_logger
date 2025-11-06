@@ -41,16 +41,12 @@ async function linkRouterToLocation(linkage) {
 
     const clickupTaskId = routerResult.rows[0].clickup_task_id;
 
-    // Validate location task exists in ClickUp
-    try {
-      const locationTask = await clickupClient.getTask(locationTaskId);
-      logger.info('Location task validated', { 
-        locationTaskId, 
-        name: locationTask.name 
-      });
-    } catch (error) {
-      throw new Error(`Invalid location task ID ${locationTaskId}: ${error.message}`);
-    }
+    // Note: locationTaskId is actually a ClickUp list ID (lists represent properties)
+    logger.info('Linking router to location list', { 
+      routerId,
+      locationTaskId, // This is actually a list ID
+      locationTaskName 
+    });
 
     // Update router with location task info
     const result = await client.query(
