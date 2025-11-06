@@ -74,10 +74,10 @@ function AppContent() {
   
   // Navigation menu items
   const navItems = [
-    { path: '/', label: '📊 Network Analytics', icon: '📊' },
-    { path: '/assignments', label: '📍 Router Assignments', icon: '📍' },
-    { path: '/stored', label: '📦 Stored Routers', icon: '📦' },
-    { path: '/status', label: '⚙️ System Status', icon: '⚙️' },
+    { path: '/', label: 'Network Analytics', icon: '📊' },
+    { path: '/assignments', label: 'Router Assignments', icon: '📍' },
+    { path: '/stored', label: 'Stored Routers', icon: '📦' },
+    { path: '/status', label: 'System Status', icon: '⚙️' },
   ];
 
   return (
