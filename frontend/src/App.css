@@ -1,1 +1,146 @@
-/* Additional App-specific styles */
+/* App Header */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+  gap: 24px;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 20px;
+}
+
+.app-header-left {
+  flex: 1;
+}
+
+.app-logo-link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.app-logo-link:hover .app-title {
+  color: #6366f1;
+}
+
+.app-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+  color: #0f172a;
+  transition: color 0.2s ease;
+}
+
+.app-subtitle {
+  font-size: 14px;
+  color: #64748b;
+  margin: 4px 0 0 0;
+}
+
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Navigation Menu */
+.app-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  background: #f8fafc;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.app-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.app-nav-link:hover {
+  background: #fff;
+  color: #6366f1;
+  border-color: #e5e7eb;
+}
+
+.app-nav-link.active {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.app-nav-icon {
+  font-size: 18px;
+}
+
+.app-nav-label {
+  font-size: 14px;
+}
+
+/* Dark Mode Overrides */
+.dark-mode .app-title {
+  color: #f1f5f9;
+}
+
+.dark-mode .app-subtitle {
+  color: #94a3b8;
+}
+
+.dark-mode .app-header {
+  border-bottom-color: #334155;
+}
+
+.dark-mode .app-nav {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.dark-mode .app-nav-link {
+  color: #94a3b8;
+}
+
+.dark-mode .app-nav-link:hover {
+  background: #334155;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+
+.dark-mode .app-nav-link.active {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .app-header-right {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  
+  .app-nav {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .app-nav-link {
+    width: 100%;
+  }
+}
+

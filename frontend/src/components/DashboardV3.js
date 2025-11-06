@@ -136,12 +136,11 @@ function DeltaBadge({ current, previous }) {
   return <span className={`delta ${cls}`}>{sym} {Math.abs(rounded)}%</span>;
 }
 
-export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
+export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, page = 'network' }) {
   const [mode, setMode] = useState('rolling');
   const [value, setValue] = useState(24);
   const [dark, setDark] = useState(defaultDarkMode);
   const [hoveredPill, setHoveredPill] = useState(null);
-  const [currentPage, setCurrentPage] = useState('routers'); // 'network', 'routers', 'status'
   const [routers, setRouters] = useState([]);
   const [usage, setUsage] = useState([]);
   const [usagePrev, setUsagePrev] = useState([]);
@@ -251,48 +250,16 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
 
   return (
     <div className={className}>
-      <div className="v3-header">
-        <div>
-          <h1>� VacatAd Dashboard</h1>
-          <p>Monitor router network and property assignments</p>
-        </div>
-        <div className="v3-controls">
-          <ClickUpAuthButton />
+      {/* Time Controls - Show for network and status pages */}
+      {(page === 'network' || page === 'status') && (
+        <div className="v3-controls-bar">
           <TimeControls mode={mode} value={value} onChange={updateTime} />
           <div className="toggle" onClick={()=>setDark(!dark)} title="Toggle dark mode">{dark ? '🌙' : '🌞'}</div>
         </div>
-      </div>
-
-      {/* Page Navigation */}
-      <div className="v3-page-nav">
-        <button 
-          className={`v3-page-btn ${currentPage === 'network' ? 'active' : ''}`}
-          onClick={() => setCurrentPage('network')}
-        >
-          📊 Network Analytics
-        </button>
-        <button 
-          className={`v3-page-btn ${currentPage === 'routers' ? 'active' : ''}`}
-          onClick={() => setCurrentPage('routers')}
-        >
-          📍 Router Assignments
-        </button>
-        <button 
-          className={`v3-page-btn ${currentPage === 'stored' ? 'active' : ''}`}
-          onClick={() => setCurrentPage('stored')}
-        >
-          📦 Stored Routers
-        </button>
-        <button 
-          className={`v3-page-btn ${currentPage === 'status' ? 'active' : ''}`}
-          onClick={() => setCurrentPage('status')}
-        >
-          ⚙️ System Status
-        </button>
-      </div>
+      )}
 
       {/* Network Analytics Page */}
-      {currentPage === 'network' && (
+      {page === 'network' && (
         <>
           {/* Metrics */}
           <div className="v3-metrics">
@@ -437,7 +404,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
       )}
 
       {/* Router Assignments Page */}
-      {currentPage === 'routers' && (
+      {page === 'assignments' && (
         <div className="v3-full-width-content">
           <InstalledRouters />
           
@@ -495,14 +462,14 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
       )}
 
       {/* Stored Routers Page */}
-      {currentPage === 'stored' && (
+      {page === 'stored' && (
         <div className="v3-full-width-content">
           <StoredWithRouters />
         </div>
       )}
 
       {/* System Status Page */}
-      {currentPage === 'status' && (
+      {page === 'status' && (
         <div className="v3-full-width-content">
           {/* Storage Card */}
           <div className="v3-card">
