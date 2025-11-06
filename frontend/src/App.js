@@ -11,26 +11,24 @@ import { ToastContainer, toast } from 'react-toastify';
 import { getRouters } from './services/api';
 import 'react-toastify/dist/ReactToastify.css';
 
-function AppContent() {
+// Wrapper component for router detail page that loads router data from URL
+function RouterDetailPage() {
   const [selectedRouter, setSelectedRouter] = useState(null);
-  const [darkMode] = useState(true);
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [loading, setLoading] = useState(true);
   const params = useParams();
+  const navigate = useNavigate();
   
-  // Load router from URL if present
   useEffect(() => {
-    const loadRouterFromUrl = async () => {
+    const loadRouter = async () => {
       if (params.routerId) {
         try {
+          setLoading(true);
           const response = await getRouters();
           const routers = response.data || [];
           const router = routers.find(r => r.router_id === params.routerId);
           
           if (router) {
             setSelectedRouter(router);
-            const label = router.name ? `${router.name} (ID ${router.router_id})` : `ID ${router.router_id}`;
-            toast.success(`Opening ${label}`);
           } else {
             toast.error(`Router ${params.routerId} not found`);
             navigate('/');
@@ -39,16 +37,33 @@ function AppContent() {
           console.error('Error loading router:', error);
           toast.error('Failed to load router');
           navigate('/');
+        } finally {
+          setLoading(false);
         }
       }
     };
     
-    loadRouterFromUrl();
+    loadRouter();
   }, [params.routerId, navigate]);
+
+  if (loading) {
+    return (
+      <div className="card">
+        <p>Loading router details...</p>
+      </div>
+    );
+  }
+
+  return <RouterDashboard router={selectedRouter} />;
+}
+
+function AppContent() {
+  const [darkMode] = useState(true);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Header router selector opens the Router details page
   const handleHeaderRouterSelect = (router) => {
-    setSelectedRouter(router);
     navigate(`/router/${router.router_id}`);
     const label = router.name ? `${router.name} (ID ${router.router_id})` : `ID ${router.router_id}`;
     toast.success(`Opening ${label}`);
@@ -106,7 +121,7 @@ function AppContent() {
             <Route path="/assignments" element={<DashboardV3 page="assignments" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />} />
             <Route path="/stored" element={<DashboardV3 page="stored" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />} />
             <Route path="/status" element={<DashboardV3 page="status" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />} />
-            <Route path="/router/:routerId" element={<RouterDashboard router={selectedRouter} />} />
+            <Route path="/router/:routerId" element={<RouterDetailPage />} />
           </Routes>
         </ErrorBoundary>
       </div>
