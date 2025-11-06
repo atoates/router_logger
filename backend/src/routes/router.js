@@ -348,32 +348,37 @@ router.get('/routers/with-locations', async (req, res) => {
       ORDER BY name ASC
     `);
     
-    // Fetch Date Installed custom field for each router
-    const routersWithDates = await Promise.all(
-      result.rows.map(async (router) => {
-        try {
-          const dateInstalled = await clickupClient.getListCustomFieldValue(
-            router.clickup_location_task_id,
-            DATE_INSTALLED_FIELD_ID,
-            'default'
-          );
-          
-          return {
-            ...router,
-            date_installed: dateInstalled // Unix timestamp in milliseconds or null
-          };
-        } catch (error) {
-          logger.error('Error fetching date installed for router:', { 
-            router_id: router.router_id, 
-            error: error.message 
-          });
-          return {
-            ...router,
-            date_installed: null
-          };
-        }
-      })
-    );
+    // Fetch Date Installed custom field for each router SEQUENTIALLY with delay
+    // to avoid ClickUp rate limits
+    const routersWithDates = [];
+    for (const router of result.rows) {
+      try {
+        const dateInstalled = await clickupClient.getListCustomFieldValue(
+          router.clickup_location_task_id,
+          DATE_INSTALLED_FIELD_ID,
+          'default'
+        );
+        
+        routersWithDates.push({
+          ...router,
+          date_installed: dateInstalled // Unix timestamp in milliseconds or null
+        });
+      } catch (error) {
+        logger.error('Error fetching date installed for router:', { 
+          router_id: router.router_id, 
+          error: error.message 
+        });
+        routersWithDates.push({
+          ...router,
+          date_installed: null
+        });
+      }
+      
+      // Add 200ms delay between requests to avoid rate limits
+      if (result.rows.indexOf(router) < result.rows.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
     
     res.json(routersWithDates);
   } catch (error) {

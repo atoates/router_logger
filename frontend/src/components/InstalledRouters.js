@@ -24,7 +24,6 @@ const InstalledRouters = () => {
         throw new Error(errorData.error || `Failed to fetch installed routers (${response.status})`);
       }
       const data = await response.json();
-      console.log('Installed routers data (first router):', data[0]);
       setInstalledRouters(data);
       setError(null);
     } catch (err) {
