@@ -429,9 +429,9 @@ export default function RouterDashboard({ router }) {
                   <Line 
                     type="stepAfter" 
                     dataKey="offline" 
-                    stroke="#ef4444" 
-                    strokeWidth={2.5}
-                    dot={false}
+                    stroke="transparent" 
+                    strokeWidth={0}
+                    dot={{ fill: '#ef4444', r: 3 }}
                     name="offline"
                     isAnimationActive={false}
                     connectNulls={false}
