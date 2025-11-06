@@ -75,7 +75,7 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
 
   // Debounced search for properties
   useEffect(() => {
-    if (!workspaceId || searchQuery.length < 2) {
+    if (!spaceId || searchQuery.length < 2) {
       setSearchResults([]);
       setShowDropdown(false);
       return;
@@ -84,22 +84,38 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
+        // Get the space's folder structure with all lists
         const res = await fetch(
-          `${API_BASE}/api/clickup/search-tasks/${workspaceId}?search=${encodeURIComponent(searchQuery)}`
+          `${API_BASE}/api/clickup/debug/space-lists/${spaceId}`
         );
         const data = await res.json();
         
-        // Filter results to only show tasks from Active Accounts space
-        const filteredTasks = data.tasks?.filter(task => 
-          task.space?.name === 'Active Accounts'
-        ) || [];
+        // Extract all lists from all folders
+        let allLists = [];
+        if (data.folderless && data.folderless.length > 0) {
+          allLists = allLists.concat(data.folderless);
+        }
+        if (data.folders && data.folders.length > 0) {
+          data.folders.forEach(folder => {
+            if (folder.lists && folder.lists.length > 0) {
+              allLists = allLists.concat(folder.lists.map(list => ({
+                ...list,
+                folderName: folder.folder.name
+              })));
+            }
+          });
+        }
+        
+        // Filter lists by search query (case insensitive)
+        const filtered = allLists.filter(list => 
+          list.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
         
         // Format for the dropdown
-        const formattedResults = filteredTasks.map(task => ({
-          id: task.id,
-          name: task.name,
-          status: task.status,
-          list: task.list
+        const formattedResults = filtered.map(list => ({
+          id: list.id,
+          name: list.name,
+          folderName: list.folderName
         }));
         
         setSearchResults(formattedResults);
@@ -113,7 +129,7 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, workspaceId]);
+  }, [searchQuery, spaceId]);
 
   const assignLocation = useCallback(async (locationId, locationName) => {
     if (!routerId) return;
