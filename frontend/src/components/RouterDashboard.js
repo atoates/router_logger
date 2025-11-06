@@ -382,10 +382,14 @@ export default function RouterDashboard({ router }) {
             <div style={{ height: 140 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart 
-                  data={(uptime||[]).map(d => ({
-                    ...d,
-                    statusValue: (d.status === 'online' || d.status === 1 || d.status === '1' || d.status === true) ? 1 : 0
-                  }))} 
+                  data={(uptime||[]).map(d => {
+                    const isOnline = (d.status === 'online' || d.status === 1 || d.status === '1' || d.status === true);
+                    return {
+                      ...d,
+                      online: isOnline ? 1 : null,
+                      offline: !isOnline ? 0 : null
+                    };
+                  })} 
                   margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -405,25 +409,33 @@ export default function RouterDashboard({ router }) {
                   />
                   <Tooltip 
                     labelFormatter={(t)=> new Date(t).toLocaleString()} 
-                    formatter={(value) => value === 1 ? 'Online' : 'Offline'}
+                    formatter={(value, name) => {
+                      if (name === 'online') return ['Online', 'Status'];
+                      if (name === 'offline') return ['Offline', 'Status'];
+                      return [value, name];
+                    }}
                     contentStyle={{ fontSize: '12px' }}
                   />
                   <Line 
                     type="stepAfter" 
-                    dataKey="statusValue" 
-                    stroke="#6366f1" 
-                    strokeWidth={2}
+                    dataKey="online" 
+                    stroke="#10b981" 
+                    strokeWidth={2.5}
                     dot={false}
-                    name="Status"
+                    name="online"
                     isAnimationActive={false}
+                    connectNulls={false}
                   />
-                  {/* Color the area under the line */}
-                  <defs>
-                    <linearGradient id="statusGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="#ef4444" stopOpacity={0.3} />
-                    </linearGradient>
-                  </defs>
+                  <Line 
+                    type="stepAfter" 
+                    dataKey="offline" 
+                    stroke="#ef4444" 
+                    strokeWidth={2.5}
+                    dot={false}
+                    name="offline"
+                    isAnimationActive={false}
+                    connectNulls={false}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
