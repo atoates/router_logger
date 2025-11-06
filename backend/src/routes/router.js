@@ -325,6 +325,89 @@ router.get('/routers/:routerId/current-location', async (req, res) => {
   }
 });
 
+// GET all routers with location links (installed routers)
+router.get('/routers/with-locations', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        router_id,
+        name,
+        last_seen,
+        current_status,
+        clickup_task_id,
+        clickup_task_url,
+        clickup_location_task_id,
+        clickup_location_task_name,
+        location_linked_at
+      FROM routers
+      WHERE clickup_location_task_id IS NOT NULL
+      ORDER BY name ASC
+    `);
+    
+    res.json(result.rows);
+  } catch (error) {
+    logger.error('Error fetching routers with locations:', error);
+    res.status(500).json({ error: 'Failed to fetch routers with locations' });
+  }
+});
+
+// GET all routers grouped by assignees (stored with)
+router.get('/routers/by-assignees', async (req, res) => {
+  try {
+    // Get all routers with their ClickUp tasks
+    const routersResult = await pool.query(`
+      SELECT 
+        router_id,
+        name,
+        last_seen,
+        current_status,
+        clickup_task_id,
+        clickup_task_url
+      FROM routers
+      WHERE clickup_task_id IS NOT NULL
+      ORDER BY name ASC
+    `);
+
+    // Group routers by their assignees from ClickUp
+    const routersByAssignee = {};
+    const clickupClient = require('../services/clickupClient');
+    
+    for (const router of routersResult.rows) {
+      try {
+        const task = await clickupClient.getTask(router.clickup_task_id);
+        
+        if (task.assignees && task.assignees.length > 0) {
+          for (const assignee of task.assignees) {
+            const assigneeName = assignee.username || assignee.email || 'Unknown';
+            if (!routersByAssignee[assigneeName]) {
+              routersByAssignee[assigneeName] = [];
+            }
+            routersByAssignee[assigneeName].push(router);
+          }
+        } else {
+          // Unassigned routers
+          if (!routersByAssignee['Unassigned']) {
+            routersByAssignee['Unassigned'] = [];
+          }
+          routersByAssignee['Unassigned'].push(router);
+        }
+      } catch (error) {
+        logger.warn(`Failed to get assignees for router ${router.router_id}:`, error.message);
+        // Add to unassigned if we can't get task info
+        if (!routersByAssignee['Unassigned']) {
+          routersByAssignee['Unassigned'] = [];
+        }
+        routersByAssignee['Unassigned'].push(router);
+      }
+    }
+    
+    res.json(routersByAssignee);
+  } catch (error) {
+    logger.error('Error fetching routers by assignees:', error);
+    res.status(500).json({ error: 'Failed to fetch routers by assignees' });
+  }
+});
+
 // POST link router to a location (ClickUp location task)
 // This will remove the assignee from the router task
 router.post('/routers/:routerId/link-location', async (req, res) => {

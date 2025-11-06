@@ -172,3 +172,98 @@
 .oos-return-btn:active {
   transform: scale(0.98);
 }
+
+/* Stored With Grouped Layout */
+.stored-with-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.assignee-group {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.assignee-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assignee-router-count {
+  background: #6366f1;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.assignee-routers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.router-item {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.router-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.router-item-id {
+  font-weight: 700;
+  color: #6366f1;
+  font-size: 13px;
+}
+
+.router-item-name {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.router-item-location {
+  font-size: 12px;
+  color: #64748b;
+  padding: 4px 0;
+  border-top: 1px solid #f1f5f9;
+}
+
+.router-item-view-btn {
+  padding: 6px 12px;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-top: 4px;
+}
+
+.router-item-view-btn:hover {
+  background: #4f46e5;
+}
+
+.router-item-view-btn:active {
+  transform: scale(0.98);
+}

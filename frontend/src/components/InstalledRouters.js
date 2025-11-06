@@ -17,7 +17,7 @@ const InstalledRouters = () => {
   const fetchInstalledRouters = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/api/router-properties/installed-routers`);
+      const response = await fetch(`${API_BASE}/api/routers/with-locations`);
       if (!response.ok) throw new Error('Failed to fetch installed routers');
       const data = await response.json();
       setInstalledRouters(data);
@@ -46,13 +46,6 @@ const InstalledRouters = () => {
     const now = new Date();
     const days = Math.floor((now - date) / (1000 * 60 * 60 * 24));
     return days;
-  };
-
-  const getReviewDate = (installedDate) => {
-    if (!installedDate) return null;
-    const date = new Date(installedDate);
-    date.setDate(date.getDate() + 92);
-    return date;
   };
 
   const handleRouterClick = (routerId) => {
@@ -94,33 +87,30 @@ const InstalledRouters = () => {
             <thead>
               <tr>
                 <th>Router</th>
-                <th>Property</th>
-                <th>Installed</th>
+                <th>Location</th>
+                <th>Linked</th>
                 <th>Days</th>
-                <th>92-Day Review</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {installedRouters.map((router) => {
-                const daysInstalled = getDaysInstalled(router.installedAt);
-                const reviewDate = getReviewDate(router.installedAt);
-                const daysUntilReview = reviewDate ? Math.floor((reviewDate - new Date()) / (1000 * 60 * 60 * 24)) : null;
+                const daysInstalled = getDaysInstalled(router.location_linked_at);
                 
                 return (
-                  <tr key={router.routerId}>
+                  <tr key={router.router_id}>
                     <td>
                       <div className="ir-router-info">
-                        <div className="ir-router-id">#{router.routerId}</div>
-                        {router.routerName && (
-                          <div className="ir-router-name">{router.routerName}</div>
+                        <div className="ir-router-id">#{router.router_id}</div>
+                        {router.name && (
+                          <div className="ir-router-name">{router.name}</div>
                         )}
                       </div>
                     </td>
                     <td>
-                      <div className="ir-property-name">{router.propertyName || 'Unknown'}</div>
+                      <div className="ir-property-name">{router.clickup_location_task_name || 'Unknown'}</div>
                     </td>
-                    <td>{formatDate(router.installedAt)}</td>
+                    <td>{formatDate(router.location_linked_at)}</td>
                     <td>
                       {daysInstalled !== null && (
                         <span className={`ir-days-badge ${daysInstalled > 92 ? 'ir-days-warning' : ''}`}>
@@ -129,25 +119,9 @@ const InstalledRouters = () => {
                       )}
                     </td>
                     <td>
-                      {reviewDate && (
-                        <div className="ir-review-info">
-                          <div>{formatDate(reviewDate)}</div>
-                          {daysUntilReview !== null && (
-                            <div className={`ir-review-countdown ${daysUntilReview < 0 ? 'overdue' : daysUntilReview <= 7 ? 'soon' : ''}`}>
-                              {daysUntilReview < 0 
-                                ? `${Math.abs(daysUntilReview)}d overdue` 
-                                : daysUntilReview === 0 
-                                ? 'Today!' 
-                                : `in ${daysUntilReview}d`}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td>
                       <button
                         className="ir-view-btn"
-                        onClick={() => handleRouterClick(router.routerId)}
+                        onClick={() => handleRouterClick(router.router_id)}
                         title="View router details"
                       >
                         View Router

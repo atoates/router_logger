@@ -3,7 +3,7 @@ import { getRouters, getNetworkUsageRolling, getNetworkUsage, getTopRoutersRolli
 import api from '../services/api';
 import { AreaChart, Area, BarChart, Bar, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
 import ClickUpAuthButton from './ClickUpAuthButton';
-import OutOfServiceRouters from './OutOfServiceRouters';
+import StoredWithRouters from './OutOfServiceRouters';
 import InstalledRouters from './InstalledRouters';
 import '../DashboardV3.css';
 
@@ -434,7 +434,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
       {currentPage === 'routers' && (
         <div className="v3-full-width-content">
           <InstalledRouters />
-          <OutOfServiceRouters />
+          <StoredWithRouters />
           
           {/* Overdue Inspections */}
           {(() => {
