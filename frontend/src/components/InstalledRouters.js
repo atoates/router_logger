@@ -24,6 +24,7 @@ const InstalledRouters = () => {
         throw new Error(errorData.error || `Failed to fetch installed routers (${response.status})`);
       }
       const data = await response.json();
+      console.log('Installed routers data (first router):', data[0]);
       setInstalledRouters(data);
       setError(null);
     } catch (err) {
@@ -105,6 +106,11 @@ const InstalledRouters = () => {
   const isRouterOnline = (lastSeen) => {
     if (!lastSeen) return false;
     const lastSeenDate = new Date(lastSeen);
+    // Check if date is valid
+    if (isNaN(lastSeenDate.getTime())) {
+      console.warn('Invalid last_seen date:', lastSeen);
+      return false;
+    }
     const now = new Date();
     const minutesSinceLastSeen = (now - lastSeenDate) / (1000 * 60);
     // Consider online if seen in last 60 minutes (1 hour)
