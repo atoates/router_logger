@@ -23,6 +23,10 @@ const {
 const { linkRouterToLocation, unlinkRouterFromLocation, assignRouterToUsers, removeRouterAssignees, getCurrentLocation } = require('../services/propertyService');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger, pool } = require('../config/database');
+const clickupClient = require('../services/clickupClient');
+
+// Custom field ID for "Date Installed" in ClickUp
+const DATE_INSTALLED_FIELD_ID = '9f31c21a-630d-49f2-8a79-354de03e24d1';
 
 // POST endpoint for routers to send data (HTTPS Data to Server)
 router.post('/log', async (req, res) => {
@@ -344,7 +348,34 @@ router.get('/routers/with-locations', async (req, res) => {
       ORDER BY name ASC
     `);
     
-    res.json(result.rows);
+    // Fetch Date Installed custom field for each router
+    const routersWithDates = await Promise.all(
+      result.rows.map(async (router) => {
+        try {
+          const dateInstalled = await clickupClient.getListCustomFieldValue(
+            router.clickup_location_task_id,
+            DATE_INSTALLED_FIELD_ID,
+            'default'
+          );
+          
+          return {
+            ...router,
+            date_installed: dateInstalled // Unix timestamp in milliseconds or null
+          };
+        } catch (error) {
+          logger.error('Error fetching date installed for router:', { 
+            router_id: router.router_id, 
+            error: error.message 
+          });
+          return {
+            ...router,
+            date_installed: null
+          };
+        }
+      })
+    );
+    
+    res.json(routersWithDates);
   } catch (error) {
     logger.error('Error fetching routers with locations:', error);
     res.status(500).json({ error: 'Failed to fetch routers with locations' });

@@ -33,19 +33,25 @@ const InstalledRouters = () => {
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', { 
-      day: 'numeric', 
-      month: 'short', 
-      year: 'numeric' 
-    });
+  const formatDate = (dateValue) => {
+    if (!dateValue) return 'N/A';
+    
+    // Handle Unix timestamp (milliseconds)
+    const date = typeof dateValue === 'number' ? new Date(dateValue) : new Date(dateValue);
+    
+    // Format as DD/MM/YYYY (UK format)
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    
+    return `${day}/${month}/${year}`;
   };
 
   const getDaysInstalled = (installedDate) => {
     if (!installedDate) return null;
-    const date = new Date(installedDate);
+    
+    // Handle Unix timestamp (milliseconds)
+    const date = typeof installedDate === 'number' ? new Date(installedDate) : new Date(installedDate);
     const now = new Date();
     const days = Math.floor((now - date) / (1000 * 60 * 60 * 24));
     return days;
@@ -91,14 +97,16 @@ const InstalledRouters = () => {
               <tr>
                 <th>Router</th>
                 <th>Location</th>
-                <th>Linked</th>
+                <th>Start Date</th>
                 <th>Days</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {installedRouters.map((router) => {
-                const daysInstalled = getDaysInstalled(router.location_linked_at);
+                // Use date_installed if available, fallback to location_linked_at
+                const installDate = router.date_installed || router.location_linked_at;
+                const daysInstalled = getDaysInstalled(installDate);
                 
                 return (
                   <tr key={router.router_id}>
@@ -113,7 +121,7 @@ const InstalledRouters = () => {
                     <td>
                       <div className="ir-property-name">{router.clickup_location_task_name || 'Unknown'}</div>
                     </td>
-                    <td>{formatDate(router.location_linked_at)}</td>
+                    <td>{formatDate(installDate)}</td>
                     <td>
                       {daysInstalled !== null && (
                         <span className={`ir-days-badge ${daysInstalled > 92 ? 'ir-days-warning' : ''}`}>

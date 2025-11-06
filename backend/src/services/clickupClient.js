@@ -132,7 +132,7 @@ class ClickUpClient {
   }
 
   /**
-   * Find list by name across all spaces in workspace
+   * Find a list by name across all spaces in a workspace
    * @param {string} workspaceId - Workspace ID
    * @param {string} listName - List name to search for
    * @param {string} userId - User identifier
@@ -160,6 +160,37 @@ class ClickUpClient {
   }
 
   /**
+   * Get custom field value from a list
+   * @param {string} listId - List ID
+   * @param {string} fieldId - Custom field ID (e.g., "9f31c21a-630d-49f2-8a79-354de03e24d1" for Date Installed)
+   * @param {string} userId - User identifier
+   * @returns {Promise<any>} Custom field value or null
+   */
+  async getListCustomFieldValue(listId, fieldId, userId = 'default') {
+    try {
+      // Get the first task in the list to retrieve custom field values
+      const tasks = await this.getTasks(listId, { page: 0, limit: 1 }, userId);
+      
+      if (!tasks || tasks.length === 0) {
+        logger.warn('No tasks found in list', { listId });
+        return null;
+      }
+      
+      const task = tasks[0];
+      const customField = task.custom_fields?.find(field => field.id === fieldId);
+      
+      if (!customField) {
+        logger.warn('Custom field not found in task', { listId, fieldId, taskId: task.id });
+        return null;
+      }
+      
+      // Return the value - for date fields, this is typically in milliseconds timestamp
+      return customField.value || null;
+    } catch (error) {
+      logger.error('Error getting custom field value:', error.message);
+      return null;
+    }
+  }  /**
    * Get tasks from a list
    * @param {string} listId - List ID
    * @param {Object} options - Query options (page, archived, etc.)
