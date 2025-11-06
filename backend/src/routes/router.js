@@ -25,6 +25,13 @@ const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger, pool } = require('../config/database');
 const clickupClient = require('../services/clickupClient');
 
+// Cache for routers with locations (15 minute TTL)
+const routersWithLocationsCache = {
+  data: null,
+  timestamp: null,
+  TTL: 15 * 60 * 1000 // 15 minutes
+};
+
 // Temporary endpoint to sync date_installed from ClickUp to database
 router.post('/admin/sync-dates', async (req, res) => {
   const DATE_INSTALLED_FIELD_ID = '9f31c21a-630d-49f2-8a79-354de03e24d1';
@@ -83,11 +90,16 @@ router.post('/admin/sync-dates', async (req, res) => {
       }
     }
     
-    logger.info('Date sync completed', { updated, failed, total: result.rows.length });
+    // Clear the cache after syncing
+    routersWithLocationsCache.data = null;
+    routersWithLocationsCache.timestamp = null;
+    
+    logger.info('Date sync completed and cache cleared', { updated, failed, total: result.rows.length });
     
     res.json({
       success: true,
       summary: { updated, failed, total: result.rows.length },
+      cacheCleared: true,
       results
     });
     
@@ -397,13 +409,6 @@ router.get('/routers/:routerId/current-location', async (req, res) => {
     res.status(500).json({ error: error.message || 'Failed to get current location' });
   }
 });
-
-// Cache for routers with locations (15 minute TTL)
-const routersWithLocationsCache = {
-  data: null,
-  timestamp: null,
-  TTL: 15 * 60 * 1000 // 15 minutes
-};
 
 // GET all routers with location links (installed routers)
 router.get('/routers/with-locations', async (req, res) => {
