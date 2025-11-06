@@ -165,32 +165,37 @@ async function syncAllRoutersToClickUp() {
     let updated = 0;
     let errors = 0;
 
-    // Sync routers in batches to avoid overwhelming ClickUp API
-    const BATCH_SIZE = 5;
-    const DELAY_BETWEEN_BATCHES = 1000; // 1 second
+    // Sync routers sequentially with delays to avoid ClickUp rate limits
+    // ClickUp allows 100 requests/minute, so we use 700ms delay = ~85 requests/minute safely
+    const DELAY_BETWEEN_ROUTERS = 700; // milliseconds between each router sync
+    
+    logger.info(`Syncing ${routers.length} routers sequentially with ${DELAY_BETWEEN_ROUTERS}ms delays...`);
 
-    for (let i = 0; i < routers.length; i += BATCH_SIZE) {
-      const batch = routers.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < routers.length; i++) {
+      const router = routers[i];
       
-      // Process batch in parallel
-      const results = await Promise.allSettled(
-        batch.map(router => syncRouterToClickUp(router))
-      );
-
-      results.forEach((result, idx) => {
-        if (result.status === 'fulfilled' && result.value.success) {
+      try {
+        const result = await syncRouterToClickUp(router);
+        
+        if (result.success) {
           updated++;
         } else {
           errors++;
-          const router = batch[idx];
-          const error = result.status === 'rejected' ? result.reason : result.value.error;
-          logger.warn(`Failed to sync router ${router.router_id}: ${error}`);
+          logger.warn(`Failed to sync router ${router.router_id}: ${result.error}`);
         }
-      });
+      } catch (error) {
+        errors++;
+        logger.warn(`Failed to sync router ${router.router_id}: ${error.message}`);
+      }
 
-      // Delay between batches to avoid rate limiting
-      if (i + BATCH_SIZE < routers.length) {
-        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
+      // Delay between routers to avoid rate limiting (except after last router)
+      if (i < routers.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_ROUTERS));
+      }
+      
+      // Log progress every 10 routers
+      if ((i + 1) % 10 === 0) {
+        logger.info(`Progress: ${i + 1}/${routers.length} routers synced (${updated} successful, ${errors} errors)`);
       }
     }
 
