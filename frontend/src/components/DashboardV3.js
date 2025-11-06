@@ -278,6 +278,12 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
           📍 Router Assignments
         </button>
         <button 
+          className={`v3-page-btn ${currentPage === 'stored' ? 'active' : ''}`}
+          onClick={() => setCurrentPage('stored')}
+        >
+          📦 Stored Routers
+        </button>
+        <button 
           className={`v3-page-btn ${currentPage === 'status' ? 'active' : ''}`}
           onClick={() => setCurrentPage('status')}
         >
@@ -434,7 +440,6 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
       {currentPage === 'routers' && (
         <div className="v3-full-width-content">
           <InstalledRouters />
-          <StoredWithRouters />
           
           {/* Overdue Inspections */}
           {(() => {
@@ -486,6 +491,13 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false }) {
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* Stored Routers Page */}
+      {currentPage === 'stored' && (
+        <div className="v3-full-width-content">
+          <StoredWithRouters />
         </div>
       )}
 
