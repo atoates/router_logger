@@ -1,7 +1,9 @@
 /**
  * Property Service - SIMPLIFIED
- * Only handles linking routers to location tasks
- * NO stored_with tracking, NO event history, NO property assignments
+ * Handles:
+ * 1. Linking routers to location tasks
+ * 2. Assigning routers to ClickUp users (syncs with ClickUp assignees)
+ * NO property history logging
  */
 
 const { pool, logger } = require('../config/database');
@@ -206,8 +208,77 @@ async function getCurrentLocation(routerId) {
   }
 }
 
+/**
+ * Assign router to ClickUp user(s)
+ * Updates the ClickUp task assignees field
+ * @param {Object} assignment - Assignment details
+ * @returns {Promise<Object>} Update result
+ */
+async function assignRouterToUsers(assignment) {
+  const {
+    routerId,
+    assigneeUserIds,  // Array of ClickUp user IDs
+    assigneeUsernames = []  // Array of usernames for logging
+  } = assignment;
+
+  try {
+    // Get router's ClickUp task ID
+    const result = await pool.query(
+      'SELECT clickup_task_id FROM routers WHERE router_id = $1',
+      [routerId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error(`Router ${routerId} not found`);
+    }
+
+    const clickupTaskId = result.rows[0].clickup_task_id;
+
+    if (!clickupTaskId) {
+      throw new Error(`Router ${routerId} does not have a ClickUp task`);
+    }
+
+    // Update ClickUp task assignees
+    const userIds = assigneeUserIds.map(id => parseInt(id));
+    
+    // First, get current assignees to replace them completely
+    const task = await clickupClient.getTask(clickupTaskId);
+    const currentAssigneeIds = task.assignees?.map(a => a.id).filter(id => id) || [];
+    
+    // Remove all current assignees and add new ones
+    await clickupClient.updateTaskAssignees(
+      clickupTaskId,
+      { 
+        rem: currentAssigneeIds,
+        add: userIds 
+      },
+      'default'
+    );
+
+    logger.info('Router assignees updated in ClickUp', { 
+      routerId, 
+      clickupTaskId,
+      removedAssignees: currentAssigneeIds,
+      addedAssignees: userIds,
+      usernames: assigneeUsernames
+    });
+
+    return {
+      success: true,
+      routerId,
+      clickupTaskId,
+      assignedTo: assigneeUsernames
+    };
+
+  } catch (error) {
+    logger.error('Error assigning router to users:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   linkRouterToLocation,
   unlinkRouterFromLocation,
-  getCurrentLocation
+  getCurrentLocation,
+  assignRouterToUsers
 };

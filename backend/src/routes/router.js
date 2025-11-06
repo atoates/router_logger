@@ -20,7 +20,7 @@ const {
   logInspection,
   getInspectionHistory
 } = require('../models/router');
-const { linkRouterToLocation, unlinkRouterFromLocation } = require('../services/propertyService');
+const { linkRouterToLocation, unlinkRouterFromLocation, assignRouterToUsers } = require('../services/propertyService');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger, pool } = require('../config/database');
 
@@ -359,6 +359,33 @@ router.post('/routers/:routerId/unlink-location', async (req, res) => {
   } catch (error) {
     logger.error('Error unlinking router from location:', error);
     res.status(500).json({ error: error.message || 'Failed to unlink router from location' });
+  }
+});
+
+// POST assign router to ClickUp user(s)
+// Updates the ClickUp task assignees field
+router.post('/routers/:routerId/assign', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const { assignee_user_ids, assignee_usernames } = req.body;
+    
+    if (!assignee_user_ids || !Array.isArray(assignee_user_ids) || assignee_user_ids.length === 0) {
+      return res.status(400).json({ 
+        error: 'assignee_user_ids array is required and must contain at least one user ID' 
+      });
+    }
+    
+    const result = await assignRouterToUsers({
+      routerId,
+      assigneeUserIds: assignee_user_ids,
+      assigneeUsernames: assignee_usernames || []
+    });
+    
+    logger.info(`Router ${routerId} assigned to users`, { assignees: assignee_usernames });
+    res.json(result);
+  } catch (error) {
+    logger.error('Error assigning router:', error);
+    res.status(500).json({ error: error.message || 'Failed to assign router' });
   }
 });
 
