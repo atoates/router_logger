@@ -193,10 +193,29 @@ async function getCurrentLocation(routerId) {
       return null;
     }
 
+    // Fetch date_installed from ClickUp
+    const clickupClient = require('./clickupClient');
+    const DATE_INSTALLED_FIELD_ID = '9f31c21a-630d-49f2-8a79-354de03e24d1';
+    let dateInstalled = null;
+    
+    try {
+      dateInstalled = await clickupClient.getListCustomFieldValue(
+        router.clickup_location_task_id,
+        DATE_INSTALLED_FIELD_ID,
+        'default'
+      );
+    } catch (error) {
+      logger.warn('Error fetching date_installed for router location:', { 
+        router_id: routerId, 
+        error: error.message 
+      });
+    }
+
     return {
       location_task_id: router.clickup_location_task_id,
       location_task_name: router.clickup_location_task_name,
-      linked_at: router.location_linked_at
+      linked_at: router.location_linked_at,
+      date_installed: dateInstalled
     };
   } catch (error) {
     logger.error('Error getting current location:', error);

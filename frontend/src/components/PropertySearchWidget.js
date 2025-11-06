@@ -60,7 +60,8 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
           setCurrentLocation({
             id: data.location.location_task_id,
             name: data.location.location_task_name,
-            linkedAt: data.location.linked_at
+            linkedAt: data.location.linked_at,
+            dateInstalled: data.location.date_installed
           });
         } else {
           setCurrentLocation(null);
@@ -325,8 +326,36 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
           <div className="psw-current-content">
             <div className="psw-property-name">{currentLocation.name}</div>
             <div className="psw-property-meta">
-              Linked {new Date(currentLocation.linkedAt).toLocaleDateString()}
+              Linked {new Date(currentLocation.linkedAt).toLocaleDateString('en-GB')}
             </div>
+            {/* Date Installed and Uninstall Date */}
+            {currentLocation.dateInstalled ? (
+              <div className="psw-dates-section">
+                <div className="psw-date-row">
+                  <span className="psw-date-label">Install Date:</span>
+                  <span className="psw-date-value">
+                    {new Date(currentLocation.dateInstalled).toLocaleDateString('en-GB')}
+                  </span>
+                </div>
+                <div className="psw-date-row">
+                  <span className="psw-date-label">Uninstall Date:</span>
+                  <span className={`psw-date-value ${
+                    new Date(currentLocation.dateInstalled).getTime() + (92 * 24 * 60 * 60 * 1000) < Date.now()
+                      ? 'overdue'
+                      : ''
+                  }`}>
+                    {new Date(new Date(currentLocation.dateInstalled).getTime() + (92 * 24 * 60 * 60 * 1000)).toLocaleDateString('en-GB')}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="psw-dates-section">
+                <div className="psw-date-row">
+                  <span className="psw-date-label">Install Date:</span>
+                  <span className="psw-date-value text-muted">Date not set</span>
+                </div>
+              </div>
+            )}
             <a 
               href={`https://app.clickup.com/${workspaceId}/v/li/${currentLocation.id}`}
               target="_blank"
