@@ -1,6 +1,5 @@
 require('dotenv').config();
 const { Pool } = require('pg');
-const logger = require('./src/services/logger');
 const clickupClient = require('./src/services/clickupClient');
 
 const pool = new Pool({
@@ -21,7 +20,7 @@ async function syncDateInstalled() {
        WHERE clickup_location_task_id IS NOT NULL`
     );
     
-    logger.info(`Found ${result.rows.length} routers with location assignments`);
+    console.log(`Found ${result.rows.length} routers with location assignments`);
     
     let updated = 0;
     let failed = 0;
@@ -45,7 +44,7 @@ async function syncDateInstalled() {
           [dateInstalled, router.router_id]
         );
         
-        logger.info(`Updated router ${router.router_id}`, { 
+        console.log(`Updated router ${router.router_id}`, { 
           date_installed: dateInstalled ? new Date(dateInstalled).toISOString() : null 
         });
         updated++;
@@ -54,15 +53,15 @@ async function syncDateInstalled() {
         await new Promise(resolve => setTimeout(resolve, 200));
         
       } catch (error) {
-        logger.error(`Failed to sync date for router ${router.router_id}:`, error.message);
+        console.error(`Failed to sync date for router ${router.router_id}:`, error.message);
         failed++;
       }
     }
     
-    logger.info('Sync completed', { updated, failed, total: result.rows.length });
+    console.log('Sync completed', { updated, failed, total: result.rows.length });
     
   } catch (error) {
-    logger.error('Sync failed:', error);
+    console.error('Sync failed:', error);
     throw error;
   } finally {
     await pool.end();
@@ -71,10 +70,10 @@ async function syncDateInstalled() {
 
 syncDateInstalled()
   .then(() => {
-    logger.info('Sync completed successfully');
+    console.log('Sync completed successfully');
     process.exit(0);
   })
   .catch((error) => {
-    logger.error('Sync failed:', error);
+    console.error('Sync failed:', error);
     process.exit(1);
   });
