@@ -329,9 +329,31 @@ router.get('/routers/:routerId/current-location', async (req, res) => {
   }
 });
 
+// Cache for routers with locations (15 minute TTL)
+const routersWithLocationsCache = {
+  data: null,
+  timestamp: null,
+  TTL: 15 * 60 * 1000 // 15 minutes
+};
+
 // GET all routers with location links (installed routers)
 router.get('/routers/with-locations', async (req, res) => {
   try {
+    // Check if cache is still valid
+    const now = Date.now();
+    if (routersWithLocationsCache.data && 
+        routersWithLocationsCache.timestamp && 
+        (now - routersWithLocationsCache.timestamp) < routersWithLocationsCache.TTL) {
+      logger.info('Returning cached routers-with-locations data', {
+        age: Math.round((now - routersWithLocationsCache.timestamp) / 1000),
+        count: routersWithLocationsCache.data.length
+      });
+      res.set('X-Cache', 'HIT');
+      return res.json(routersWithLocationsCache.data);
+    }
+
+    logger.info('Cache miss, fetching fresh routers-with-locations data');
+    
     const result = await pool.query(`
       SELECT 
         router_id,
@@ -380,6 +402,15 @@ router.get('/routers/with-locations', async (req, res) => {
       }
     }
     
+    // Update cache
+    routersWithLocationsCache.data = routersWithDates;
+    routersWithLocationsCache.timestamp = Date.now();
+    
+    logger.info('Updated routers-with-locations cache', {
+      count: routersWithDates.length
+    });
+    
+    res.set('X-Cache', 'MISS');
     res.json(routersWithDates);
   } catch (error) {
     logger.error('Error fetching routers with locations:', error);
