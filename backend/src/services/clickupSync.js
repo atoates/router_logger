@@ -5,6 +5,7 @@
 
 const { pool, logger } = require('../config/database');
 const clickupClient = require('./clickupClient');
+const crypto = require('crypto');
 
 // Custom field IDs from ClickUp
 const CUSTOM_FIELDS = {
@@ -42,6 +43,23 @@ async function syncRouterToClickUp(router) {
   try {
     if (!router.clickup_task_id) {
       return { success: false, error: 'No ClickUp task linked' };
+    }
+
+    // Calculate hash of current router data
+    const currentDataHash = crypto.createHash('md5')
+      .update(JSON.stringify({
+        status: router.current_status,
+        firmware: router.firmware_version,
+        last_seen: router.last_seen,
+        imei: router.imei,
+        router_id: router.router_id
+      }))
+      .digest('hex');
+    
+    // Skip sync if data hasn't changed (smart sync)
+    if (router.last_clickup_sync_hash && router.last_clickup_sync_hash === currentDataHash) {
+      logger.debug(`Router ${router.router_id}: No changes detected, skipping sync`);
+      return { success: true, skipped: true };
     }
 
     const customFields = [];
@@ -129,6 +147,17 @@ async function syncRouterToClickUp(router) {
       // Don't fail the whole sync if just the URL field fails
     }
 
+    // Store the hash in database for future comparison (smart sync)
+    try {
+      await pool.query(
+        'UPDATE routers SET last_clickup_sync_hash = $1 WHERE router_id = $2',
+        [currentDataHash, router.router_id]
+      );
+    } catch (hashError) {
+      logger.warn(`Failed to update sync hash for router ${router.router_id}:`, hashError.message);
+      // Don't fail sync if hash update fails
+    }
+
     logger.debug(`Synced router ${router.router_id}: dbStatus=${router.current_status}, isOnline=${isOnline}, lastSeen=${router.last_seen}, clickupStatus=${statusValue}`);
 
     return { success: true };
@@ -156,6 +185,7 @@ async function syncAllRoutersToClickUp() {
          r.firmware_version, 
          r.last_seen, 
          r.name,
+         r.last_clickup_sync_hash,
          (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status
        FROM routers r
        WHERE r.clickup_task_id IS NOT NULL
@@ -174,13 +204,14 @@ async function syncAllRoutersToClickUp() {
     }
 
     let updated = 0;
+    let skipped = 0;
     let errors = 0;
 
     // Sync routers sequentially with delays to avoid ClickUp rate limits
     // ClickUp allows 100 requests/minute, so we use 700ms delay = ~85 requests/minute safely
     const DELAY_BETWEEN_ROUTERS = 700; // milliseconds between each router sync
     
-    logger.info(`Syncing ${routers.length} routers sequentially with ${DELAY_BETWEEN_ROUTERS}ms delays...`);
+    logger.info(`Syncing ${routers.length} routers sequentially with ${DELAY_BETWEEN_ROUTERS}ms delays (smart sync enabled)...`);
 
     for (let i = 0; i < routers.length; i++) {
       const router = routers[i];
@@ -189,7 +220,11 @@ async function syncAllRoutersToClickUp() {
         const result = await syncRouterToClickUp(router);
         
         if (result.success) {
-          updated++;
+          if (result.skipped) {
+            skipped++;
+          } else {
+            updated++;
+          }
         } else {
           errors++;
           logger.warn(`Failed to sync router ${router.router_id}: ${result.error}`);
@@ -200,13 +235,14 @@ async function syncAllRoutersToClickUp() {
       }
 
       // Delay between routers to avoid rate limiting (except after last router)
-      if (i < routers.length - 1) {
+      // Skip delay for skipped routers to speed up sync
+      if (i < routers.length - 1 && !result?.skipped) {
         await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_ROUTERS));
       }
       
       // Log progress every 10 routers
       if ((i + 1) % 10 === 0) {
-        logger.info(`Progress: ${i + 1}/${routers.length} routers synced (${updated} successful, ${errors} errors)`);
+        logger.info(`Progress: ${i + 1}/${routers.length} routers processed (${updated} updated, ${skipped} skipped, ${errors} errors)`);
       }
     }
 
@@ -214,13 +250,15 @@ async function syncAllRoutersToClickUp() {
     lastSyncTime = new Date();
     syncStats.totalSyncs++;
     syncStats.lastSyncUpdated = updated;
+    syncStats.lastSyncSkipped = skipped;
     syncStats.lastSyncErrors = errors;
     syncStats.lastSyncDuration = duration;
 
-    logger.info(`ClickUp sync completed: ${updated} updated, ${errors} errors (${duration}ms)`);
+    logger.info(`ClickUp sync completed: ${updated} updated, ${skipped} skipped (no changes), ${errors} errors (${duration}ms)`);
 
     return {
       updated,
+      skipped,
       errors,
       total: routers.length,
       duration

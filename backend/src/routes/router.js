@@ -468,11 +468,11 @@ router.get('/routers/with-locations', async (req, res) => {
   }
 });
 
-// Cache for assignee data (5 minute TTL)
+// Cache for assignee data (15 minute TTL)
 const assigneeCache = {
   data: null,
   timestamp: null,
-  TTL: 5 * 60 * 1000 // 5 minutes
+  TTL: 15 * 60 * 1000 // 15 minutes - reduced API calls by caching longer
 };
 
 // GET all routers grouped by assignees (stored with)

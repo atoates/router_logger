@@ -9,6 +9,36 @@ const logger = require('../config/database').logger;
 
 const CLICKUP_API_BASE = 'https://api.clickup.com/api/v2';
 
+/**
+ * Retry function with exponential backoff for rate limiting
+ * @param {Function} fn - Async function to retry
+ * @param {number} maxRetries - Maximum number of retry attempts
+ * @param {string} operation - Description of operation for logging
+ * @returns {Promise<any>} Result of the function
+ */
+async function retryWithBackoff(fn, maxRetries = 3, operation = 'API call') {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const isRateLimited = error.response?.status === 429;
+      const isLastAttempt = attempt === maxRetries;
+      
+      if (isRateLimited && !isLastAttempt) {
+        // Get retry-after from header or use exponential backoff
+        const retryAfter = error.response?.headers?.['retry-after'];
+        const backoffDelay = retryAfter ? parseInt(retryAfter) * 1000 : Math.min(1000 * Math.pow(2, attempt), 60000);
+        
+        logger.warn(`Rate limited on ${operation}, retrying in ${backoffDelay}ms (attempt ${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+      } else {
+        // Not rate limited, or last attempt - throw error
+        throw error;
+      }
+    }
+  }
+}
+
 class ClickUpClient {
   /**
    * Get axios instance with authorization header
@@ -280,39 +310,41 @@ class ClickUpClient {
    * @returns {Promise<Object>} Updated task
    */
   async updateTask(taskId, updates, userId = 'default') {
-    try {
-      const client = await this.getAuthorizedClient(userId);
-      
-      // Log detailed request info
-      logger.info('ClickUp updateTask request:', {
-        taskId,
-        updateKeys: Object.keys(updates),
-        hasCustomFields: !!updates.custom_fields,
-        customFieldsCount: updates.custom_fields?.length || 0,
-        customFields: updates.custom_fields
-      });
-      
-      const response = await client.put(`/task/${taskId}`, updates);
-      
-      // Log response
-      logger.info('ClickUp updateTask response:', {
-        taskId,
-        status: response.status,
-        statusText: response.statusText,
-        hasData: !!response.data
-      });
-      
-      return response.data;
-    } catch (error) {
-      logger.error('Error updating ClickUp task:', {
-        taskId,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        errorData: error.response?.data,
-        message: error.message
-      });
-      throw error;
-    }
+    return retryWithBackoff(async () => {
+      try {
+        const client = await this.getAuthorizedClient(userId);
+        
+        // Log detailed request info
+        logger.info('ClickUp updateTask request:', {
+          taskId,
+          updateKeys: Object.keys(updates),
+          hasCustomFields: !!updates.custom_fields,
+          customFieldsCount: updates.custom_fields?.length || 0,
+          customFields: updates.custom_fields
+        });
+        
+        const response = await client.put(`/task/${taskId}`, updates);
+        
+        // Log response
+        logger.info('ClickUp updateTask response:', {
+          taskId,
+          status: response.status,
+          statusText: response.statusText,
+          hasData: !!response.data
+        });
+        
+        return response.data;
+      } catch (error) {
+        logger.error('Error updating ClickUp task:', {
+          taskId,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          errorData: error.response?.data,
+          message: error.message
+        });
+        throw error;
+      }
+    }, 3, `updateTask(${taskId})`);
   }
 
   /**
@@ -376,37 +408,39 @@ class ClickUpClient {
    * @returns {Promise<Object>} Response
    */
   async updateCustomField(taskId, fieldId, value, userId = 'default') {
-    try {
-      const client = await this.getAuthorizedClient(userId);
-      
-      logger.info('ClickUp updateCustomField request:', {
-        taskId,
-        fieldId,
-        value,
-        valueType: typeof value
-      });
-      
-      const response = await client.post(`/task/${taskId}/field/${fieldId}`, { value });
-      
-      logger.info('ClickUp updateCustomField response:', {
-        taskId,
-        fieldId,
-        status: response.status,
-        hasData: !!response.data
-      });
-      
-      return response.data;
-    } catch (error) {
-      logger.error('Error updating custom field:', {
-        taskId,
-        fieldId,
-        value,
-        status: error.response?.status,
-        errorData: error.response?.data,
-        message: error.message
-      });
-      throw error;
-    }
+    return retryWithBackoff(async () => {
+      try {
+        const client = await this.getAuthorizedClient(userId);
+        
+        logger.info('ClickUp updateCustomField request:', {
+          taskId,
+          fieldId,
+          value,
+          valueType: typeof value
+        });
+        
+        const response = await client.post(`/task/${taskId}/field/${fieldId}`, { value });
+        
+        logger.info('ClickUp updateCustomField response:', {
+          taskId,
+          fieldId,
+          status: response.status,
+          hasData: !!response.data
+        });
+        
+        return response.data;
+      } catch (error) {
+        logger.error('Error updating custom field:', {
+          taskId,
+          fieldId,
+          value,
+          status: error.response?.status,
+          errorData: error.response?.data,
+          message: error.message
+        });
+        throw error;
+      }
+    }, 3, `updateCustomField(${taskId}, ${fieldId})`);
   }
 
   /**
