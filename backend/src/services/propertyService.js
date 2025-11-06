@@ -276,9 +276,75 @@ async function assignRouterToUsers(assignment) {
   }
 }
 
+/**
+ * Remove all assignees from router's ClickUp task
+ * @param {string} routerId - Router ID
+ * @returns {Promise<Object>} Update result
+ */
+async function removeRouterAssignees(routerId) {
+  try {
+    // Get router's ClickUp task ID
+    const result = await pool.query(
+      'SELECT clickup_task_id FROM routers WHERE router_id = $1',
+      [routerId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error(`Router ${routerId} not found`);
+    }
+
+    const clickupTaskId = result.rows[0].clickup_task_id;
+
+    if (!clickupTaskId) {
+      throw new Error(`Router ${routerId} does not have a ClickUp task`);
+    }
+
+    // Get current assignees to remove them
+    const task = await clickupClient.getTask(clickupTaskId);
+    const currentAssigneeIds = task.assignees?.map(a => a.id).filter(id => id) || [];
+    
+    if (currentAssigneeIds.length === 0) {
+      return {
+        success: true,
+        routerId,
+        clickupTaskId,
+        message: 'No assignees to remove'
+      };
+    }
+
+    // Remove all current assignees
+    await clickupClient.updateTaskAssignees(
+      clickupTaskId,
+      { 
+        rem: currentAssigneeIds,
+        add: [] 
+      },
+      'default'
+    );
+
+    logger.info('Router assignees removed from ClickUp', { 
+      routerId, 
+      clickupTaskId,
+      removedAssignees: currentAssigneeIds
+    });
+
+    return {
+      success: true,
+      routerId,
+      clickupTaskId,
+      removedCount: currentAssigneeIds.length
+    };
+
+  } catch (error) {
+    logger.error('Error removing router assignees:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   linkRouterToLocation,
   unlinkRouterFromLocation,
   getCurrentLocation,
-  assignRouterToUsers
+  assignRouterToUsers,
+  removeRouterAssignees
 };

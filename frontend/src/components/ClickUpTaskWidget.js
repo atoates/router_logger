@@ -182,6 +182,39 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
     }
   };
 
+  const handleRemoveAssignment = async () => {
+    if (!window.confirm('Remove all assignees from this router?')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const API_BASE = process.env.REACT_APP_API_URL || 'https://routerlogger-production.up.railway.app';
+      const response = await fetch(`${API_BASE}/api/routers/${router.router_id}/remove-assignees`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Reload the task to update the UI
+        const taskResponse = await getRouterTask(router.router_id);
+        if (taskResponse.data.linked) {
+          setLinkedTask(taskResponse.data.task);
+        }
+        alert('Assignees removed successfully');
+      } else {
+        throw new Error(data.error || 'Failed to remove assignees');
+      }
+    } catch (error) {
+      console.error('Error removing assignees:', error);
+      alert(error.message || 'Failed to remove assignees');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!authorized) {
     return null; // Don't show widget if not authorized
   }
@@ -240,11 +273,11 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
               </a>
               {onStoredWith && (
                 <button 
-                  onClick={onStoredWith}
+                  onClick={linkedTask.assignees && linkedTask.assignees.length > 0 ? handleRemoveAssignment : onStoredWith}
                   className="task-btn task-btn-secondary"
                 >
                   {linkedTask.assignees && linkedTask.assignees.length > 0 
-                    ? 'Change Assignment' 
+                    ? 'Remove Assignment' 
                     : 'Assign Router'}
                 </button>
               )}

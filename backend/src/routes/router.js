@@ -20,7 +20,7 @@ const {
   logInspection,
   getInspectionHistory
 } = require('../models/router');
-const { linkRouterToLocation, unlinkRouterFromLocation, assignRouterToUsers } = require('../services/propertyService');
+const { linkRouterToLocation, unlinkRouterFromLocation, assignRouterToUsers, removeRouterAssignees } = require('../services/propertyService');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const { logger, pool } = require('../config/database');
 
@@ -386,6 +386,22 @@ router.post('/routers/:routerId/assign', async (req, res) => {
   } catch (error) {
     logger.error('Error assigning router:', error);
     res.status(500).json({ error: error.message || 'Failed to assign router' });
+  }
+});
+
+// POST remove all assignees from router
+// Removes all assignees from the ClickUp task
+router.post('/routers/:routerId/remove-assignees', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    
+    const result = await removeRouterAssignees(routerId);
+    
+    logger.info(`Router ${routerId} assignees removed`);
+    res.json(result);
+  } catch (error) {
+    logger.error('Error removing router assignees:', error);
+    res.status(500).json({ error: error.message || 'Failed to remove assignees' });
   }
 });
 
