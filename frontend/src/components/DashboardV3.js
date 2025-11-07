@@ -153,6 +153,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
   const [clickupUsage, setClickUpUsage] = useState(null);
   const [smartSyncEnabled, setSmartSyncEnabled] = useState(true);
   const [smartSyncLoading, setSmartSyncLoading] = useState(false);
+  const [manualSyncLoading, setManualSyncLoading] = useState(false);
   const [, setLoading] = useState(true);
 
   const updateTime = (m, v) => { setMode(m); setValue(v); };
@@ -264,6 +265,29 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
       alert('Failed to update smart sync setting. Please try again.');
     } finally {
       setSmartSyncLoading(false);
+    }
+  };
+
+  // Handle manual sync trigger
+  const handleManualSync = async () => {
+    if (!window.confirm('Trigger a manual ClickUp sync for all routers? This will update all router data in ClickUp immediately.')) {
+      return;
+    }
+    
+    setManualSyncLoading(true);
+    try {
+      const response = await api.post('/clickup/sync');
+      const result = response.data;
+      alert(`Sync completed!\n\nUpdated: ${result.updated || 0} routers\nErrors: ${result.errors || 0}\nSkipped: ${result.skipped || 0}\nDuration: ${((result.duration || 0) / 1000).toFixed(1)}s`);
+      
+      // Refresh ClickUp usage stats
+      const clickupRes = await api.get('/monitoring/clickup');
+      setClickUpUsage(clickupRes.data || null);
+    } catch (error) {
+      console.error('Failed to trigger manual sync:', error);
+      alert(`Failed to trigger sync: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setManualSyncLoading(false);
     }
   };
 
@@ -735,6 +759,52 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
                   </span>
                 </label>
               </div>
+
+              {/* Manual Sync Button */}
+              <div style={{ 
+                display:'flex', 
+                flexDirection:'column',
+                gap:8,
+                padding:12, 
+                background: dark ? '#1f2937' : '#f8fafc', 
+                borderRadius:6 
+              }}>
+                <div>
+                  <div style={{ fontWeight:600, marginBottom:4 }}>Manual Sync</div>
+                  <div style={{ fontSize:12, color:'#64748b', marginBottom:8 }}>
+                    Trigger an immediate sync of all routers to ClickUp
+                  </div>
+                </div>
+                <button
+                  onClick={handleManualSync}
+                  disabled={manualSyncLoading}
+                  style={{
+                    padding: '10px 16px',
+                    background: manualSyncLoading ? '#e5e7eb' : '#2563eb',
+                    color: manualSyncLoading ? '#6b7280' : '#fff',
+                    border: 'none',
+                    borderRadius: 6,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: manualSyncLoading ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                    opacity: manualSyncLoading ? 0.6 : 1
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!manualSyncLoading) {
+                      e.target.style.background = '#1d4ed8';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!manualSyncLoading) {
+                      e.target.style.background = '#2563eb';
+                    }
+                  }}
+                >
+                  {manualSyncLoading ? '⏳ Syncing...' : '🔄 Sync Now'}
+                </button>
+              </div>
+
               <div style={{ 
                 fontSize:11, 
                 color:'#94a3b8', 
