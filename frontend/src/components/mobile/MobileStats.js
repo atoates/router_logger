@@ -247,11 +247,35 @@ const MobileStats = ({ router }) => {
             </div>
           )}
 
-          <div>
+          <div style={{ marginBottom: '16px' }}>
             <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>Network</div>
             <div style={{ fontSize: '14px', color: '#374151' }}>
-              {router?.operator || 'Unknown'} • {router?.network_type || 'Unknown'}<br/>
-              {router?.wan_ip && `IP: ${router.wan_ip}`}
+              {logs.length > 0 && logs[logs.length - 1]?.operator 
+                ? `${logs[logs.length - 1].operator}${logs[logs.length - 1].network_type ? ' • ' + logs[logs.length - 1].network_type : ''}`
+                : 'Unknown'}<br/>
+              {logs.length > 0 && logs[logs.length - 1]?.wan_ip && `IP: ${logs[logs.length - 1].wan_ip}`}
+            </div>
+          </div>
+
+          {/* Logging Status Badge */}
+          <div>
+            <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>Status</div>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              background: '#d1fae5',
+              border: '1px solid #6ee7b7',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: '600',
+              color: '#065f46'
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M20 6L9 17l-5-5"/>
+              </svg>
+              Logging Enabled
             </div>
           </div>
         </div>
