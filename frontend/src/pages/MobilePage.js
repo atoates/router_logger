@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { getRouters } from '../services/api';
+import React, { useState } from 'react';
 import MobileSearch from '../components/mobile/MobileSearch';
 import MobileLocation from '../components/mobile/MobileLocation';
 import MobileStats from '../components/mobile/MobileStats';
@@ -8,99 +7,67 @@ import './MobilePage.css';
 const MobilePage = () => {
   const [activeTab, setActiveTab] = useState('search');
   const [selectedRouter, setSelectedRouter] = useState(null);
-  const [routers, setRouters] = useState([]);
 
-  useEffect(() => {
-    loadRouters();
-  }, []);
-
-  const loadRouters = async () => {
-    try {
-      const response = await getRouters();
-      setRouters(response.data || []);
-    } catch (error) {
-      console.error('Failed to load routers:', error);
-    }
-  };
-
-  const handleRouterSelect = (router) => {
+  const handleSelectRouter = (router) => {
     setSelectedRouter(router);
-  };
-
-  const handleRouterUpdate = () => {
-    // Reload routers after updates
-    loadRouters();
-    if (selectedRouter) {
-      // Refresh the selected router data
-      const updated = routers.find(r => r.router_id === selectedRouter.router_id);
-      if (updated) {
-        setSelectedRouter(updated);
-      }
-    }
   };
 
   return (
     <div className="mobile-page">
-      <div className="mobile-header">
-        <h1>📱 VacatAd Mobile</h1>
-        {selectedRouter && (
-          <div className="mobile-router-badge">
-            {selectedRouter.name || `Router #${selectedRouter.router_id}`}
-          </div>
-        )}
-      </div>
-
       <div className="mobile-content">
         {activeTab === 'search' && (
           <MobileSearch 
-            routers={routers}
+            onSelectRouter={handleSelectRouter}
             selectedRouter={selectedRouter}
-            onRouterSelect={handleRouterSelect}
-            onRouterUpdate={handleRouterUpdate}
           />
         )}
         
-        {activeTab === 'location' && (
-          <MobileLocation 
-            selectedRouter={selectedRouter}
-            onRouterUpdate={handleRouterUpdate}
-          />
+        {activeTab === 'location' && selectedRouter && (
+          <MobileLocation router={selectedRouter} />
         )}
         
-        {activeTab === 'stats' && (
-          <MobileStats 
-            selectedRouter={selectedRouter}
-          />
+        {activeTab === 'stats' && selectedRouter && (
+          <MobileStats router={selectedRouter} />
         )}
       </div>
 
-      <div className="mobile-nav">
+      <nav className="mobile-nav">
         <button 
-          className={`mobile-nav-btn ${activeTab === 'search' ? 'active' : ''}`}
+          className={activeTab === 'search' ? 'active' : ''}
           onClick={() => setActiveTab('search')}
         >
-          <span className="nav-icon">🔍</span>
-          <span className="nav-label">Search</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+          Search
         </button>
         
         <button 
-          className={`mobile-nav-btn ${activeTab === 'location' ? 'active' : ''}`}
-          onClick={() => setActiveTab('location')}
+          className={activeTab === 'location' ? 'active' : ''}
+          onClick={() => selectedRouter && setActiveTab('location')}
           disabled={!selectedRouter}
         >
-          <span className="nav-icon">📍</span>
-          <span className="nav-label">Location</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          Location
         </button>
         
         <button 
-          className={`mobile-nav-btn ${activeTab === 'stats' ? 'active' : ''}`}
-          onClick={() => setActiveTab('stats')}
+          className={activeTab === 'stats' ? 'active' : ''}
+          onClick={() => selectedRouter && setActiveTab('stats')}
           disabled={!selectedRouter}
         >
-          <span className="nav-icon">📊</span>
-          <span className="nav-label">Stats</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="12" y1="20" x2="12" y2="10"/>
+            <line x1="18" y1="20" x2="18" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="16"/>
+          </svg>
+          Stats
         </button>
-      </div>
+      </nav>
     </div>
   );
 };

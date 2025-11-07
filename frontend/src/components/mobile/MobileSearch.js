@@ -1,229 +1,221 @@
-import React, { useState } from 'react';
-import api from '../../services/api';
+import React, { useState, useEffect } from 'react';
+import { getRouters, assignRouter, removeRouterAssignees } from '../../services/api';
 
-const MobileSearch = ({ routers, selectedRouter, onRouterSelect, onRouterUpdate }) => {
+const MobileSearch = ({ onSelectRouter, selectedRouter }) => {
+  const [routers, setRouters] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [assigning, setAssigning] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadRouters();
+  }, []);
+
+  const loadRouters = async () => {
+    try {
+      setLoading(true);
+      const response = await getRouters();
+      setRouters(response.data || []);
+    } catch (error) {
+      console.error('Failed to load routers:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredRouters = routers.filter(router => {
+    if (!searchTerm) return true;
     const search = searchTerm.toLowerCase();
     return (
-      router.router_id?.toLowerCase().includes(search) ||
       router.name?.toLowerCase().includes(search) ||
+      router.router_id?.toString().includes(search) ||
       router.imei?.toLowerCase().includes(search)
     );
   });
 
-  const handleAssignToMe = async () => {
-    if (!selectedRouter?.clickup_task_id) {
-      alert('Router not linked to ClickUp');
-      return;
-    }
-
-    // Get current user from ClickUp auth
+  const handleAssignToMe = async (router) => {
     try {
-      setAssigning(true);
-      
-      const authResponse = await api.get('/clickup/auth/status');
-      if (!authResponse.data.authorized || !authResponse.data.user) {
+      const userResponse = await fetch('/api/clickup/current-user', {
+        credentials: 'include'
+      });
+      if (!userResponse.ok) {
         alert('Please connect to ClickUp first');
         return;
       }
-
-      const userId = authResponse.data.user.id;
-      const username = authResponse.data.user.username;
-
-      // Assign the router
-      const response = await api.post(`/routers/${selectedRouter.router_id}/assign`, {
-        userId: userId
-      });
-
-      if (response.data.success) {
-        alert(`Router assigned to ${username}!`);
-        onRouterUpdate();
-      }
+      const userData = await userResponse.json();
+      await assignRouter(router.router_id, userData.id);
+      alert('Router assigned to you!');
+      loadRouters();
     } catch (error) {
       console.error('Failed to assign router:', error);
-      alert('Failed to assign router: ' + (error.response?.data?.error || error.message));
-    } finally {
-      setAssigning(false);
+      alert('Failed to assign router');
     }
   };
 
-  const handleRemoveAssignment = async () => {
-    if (!selectedRouter?.clickup_task_id) {
-      alert('Router not linked to ClickUp');
-      return;
-    }
-
-    if (!window.confirm('Remove assignment from this router?')) {
-      return;
-    }
-
+  const handleRemoveAssignment = async (router) => {
     try {
-      setAssigning(true);
-      const response = await api.post(`/routers/${selectedRouter.router_id}/remove-assignees`);
-      
-      if (response.data.success) {
-        alert('Assignment removed!');
-        onRouterUpdate();
-      }
+      await removeRouterAssignees(router.router_id);
+      alert('Assignment removed!');
+      loadRouters();
     } catch (error) {
       console.error('Failed to remove assignment:', error);
-      alert('Failed to remove assignment: ' + (error.response?.data?.error || error.message));
-    } finally {
-      setAssigning(false);
+      alert('Failed to remove assignment');
     }
   };
 
-  const getRouterStatus = (router) => {
-    const isOnline = router.current_status === 'online' || router.current_status === 1 || router.current_status === '1';
-    return isOnline ? 'online' : 'offline';
-  };
-
-  const getAssigneeName = (router) => {
-    try {
-      if (router.clickup_assignees) {
-        const assignees = JSON.parse(router.clickup_assignees);
-        if (assignees && assignees.length > 0) {
-          return assignees[0].username || assignees[0].email || 'Unknown';
-        }
-      }
-    } catch (e) {
-      console.error('Failed to parse assignees:', e);
-    }
-    return null;
-  };
+  if (loading) {
+    return <div style={{ padding: '20px', textAlign: 'center' }}>Loading routers...</div>;
+  }
 
   return (
-    <div>
-      <div className="mobile-card">
-        <input
-          type="text"
-          className="mobile-input"
-          placeholder="Search by name, ID, or IMEI..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          autoFocus
-        />
+    <div style={{ padding: '16px' }}>
+      <input
+        type="text"
+        placeholder="Search router name, ID, or IMEI..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        style={{
+          width: '100%',
+          padding: '14px 16px',
+          fontSize: '16px',
+          border: '1px solid #e5e7eb',
+          borderRadius: '12px',
+          marginBottom: '16px',
+          boxSizing: 'border-box'
+        }}
+      />
+
+      <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px' }}>
+        {filteredRouters.length} router{filteredRouters.length !== 1 ? 's' : ''} found
       </div>
 
-      {searchTerm && (
-        <div className="mobile-card">
-          <div className="mobile-card-title">
-            {filteredRouters.length} router{filteredRouters.length !== 1 ? 's' : ''} found
-          </div>
-          <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-            {filteredRouters.map(router => (
-              <div
-                key={router.router_id}
-                onClick={() => onRouterSelect(router)}
-                style={{
-                  padding: '12px',
-                  borderRadius: '8px',
-                  background: selectedRouter?.router_id === router.router_id ? '#f5f3ff' : '#f8fafc',
-                  marginBottom: '8px',
-                  cursor: 'pointer',
-                  border: selectedRouter?.router_id === router.router_id ? '2px solid #7c3aed' : '2px solid transparent'
-                }}
-              >
-                <div style={{ fontWeight: 600, marginBottom: '4px' }}>
-                  {router.name || `Router #${router.router_id}`}
-                </div>
-                <div style={{ fontSize: '13px', color: '#64748b' }}>
-                  ID: {router.router_id}
-                </div>
-                <div style={{ marginTop: '6px' }}>
-                  <span className={`mobile-status-badge mobile-status-${getRouterStatus(router)}`}>
-                    {getRouterStatus(router) === 'online' ? '● Online' : '○ Offline'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {selectedRouter && (
-        <div className="mobile-card">
-          <div className="mobile-card-title">Router Details</div>
-          
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>Router ID</div>
-            <div style={{ fontWeight: 600 }}>{selectedRouter.router_id}</div>
-          </div>
-
-          {selectedRouter.imei && (
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>IMEI</div>
-              <div style={{ fontWeight: 600 }}>{selectedRouter.imei}</div>
-            </div>
-          )}
-
-          {selectedRouter.last_seen && (
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>Last Seen</div>
-              <div style={{ fontWeight: 600 }}>{new Date(selectedRouter.last_seen).toLocaleString()}</div>
-            </div>
-          )}
-
-          {getAssigneeName(selectedRouter) && (
-            <div style={{ marginBottom: '16px', padding: '12px', background: '#f0fdf4', borderRadius: '8px', borderLeft: '3px solid #10b981' }}>
-              <div style={{ fontSize: '13px', color: '#065f46', marginBottom: '4px' }}>Assigned To</div>
-              <div style={{ fontWeight: 600, color: '#065f46' }}>👤 {getAssigneeName(selectedRouter)}</div>
-            </div>
-          )}
-
-          {selectedRouter.clickup_location_task_name && (
-            <div style={{ marginBottom: '16px', padding: '12px', background: '#eff6ff', borderRadius: '8px', borderLeft: '3px solid #3b82f6' }}>
-              <div style={{ fontSize: '13px', color: '#1e40af', marginBottom: '4px' }}>Installed At</div>
-              <div style={{ fontWeight: 600, color: '#1e40af' }}>📍 {selectedRouter.clickup_location_task_name}</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {selectedRouter && selectedRouter.clickup_task_id && (
-        <div className="mobile-card">
-          <div className="mobile-card-title">Quick Actions</div>
-          
-          {getAssigneeName(selectedRouter) ? (
-            <button
-              className="mobile-button mobile-button-secondary"
-              onClick={handleRemoveAssignment}
-              disabled={assigning}
-              style={{ marginBottom: '12px' }}
-            >
-              {assigning ? '⏳ Removing...' : '🗑️ Remove Assignment'}
-            </button>
-          ) : (
-            <button
-              className="mobile-button mobile-button-primary"
-              onClick={handleAssignToMe}
-              disabled={assigning}
-              style={{ marginBottom: '12px' }}
-            >
-              {assigning ? '⏳ Assigning...' : '👤 Assign to Me'}
-            </button>
-          )}
-
-          <a
-            href={selectedRouter.clickup_task_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mobile-button mobile-button-secondary"
-            style={{ textDecoration: 'none', display: 'flex' }}
+      {filteredRouters.map(router => {
+        const isOnline = router.current_status === 'online';
+        const isSelected = selectedRouter?.router_id === router.router_id;
+        
+        return (
+          <div
+            key={router.router_id}
+            onClick={() => onSelectRouter(router)}
+            style={{
+              background: isSelected ? '#eff6ff' : '#fff',
+              border: `2px solid ${isSelected ? '#2563eb' : '#e5e7eb'}`,
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '12px',
+              cursor: 'pointer'
+            }}
           >
-            🔗 View in ClickUp
-          </a>
-        </div>
-      )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+              <div style={{ fontSize: '17px', fontWeight: '600', color: '#111827' }}>
+                {router.name || `Router #${router.router_id}`}
+              </div>
+              <div style={{
+                padding: '4px 10px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: '600',
+                background: isOnline ? '#dcfce7' : '#fee2e2',
+                color: isOnline ? '#166534' : '#991b1b'
+              }}>
+                {isOnline ? 'Online' : 'Offline'}
+              </div>
+            </div>
 
-      {!selectedRouter && !searchTerm && (
-        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
-          <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>Search for a Router</div>
-          <div style={{ fontSize: '14px' }}>Enter router name, ID, or IMEI above</div>
+            <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>
+              ID: {router.router_id} • IMEI: {router.imei || 'N/A'}
+            </div>
+
+            {router.clickup_assignees && JSON.parse(router.clickup_assignees).length > 0 && (
+              <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>
+                👤 Assigned
+              </div>
+            )}
+
+            {router.clickup_location_task_name && (
+              <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>
+                📍 {router.clickup_location_task_name}
+              </div>
+            )}
+
+            <div style={{ fontSize: '12px', color: '#9ca3af' }}>
+              Last seen: {router.last_seen ? new Date(router.last_seen).toLocaleString() : 'Never'}
+            </div>
+
+            {isSelected && (
+              <div style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {(!router.clickup_assignees || JSON.parse(router.clickup_assignees).length === 0) ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAssignToMe(router);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '10px 16px',
+                      background: '#2563eb',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Assign to Me
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveAssignment(router);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '10px 16px',
+                      background: '#dc2626',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Remove Assignment
+                  </button>
+                )}
+                
+                {router.clickup_task_url && (
+                  <a
+                    href={router.clickup_task_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      flex: 1,
+                      padding: '10px 16px',
+                      background: '#f3f4f6',
+                      color: '#374151',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      textAlign: 'center',
+                      textDecoration: 'none'
+                    }}
+                  >
+                    View in ClickUp
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {filteredRouters.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#6b7280' }}>
+          No routers found
         </div>
       )}
     </div>
