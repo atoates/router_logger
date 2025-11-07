@@ -117,17 +117,7 @@ async function syncRouterToClickUp(router) {
     
     const updatedTask = await clickupClient.updateTask(router.clickup_task_id, updatePayload, 'default');
 
-    // Store assignee data in database for Stored With page (eliminates 99 API calls)
-    if (updatedTask && updatedTask.assignees) {
-      try {
-        await pool.query(
-          'UPDATE routers SET clickup_assignees = $1 WHERE router_id = $2',
-          [JSON.stringify(updatedTask.assignees), router.router_id]
-        );
-      } catch (assigneeError) {
-        logger.warn(`Failed to update assignees for router ${router.router_id}:`, assigneeError.message);
-      }
-    }
+    // Note: updatedTask doesn't include assignees. Run /api/clickup/sync/assignees separately to update those.
 
     // Update task status based on location and assignee
     // Logic:
@@ -336,14 +326,61 @@ async function syncAllRoutersToClickUp() {
  * SIMPLIFIED - No longer tracks assignees (removed stored_with functionality)
  */
 async function syncAssigneesFromClickUp() {
-  logger.info('Assignee sync disabled (stored_with functionality removed)');
-  return {
-    success: true,
-    synced: 0,
-    errors: 0,
-    duration: 0,
-    message: 'Assignee sync disabled - stored_with tracking removed'
-  };
+  try {
+    logger.info('Starting assignee sync from ClickUp...');
+    const startTime = Date.now();
+    let synced = 0;
+    let errors = 0;
+
+    // Get all routers with ClickUp tasks
+    const result = await pool.query(`
+      SELECT router_id, clickup_task_id, name
+      FROM routers
+      WHERE clickup_task_id IS NOT NULL
+    `);
+
+    logger.info(`Found ${result.rows.length} routers with ClickUp tasks`);
+
+    for (const router of result.rows) {
+      try {
+        // Fetch the full task to get assignees
+        const task = await clickupClient.getTask(router.clickup_task_id, 'default');
+        
+        if (task && task.assignees) {
+          // Store assignees in database
+          await pool.query(
+            'UPDATE routers SET clickup_assignees = $1 WHERE router_id = $2',
+            [JSON.stringify(task.assignees), router.router_id]
+          );
+          synced++;
+          
+          if (task.assignees.length > 0) {
+            const assigneeNames = task.assignees.map(a => a.username || a.email).join(', ');
+            logger.info(`Router ${router.router_id} (${router.name}): Updated assignees - ${assigneeNames}`);
+          }
+        }
+        
+        // Add delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        errors++;
+        logger.warn(`Failed to sync assignees for router ${router.router_id}:`, error.message);
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    logger.info(`Assignee sync complete: ${synced} synced, ${errors} errors in ${duration}ms`);
+
+    return {
+      success: true,
+      synced,
+      errors,
+      duration
+    };
+  } catch (error) {
+    logger.error('Assignee sync failed:', error);
+    throw error;
+  }
 }
 
 /**

@@ -62,20 +62,21 @@ const StoredWithRouters = () => {
       setSyncing(true);
       setError(null);
       
-      // Trigger ClickUp sync to refresh assignee data
-      const syncResponse = await fetch(`${API_BASE}/api/clickup/sync`, {
+      // Trigger assignee sync from ClickUp (this makes API calls but only fetches assignees)
+      const syncResponse = await fetch(`${API_BASE}/api/clickup/sync/assignees`, {
         method: 'POST',
         credentials: 'include'
       });
       
       if (!syncResponse.ok) {
-        throw new Error('Failed to sync with ClickUp');
+        const errorData = await syncResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to sync assignees from ClickUp');
       }
       
       // Wait a moment for the sync to complete
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Fetch updated data
+      // Fetch updated data from database
       await fetchRoutersByAssignees();
     } catch (err) {
       console.error('Error refreshing data:', err);
