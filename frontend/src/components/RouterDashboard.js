@@ -149,7 +149,13 @@ export default function RouterDashboard({ router }) {
     return { txrx, latest };
   }, [logs, showRawData]);
 
-  const totalBytes = useMemo(() => (series.txrx || []).reduce((s,d)=> s + (Number(d.total_bytes)||0), 0), [series]);
+  const totalBytes = useMemo(() => {
+    // Use stats if available (includes baseline jump), otherwise sum from logs
+    if (stats?.total_data_usage != null) {
+      return Number(stats.total_data_usage) || 0;
+    }
+    return (series.txrx || []).reduce((s,d)=> s + (Number(d.total_bytes)||0), 0);
+  }, [series, stats]);
   const onlinePct = useMemo(() => {
     if (!uptime || uptime.length === 0) {
       console.log('RouterDashboard - No uptime data available');
