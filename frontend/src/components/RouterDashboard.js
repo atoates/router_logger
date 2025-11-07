@@ -41,8 +41,8 @@ export default function RouterDashboard({ router }) {
   const [stats, setStats] = useState(null);
   const [uptime, setUptime] = useState([]);
   const [inspections, setInspections] = useState([]);
-  const [showRawData, setShowRawData] = useState(false); // Toggle for chart scale
-  const [useRollingAverage, setUseRollingAverage] = useState(false); // Toggle for rolling average
+  const [showRawData, setShowRawData] = useState(false); // Toggle for chart scale (false = normalized)
+  const [useRollingAverage, setUseRollingAverage] = useState(true); // Toggle for rolling average (true = smoothed by default)
   const propertyWidgetRef = useRef(null);
 
   const routerId = router?.router_id;
