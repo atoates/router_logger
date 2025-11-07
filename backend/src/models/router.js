@@ -210,31 +210,51 @@ async function getLogs(filters = {}) {
 // Get usage statistics with data deltas
 async function getUsageStats(routerId, startDate, endDate) {
   const query = `
-    WITH ordered_logs AS (
+    WITH params AS (
+      SELECT $2::timestamp AS start_ts, $3::timestamp AS end_ts
+    ), base AS (
+      SELECT l.total_tx_bytes AS base_tx, l.total_rx_bytes AS base_rx
+      FROM router_logs l, params
+      WHERE l.router_id = $1
+        AND l.timestamp < (SELECT start_ts FROM params)
+      ORDER BY l.timestamp DESC
+      LIMIT 1
+    ), ordered_logs AS (
       SELECT 
         timestamp,
         total_tx_bytes,
         total_rx_bytes,
         LAG(total_tx_bytes) OVER (ORDER BY timestamp) as prev_tx,
-        LAG(total_rx_bytes) OVER (ORDER BY timestamp) as prev_rx
-      FROM router_logs
+        LAG(total_rx_bytes) OVER (ORDER BY timestamp) as prev_rx,
+        FIRST_VALUE(total_tx_bytes) OVER (ORDER BY timestamp) as first_tx,
+        FIRST_VALUE(total_rx_bytes) OVER (ORDER BY timestamp) as first_rx
+      FROM router_logs, params
       WHERE router_id = $1
-        AND timestamp >= $2
-        AND timestamp <= $3
+        AND timestamp >= (SELECT start_ts FROM params)
+        AND timestamp <= (SELECT end_ts FROM params)
       ORDER BY timestamp
     ),
     deltas AS (
       SELECT
-        SUM(GREATEST(total_tx_bytes - COALESCE(prev_tx, 0), 0)) as period_tx_bytes,
-        SUM(GREATEST(total_rx_bytes - COALESCE(prev_rx, 0), 0)) as period_rx_bytes
+        SUM(CASE WHEN prev_tx IS NULL THEN 0 ELSE GREATEST(total_tx_bytes - prev_tx, 0) END) as sum_tx_deltas,
+        SUM(CASE WHEN prev_rx IS NULL THEN 0 ELSE GREATEST(total_rx_bytes - prev_rx, 0) END) as sum_rx_deltas,
+        MAX(first_tx) as first_tx,
+        MAX(first_rx) as first_rx
       FROM ordered_logs
+    ),
+    totals AS (
+      SELECT
+        (GREATEST(d.first_tx - COALESCE(b.base_tx, d.first_tx), 0) + COALESCE(d.sum_tx_deltas, 0))::bigint as period_tx_bytes,
+        (GREATEST(d.first_rx - COALESCE(b.base_rx, d.first_rx), 0) + COALESCE(d.sum_rx_deltas, 0))::bigint as period_rx_bytes
+      FROM deltas d
+      LEFT JOIN base b ON true
     )
     SELECT 
       $1 as router_id,
       COUNT(*) as total_logs,
-      d.period_tx_bytes,
-      d.period_rx_bytes,
-      (d.period_tx_bytes + d.period_rx_bytes) as total_data_usage,
+      t.period_tx_bytes,
+      t.period_rx_bytes,
+      (t.period_tx_bytes + t.period_rx_bytes) as total_data_usage,
       AVG(rsrp) as avg_rsrp,
       AVG(rsrq) as avg_rsrq,
       AVG(rssi) as avg_rssi,
@@ -243,11 +263,11 @@ async function getUsageStats(routerId, startDate, endDate) {
       AVG(wifi_client_count) as avg_clients,
       MIN(timestamp) as first_log,
       MAX(timestamp) as last_log
-    FROM router_logs, deltas d
+    FROM router_logs, params, totals t
     WHERE router_id = $1
-      AND timestamp >= $2
-      AND timestamp <= $3
-    GROUP BY d.period_tx_bytes, d.period_rx_bytes;
+      AND timestamp >= (SELECT start_ts FROM params)
+      AND timestamp <= (SELECT end_ts FROM params)
+    GROUP BY t.period_tx_bytes, t.period_rx_bytes;
   `;
   
   try {
@@ -483,36 +503,48 @@ async function getTopRoutersByUsage(days = 7, limit = 5) {
   try {
     const daysInt = Math.max(1, Math.min(365, Number(days) || 7));
     const limInt = Math.max(1, Math.min(100, Number(limit) || 5));
-    // Updated to match getUsageStats: only count deltas WITHIN the period
     const query = `
       WITH params AS (
         SELECT NOW() - ($1::int || ' days')::interval AS start_ts
-      ), ordered_logs AS (
-        SELECT 
-          router_id,
-          total_tx_bytes,
-          total_rx_bytes,
-          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) as prev_tx,
-          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) as prev_rx
-        FROM router_logs, params
-        WHERE timestamp >= (SELECT start_ts FROM params)
-        ORDER BY router_id, timestamp
+      ), base AS (
+        SELECT l.router_id, l.total_tx_bytes AS base_tx, l.total_rx_bytes AS base_rx
+        FROM router_logs l
+        JOIN (
+          SELECT router_id, MAX(timestamp) AS ts
+          FROM router_logs, params
+          WHERE timestamp < (SELECT start_ts FROM params)
+          GROUP BY router_id
+        ) b ON b.router_id = l.router_id AND b.ts = l.timestamp
+      ), win AS (
+        SELECT l.router_id, l.timestamp, l.total_tx_bytes, l.total_rx_bytes,
+               LAG(l.total_tx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS prev_tx,
+               LAG(l.total_rx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS prev_rx,
+               FIRST_VALUE(l.total_tx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS first_tx,
+               FIRST_VALUE(l.total_rx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS first_rx
+        FROM router_logs l, params
+        WHERE l.timestamp >= (SELECT start_ts FROM params)
       ), deltas AS (
-        SELECT
-          router_id,
-          SUM(GREATEST(total_tx_bytes - COALESCE(prev_tx, 0), 0)) as tx_bytes,
-          SUM(GREATEST(total_rx_bytes - COALESCE(prev_rx, 0), 0)) as rx_bytes
-        FROM ordered_logs
-        GROUP BY router_id
+        SELECT 
+          w.router_id,
+          SUM(CASE WHEN w.prev_tx IS NULL THEN 0 ELSE GREATEST(w.total_tx_bytes - w.prev_tx, 0) END) AS sum_tx_deltas,
+          SUM(CASE WHEN w.prev_rx IS NULL THEN 0 ELSE GREATEST(w.total_rx_bytes - w.prev_rx, 0) END) AS sum_rx_deltas,
+          MAX(w.first_tx) AS first_tx,
+          MAX(w.first_rx) AS first_rx
+        FROM win w
+        GROUP BY w.router_id
+      ), totals AS (
+        SELECT d.router_id,
+               (GREATEST(d.first_tx - COALESCE(b.base_tx, d.first_tx), 0) + COALESCE(d.sum_tx_deltas, 0))::bigint AS tx_bytes,
+               (GREATEST(d.first_rx - COALESCE(b.base_rx, d.first_rx), 0) + COALESCE(d.sum_rx_deltas, 0))::bigint AS rx_bytes
+        FROM deltas d
+        LEFT JOIN base b ON b.router_id = d.router_id
       )
-      SELECT 
-        r.router_id, 
-        r.name,
-        d.tx_bytes,
-        d.rx_bytes,
-        (d.tx_bytes + d.rx_bytes) AS total_bytes
-      FROM deltas d
-      JOIN routers r ON r.router_id = d.router_id
+      SELECT r.router_id, r.name,
+             totals.tx_bytes,
+             totals.rx_bytes,
+             (totals.tx_bytes + totals.rx_bytes) AS total_bytes
+      FROM totals
+      JOIN routers r ON r.router_id = totals.router_id
       ORDER BY total_bytes DESC
       LIMIT $2;
     `;
@@ -533,10 +565,18 @@ module.exports.getTopRoutersByUsage = getTopRoutersByUsage;
 async function getNetworkUsageByDay(days = 7) {
   try {
     const daysInt = Math.max(1, Math.min(90, Number(days) || 7));
-    // Updated to only count deltas WITHIN the period (no baseline jump)
     const query = `
       WITH params AS (
         SELECT (CURRENT_DATE - ($1::int - 1) * INTERVAL '1 day') AS start_ts
+      ), base AS (
+        SELECT l.router_id, l.total_tx_bytes AS base_tx, l.total_rx_bytes AS base_rx
+        FROM router_logs l
+        JOIN (
+          SELECT router_id, MAX(timestamp) AS ts
+          FROM router_logs, params
+          WHERE timestamp < (SELECT start_ts FROM params)
+          GROUP BY router_id
+        ) b ON b.router_id = l.router_id AND b.ts = l.timestamp
       ), ordered AS (
         SELECT 
           l.router_id, 
@@ -551,9 +591,16 @@ async function getNetworkUsageByDay(days = 7) {
       ), deltas AS (
         SELECT 
           o.day,
-          GREATEST(o.total_tx_bytes - COALESCE(o.prev_tx, 0), 0) AS tx_delta,
-          GREATEST(o.total_rx_bytes - COALESCE(o.prev_rx, 0), 0) AS rx_delta
+          CASE 
+            WHEN o.prev_tx IS NOT NULL THEN GREATEST(o.total_tx_bytes - o.prev_tx, 0)
+            ELSE GREATEST(o.total_tx_bytes - COALESCE(b.base_tx, o.total_tx_bytes), 0)
+          END AS tx_delta,
+          CASE 
+            WHEN o.prev_rx IS NOT NULL THEN GREATEST(o.total_rx_bytes - o.prev_rx, 0)
+            ELSE GREATEST(o.total_rx_bytes - COALESCE(b.base_rx, o.total_rx_bytes), 0)
+          END AS rx_delta
         FROM ordered o
+        LEFT JOIN base b ON b.router_id = o.router_id
       )
       SELECT 
         day AS date,
@@ -654,10 +701,18 @@ async function getNetworkUsageRolling(hours = 24, bucket = 'hour') {
   try {
     const hrs = Math.max(1, Math.min(24 * 30, Number(hours) || 24));
     const buck = bucket === 'day' ? 'day' : 'hour';
-    // Updated to only count deltas WITHIN the period (no baseline jump)
     const query = `
       WITH params AS (
         SELECT NOW() - ($1::int || ' hours')::interval AS start_ts
+      ), base AS (
+        SELECT l.router_id, l.total_tx_bytes AS base_tx, l.total_rx_bytes AS base_rx
+        FROM router_logs l
+        JOIN (
+          SELECT router_id, MAX(timestamp) AS ts
+          FROM router_logs, params
+          WHERE timestamp < (SELECT start_ts FROM params)
+          GROUP BY router_id
+        ) b ON b.router_id = l.router_id AND b.ts = l.timestamp
       ), ordered AS (
         SELECT 
           l.router_id,
@@ -671,9 +726,17 @@ async function getNetworkUsageRolling(hours = 24, bucket = 'hour') {
       ), deltas AS (
         SELECT 
           o.bucket_ts,
-          GREATEST(o.total_tx_bytes - COALESCE(o.prev_tx, 0), 0) AS tx_delta,
-          GREATEST(o.total_rx_bytes - COALESCE(o.prev_rx, 0), 0) AS rx_delta
+          o.router_id,
+          CASE 
+            WHEN o.prev_tx IS NOT NULL THEN GREATEST(o.total_tx_bytes - o.prev_tx, 0)
+            ELSE GREATEST(o.total_tx_bytes - COALESCE(b.base_tx, o.total_tx_bytes), 0)
+          END AS tx_delta,
+          CASE 
+            WHEN o.prev_rx IS NOT NULL THEN GREATEST(o.total_rx_bytes - o.prev_rx, 0)
+            ELSE GREATEST(o.total_rx_bytes - COALESCE(b.base_rx, o.total_rx_bytes), 0)
+          END AS rx_delta
         FROM ordered o
+        LEFT JOIN base b ON b.router_id = o.router_id
       )
       SELECT 
         bucket_ts AS date,
@@ -701,36 +764,48 @@ async function getTopRoutersByUsageRolling(hours = 24, limit = 5) {
   try {
     const hrs = Math.max(1, Math.min(24 * 30, Number(hours) || 24));
     const lim = Math.max(1, Math.min(100, Number(limit) || 5));
-    // Updated to match getUsageStats: only count deltas WITHIN the period
     const query = `
       WITH params AS (
         SELECT NOW() - ($1::int || ' hours')::interval AS start_ts
-      ), ordered_logs AS (
-        SELECT 
-          router_id,
-          total_tx_bytes,
-          total_rx_bytes,
-          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) as prev_tx,
-          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) as prev_rx
-        FROM router_logs, params
-        WHERE timestamp >= (SELECT start_ts FROM params)
-        ORDER BY router_id, timestamp
+      ), base AS (
+        SELECT l.router_id, l.total_tx_bytes AS base_tx, l.total_rx_bytes AS base_rx
+        FROM router_logs l
+        JOIN (
+          SELECT router_id, MAX(timestamp) AS ts
+          FROM router_logs, params
+          WHERE timestamp < (SELECT start_ts FROM params)
+          GROUP BY router_id
+        ) b ON b.router_id = l.router_id AND b.ts = l.timestamp
+      ), win AS (
+        SELECT l.router_id, l.timestamp, l.total_tx_bytes, l.total_rx_bytes,
+               LAG(l.total_tx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS prev_tx,
+               LAG(l.total_rx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS prev_rx,
+               FIRST_VALUE(l.total_tx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS first_tx,
+               FIRST_VALUE(l.total_rx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS first_rx
+        FROM router_logs l, params
+        WHERE l.timestamp >= (SELECT start_ts FROM params)
       ), deltas AS (
-        SELECT
-          router_id,
-          SUM(GREATEST(total_tx_bytes - COALESCE(prev_tx, 0), 0)) as tx_bytes,
-          SUM(GREATEST(total_rx_bytes - COALESCE(prev_rx, 0), 0)) as rx_bytes
-        FROM ordered_logs
-        GROUP BY router_id
+        SELECT 
+          w.router_id,
+          SUM(CASE WHEN w.prev_tx IS NULL THEN 0 ELSE GREATEST(w.total_tx_bytes - w.prev_tx, 0) END) AS sum_tx_deltas,
+          SUM(CASE WHEN w.prev_rx IS NULL THEN 0 ELSE GREATEST(w.total_rx_bytes - w.prev_rx, 0) END) AS sum_rx_deltas,
+          MAX(w.first_tx) AS first_tx,
+          MAX(w.first_rx) AS first_rx
+        FROM win w
+        GROUP BY w.router_id
+      ), totals AS (
+        SELECT d.router_id,
+               (GREATEST(d.first_tx - COALESCE(b.base_tx, d.first_tx), 0) + COALESCE(d.sum_tx_deltas, 0))::bigint AS tx_bytes,
+               (GREATEST(d.first_rx - COALESCE(b.base_rx, d.first_rx), 0) + COALESCE(d.sum_rx_deltas, 0))::bigint AS rx_bytes
+        FROM deltas d
+        LEFT JOIN base b ON b.router_id = d.router_id
       )
-      SELECT 
-        r.router_id, 
-        r.name,
-        d.tx_bytes,
-        d.rx_bytes,
-        (d.tx_bytes + d.rx_bytes) AS total_bytes
-      FROM deltas d
-      JOIN routers r ON r.router_id = d.router_id
+      SELECT r.router_id, r.name,
+             totals.tx_bytes,
+             totals.rx_bytes,
+             (totals.tx_bytes + totals.rx_bytes) AS total_bytes
+      FROM totals
+      JOIN routers r ON r.router_id = totals.router_id
       ORDER BY total_bytes DESC
       LIMIT $2;
     `;
@@ -751,10 +826,18 @@ module.exports.getTopRoutersByUsageRolling = getTopRoutersByUsageRolling;
 async function getOperatorDistributionRolling(hours = 24) {
   try {
     const hrs = Math.max(1, Math.min(24 * 30, Number(hours) || 24));
-    // Updated to only count deltas WITHIN the period (no baseline jump)
     const query = `
       WITH params AS (
         SELECT NOW() - ($1::int || ' hours')::interval AS start_ts
+      ), base AS (
+        SELECT l.router_id, l.total_tx_bytes AS base_tx, l.total_rx_bytes AS base_rx
+        FROM router_logs l
+        JOIN (
+          SELECT router_id, MAX(timestamp) AS ts
+          FROM router_logs, params
+          WHERE timestamp < (SELECT start_ts FROM params)
+          GROUP BY router_id
+        ) b ON b.router_id = l.router_id AND b.ts = l.timestamp
       ), ordered AS (
         SELECT 
           l.router_id,
@@ -768,9 +851,16 @@ async function getOperatorDistributionRolling(hours = 24) {
       ), deltas AS (
         SELECT 
           o.operator,
-          GREATEST(o.total_tx_bytes - COALESCE(o.prev_tx, 0), 0) AS tx_delta,
-          GREATEST(o.total_rx_bytes - COALESCE(o.prev_rx, 0), 0) AS rx_delta
+          CASE 
+            WHEN o.prev_tx IS NOT NULL THEN GREATEST(o.total_tx_bytes - o.prev_tx, 0)
+            ELSE GREATEST(o.total_tx_bytes - COALESCE(b.base_tx, o.total_tx_bytes), 0)
+          END AS tx_delta,
+          CASE 
+            WHEN o.prev_rx IS NOT NULL THEN GREATEST(o.total_rx_bytes - o.prev_rx, 0)
+            ELSE GREATEST(o.total_rx_bytes - COALESCE(b.base_rx, o.total_rx_bytes), 0)
+          END AS rx_delta
         FROM ordered o
+        LEFT JOIN base b ON b.router_id = o.router_id
       )
       SELECT operator,
              SUM(tx_delta)::bigint AS tx_bytes,
