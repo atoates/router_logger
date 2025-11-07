@@ -505,8 +505,18 @@ export default function RouterDashboard({ router }) {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="date" tickFormatter={(t)=> new Date(t).toLocaleDateString()} tick={{ fontSize: 11 }} />
-              <YAxis scale="log" domain={['auto', 'auto']} tickFormatter={(v)=>formatBytes(v)} tick={{ fontSize: 11 }} allowDataOverflow={false} />
+              <XAxis 
+                dataKey="date" 
+                tickFormatter={(t)=> new Date(t).toLocaleDateString()} 
+                tick={{ fontSize: 11, fill: '#374151' }} 
+              />
+              <YAxis 
+                scale="linear" 
+                domain={[0, 'auto']} 
+                tickFormatter={(v)=>formatBytes(v)} 
+                tick={{ fontSize: 11, fill: '#374151' }} 
+                allowDataOverflow={false} 
+              />
               <Tooltip formatter={(v)=>formatBytes(v)} labelFormatter={(t)=> new Date(t).toLocaleString()} />
               <Legend />
               <Area type="monotone" dataKey="tx_bytes" stroke="#6366f1" fill="url(#rdTx)" name="TX" />

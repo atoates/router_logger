@@ -82,8 +82,12 @@ function DataCharts({ routerId, startDate, endDate }) {
                 textAnchor="end" 
                 height={80}
                 interval="preserveStartEnd"
+                tick={{ fontSize: 11, fill: '#374151' }}
               />
-              <YAxis label={{ value: 'MB', angle: -90, position: 'insideLeft' }} />
+              <YAxis 
+                label={{ value: 'MB', angle: -90, position: 'insideLeft' }} 
+                tick={{ fill: '#374151' }}
+              />
               <Tooltip />
               <Legend />
               <Area 
@@ -122,8 +126,12 @@ function DataCharts({ routerId, startDate, endDate }) {
                 textAnchor="end" 
                 height={80}
                 interval="preserveStartEnd"
+                tick={{ fontSize: 11, fill: '#374151' }}
               />
-              <YAxis label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
+              <YAxis 
+                label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} 
+                tick={{ fill: '#374151' }}
+              />
               <Tooltip />
               <Legend />
               <Line 
