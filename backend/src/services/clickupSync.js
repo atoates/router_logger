@@ -87,6 +87,65 @@ async function syncRouterToClickUp(router) {
       });
     }
 
+    // Data Usage (number) - last 30 days in GB
+    try {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const now = new Date();
+      
+      const usageQuery = `
+        WITH params AS (
+          SELECT $2::timestamp AS start_ts, $3::timestamp AS end_ts
+        ), base AS (
+          SELECT l.total_tx_bytes AS base_tx, l.total_rx_bytes AS base_rx
+          FROM router_logs l, params
+          WHERE l.router_id = $1
+            AND l.timestamp < (SELECT start_ts FROM params)
+          ORDER BY l.timestamp DESC
+          LIMIT 1
+        ), ordered_logs AS (
+          SELECT 
+            total_tx_bytes,
+            total_rx_bytes,
+            LAG(total_tx_bytes) OVER (ORDER BY timestamp) as prev_tx,
+            LAG(total_rx_bytes) OVER (ORDER BY timestamp) as prev_rx,
+            FIRST_VALUE(total_tx_bytes) OVER (ORDER BY timestamp) as first_tx,
+            FIRST_VALUE(total_rx_bytes) OVER (ORDER BY timestamp) as first_rx
+          FROM router_logs, params
+          WHERE router_id = $1
+            AND timestamp >= (SELECT start_ts FROM params)
+            AND timestamp <= (SELECT end_ts FROM params)
+          ORDER BY timestamp
+        ),
+        deltas AS (
+          SELECT
+            SUM(CASE WHEN prev_tx IS NULL THEN 0 ELSE GREATEST(total_tx_bytes - prev_tx, 0) END) as sum_tx_deltas,
+            SUM(CASE WHEN prev_rx IS NULL THEN 0 ELSE GREATEST(total_rx_bytes - prev_rx, 0) END) as sum_rx_deltas,
+            MAX(first_tx) as first_tx,
+            MAX(first_rx) as first_rx
+          FROM ordered_logs
+        )
+        SELECT
+          (GREATEST(d.first_tx - COALESCE(b.base_tx, d.first_tx), 0) + COALESCE(d.sum_tx_deltas, 0) +
+           GREATEST(d.first_rx - COALESCE(b.base_rx, d.first_rx), 0) + COALESCE(d.sum_rx_deltas, 0))::bigint as total_bytes
+        FROM deltas d
+        LEFT JOIN base b ON true
+      `;
+      
+      const usageResult = await pool.query(usageQuery, [router.router_id, thirtyDaysAgo, now]);
+      const totalBytes = usageResult.rows[0]?.total_bytes || 0;
+      const totalGB = (totalBytes / 1024 / 1024 / 1024).toFixed(2); // Convert to GB with 2 decimals
+      
+      customFields.push({
+        id: CUSTOM_FIELDS.DATA_USAGE,
+        value: parseFloat(totalGB) // ClickUp number field expects a number, not string
+      });
+      
+      logger.debug(`Router ${router.router_id}: Data usage (30d) = ${totalGB} GB`);
+    } catch (usageError) {
+      logger.warn(`Failed to calculate data usage for router ${router.router_id}:`, usageError.message);
+      // Don't fail the entire sync if usage calculation fails
+    }
+
     // Last Online (date timestamp in milliseconds)
     if (router.last_seen) {
       customFields.push({
