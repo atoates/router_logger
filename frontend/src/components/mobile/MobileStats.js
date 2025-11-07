@@ -113,9 +113,10 @@ const MobileStats = ({ router }) => {
             logs: logs,
             gpsLocation: gpsData
           });
+          alert('Report generated successfully!');
         } catch (error) {
           console.error('Failed to generate report:', error);
-          alert('Failed to generate report');
+          alert(`Failed to generate report: ${error.message || error}`);
         } finally {
           setGenerating(false);
         }
@@ -214,7 +215,7 @@ const MobileStats = ({ router }) => {
           <div style={{ marginBottom: '16px' }}>
             <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>Data Usage</div>
             <div style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>
-              ↑ {formatBytes(stats?.tx_bytes)} • ↓ {formatBytes(stats?.rx_bytes)}
+              ↑ {formatBytes(stats?.period_tx_bytes || 0)} • ↓ {formatBytes(stats?.period_rx_bytes || 0)}
             </div>
           </div>
 

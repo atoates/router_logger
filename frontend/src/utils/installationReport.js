@@ -130,9 +130,9 @@ export async function generateInstallationReport({ router, stats, logs, gpsLocat
   addText(`Uptime: ${uptimePercentage}% (${logs.length} data points)`, margin, 11);
   
   if (stats) {
-    addText(`Data Upload: ${formatBytes(stats.total_tx_bytes || 0)}`, margin, 11);
-    addText(`Data Download: ${formatBytes(stats.total_rx_bytes || 0)}`, margin, 11);
-    addText(`Total Data: ${formatBytes((stats.total_tx_bytes || 0) + (stats.total_rx_bytes || 0))}`, margin, 11, 'bold');
+    addText(`Data Upload: ${formatBytes(stats.period_tx_bytes || stats.total_tx_bytes || 0)}`, margin, 11);
+    addText(`Data Download: ${formatBytes(stats.period_rx_bytes || stats.total_rx_bytes || 0)}`, margin, 11);
+    addText(`Total Data: ${formatBytes((stats.period_tx_bytes || stats.total_tx_bytes || 0) + (stats.period_rx_bytes || stats.total_rx_bytes || 0))}`, margin, 11, 'bold');
   }
 
   // Latest network info
@@ -183,7 +183,7 @@ export async function generateInstallationReport({ router, stats, logs, gpsLocat
   const checks = [
     { label: 'Router powered on and connected', passed: isOnline },
     { label: 'Network connectivity established', passed: isOnline && latestLog && latestLog.wan_ip },
-    { label: 'Data transmission active', passed: stats && (stats.total_tx_bytes > 0 || stats.total_rx_bytes > 0) },
+    { label: 'Data transmission active', passed: stats && ((stats.period_tx_bytes || stats.total_tx_bytes || 0) > 0 || (stats.period_rx_bytes || stats.total_rx_bytes || 0) > 0) },
     { label: 'Signal strength adequate', passed: latestLog && (latestLog.rsrp > -110 || latestLog.rssi > -90) },
     { label: 'Location verified with GPS', passed: gpsLocation && gpsLocation.accuracy < 50 }
   ];
