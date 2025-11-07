@@ -240,6 +240,8 @@ async function syncAllRoutersToClickUp() {
       `SELECT 
          r.router_id, 
          r.clickup_task_id, 
+         r.clickup_location_task_id,
+         r.clickup_location_task_name,
          r.imei, 
          r.firmware_version, 
          r.last_seen, 
