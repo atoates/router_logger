@@ -41,6 +41,7 @@ export default function RouterDashboard({ router }) {
   const [stats, setStats] = useState(null);
   const [uptime, setUptime] = useState([]);
   const [inspections, setInspections] = useState([]);
+  const [showRawData, setShowRawData] = useState(false); // Toggle for chart scale
   const propertyWidgetRef = useRef(null);
 
   const routerId = router?.router_id;
@@ -127,24 +128,26 @@ export default function RouterDashboard({ router }) {
       prevTx = tx; prevRx = rx;
     }
     
-    // Remove outliers that skew the chart (values > 3x median)
-    const totalValues = txrx.map(d => d.total_bytes).filter(v => v > 0);
-    if (totalValues.length > 0) {
-      const sorted = [...totalValues].sort((a, b) => a - b);
-      const median = sorted[Math.floor(sorted.length / 2)];
-      const outlierThreshold = median * 5; // 5x median instead of 3x to be less aggressive
-      
-      // Filter out extreme outliers but keep the data points (just cap them)
-      txrx.forEach(d => {
-        if (d.tx_bytes > outlierThreshold) d.tx_bytes = outlierThreshold;
-        if (d.rx_bytes > outlierThreshold) d.rx_bytes = outlierThreshold;
-        d.total_bytes = d.tx_bytes + d.rx_bytes;
-      });
+    // Remove outliers that skew the chart (only if NOT showing raw data)
+    if (!showRawData) {
+      const totalValues = txrx.map(d => d.total_bytes).filter(v => v > 0);
+      if (totalValues.length > 0) {
+        const sorted = [...totalValues].sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)];
+        const outlierThreshold = median * 5; // 5x median instead of 3x to be less aggressive
+        
+        // Filter out extreme outliers but keep the data points (just cap them)
+        txrx.forEach(d => {
+          if (d.tx_bytes > outlierThreshold) d.tx_bytes = outlierThreshold;
+          if (d.rx_bytes > outlierThreshold) d.rx_bytes = outlierThreshold;
+          d.total_bytes = d.tx_bytes + d.rx_bytes;
+        });
+      }
     }
     
     const latest = asc[asc.length-1];
     return { txrx, latest };
-  }, [logs]);
+  }, [logs, showRawData]);
 
   const totalBytes = useMemo(() => (series.txrx || []).reduce((s,d)=> s + (Number(d.total_bytes)||0), 0), [series]);
   const onlinePct = useMemo(() => {
@@ -506,7 +509,26 @@ export default function RouterDashboard({ router }) {
 
       {/* TX/RX Chart - Full Width */}
       <div className="card">
-        <div className="card-title">TX/RX ({label})</div>
+        <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>TX/RX ({label})</span>
+          <button
+            onClick={() => setShowRawData(!showRawData)}
+            style={{
+              padding: '6px 12px',
+              fontSize: '12px',
+              fontWeight: '500',
+              background: showRawData ? '#3b82f6' : '#6b7280',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+            title={showRawData ? 'Showing all data (including spikes)' : 'Outliers capped at 5x median for better visibility'}
+          >
+            {showRawData ? '📊 Raw Data' : '📉 Normalized'}
+          </button>
+        </div>
         <div style={{ height: 260 }}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={series.txrx} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
