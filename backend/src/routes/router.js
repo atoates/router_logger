@@ -518,9 +518,18 @@ router.get('/routers/by-assignees', async (req, res) => {
     for (const router of routers) {
       try {
         // Parse assignees from database
-        const assignees = router.clickup_assignees ? JSON.parse(router.clickup_assignees) : null;
+        let assignees = null;
         
-        if (assignees && assignees.length > 0) {
+        if (router.clickup_assignees) {
+          // Handle both string and object formats
+          if (typeof router.clickup_assignees === 'string') {
+            assignees = JSON.parse(router.clickup_assignees);
+          } else {
+            assignees = router.clickup_assignees;
+          }
+        }
+        
+        if (assignees && Array.isArray(assignees) && assignees.length > 0) {
           for (const assignee of assignees) {
             const assigneeName = assignee.username || assignee.email || 'Unknown';
             if (!routersByAssignee[assigneeName]) {
@@ -533,14 +542,14 @@ router.get('/routers/by-assignees', async (req, res) => {
             }
           }
         } else {
-          // Unassigned routers
+          // Unassigned routers (no assignees or empty array)
           if (!routersByAssignee['Unassigned']) {
             routersByAssignee['Unassigned'] = [];
           }
           routersByAssignee['Unassigned'].push(router);
         }
       } catch (parseError) {
-        logger.warn(`Failed to parse assignees for router ${router.router_id}:`, parseError.message);
+        logger.warn(`Failed to parse assignees for router ${router.router_id}: ${parseError.message} - Data: ${JSON.stringify(router.clickup_assignees)?.substring(0, 100)}`);
         // Add to unassigned if we can't parse
         if (!routersByAssignee['Unassigned']) {
           routersByAssignee['Unassigned'] = [];
