@@ -76,7 +76,12 @@ const MobileStats = ({ router }) => {
             timestamp: new Date(position.timestamp).toISOString()
           };
 
-          await generateInstallationReport(router, stats, logs, gpsData);
+          await generateInstallationReport({
+            router: router,
+            stats: stats,
+            logs: logs,
+            gpsLocation: gpsData
+          });
         } catch (error) {
           console.error('Failed to generate report:', error);
           alert('Failed to generate report');
