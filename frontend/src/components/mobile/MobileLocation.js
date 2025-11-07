@@ -15,15 +15,24 @@ const MobileLocation = ({ router }) => {
 
     try {
       setSearching(true);
-      const response = await fetch(`/api/clickup/properties/search?query=${encodeURIComponent(searchTerm)}`, {
+      const response = await fetch(`${API_BASE}/api/clickup/properties/search?query=${encodeURIComponent(searchTerm)}`, {
         credentials: 'include'
       });
-      if (!response.ok) throw new Error('Search failed');
+      
+      console.log('Search response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Search error response:', errorText);
+        throw new Error('Search failed');
+      }
+      
       const data = await response.json();
+      console.log('Search results:', data);
       setProperties(data.properties || []);
     } catch (error) {
       console.error('Failed to search properties:', error);
-      alert('Failed to search properties');
+      alert('Failed to search properties. Make sure you are connected to ClickUp.');
     } finally {
       setSearching(false);
     }
