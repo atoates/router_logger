@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { linkRouterToLocation, unlinkRouterFromLocation } from '../../services/api';
+
+const API_BASE = process.env.REACT_APP_API_URL || 'https://routerlogger-production.up.railway.app';
 
 const MobileLocation = ({ router }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -30,7 +31,18 @@ const MobileLocation = ({ router }) => {
 
   const handleLinkLocation = async (property) => {
     try {
-      await linkRouterToLocation(router.router_id, property.id, property.name);
+      const response = await fetch(`${API_BASE}/api/routers/${router.router_id}/link-location`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          locationTaskId: property.id,
+          locationTaskName: property.name
+        })
+      });
+      
+      if (!response.ok) throw new Error('Failed to link location');
+      
       alert('Location linked successfully!');
       window.location.reload();
     } catch (error) {
@@ -41,7 +53,13 @@ const MobileLocation = ({ router }) => {
 
   const handleUnlinkLocation = async () => {
     try {
-      await unlinkRouterFromLocation(router.router_id);
+      const response = await fetch(`${API_BASE}/api/routers/${router.router_id}/unlink-location`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (!response.ok) throw new Error('Failed to unlink location');
+      
       alert('Location unlinked successfully!');
       window.location.reload();
     } catch (error) {

@@ -8,6 +8,7 @@ const StoredWithRouters = () => {
   const [routersByAssignee, setRoutersByAssignee] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [syncing, setSyncing] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -56,6 +57,34 @@ const StoredWithRouters = () => {
     navigate(`/router/${routerId}`);
   };
 
+  const handleRefresh = async () => {
+    try {
+      setSyncing(true);
+      setError(null);
+      
+      // Trigger ClickUp sync to refresh assignee data
+      const syncResponse = await fetch(`${API_BASE}/api/clickup/sync`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (!syncResponse.ok) {
+        throw new Error('Failed to sync with ClickUp');
+      }
+      
+      // Wait a moment for the sync to complete
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Fetch updated data
+      await fetchRoutersByAssignees();
+    } catch (err) {
+      console.error('Error refreshing data:', err);
+      setError(err.message);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="oos-card">
@@ -79,10 +108,28 @@ const StoredWithRouters = () => {
 
   return (
     <div className="oos-card">
-      <h3 className="oos-title">
-        Stored With
-        <span className="oos-count">{totalRouters} routers</span>
-      </h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h3 className="oos-title" style={{ margin: 0 }}>
+          Stored With
+          <span className="oos-count">{totalRouters} routers</span>
+        </h3>
+        <button
+          onClick={handleRefresh}
+          disabled={syncing}
+          style={{
+            padding: '8px 16px',
+            background: syncing ? '#e5e7eb' : '#2563eb',
+            color: syncing ? '#6b7280' : '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '14px',
+            fontWeight: '600',
+            cursor: syncing ? 'not-allowed' : 'pointer'
+          }}
+        >
+          {syncing ? '🔄 Syncing...' : '🔄 Refresh'}
+        </button>
+      </div>
       
       {assigneeNames.length === 0 ? (
         <div className="oos-empty">

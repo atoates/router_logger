@@ -73,4 +73,8 @@ export const getRouterTask = (routerId) => api.get(`/clickup/router-task/${route
 // Submit log (for testing)
 export const submitLog = (data) => api.post('/log', data);
 
+// Router Assignment (for mobile app)
+export const assignRouter = (routerId, userId) => api.post(`/routers/${routerId}/assign`, { userId });
+export const removeRouterAssignees = (routerId) => api.post(`/routers/${routerId}/remove-assignees`);
+
 export default api;
