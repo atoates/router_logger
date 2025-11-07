@@ -100,6 +100,75 @@ router.get('/debug/:deviceId', async (req, res) => {
   }
 });
 
+// Refresh single router from RMS
+router.post('/refresh/:routerId', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const pool = require('../config/database').pool;
+    
+    // Get router's RMS device ID
+    const routerResult = await pool.query(
+      'SELECT router_id, rms_device_id FROM routers WHERE router_id = $1',
+      [routerId]
+    );
+    
+    if (!routerResult.rows.length) {
+      return res.status(404).json({ error: 'Router not found' });
+    }
+    
+    const router = routerResult.rows[0];
+    if (!router.rms_device_id) {
+      return res.status(400).json({ error: 'Router has no RMS device ID' });
+    }
+    
+    // Fetch fresh data from RMS
+    const rms = await RMSClient.createWithAuth();
+    const deviceData = await rms.getDevice(router.rms_device_id);
+    
+    // Update router with fresh data
+    const updateQuery = `
+      UPDATE routers SET
+        name = $1,
+        serial = $2,
+        imei = $3,
+        status = $4,
+        last_seen = $5,
+        signal_strength = $6,
+        operator = $7,
+        ip_address = $8,
+        updated_at = NOW()
+      WHERE router_id = $9
+      RETURNING *
+    `;
+    
+    const updatedRouter = await pool.query(updateQuery, [
+      deviceData.name || router.router_id,
+      deviceData.serial,
+      deviceData.imei,
+      deviceData.status?.toLowerCase() || 'offline',
+      deviceData.last_connection ? new Date(deviceData.last_connection) : null,
+      deviceData.signal_strength,
+      deviceData.operator,
+      deviceData.ip_address,
+      router.router_id
+    ]);
+    
+    logger.info(`Router ${routerId} refreshed from RMS`);
+    res.json({
+      success: true,
+      message: 'Router refreshed from RMS',
+      router: updatedRouter.rows[0]
+    });
+  } catch (error) {
+    logger.error(`Failed to refresh router ${req.params.routerId}:`, error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to refresh router',
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;
 
 // Admin: merge duplicate routers by name into serial-like ID

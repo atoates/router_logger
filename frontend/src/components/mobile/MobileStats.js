@@ -7,6 +7,7 @@ const MobileStats = ({ router }) => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (router) {
@@ -42,6 +43,36 @@ const MobileStats = ({ router }) => {
       console.error('Failed to load stats:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefreshFromRMS = async () => {
+    try {
+      setRefreshing(true);
+      const API_BASE = process.env.REACT_APP_API_URL || '';
+      const response = await fetch(`${API_BASE}/api/rms/refresh/${router.router_id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to refresh');
+      }
+
+      const result = await response.json();
+      alert('Router data refreshed from RMS!');
+      
+      // Reload stats to show updated data
+      await loadStats();
+      
+      // Notify parent to refresh router list (optional)
+      window.dispatchEvent(new Event('router-updated'));
+    } catch (error) {
+      console.error('Failed to refresh from RMS:', error);
+      alert(`Failed to refresh: ${error.message}`);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -115,9 +146,31 @@ const MobileStats = ({ router }) => {
 
   return (
     <div style={{ padding: '16px' }}>
-      <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: '600' }}>
-        {router.name || `Router #${router.router_id}`}
-      </h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>
+          {router.name || `Router #${router.router_id}`}
+        </h2>
+        <button
+          onClick={handleRefreshFromRMS}
+          disabled={refreshing}
+          style={{
+            padding: '8px 16px',
+            background: refreshing ? '#94a3b8' : '#3b82f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: '500',
+            cursor: refreshing ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <span>{refreshing ? '🔄' : '↻'}</span>
+          {refreshing ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
 
       {/* Status */}
       <div style={{ marginBottom: '16px' }}>
