@@ -21,9 +21,20 @@ const MobileStats = ({ router }) => {
       const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
 
       const [statsResponse, logsResponse] = await Promise.all([
-        getUsageStats(router.router_id, startDate.toISOString(), endDate.toISOString()),
-        getLogs(router.router_id, startDate.toISOString(), endDate.toISOString())
+        getUsageStats({
+          routerId: router.router_id,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString()
+        }),
+        getLogs({
+          routerId: router.router_id,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString()
+        })
       ]);
+
+      console.log('Stats response:', statsResponse);
+      console.log('Logs response:', logsResponse);
 
       setStats(statsResponse.data[0] || {});
       setLogs(logsResponse.data || []);
