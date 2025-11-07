@@ -484,9 +484,22 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
             <div className="v3-card-title">💾 Storage</div>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               <div style={{ display:'flex', justifyContent:'space-between' }}>
-                <span>Total DB</span>
+                <span>Total DB Size</span>
                 <strong>{dbSize ? formatBytes(dbSize.db_bytes) : '—'}</strong>
               </div>
+              {dbSize && dbSize.tables && dbSize.tables.length > 0 && (
+                <>
+                  <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderTop:'1px solid #e5e7eb' }}>
+                    <span style={{ fontSize:13, color:'#64748b' }}>User Tables Total</span>
+                    <span style={{ fontSize:13, fontWeight:600, color:'#64748b' }}>
+                      {formatBytes(dbSize.tables.reduce((sum, t) => sum + (t.total_bytes || 0), 0))}
+                    </span>
+                  </div>
+                  <div style={{ fontSize:11, color:'#9ca3af', fontStyle:'italic', marginBottom:4 }}>
+                    Difference includes system catalogs, WAL, indexes, and overhead
+                  </div>
+                </>
+              )}
               {dbSize && dbSize.tables && dbSize.tables.map(t => (
                 <div key={t.name} style={{ display:'flex', flexDirection:'column', gap:6 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
