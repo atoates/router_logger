@@ -126,6 +126,22 @@ export default function RouterDashboard({ router }) {
       });
       prevTx = tx; prevRx = rx;
     }
+    
+    // Remove outliers that skew the chart (values > 3x median)
+    const totalValues = txrx.map(d => d.total_bytes).filter(v => v > 0);
+    if (totalValues.length > 0) {
+      const sorted = [...totalValues].sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      const outlierThreshold = median * 5; // 5x median instead of 3x to be less aggressive
+      
+      // Filter out extreme outliers but keep the data points (just cap them)
+      txrx.forEach(d => {
+        if (d.tx_bytes > outlierThreshold) d.tx_bytes = outlierThreshold;
+        if (d.rx_bytes > outlierThreshold) d.rx_bytes = outlierThreshold;
+        d.total_bytes = d.tx_bytes + d.rx_bytes;
+      });
+    }
+    
     const latest = asc[asc.length-1];
     return { txrx, latest };
   }, [logs]);
@@ -517,7 +533,13 @@ export default function RouterDashboard({ router }) {
                 tick={{ fontSize: 11, fill: '#374151' }} 
                 allowDataOverflow={false} 
               />
-              <Tooltip formatter={(v)=>formatBytes(v)} labelFormatter={(t)=> new Date(t).toLocaleString()} />
+              <Tooltip 
+                formatter={(v)=>formatBytes(v)} 
+                labelFormatter={(t)=> new Date(t).toLocaleString()}
+                contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151' }}
+                labelStyle={{ color: '#f3f4f6' }}
+                itemStyle={{ color: '#f3f4f6' }}
+              />
               <Legend />
               <Area type="monotone" dataKey="tx_bytes" stroke="#6366f1" fill="url(#rdTx)" name="TX" />
               <Area type="monotone" dataKey="rx_bytes" stroke="#10b981" fill="url(#rdRx)" name="RX" />
