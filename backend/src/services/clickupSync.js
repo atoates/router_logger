@@ -371,6 +371,16 @@ async function syncAssigneesFromClickUp() {
     const duration = Date.now() - startTime;
     logger.info(`Assignee sync complete: ${synced} synced, ${errors} errors in ${duration}ms`);
 
+    // Invalidate the assignee cache so users see fresh data immediately
+    try {
+      const routerRoutes = require('../routes/router');
+      if (routerRoutes.invalidateAssigneeCache) {
+        routerRoutes.invalidateAssigneeCache();
+      }
+    } catch (err) {
+      logger.warn('Could not invalidate assignee cache:', err.message);
+    }
+
     return {
       success: true,
       synced,

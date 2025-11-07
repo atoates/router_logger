@@ -469,12 +469,19 @@ router.get('/routers/with-locations', async (req, res) => {
   }
 });
 
-// Cache for assignee data (15 minute TTL)
+// Cache for assignee data (1 week TTL - assignees rarely change)
 const assigneeCache = {
   data: null,
   timestamp: null,
-  TTL: 15 * 60 * 1000 // 15 minutes - reduced API calls by caching longer
+  TTL: 7 * 24 * 60 * 60 * 1000 // 1 week - assignees change max 2x/month
 };
+
+// Function to invalidate assignee cache (called after sync)
+function invalidateAssigneeCache() {
+  assigneeCache.data = null;
+  assigneeCache.timestamp = null;
+  logger.info('Assignee cache invalidated');
+}
 
 // GET all routers grouped by assignees (stored with)
 router.get('/routers/by-assignees', async (req, res) => {
@@ -669,4 +676,5 @@ router.post('/routers/:routerId/remove-assignees', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.invalidateAssigneeCache = invalidateAssigneeCache;
 
