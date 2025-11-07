@@ -128,11 +128,11 @@ async function linkRouterToLocation(linkage) {
 
         // Add comment to router task linking the location
         try {
-          const commentText = `📍 Router assigned to location: **${locationTaskName}**\n\n` +
-            `Location Task ID: ${locationTaskId}\n` +
-            `Assigned at: ${new Date().toLocaleString()}` +
-            (linkedBy ? `\nLinked by: ${linkedBy}` : '') +
-            (notes ? `\n\nNotes: ${notes}` : '');
+          const commentText = `🤖 **System:** Router assigned to location: **${locationTaskName}**\n\n` +
+            `📍 Location: https://app.clickup.com/${locationTaskId}\n` +
+            `🕐 Assigned at: ${new Date().toLocaleString()}` +
+            (linkedBy ? `\n👤 Linked by: ${linkedBy}` : '') +
+            (notes ? `\n\n📝 Notes: ${notes}` : '');
 
           await clickupClient.createTaskComment(
             clickupTaskId,
@@ -242,11 +242,11 @@ async function unlinkRouterFromLocation(unlinkage) {
 
         // Add comment to router task about unlinking
         try {
-          const commentText = `🔓 Router removed from location\n\n` +
-            `Previously at: Location ${wasLinkedToLocation}\n` +
-            `Unlinked at: ${new Date().toLocaleString()}` +
-            (unlinkedBy ? `\nUnlinked by: ${unlinkedBy}` : '') +
-            (notes ? `\n\nNotes: ${notes}` : '');
+          const commentText = `🤖 **System:** Router removed from location\n\n` +
+            `📍 Previously at: Location ${wasLinkedToLocation}\n` +
+            `🕐 Unlinked at: ${new Date().toLocaleString()}` +
+            (unlinkedBy ? `\n👤 Unlinked by: ${unlinkedBy}` : '') +
+            (notes ? `\n\n📝 Notes: ${notes}` : '');
 
           await clickupClient.createTaskComment(
             router.clickup_task_id,
