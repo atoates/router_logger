@@ -463,12 +463,71 @@ class ClickUpClient {
   }
 
   /**
+   * Create a comment on a task
+   * @param {string} taskId - Task ID
+   * @param {string} commentText - Comment text
+   * @param {Object} options - Additional options
+   * @param {boolean} options.notifyAll - Notify all task members (default: false)
+   * @param {number} options.assignee - ClickUp user ID to assign the comment to
+   * @param {string} userId - User identifier
+   * @returns {Promise<Object>} Created comment
+   */
+  async createTaskComment(taskId, commentText, options = {}, userId = 'default') {
+    let attempt = 0;
+    return retryWithBackoff(async () => {
+      const isRetry = attempt > 0;
+      attempt++;
+      
+      try {
+        const client = await this.getAuthorizedClient(userId);
+        
+        const payload = {
+          comment_text: commentText,
+          notify_all: options.notifyAll || false
+        };
+        
+        if (options.assignee) {
+          payload.assignee = options.assignee;
+        }
+        
+        logger.info('ClickUp createTaskComment request:', {
+          taskId,
+          commentLength: commentText.length,
+          notifyAll: payload.notify_all,
+          hasAssignee: !!options.assignee
+        });
+        
+        const response = await client.post(`/task/${taskId}/comment`, payload);
+        
+        trackClickUpCall('createTaskComment', response.status, isRetry);
+        
+        logger.info('ClickUp createTaskComment response:', {
+          taskId,
+          commentId: response.data?.id,
+          status: response.status
+        });
+        
+        return response.data;
+      } catch (error) {
+        trackClickUpCall('createTaskComment', error.response?.status || 500, isRetry);
+        logger.error('Error creating task comment:', {
+          taskId,
+          status: error.response?.status,
+          errorData: error.response?.data,
+          message: error.message
+        });
+        throw error;
+      }
+    }, 3, `createTaskComment(${taskId})`);
+  }
+
+  /**
    * Search tasks across workspace
    * @param {string} workspaceId - Workspace ID
    * @param {Object} filters - Search filters
    * @param {string} userId - User identifier
    * @returns {Promise<Array>} Matching tasks
-   */
+```
   async searchTasks(workspaceId, filters = {}, userId = 'default') {
     try {
       const client = await this.getAuthorizedClient(userId);

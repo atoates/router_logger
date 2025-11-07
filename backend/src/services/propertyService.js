@@ -125,6 +125,35 @@ async function linkRouterToLocation(linkage) {
             removedAssignees: assigneeIds
           });
         }
+
+        // Add comment to router task linking the location
+        try {
+          const commentText = `📍 Router assigned to location: **${locationTaskName}**\n\n` +
+            `Location Task ID: ${locationTaskId}\n` +
+            `Assigned at: ${new Date().toLocaleString()}` +
+            (linkedBy ? `\nLinked by: ${linkedBy}` : '') +
+            (notes ? `\n\nNotes: ${notes}` : '');
+
+          await clickupClient.createTaskComment(
+            clickupTaskId,
+            commentText,
+            { notifyAll: false },
+            'default'
+          );
+          
+          logger.info('Added location assignment comment to router task', {
+            routerId,
+            clickupTaskId,
+            locationTaskId,
+            locationTaskName
+          });
+        } catch (commentError) {
+          logger.warn('Failed to add comment to router task (assignment still recorded)', {
+            routerId,
+            clickupTaskId,
+            error: commentError.message
+          });
+        }
       } catch (clickupError) {
         logger.warn('Failed to update ClickUp task status/assignees (location link still recorded)', {
           routerId,
@@ -210,6 +239,32 @@ async function unlinkRouterFromLocation(unlinkage) {
           routerId, 
           clickupTaskId: router.clickup_task_id
         });
+
+        // Add comment to router task about unlinking
+        try {
+          const commentText = `🔓 Router removed from location\n\n` +
+            `Previously at: Location ${wasLinkedToLocation}\n` +
+            `Unlinked at: ${new Date().toLocaleString()}` +
+            (unlinkedBy ? `\nUnlinked by: ${unlinkedBy}` : '') +
+            (notes ? `\n\nNotes: ${notes}` : '');
+
+          await clickupClient.createTaskComment(
+            router.clickup_task_id,
+            commentText,
+            { notifyAll: false },
+            'default'
+          );
+          
+          logger.info('Added unlink comment to router task', {
+            routerId,
+            clickupTaskId: router.clickup_task_id
+          });
+        } catch (commentError) {
+          logger.warn('Failed to add unlink comment (unlink still recorded)', {
+            routerId,
+            error: commentError.message
+          });
+        }
       } catch (clickupError) {
         logger.warn('Failed to update ClickUp task status (unlink still recorded)', {
           routerId,
