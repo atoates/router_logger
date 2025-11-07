@@ -83,7 +83,7 @@ export default function RouterDashboard({ router }) {
         // Ignore if a newer load started or component unmounted
         if (!mounted || seq !== loadSeqRef.current) return;
         setLogs(Array.isArray(logsRes.data) ? logsRes.data : []);
-        setStats(statsRes.data || null);
+        setStats(Array.isArray(statsRes.data) ? statsRes.data[0] : statsRes.data);
         setUptime(Array.isArray(upRes.data) ? upRes.data : []);
         setInspections(Array.isArray(inspRes.data) ? inspRes.data : []);
       } catch (e) {
