@@ -70,8 +70,9 @@ function AppContent() {
     toast.success(`Opening ${label}`);
   };
 
-  // Determine if we're on a router page
+  // Determine if we're on a router page or mobile page
   const isRouterPage = location.pathname.startsWith('/router/');
+  const isMobilePage = location.pathname === '/mobile';
   
   // Navigation menu items
   const navItems = [
@@ -80,6 +81,15 @@ function AppContent() {
     { path: '/stored', label: 'Stored Routers', icon: '📦' },
     { path: '/status', label: 'System Status', icon: '⚙️' },
   ];
+
+  // If mobile page, render it standalone without header/nav
+  if (isMobilePage) {
+    return (
+      <ErrorBoundary>
+        <MobilePage />
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <div className={`app ${darkMode ? 'dark-mode' : ''}`}>
@@ -122,7 +132,6 @@ function AppContent() {
             <Route path="/assignments" element={<DashboardV3 page="assignments" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />} />
             <Route path="/stored" element={<DashboardV3 page="stored" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />} />
             <Route path="/status" element={<DashboardV3 page="status" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />} />
-            <Route path="/mobile" element={<MobilePage />} />
             <Route path="/router/:routerId" element={<RouterDetailPage />} />
           </Routes>
         </ErrorBoundary>

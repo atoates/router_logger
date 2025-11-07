@@ -32,6 +32,17 @@ const MobileSearch = ({ onSelectRouter, selectedRouter }) => {
     );
   });
 
+  const hasAssignees = (router) => {
+    try {
+      if (!router.clickup_assignees) return false;
+      const assignees = JSON.parse(router.clickup_assignees);
+      return Array.isArray(assignees) && assignees.length > 0;
+    } catch (e) {
+      console.error('Failed to parse assignees for router', router.router_id, e);
+      return false;
+    }
+  };
+
   const handleAssignToMe = async (router) => {
     try {
       const userResponse = await fetch('/api/clickup/current-user', {
@@ -125,7 +136,7 @@ const MobileSearch = ({ onSelectRouter, selectedRouter }) => {
               ID: {router.router_id} • IMEI: {router.imei || 'N/A'}
             </div>
 
-            {router.clickup_assignees && JSON.parse(router.clickup_assignees).length > 0 && (
+            {hasAssignees(router) && (
               <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>
                 👤 Assigned
               </div>
@@ -143,7 +154,7 @@ const MobileSearch = ({ onSelectRouter, selectedRouter }) => {
 
             {isSelected && (
               <div style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {(!router.clickup_assignees || JSON.parse(router.clickup_assignees).length === 0) ? (
+                {!hasAssignees(router) ? (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
