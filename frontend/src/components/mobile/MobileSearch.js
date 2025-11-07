@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getRouters, assignRouter, removeRouterAssignees } from '../../services/api';
 
+const API_BASE = process.env.REACT_APP_API_URL || 'https://routerlogger-production.up.railway.app';
+
 const MobileSearch = ({ onSelectRouter, selectedRouter }) => {
   const [routers, setRouters] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -70,6 +72,25 @@ const MobileSearch = ({ onSelectRouter, selectedRouter }) => {
     } catch (error) {
       console.error('Failed to remove assignment:', error);
       alert('Failed to remove assignment');
+    }
+  };
+
+  const handleUninstall = async (router) => {
+    if (!confirm(`Uninstall router from ${router.clickup_location_task_name}?`)) return;
+    
+    try {
+      const response = await fetch(`${API_BASE}/api/routers/${router.router_id}/unlink-location`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (!response.ok) throw new Error('Failed to uninstall');
+      
+      alert('Router uninstalled successfully!');
+      loadRouters();
+    } catch (error) {
+      console.error('Failed to uninstall:', error);
+      alert('Failed to uninstall router');
     }
   };
 
@@ -154,6 +175,7 @@ const MobileSearch = ({ onSelectRouter, selectedRouter }) => {
 
             {isSelected && (
               <div style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {/* Assignment buttons */}
                 {!hasAssignees(router) ? (
                   <button
                     onClick={(e) => {
@@ -161,7 +183,7 @@ const MobileSearch = ({ onSelectRouter, selectedRouter }) => {
                       handleAssignToMe(router);
                     }}
                     style={{
-                      flex: 1,
+                      flex: '1 1 45%',
                       padding: '10px 16px',
                       background: '#2563eb',
                       color: '#fff',
@@ -181,7 +203,7 @@ const MobileSearch = ({ onSelectRouter, selectedRouter }) => {
                       handleRemoveAssignment(router);
                     }}
                     style={{
-                      flex: 1,
+                      flex: '1 1 45%',
                       padding: '10px 16px',
                       background: '#dc2626',
                       color: '#fff',
@@ -196,6 +218,54 @@ const MobileSearch = ({ onSelectRouter, selectedRouter }) => {
                   </button>
                 )}
                 
+                {/* Install/Uninstall button */}
+                {router.clickup_location_task_name ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUninstall(router);
+                    }}
+                    style={{
+                      flex: '1 1 45%',
+                      padding: '10px 16px',
+                      background: '#f59e0b',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📍 Uninstall
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Switch to Location tab
+                      if (onSelectRouter) {
+                        onSelectRouter(router);
+                      }
+                      // You can add navigation to Location tab here if needed
+                      alert('Go to Location tab to install this router');
+                    }}
+                    style={{
+                      flex: '1 1 45%',
+                      padding: '10px 16px',
+                      background: '#10b981',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📍 Install
+                  </button>
+                )}
+                
                 {router.clickup_task_url && (
                   <a
                     href={router.clickup_task_url}
@@ -203,7 +273,7 @@ const MobileSearch = ({ onSelectRouter, selectedRouter }) => {
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
                     style={{
-                      flex: 1,
+                      flex: '1 1 100%',
                       padding: '10px 16px',
                       background: '#f3f4f6',
                       color: '#374151',
