@@ -440,9 +440,62 @@ router.get('/router-task/:routerId', async (req, res) => {
 });
 
 /**
+ * GET /api/clickup/properties/search
+ * Search for properties across all spaces (for mobile app)
+ */
+router.get('/properties/search', async (req, res) => {
+  try {
+    const { query = '' } = req.query;
+    
+    if (!query || query.length < 2) {
+      return res.json({ properties: [] });
+    }
+
+    // Get workspace/team ID from environment or use the first available one
+    const workspaces = await clickupClient.getTeams('default');
+    if (!workspaces || workspaces.length === 0) {
+      return res.status(400).json({ error: 'No ClickUp workspace configured' });
+    }
+    
+    const workspaceId = workspaces[0].id;
+    
+    // Search all tasks in workspace
+    const tasks = await clickupClient.searchAllTasks(workspaceId, query, 'default');
+    
+    // Filter for location/property tasks and format
+    const properties = tasks
+      .filter(task => {
+        // Include tasks that might be properties
+        const name = (task.name || '').toLowerCase();
+        const hasAddress = name.includes('flat') || name.includes('street') || 
+                          name.includes('avenue') || name.includes('road') ||
+                          name.includes('#');
+        return hasAddress || task.custom_fields?.some(f => f.name?.toLowerCase().includes('address'));
+      })
+      .map(task => ({
+        id: task.id,
+        name: task.name,
+        status: task.status?.status,
+        url: task.url,
+        list_id: task.list?.id,
+        list_name: task.list?.name
+      }));
+
+    res.json({ 
+      properties,
+      count: properties.length 
+    });
+  } catch (error) {
+    logger.error('Error searching properties:', sanitizeError(error));
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/clickup/properties/:listId
  * Search for property tasks in a list
  */
+```
 router.get('/properties/:listId', async (req, res) => {
   try {
     const { listId } = req.params;

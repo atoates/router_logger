@@ -106,9 +106,9 @@ router.post('/refresh/:routerId', async (req, res) => {
     const { routerId } = req.params;
     const pool = require('../config/database').pool;
     
-    // Get router's RMS device ID
+    // Check if router exists - router_id IS the device ID (serial number)
     const routerResult = await pool.query(
-      'SELECT router_id, rms_device_id FROM routers WHERE router_id = $1',
+      'SELECT router_id FROM routers WHERE router_id = $1',
       [routerId]
     );
     
@@ -116,14 +116,13 @@ router.post('/refresh/:routerId', async (req, res) => {
       return res.status(404).json({ error: 'Router not found' });
     }
     
-    const router = routerResult.rows[0];
-    if (!router.rms_device_id) {
-      return res.status(400).json({ error: 'Router has no RMS device ID' });
-    }
-    
-    // Fetch fresh data from RMS
+    // Fetch fresh data from RMS using router_id as device ID
     const rms = await RMSClient.createWithAuth();
-    const deviceData = await rms.getDevice(router.rms_device_id);
+    const deviceData = await rms.getDevice(routerId);
+    
+    // Get monitoring data if available
+    const monitoring = deviceData.monitoring || {};
+    const cellular = monitoring.cellular || monitoring.mobile || {};
     
     // Update router with fresh data
     const updateQuery = `
@@ -131,26 +130,24 @@ router.post('/refresh/:routerId', async (req, res) => {
         name = $1,
         serial = $2,
         imei = $3,
-        status = $4,
+        current_status = $4,
         last_seen = $5,
-        signal_strength = $6,
-        operator = $7,
-        ip_address = $8,
+        operator = $6,
+        wan_ip = $7,
         updated_at = NOW()
-      WHERE router_id = $9
+      WHERE router_id = $8
       RETURNING *
     `;
     
     const updatedRouter = await pool.query(updateQuery, [
-      deviceData.name || router.router_id,
-      deviceData.serial,
-      deviceData.imei,
+      deviceData.name || routerId,
+      deviceData.serial || deviceData.serial_number || routerId,
+      deviceData.imei || cellular.imei,
       deviceData.status?.toLowerCase() || 'offline',
-      deviceData.last_connection ? new Date(deviceData.last_connection) : null,
-      deviceData.signal_strength,
-      deviceData.operator,
-      deviceData.ip_address,
-      router.router_id
+      deviceData.last_connection ? new Date(deviceData.last_connection) : new Date(),
+      cellular.operator || cellular.network_name,
+      monitoring.network?.wan_ip || monitoring.network?.ip,
+      routerId
     ]);
     
     logger.info(`Router ${routerId} refreshed from RMS`);
