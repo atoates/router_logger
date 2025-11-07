@@ -63,6 +63,16 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Auto-redirect mobile users to /mobile (only on homepage)
+  useEffect(() => {
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isHomePage = location.pathname === '/';
+    
+    if (isMobileDevice && isHomePage) {
+      navigate('/mobile');
+    }
+  }, [location.pathname, navigate]);
+
   // Header router selector opens the Router details page
   const handleHeaderRouterSelect = (router) => {
     navigate(`/router/${router.router_id}`);
