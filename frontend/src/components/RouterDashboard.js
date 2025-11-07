@@ -42,6 +42,7 @@ export default function RouterDashboard({ router }) {
   const [uptime, setUptime] = useState([]);
   const [inspections, setInspections] = useState([]);
   const [showRawData, setShowRawData] = useState(false); // Toggle for chart scale
+  const [useRollingAverage, setUseRollingAverage] = useState(false); // Toggle for rolling average
   const propertyWidgetRef = useRef(null);
 
   const routerId = router?.router_id;
@@ -135,6 +136,23 @@ export default function RouterDashboard({ router }) {
       prevTx = tx; prevRx = rx;
     }
     
+    // Apply rolling average if enabled
+    if (useRollingAverage && txrx.length > 1) {
+      const windowSize = Math.max(3, Math.floor(txrx.length / 20)); // Adaptive window size
+      for (let i = 0; i < txrx.length; i++) {
+        const start = Math.max(0, i - Math.floor(windowSize / 2));
+        const end = Math.min(txrx.length, i + Math.ceil(windowSize / 2));
+        const window = txrx.slice(start, end);
+        
+        const avgTx = window.reduce((sum, d) => sum + d.tx_bytes, 0) / window.length;
+        const avgRx = window.reduce((sum, d) => sum + d.rx_bytes, 0) / window.length;
+        
+        txrx[i].tx_bytes = avgTx;
+        txrx[i].rx_bytes = avgRx;
+        txrx[i].total_bytes = avgTx + avgRx;
+      }
+    }
+    
     // Remove outliers that skew the chart (only if NOT showing raw data)
     if (!showRawData) {
       const totalValues = txrx.map(d => d.total_bytes).filter(v => v > 0);
@@ -154,7 +172,7 @@ export default function RouterDashboard({ router }) {
     
     const latest = asc[asc.length-1];
     return { txrx, latest };
-  }, [logs, showRawData]);
+  }, [logs, showRawData, useRollingAverage]);
 
   const totalBytes = useMemo(() => {
     // Use stats if available (includes baseline jump), otherwise sum from logs
@@ -544,6 +562,24 @@ export default function RouterDashboard({ router }) {
             title={showRawData ? 'Showing all data (including spikes)' : 'Outliers capped at 5x median for better visibility'}
           >
             {showRawData ? '📊 Raw Data' : '📉 Normalized'}
+          </button>
+          <button
+            onClick={() => setUseRollingAverage(!useRollingAverage)}
+            style={{
+              padding: '6px 12px',
+              fontSize: '13px',
+              fontWeight: '500',
+              background: useRollingAverage ? '#8b5cf6' : '#6b7280',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              marginLeft: '8px'
+            }}
+            title={useRollingAverage ? 'Showing rolling average (smoothed)' : 'Showing raw deltas (spiky)'}
+          >
+            {useRollingAverage ? '📈 Smoothed' : '⚡ Instant'}
           </button>
         </div>
         <div style={{ height: 260 }}>
