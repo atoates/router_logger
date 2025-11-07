@@ -83,7 +83,13 @@ export default function RouterDashboard({ router }) {
         // Ignore if a newer load started or component unmounted
         if (!mounted || seq !== loadSeqRef.current) return;
         setLogs(Array.isArray(logsRes.data) ? logsRes.data : []);
-        setStats(Array.isArray(statsRes.data) ? statsRes.data[0] : statsRes.data);
+        const extractedStats = Array.isArray(statsRes.data) ? statsRes.data[0] : statsRes.data;
+        console.log('Stats response:', statsRes);
+        console.log('Extracted stats:', extractedStats);
+        console.log('total_data_usage:', extractedStats?.total_data_usage);
+        console.log('period_tx_bytes:', extractedStats?.period_tx_bytes);
+        console.log('period_rx_bytes:', extractedStats?.period_rx_bytes);
+        setStats(extractedStats);
         setUptime(Array.isArray(upRes.data) ? upRes.data : []);
         setInspections(Array.isArray(inspRes.data) ? inspRes.data : []);
       } catch (e) {
@@ -151,10 +157,14 @@ export default function RouterDashboard({ router }) {
 
   const totalBytes = useMemo(() => {
     // Use stats if available (includes baseline jump), otherwise sum from logs
+    console.log('Calculating totalBytes with stats:', stats);
     if (stats?.total_data_usage != null) {
+      console.log('Using stats.total_data_usage:', stats.total_data_usage);
       return Number(stats.total_data_usage) || 0;
     }
-    return (series.txrx || []).reduce((s,d)=> s + (Number(d.total_bytes)||0), 0);
+    const summed = (series.txrx || []).reduce((s,d)=> s + (Number(d.total_bytes)||0), 0);
+    console.log('Using summed from logs:', summed);
+    return summed;
   }, [series, stats]);
   const onlinePct = useMemo(() => {
     if (!uptime || uptime.length === 0) {
