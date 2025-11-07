@@ -83,7 +83,8 @@ export default function RouterDashboard({ router }) {
         // Ignore if a newer load started or component unmounted
         if (!mounted || seq !== loadSeqRef.current) return;
         setLogs(Array.isArray(logsRes.data) ? logsRes.data : []);
-        const extractedStats = Array.isArray(statsRes.data) ? statsRes.data[0] : statsRes.data;
+        // Handle nested data structure: statsRes.data.data[0]
+        const extractedStats = statsRes.data?.data?.[0] || statsRes.data?.[0] || statsRes.data || null;
         console.log('Stats response:', statsRes);
         console.log('Extracted stats:', extractedStats);
         console.log('total_data_usage:', extractedStats?.total_data_usage);
