@@ -23,14 +23,14 @@ const MobileStats = ({ router }) => {
 
       const [statsResponse, logsResponse] = await Promise.all([
         getUsageStats({
-          routerId: router.router_id,
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString()
+          router_id: router.router_id,
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString()
         }),
         getLogs({
-          routerId: router.router_id,
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString()
+          router_id: router.router_id,
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString()
         })
       ]);
 
