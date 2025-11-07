@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import MobileSearch from '../components/mobile/MobileSearch';
 import MobileLocation from '../components/mobile/MobileLocation';
 import MobileStats from '../components/mobile/MobileStats';
+import MobileSettings from '../components/mobile/MobileSettings';
 import './MobilePage.css';
 
 const MobilePage = () => {
@@ -28,6 +29,10 @@ const MobilePage = () => {
         
         {activeTab === 'stats' && selectedRouter && (
           <MobileStats router={selectedRouter} />
+        )}
+
+        {activeTab === 'settings' && (
+          <MobileSettings />
         )}
       </div>
 
@@ -66,6 +71,18 @@ const MobilePage = () => {
             <line x1="6" y1="20" x2="6" y2="16"/>
           </svg>
           Stats
+        </button>
+
+        <button 
+          className={activeTab === 'settings' ? 'active' : ''}
+          onClick={() => setActiveTab('settings')}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v6m0 6v6m5.2-13.2 4.3-4.3m-4.3 4.3-4.3 4.3m8.6 8.6-4.3-4.3m4.3 4.3-4.3-4.3"/>
+            <path d="M12 1v6m0 6v6"/>
+          </svg>
+          Settings
         </button>
       </nav>
     </div>
