@@ -39,7 +39,7 @@ let syncStats = {
 /**
  * Sync a single router's data to its ClickUp task
  */
-async function syncRouterToClickUp(router) {
+async function syncRouterToClickUp(router, dataUsageMap = {}) {
   try {
     if (!router.clickup_task_id) {
       return { success: false, error: 'No ClickUp task linked' };
@@ -87,63 +87,13 @@ async function syncRouterToClickUp(router) {
       });
     }
 
-    // Data Usage (number) - last 30 days in GB
-    try {
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const now = new Date();
-      
-      const usageQuery = `
-        WITH params AS (
-          SELECT $2::timestamp AS start_ts, $3::timestamp AS end_ts
-        ), base AS (
-          SELECT l.total_tx_bytes AS base_tx, l.total_rx_bytes AS base_rx
-          FROM router_logs l, params
-          WHERE l.router_id = $1
-            AND l.timestamp < (SELECT start_ts FROM params)
-          ORDER BY l.timestamp DESC
-          LIMIT 1
-        ), ordered_logs AS (
-          SELECT 
-            total_tx_bytes,
-            total_rx_bytes,
-            LAG(total_tx_bytes) OVER (ORDER BY timestamp) as prev_tx,
-            LAG(total_rx_bytes) OVER (ORDER BY timestamp) as prev_rx,
-            FIRST_VALUE(total_tx_bytes) OVER (ORDER BY timestamp) as first_tx,
-            FIRST_VALUE(total_rx_bytes) OVER (ORDER BY timestamp) as first_rx
-          FROM router_logs, params
-          WHERE router_id = $1
-            AND timestamp >= (SELECT start_ts FROM params)
-            AND timestamp <= (SELECT end_ts FROM params)
-          ORDER BY timestamp
-        ),
-        deltas AS (
-          SELECT
-            SUM(CASE WHEN prev_tx IS NULL THEN 0 ELSE GREATEST(total_tx_bytes - prev_tx, 0) END) as sum_tx_deltas,
-            SUM(CASE WHEN prev_rx IS NULL THEN 0 ELSE GREATEST(total_rx_bytes - prev_rx, 0) END) as sum_rx_deltas,
-            MAX(first_tx) as first_tx,
-            MAX(first_rx) as first_rx
-          FROM ordered_logs
-        )
-        SELECT
-          (GREATEST(d.first_tx - COALESCE(b.base_tx, d.first_tx), 0) + COALESCE(d.sum_tx_deltas, 0) +
-           GREATEST(d.first_rx - COALESCE(b.base_rx, d.first_rx), 0) + COALESCE(d.sum_rx_deltas, 0))::bigint as total_bytes
-        FROM deltas d
-        LEFT JOIN base b ON true
-      `;
-      
-      const usageResult = await pool.query(usageQuery, [router.router_id, thirtyDaysAgo, now]);
-      const totalBytes = usageResult.rows[0]?.total_bytes || 0;
-      const totalGB = (totalBytes / 1024 / 1024 / 1024).toFixed(2); // Convert to GB with 2 decimals
-      
+    // Data Usage (number) - last 30 days in GB (pre-calculated)
+    if (dataUsageMap[router.router_id] !== undefined) {
       customFields.push({
         id: CUSTOM_FIELDS.DATA_USAGE,
-        value: parseFloat(totalGB) // ClickUp number field expects a number, not string
+        value: dataUsageMap[router.router_id]
       });
-      
-      logger.debug(`Router ${router.router_id}: Data usage (30d) = ${totalGB} GB`);
-    } catch (usageError) {
-      logger.warn(`Failed to calculate data usage for router ${router.router_id}:`, usageError.message);
-      // Don't fail the entire sync if usage calculation fails
+      logger.debug(`Router ${router.router_id}: Data usage (30d) = ${dataUsageMap[router.router_id]} GB`);
     }
 
     // Last Online (date timestamp in milliseconds)
@@ -277,6 +227,82 @@ async function syncRouterToClickUp(router) {
 }
 
 /**
+ * Calculate 30-day data usage for all routers at once (FAST!)
+ */
+async function calculateAllRouterDataUsage() {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const now = new Date();
+  
+  const usageQuery = `
+    WITH params AS (
+      SELECT $1::timestamp AS start_ts, $2::timestamp AS end_ts
+    ),
+    router_list AS (
+      SELECT DISTINCT router_id FROM router_logs
+    ),
+    base AS (
+      SELECT 
+        rl.router_id,
+        l.total_tx_bytes AS base_tx, 
+        l.total_rx_bytes AS base_rx
+      FROM router_list rl
+      CROSS JOIN LATERAL (
+        SELECT total_tx_bytes, total_rx_bytes
+        FROM router_logs, params
+        WHERE router_id = rl.router_id
+          AND timestamp < (SELECT start_ts FROM params)
+        ORDER BY timestamp DESC
+        LIMIT 1
+      ) l
+    ),
+    ordered_logs AS (
+      SELECT 
+        router_id,
+        total_tx_bytes,
+        total_rx_bytes,
+        LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) as prev_tx,
+        LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) as prev_rx,
+        FIRST_VALUE(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) as first_tx,
+        FIRST_VALUE(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) as first_rx
+      FROM router_logs, params
+      WHERE timestamp >= (SELECT start_ts FROM params)
+        AND timestamp <= (SELECT end_ts FROM params)
+    ),
+    deltas AS (
+      SELECT
+        router_id,
+        SUM(CASE WHEN prev_tx IS NULL THEN 0 ELSE GREATEST(total_tx_bytes - prev_tx, 0) END) as sum_tx_deltas,
+        SUM(CASE WHEN prev_rx IS NULL THEN 0 ELSE GREATEST(total_rx_bytes - prev_rx, 0) END) as sum_rx_deltas,
+        MAX(first_tx) as first_tx,
+        MAX(first_rx) as first_rx
+      FROM ordered_logs
+      GROUP BY router_id
+    )
+    SELECT
+      d.router_id,
+      (GREATEST(d.first_tx - COALESCE(b.base_tx, d.first_tx), 0) + COALESCE(d.sum_tx_deltas, 0) +
+       GREATEST(d.first_rx - COALESCE(b.base_rx, d.first_rx), 0) + COALESCE(d.sum_rx_deltas, 0))::bigint as total_bytes
+    FROM deltas d
+    LEFT JOIN base b ON d.router_id = b.router_id
+  `;
+  
+  try {
+    const result = await pool.query(usageQuery, [thirtyDaysAgo, now]);
+    const dataUsageMap = {};
+    
+    for (const row of result.rows) {
+      const totalGB = parseFloat((row.total_bytes / 1024 / 1024 / 1024).toFixed(2));
+      dataUsageMap[row.router_id] = totalGB;
+    }
+    
+    return dataUsageMap;
+  } catch (error) {
+    logger.error('Error calculating bulk data usage:', error);
+    return {}; // Return empty map on error
+  }
+}
+
+/**
  * Sync all routers with linked ClickUp tasks
  */
 async function syncAllRoutersToClickUp() {
@@ -313,6 +339,11 @@ async function syncAllRoutersToClickUp() {
       return { updated: 0, errors: 0, total: 0 };
     }
 
+    // Calculate 30-day data usage for ALL routers at once (much faster!)
+    logger.info('Calculating 30-day data usage for all routers...');
+    const dataUsageMap = await calculateAllRouterDataUsage();
+    logger.info(`Calculated data usage for ${Object.keys(dataUsageMap).length} routers`);
+
     let updated = 0;
     let skipped = 0;
     let errors = 0;
@@ -327,7 +358,7 @@ async function syncAllRoutersToClickUp() {
       const router = routers[i];
       
       try {
-        const result = await syncRouterToClickUp(router);
+        const result = await syncRouterToClickUp(router, dataUsageMap);
         
         if (result.success) {
           if (result.skipped) {
