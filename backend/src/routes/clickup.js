@@ -45,6 +45,31 @@ router.get('/auth/status', async (req, res) => {
 });
 
 /**
+ * GET /api/clickup/auth
+ * Direct redirect to ClickUp OAuth (for mobile/simple flows)
+ */
+router.get('/auth', (req, res) => {
+  try {
+    // Generate random state for CSRF protection
+    const state = crypto.randomBytes(16).toString('hex');
+    
+    // Store state with expiration (5 minutes)
+    oauthStates.set(state, {
+      created: Date.now(),
+      expires: Date.now() + 5 * 60 * 1000
+    });
+
+    const authUrl = clickupOAuthService.getAuthorizationUrl(state);
+    
+    // Redirect directly to ClickUp OAuth page
+    res.redirect(authUrl);
+  } catch (error) {
+    logger.error('Error generating auth URL:', sanitizeError(error));
+    res.status(500).json({ error: 'Failed to generate authorization URL' });
+  }
+});
+
+/**
  * GET /api/clickup/auth/url
  * Get OAuth authorization URL
  */
