@@ -93,7 +93,9 @@ async function syncRouterToClickUp(router, dataUsageMap = {}) {
         id: CUSTOM_FIELDS.DATA_USAGE,
         value: dataUsageMap[router.router_id]
       });
-      logger.debug(`Router ${router.router_id}: Data usage (30d) = ${dataUsageMap[router.router_id]} GB`);
+      logger.info(`Router ${router.router_id}: Adding data usage to sync - ${dataUsageMap[router.router_id]} GB`);
+    } else {
+      logger.warn(`Router ${router.router_id}: No data usage calculated (not in map)`);
     }
 
     // Last Online (date timestamp in milliseconds)
@@ -290,9 +292,18 @@ async function calculateAllRouterDataUsage() {
     const result = await pool.query(usageQuery, [thirtyDaysAgo, now]);
     const dataUsageMap = {};
     
+    logger.info(`Data usage query returned ${result.rows.length} routers`);
+    
     for (const row of result.rows) {
       const totalGB = parseFloat((row.total_bytes / 1024 / 1024 / 1024).toFixed(2));
       dataUsageMap[row.router_id] = totalGB;
+    }
+    
+    // Log a few sample values
+    const sampleRouters = result.rows.slice(0, 3);
+    for (const sample of sampleRouters) {
+      const gb = dataUsageMap[sample.router_id];
+      logger.info(`Sample data usage - Router ${sample.router_id}: ${gb} GB (${sample.total_bytes} bytes)`);
     }
     
     return dataUsageMap;
