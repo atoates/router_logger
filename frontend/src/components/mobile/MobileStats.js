@@ -37,9 +37,11 @@ const MobileStats = ({ router }) => {
       console.log('Stats response:', statsResponse);
       console.log('Logs response:', logsResponse);
 
-      const statsData = statsResponse.data[0] || {};
+      // Handle nested data structure: statsResponse.data.data[0]
+      const statsData = statsResponse.data?.data?.[0] || statsResponse.data?.[0] || {};
       console.log('Stats data:', statsData);
       console.log('TX bytes:', statsData.period_tx_bytes, 'RX bytes:', statsData.period_rx_bytes);
+      console.log('Total data usage:', statsData.total_data_usage);
       console.log('Total logs:', statsData.total_logs);
       console.log('Averages:', {
         rsrp: statsData.avg_rsrp,
