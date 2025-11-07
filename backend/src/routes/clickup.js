@@ -495,7 +495,6 @@ router.get('/properties/search', async (req, res) => {
  * GET /api/clickup/properties/:listId
  * Search for property tasks in a list
  */
-```
 router.get('/properties/:listId', async (req, res) => {
   try {
     const { listId } = req.params;
