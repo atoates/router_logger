@@ -40,6 +40,13 @@ const MobileStats = ({ router }) => {
       const statsData = statsResponse.data[0] || {};
       console.log('Stats data:', statsData);
       console.log('TX bytes:', statsData.period_tx_bytes, 'RX bytes:', statsData.period_rx_bytes);
+      console.log('Total logs:', statsData.total_logs);
+      console.log('Averages:', {
+        rsrp: statsData.avg_rsrp,
+        rssi: statsData.avg_rssi,
+        rsrq: statsData.avg_rsrq,
+        sinr: statsData.avg_sinr
+      });
       
       setStats(statsData);
       setLogs(logsResponse.data || []);
@@ -221,16 +228,21 @@ const MobileStats = ({ router }) => {
             <div style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>
               ↑ {formatBytes(stats?.period_tx_bytes || 0)} • ↓ {formatBytes(stats?.period_rx_bytes || 0)}
             </div>
+            {stats?.total_data_usage > 0 && (
+              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+                Total: {formatBytes(stats.total_data_usage)}
+              </div>
+            )}
           </div>
 
-          {stats?.rsrp && (
+          {(stats?.avg_rsrp || stats?.avg_rssi) && (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>Signal Strength</div>
+              <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>Signal Strength (Avg)</div>
               <div style={{ fontSize: '14px', color: '#374151' }}>
-                RSRP: {stats.rsrp} dBm<br/>
-                RSSI: {stats.rssi} dBm<br/>
-                RSRQ: {stats.rsrq} dB<br/>
-                SINR: {stats.sinr} dB
+                {stats.avg_rsrp && `RSRP: ${Math.round(stats.avg_rsrp)} dBm`}<br/>
+                {stats.avg_rssi && `RSSI: ${Math.round(stats.avg_rssi)} dBm`}<br/>
+                {stats.avg_rsrq && `RSRQ: ${Math.round(stats.avg_rsrq)} dB`}<br/>
+                {stats.avg_sinr && `SINR: ${Math.round(stats.avg_sinr)} dB`}
               </div>
             </div>
           )}
@@ -238,8 +250,8 @@ const MobileStats = ({ router }) => {
           <div>
             <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>Network</div>
             <div style={{ fontSize: '14px', color: '#374151' }}>
-              {stats?.operator || 'Unknown'} • {stats?.network_type || 'Unknown'}<br/>
-              {stats?.wan_ip && `IP: ${stats.wan_ip}`}
+              {router?.operator || 'Unknown'} • {router?.network_type || 'Unknown'}<br/>
+              {router?.wan_ip && `IP: ${router.wan_ip}`}
             </div>
           </div>
         </div>
