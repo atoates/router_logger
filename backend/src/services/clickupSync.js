@@ -129,6 +129,53 @@ async function syncRouterToClickUp(router) {
       }
     }
 
+    // Update task status based on location and assignee
+    // Logic:
+    // - Has location + online = 'installed'
+    // - Has location + offline = 'needs attention'
+    // - Has assignee (no location) = 'ready'
+    // - No location and no assignee = 'needs attention'
+    try {
+      let desiredStatus;
+      const hasLocation = !!router.clickup_location_task_id;
+      const hasAssignee = updatedTask && updatedTask.assignees && updatedTask.assignees.length > 0;
+      const isOnline = router.current_status === 'online';
+      
+      if (hasLocation) {
+        // Router is at a location
+        if (isOnline) {
+          desiredStatus = 'installed';
+        } else {
+          desiredStatus = 'needs attention'; // Installed but offline
+        }
+      } else if (hasAssignee) {
+        // Router is with someone (stored with)
+        desiredStatus = 'ready';
+      } else {
+        // Router has no location and no assignee
+        desiredStatus = 'needs attention';
+      }
+      
+      // Only update if status is different from current
+      const currentStatus = updatedTask && updatedTask.status ? updatedTask.status.status : null;
+      if (currentStatus !== desiredStatus) {
+        await clickupClient.updateTask(
+          router.clickup_task_id,
+          { status: desiredStatus },
+          'default'
+        );
+        logger.info(`Updated task status for router ${router.router_id}: ${currentStatus} → ${desiredStatus.toUpperCase()}`, {
+          hasLocation,
+          hasAssignee,
+          isOnline,
+          locationTaskId: router.clickup_location_task_id
+        });
+      }
+    } catch (statusError) {
+      logger.warn(`Failed to update task status for router ${router.router_id}:`, statusError.message);
+      // Don't fail the whole sync if status update fails
+    }
+
     // Update Operational Status separately using the individual field API
     // This is more reliable for dropdown fields
     try {
