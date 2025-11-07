@@ -76,6 +76,7 @@ const MobileSearch = ({ onSelectRouter, selectedRouter }) => {
   };
 
   const handleUninstall = async (router) => {
+    // eslint-disable-next-line no-restricted-globals
     if (!confirm(`Uninstall router from ${router.clickup_location_task_name}?`)) return;
     
     try {
