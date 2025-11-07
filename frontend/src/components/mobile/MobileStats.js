@@ -224,15 +224,13 @@ const MobileStats = ({ router }) => {
           </div>
 
           <div style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>Data Usage</div>
-            <div style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>
+            <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>Data Usage (24h)</div>
+            <div style={{ fontSize: '20px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>
+              {formatBytes(stats?.total_data_usage || 0)}
+            </div>
+            <div style={{ fontSize: '14px', color: '#6b7280' }}>
               ↑ {formatBytes(stats?.period_tx_bytes || 0)} • ↓ {formatBytes(stats?.period_rx_bytes || 0)}
             </div>
-            {stats?.total_data_usage > 0 && (
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
-                Total: {formatBytes(stats.total_data_usage)}
-              </div>
-            )}
           </div>
 
           {(stats?.avg_rsrp || stats?.avg_rssi) && (
