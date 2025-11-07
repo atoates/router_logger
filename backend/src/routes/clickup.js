@@ -818,6 +818,41 @@ router.get('/debug/task/:taskId', async (req, res) => {
 });
 
 /**
+ * GET /api/clickup/debug/custom-fields/:taskId
+ * Debug endpoint to inspect all custom fields of a task
+ */
+router.get('/debug/custom-fields/:taskId', async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const task = await clickupClient.getTask(taskId, 'default');
+    
+    // Extract and format custom fields for easier inspection
+    const fieldsInfo = task.custom_fields?.map(field => ({
+      id: field.id,
+      name: field.name,
+      type: field.type,
+      type_config: field.type_config,
+      value: field.value,
+      value_type: typeof field.value
+    })) || [];
+    
+    // Find Data Usage field specifically
+    const dataUsageField = task.custom_fields?.find(f => f.id === 'c58206db-e995-4717-8e62-d36e15d0a3e2');
+    
+    res.json({
+      taskId: task.id,
+      taskName: task.name,
+      totalCustomFields: fieldsInfo.length,
+      dataUsageField: dataUsageField || 'NOT FOUND',
+      allFields: fieldsInfo
+    });
+  } catch (error) {
+    logger.error('Error inspecting custom fields:', sanitizeError(error));
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/clickup/settings/smart-sync
  * Get the smart sync setting
  */

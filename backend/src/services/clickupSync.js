@@ -108,17 +108,6 @@ async function syncRouterToClickUp(router, dataUsageMap = {}) {
       });
     }
 
-    // Data Usage (number) - last 30 days in GB (pre-calculated)
-    if (dataUsageMap[router.router_id] !== undefined) {
-      customFields.push({
-        id: CUSTOM_FIELDS.DATA_USAGE,
-        value: dataUsageMap[router.router_id]
-      });
-      logger.info(`Router ${router.router_id}: Adding data usage to sync - ${dataUsageMap[router.router_id]} GB`);
-    } else {
-      logger.warn(`Router ${router.router_id}: No data usage calculated (not in map)`);
-    }
-
     // Last Online (date timestamp in milliseconds)
     if (router.last_seen) {
       customFields.push({
@@ -226,6 +215,32 @@ async function syncRouterToClickUp(router, dataUsageMap = {}) {
     } catch (urlError) {
       logger.error(`Failed to update Router Dashboard URL for router ${router.router_id}:`, urlError.message);
       // Don't fail the whole sync if just the URL field fails
+    }
+
+    // Update Data Usage separately using the individual field API
+    // Number fields may require individual updates for reliability
+    if (dataUsageMap[router.router_id] !== undefined) {
+      try {
+        const dataUsageValue = dataUsageMap[router.router_id];
+        logger.info(`Router ${router.router_id}: Updating data usage field to ${dataUsageValue} GB`);
+        
+        await clickupClient.updateCustomField(
+          router.clickup_task_id,
+          CUSTOM_FIELDS.DATA_USAGE,
+          dataUsageValue,
+          'default'
+        );
+        logger.info(`✓ Successfully updated Data Usage for router ${router.router_id} to ${dataUsageValue} GB`);
+      } catch (dataError) {
+        logger.error(`Failed to update Data Usage for router ${router.router_id}:`, {
+          error: dataError.message,
+          value: dataUsageMap[router.router_id],
+          response: dataError.response?.data
+        });
+        // Don't fail the whole sync if just the data usage field fails
+      }
+    } else {
+      logger.warn(`Router ${router.router_id}: No data usage calculated (not in map) - skipping field update`);
     }
 
     // Store the hash in database for future comparison (smart sync)
