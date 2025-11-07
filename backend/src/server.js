@@ -109,9 +109,11 @@ async function startServer() {
     }
     
     // Start ClickUp sync (every 30 minutes by default)
+    // Don't run on startup - all data is persistent in database
+    // This avoids delaying deployments by 3+ minutes
     const clickupSyncInterval = process.env.CLICKUP_SYNC_INTERVAL_MINUTES || 30;
-    startClickUpSync(parseInt(clickupSyncInterval));
-    logger.info(`ClickUp sync scheduler started (every ${clickupSyncInterval} minutes)`);
+    startClickUpSync(parseInt(clickupSyncInterval), false); // false = skip initial sync
+    logger.info(`ClickUp sync scheduler started (every ${clickupSyncInterval} minutes, no startup sync)`);
     
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);

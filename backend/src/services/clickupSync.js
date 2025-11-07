@@ -496,8 +496,10 @@ async function syncAssigneesFromClickUp() {
 
 /**
  * Start scheduled ClickUp sync (idempotent)
+ * @param {number} intervalMinutes - Interval between syncs
+ * @param {boolean} runImmediately - Whether to run sync immediately on start (default: false)
  */
-function startClickUpSync(intervalMinutes = 30) {
+function startClickUpSync(intervalMinutes = 30, runImmediately = false) {
   if (syncIntervalId) {
     logger.info('ClickUp sync scheduler already running');
     return;
@@ -505,12 +507,17 @@ function startClickUpSync(intervalMinutes = 30) {
 
   logger.info(`Starting ClickUp sync scheduler (every ${intervalMinutes} minutes)`);
 
-  // Run immediately on start
-  syncAllRoutersToClickUp().catch(error => {
-    logger.error('Initial ClickUp sync failed:', error.message);
-  });
+  // Optionally run immediately on start (disabled by default to avoid delaying deployments)
+  if (runImmediately) {
+    logger.info('Running initial ClickUp sync...');
+    syncAllRoutersToClickUp().catch(error => {
+      logger.error('Initial ClickUp sync failed:', error.message);
+    });
+  } else {
+    logger.info('Skipping initial sync - will run on schedule. All data is persistent in database.');
+  }
 
-  // Then run on schedule
+  // Run on schedule
   syncIntervalId = setInterval(() => {
     syncAllRoutersToClickUp().catch(error => {
       logger.error('Scheduled ClickUp sync failed:', error.message);
