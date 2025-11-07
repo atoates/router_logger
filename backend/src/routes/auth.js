@@ -178,4 +178,48 @@ router.post('/rms/logout', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/auth/status
+ * Check OAuth token status for debugging
+ */
+router.get('/status', async (req, res) => {
+  try {
+    const status = {
+      rms: { connected: false, error: null },
+      clickup: { connected: false, error: null }
+    };
+
+    // Check RMS token
+    try {
+      const rmsToken = await oauthService.getValidToken('default_rms_user');
+      status.rms.connected = !!rmsToken;
+      if (rmsToken) {
+        status.rms.hasToken = true;
+        status.rms.tokenType = 'oauth';
+      }
+    } catch (error) {
+      status.rms.error = error.message;
+      logger.error('RMS token check failed:', error);
+    }
+
+    // Check ClickUp token
+    try {
+      const clickupOAuthService = require('../services/clickupOAuthService');
+      const clickupToken = await clickupOAuthService.getValidToken('default');
+      status.clickup.connected = !!clickupToken;
+      if (clickupToken) {
+        status.clickup.hasToken = true;
+      }
+    } catch (error) {
+      status.clickup.error = error.message;
+      logger.error('ClickUp token check failed:', error);
+    }
+
+    res.json(status);
+  } catch (error) {
+    logger.error('Error checking auth status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

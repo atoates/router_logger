@@ -447,20 +447,37 @@ router.get('/properties/search', async (req, res) => {
   try {
     const { query = '' } = req.query;
     
+    logger.info('Property search request:', { query });
+    
     if (!query || query.length < 2) {
       return res.json({ properties: [] });
     }
 
     // Get workspace/team ID from environment or use the first available one
-    const workspaces = await clickupClient.getTeams('default');
+    let workspaces;
+    try {
+      workspaces = await clickupClient.getTeams('default');
+      logger.info('Got workspaces:', { count: workspaces?.length });
+    } catch (error) {
+      logger.error('Failed to get ClickUp workspaces:', { error: error.message, stack: error.stack });
+      return res.status(500).json({ 
+        error: 'Failed to connect to ClickUp', 
+        message: error.message,
+        hint: 'Check if ClickUp OAuth token is valid at /api/auth/status'
+      });
+    }
+    
     if (!workspaces || workspaces.length === 0) {
+      logger.warn('No ClickUp workspaces found');
       return res.status(400).json({ error: 'No ClickUp workspace configured' });
     }
     
     const workspaceId = workspaces[0].id;
+    logger.info('Searching in workspace:', { workspaceId, query });
     
     // Search all tasks in workspace
     const tasks = await clickupClient.searchAllTasks(workspaceId, query, 'default');
+    logger.info('Search results:', { taskCount: tasks?.length });
     
     // Filter for location/property tasks and format
     const properties = tasks
