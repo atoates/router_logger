@@ -219,7 +219,8 @@ router.get('/stats/usage', async (req, res) => {
     }
     
     const stats = await getUsageStats(router_id, start_date, end_date);
-    res.json(stats);
+    logger.info(`Usage stats for ${router_id}:`, stats);
+    res.json({ data: [stats] }); // Wrap in data array for consistency
   } catch (error) {
     logger.error('Error fetching usage stats:', error);
     res.status(500).json({ error: 'Failed to fetch usage statistics' });

@@ -37,7 +37,11 @@ const MobileStats = ({ router }) => {
       console.log('Stats response:', statsResponse);
       console.log('Logs response:', logsResponse);
 
-      setStats(statsResponse.data[0] || {});
+      const statsData = statsResponse.data[0] || {};
+      console.log('Stats data:', statsData);
+      console.log('TX bytes:', statsData.period_tx_bytes, 'RX bytes:', statsData.period_rx_bytes);
+      
+      setStats(statsData);
       setLogs(logsResponse.data || []);
     } catch (error) {
       console.error('Failed to load stats:', error);
@@ -104,7 +108,7 @@ const MobileStats = ({ router }) => {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracy: position.coords.accuracy,
-            timestamp: new Date(position.timestamp).toISOString()
+            timestamp: position.timestamp ? new Date(position.timestamp).toISOString() : new Date().toISOString()
           };
 
           await generateInstallationReport({

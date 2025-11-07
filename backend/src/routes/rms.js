@@ -118,7 +118,20 @@ router.post('/refresh/:routerId', async (req, res) => {
     
     // Fetch fresh data from RMS using router_id as device ID
     const rms = await RMSClient.createWithAuth();
-    const deviceData = await rms.getDevice(routerId);
+    
+    let deviceData;
+    try {
+      deviceData = await rms.getDevice(routerId);
+    } catch (rmsError) {
+      logger.error(`RMS API error for router ${routerId}:`, rmsError.message);
+      return res.status(rmsError.response?.status || 500).json({
+        error: 'RMS API error',
+        message: rmsError.response?.status === 422 
+          ? `Router ${routerId} not found in RMS or invalid device ID`
+          : rmsError.message,
+        details: rmsError.response?.data
+      });
+    }
     
     // Get monitoring data if available
     const monitoring = deviceData.monitoring || {};
