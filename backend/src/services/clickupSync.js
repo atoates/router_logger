@@ -37,6 +37,22 @@ let syncStats = {
 };
 
 /**
+ * Check if smart sync is enabled
+ */
+async function isSmartSyncEnabled() {
+  try {
+    const result = await pool.query(
+      'SELECT value FROM settings WHERE key = $1',
+      ['smart_sync_enabled']
+    );
+    return result.rows.length > 0 ? result.rows[0].value === 'true' : true;
+  } catch (error) {
+    logger.error('Error checking smart sync setting:', error);
+    return true; // Default to enabled if there's an error
+  }
+}
+
+/**
  * Sync a single router's data to its ClickUp task
  */
 async function syncRouterToClickUp(router, dataUsageMap = {}) {
@@ -56,10 +72,15 @@ async function syncRouterToClickUp(router, dataUsageMap = {}) {
       }))
       .digest('hex');
     
-    // Skip sync if data hasn't changed (smart sync)
-    if (router.last_clickup_sync_hash && router.last_clickup_sync_hash === currentDataHash) {
-      logger.debug(`Router ${router.router_id}: No changes detected, skipping sync`);
+    // Skip sync if data hasn't changed (smart sync) - only if smart sync is enabled
+    const smartSyncEnabled = await isSmartSyncEnabled();
+    if (smartSyncEnabled && router.last_clickup_sync_hash && router.last_clickup_sync_hash === currentDataHash) {
+      logger.debug(`Router ${router.router_id}: No changes detected, skipping sync (smart sync enabled)`);
       return { success: true, skipped: true };
+    }
+
+    if (!smartSyncEnabled) {
+      logger.debug(`Router ${router.router_id}: Smart sync disabled, forcing update`);
     }
 
     const customFields = [];

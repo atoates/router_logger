@@ -151,6 +151,8 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
   const [inspections, setInspections] = useState([]);
   const [rmsUsage, setRMSUsage] = useState(null);
   const [clickupUsage, setClickUpUsage] = useState(null);
+  const [smartSyncEnabled, setSmartSyncEnabled] = useState(true);
+  const [smartSyncLoading, setSmartSyncLoading] = useState(false);
   const [, setLoading] = useState(true);
 
   const updateTime = (m, v) => { setMode(m); setValue(v); };
@@ -234,6 +236,36 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
     };
     load();
   }, [mode, value]);
+
+  // Fetch smart sync setting when on status page
+  useEffect(() => {
+    if (page === 'status') {
+      const fetchSmartSync = async () => {
+        try {
+          const response = await api.get('/clickup/settings/smart-sync');
+          setSmartSyncEnabled(response.data.enabled);
+        } catch (error) {
+          console.error('Failed to fetch smart sync setting:', error);
+        }
+      };
+      fetchSmartSync();
+    }
+  }, [page]);
+
+  // Handle smart sync toggle
+  const handleSmartSyncToggle = async () => {
+    setSmartSyncLoading(true);
+    try {
+      const newValue = !smartSyncEnabled;
+      const response = await api.put('/clickup/settings/smart-sync', { enabled: newValue });
+      setSmartSyncEnabled(response.data.enabled);
+    } catch (error) {
+      console.error('Failed to update smart sync setting:', error);
+      alert('Failed to update smart sync setting. Please try again.');
+    } finally {
+      setSmartSyncLoading(false);
+    }
+  };
 
   const online = routers.filter(r => r.current_status === 'online' || r.current_status === 1 || r.current_status === '1').length;
   const total = routers.length;
@@ -644,6 +676,89 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
               </div>
             </div>
           )}
+
+          {/* ClickUp Sync Settings */}
+          <div className="v3-card">
+            <div className="v3-card-title">⚙️ ClickUp Sync Settings</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              <div style={{ 
+                display:'flex', 
+                justifyContent:'space-between', 
+                alignItems:'center',
+                padding:12, 
+                background: dark ? '#1f2937' : '#f8fafc', 
+                borderRadius:6 
+              }}>
+                <div>
+                  <div style={{ fontWeight:600, marginBottom:4 }}>Smart Sync</div>
+                  <div style={{ fontSize:12, color:'#64748b' }}>
+                    Skip ClickUp updates for routers that haven't changed
+                  </div>
+                </div>
+                <label style={{ 
+                  position: 'relative',
+                  display: 'inline-block',
+                  width: 48,
+                  height: 24,
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={smartSyncEnabled}
+                    onChange={handleSmartSyncToggle}
+                    disabled={smartSyncLoading}
+                    style={{ opacity: 0, width: 0, height: 0 }}
+                  />
+                  <span style={{
+                    position: 'absolute',
+                    cursor: 'pointer',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: smartSyncEnabled ? '#10b981' : '#cbd5e1',
+                    transition: '0.4s',
+                    borderRadius: 24,
+                    opacity: smartSyncLoading ? 0.5 : 1
+                  }}>
+                    <span style={{
+                      position: 'absolute',
+                      content: '',
+                      height: 18,
+                      width: 18,
+                      left: smartSyncEnabled ? 26 : 3,
+                      bottom: 3,
+                      background: 'white',
+                      transition: '0.4s',
+                      borderRadius: '50%'
+                    }} />
+                  </span>
+                </label>
+              </div>
+              <div style={{ 
+                fontSize:11, 
+                color:'#94a3b8', 
+                padding:8, 
+                background: dark ? '#0f172a' : '#f8fafc',
+                borderRadius:6,
+                borderLeft: `3px solid ${dark ? '#334155' : '#e5e7eb'}`
+              }}>
+                <div style={{ marginBottom:4 }}>
+                  <strong>How it works:</strong>
+                </div>
+                <div>
+                  When enabled, the system compares a hash of router data (status, firmware, last seen, IMEI, router ID) before syncing to ClickUp. 
+                  If nothing has changed, the sync is skipped to reduce API calls and improve performance.
+                </div>
+                <div style={{ marginTop:8 }}>
+                  <strong>When to disable:</strong>
+                </div>
+                <div>
+                  Disable if you want to force updates to ClickUp every sync cycle, regardless of whether data has changed.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

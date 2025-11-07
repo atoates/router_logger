@@ -817,6 +817,54 @@ router.get('/debug/task/:taskId', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/clickup/settings/smart-sync
+ * Get the smart sync setting
+ */
+router.get('/settings/smart-sync', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT value FROM settings WHERE key = $1',
+      ['smart_sync_enabled']
+    );
+    
+    const enabled = result.rows.length > 0 ? result.rows[0].value === 'true' : true;
+    
+    res.json({ enabled });
+  } catch (error) {
+    logger.error('Error getting smart sync setting:', sanitizeError(error));
+    res.status(500).json({ error: 'Failed to get smart sync setting' });
+  }
+});
+
+/**
+ * PUT /api/clickup/settings/smart-sync
+ * Update the smart sync setting
+ */
+router.put('/settings/smart-sync', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled must be a boolean' });
+    }
+    
+    await pool.query(
+      `INSERT INTO settings (key, value, description, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+      ['smart_sync_enabled', enabled.toString(), 'Enable smart sync to skip ClickUp updates for routers that haven\'t changed']
+    );
+    
+    logger.info(`Smart sync setting updated to: ${enabled}`);
+    
+    res.json({ enabled });
+  } catch (error) {
+    logger.error('Error updating smart sync setting:', sanitizeError(error));
+    res.status(500).json({ error: 'Failed to update smart sync setting' });
+  }
+});
+
 // Clean up expired OAuth states periodically
 setInterval(() => {
   const now = Date.now();
