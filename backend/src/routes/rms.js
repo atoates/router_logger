@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { requireSession } = require('./session');
 const { syncFromRMS } = require('../services/rmsSync');
 const { mergeDuplicateRouters } = require('../models/router');
 const RMSClient = require('../services/rmsClient');
@@ -100,8 +101,8 @@ router.get('/debug/:deviceId', async (req, res) => {
   }
 });
 
-// Refresh single router from RMS
-router.post('/refresh/:routerId', async (req, res) => {
+// Refresh single router from RMS (requires authentication for mobile app)
+router.post('/refresh/:routerId', requireSession, async (req, res) => {
   try {
     const { routerId } = req.params;
     const pool = require('../config/database').pool;
