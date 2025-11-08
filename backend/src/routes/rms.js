@@ -490,8 +490,6 @@ router.get('/static/:routerId', async (req, res) => {
   }
 });
 
-module.exports = router;
-
 // Admin: merge duplicate routers by name into serial-like ID
 router.post('/admin/merge-routers', async (req, res) => {
   try {
@@ -502,3 +500,5 @@ router.post('/admin/merge-routers', async (req, res) => {
     res.status(500).json({ success: false, error: 'Merge failed', message: err.message });
   }
 });
+
+module.exports = router;
