@@ -205,7 +205,7 @@ async function unlinkRouterFromLocation(unlinkage) {
 
     // Get router's current state
     const routerResult = await client.query(
-      `SELECT clickup_task_id, clickup_location_task_id
+      `SELECT clickup_task_id, clickup_location_task_id, clickup_location_task_name
        FROM routers WHERE router_id = $1`,
       [routerId]
     );
@@ -216,6 +216,7 @@ async function unlinkRouterFromLocation(unlinkage) {
 
     const router = routerResult.rows[0];
     const wasLinkedToLocation = router.clickup_location_task_id;
+    const wasLinkedToLocationName = router.clickup_location_task_name;
 
     if (!wasLinkedToLocation) {
       throw new Error(`Router ${routerId} is not linked to any location`);
@@ -254,8 +255,22 @@ async function unlinkRouterFromLocation(unlinkage) {
 
         // Add comment to router task about unlinking
         try {
-          const commentText = `🤖 **System:** Router removed from location\n\n` +
-            `📍 Previously at: Location ${wasLinkedToLocation}\n` +
+          // Get workspace ID for proper ClickUp URL
+          const workspaceResult = await client.query(
+            'SELECT workspace_id FROM clickup_oauth_tokens WHERE user_id = $1',
+            ['default']
+          );
+          const workspaceId = workspaceResult.rows[0]?.workspace_id;
+          
+          // Construct proper ClickUp list URL
+          const locationUrl = workspaceId 
+            ? `https://app.clickup.com/${workspaceId}/v/li/${wasLinkedToLocation}`
+            : `https://app.clickup.com/list/${wasLinkedToLocation}`;
+          
+          const locationDisplay = wasLinkedToLocationName || wasLinkedToLocation;
+          
+          const commentText = `🤖 **System:** Router removed from location: **${locationDisplay}**\n\n` +
+            `📍 Previous Location: ${locationUrl}\n` +
             `🕐 Unlinked at: ${new Date().toLocaleString()}` +
             (unlinkedBy ? `\n👤 Unlinked by: ${unlinkedBy}` : '') +
             (notes ? `\n\n📝 Notes: ${notes}` : '');
