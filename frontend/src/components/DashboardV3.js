@@ -438,7 +438,11 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
                       );
                     }}
                   />
-                  <Tooltip formatter={(v)=>formatBytes(v)} />
+                  <Tooltip 
+                    formatter={(v)=>formatBytes(v)} 
+                    labelFormatter={(label) => `Router: ${label}`}
+                    contentStyle={{ backgroundColor: dark ? '#1f2937' : '#ffffff', border: '1px solid ' + (dark ? '#374151' : '#e5e7eb') }}
+                  />
                   <Legend />
                   <Bar dataKey="tx_bytes" stackId="a" fill="#6366f1" name="TX" onClick={(d)=>{
                     if (!onOpenRouter) return;

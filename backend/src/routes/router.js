@@ -686,7 +686,7 @@ router.post('/routers/:routerId/remove-assignees', requireSession, async (req, r
 // GET router online/offline status with 48h comparison
 router.get('/routers/status-summary', async (req, res) => {
   try {
-    // Get current status counts (excluding decommissioned routers)
+    // Get current status counts (only installed routers)
     const currentResult = await pool.query(`
       SELECT 
         COUNT(*) FILTER (WHERE current_status IN ('online', 'Online', '1')) as online_count,
@@ -697,11 +697,11 @@ router.get('/routers/status-summary', async (req, res) => {
           r.router_id,
           (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status
         FROM routers r
-        WHERE r.clickup_task_status IS NULL OR LOWER(r.clickup_task_status) != 'decommissioned'
+        WHERE LOWER(r.clickup_task_status) = 'installed'
       ) counts
     `);
 
-    // Get status counts from 48 hours ago
+    // Get status counts from 48 hours ago (only installed routers)
     const historicalResult = await pool.query(`
       SELECT 
         COUNT(*) FILTER (WHERE historical_status IN ('online', 'Online', '1')) as online_count,
@@ -718,7 +718,7 @@ router.get('/routers/status-summary', async (req, res) => {
             LIMIT 1
           ) as historical_status
         FROM routers r
-        WHERE r.clickup_task_status IS NULL OR LOWER(r.clickup_task_status) != 'decommissioned'
+        WHERE LOWER(r.clickup_task_status) = 'installed'
       ) counts
     `);
 
