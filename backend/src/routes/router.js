@@ -830,6 +830,61 @@ router.get('/routers/being-returned', async (req, res) => {
   }
 });
 
+// GET routers that need attention
+router.get('/routers/needs-attention', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        r.*,
+        (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status,
+        (SELECT timestamp FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as last_log_time,
+        CASE 
+          WHEN r.clickup_location_task_id IS NOT NULL 
+            AND (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) NOT IN ('online', 'Online', '1')
+            AND (SELECT timestamp FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) < NOW() - INTERVAL '1 hour'
+          THEN 'offline_at_location'
+          WHEN r.clickup_location_task_id IS NULL AND r.clickup_assignees IS NULL
+          THEN 'no_location_or_assignee'
+          WHEN LOWER(r.clickup_task_status) = 'needs attention'
+          THEN 'manually_flagged'
+          ELSE NULL
+        END as attention_reason
+       FROM routers r
+       WHERE 
+         LOWER(r.clickup_task_status) != 'decommissioned'
+         AND LOWER(r.clickup_task_status) != 'being returned'
+         AND (
+           -- Router has location but is offline for more than 1 hour
+           (r.clickup_location_task_id IS NOT NULL 
+            AND (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) NOT IN ('online', 'Online', '1')
+            AND (SELECT timestamp FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) < NOW() - INTERVAL '1 hour')
+           -- Router has no location or assignee
+           OR (r.clickup_location_task_id IS NULL AND r.clickup_assignees IS NULL)
+           -- Manually marked as needs attention
+           OR LOWER(r.clickup_task_status) = 'needs attention'
+         )
+       ORDER BY 
+         CASE 
+           WHEN LOWER(r.clickup_task_status) = 'needs attention' THEN 1
+           WHEN r.clickup_location_task_id IS NOT NULL THEN 2
+           ELSE 3
+         END,
+         r.last_seen DESC NULLS LAST`
+    );
+
+    logger.info(`Retrieved ${result.rows.length} routers needing attention`);
+    res.json({
+      success: true,
+      count: result.rows.length,
+      routers: result.rows
+    });
+
+  } catch (error) {
+    logger.error('Error fetching routers needing attention:', error);
+    res.status(500).json({ error: 'Failed to fetch routers needing attention' });
+  }
+});
+
 // PATCH update router notes
 router.patch('/routers/:router_id/notes', async (req, res) => {
   try {
