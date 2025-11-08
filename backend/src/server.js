@@ -44,6 +44,15 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
+// Health check endpoint (for Railway health checks)
+let isServerReady = false;
+app.get('/health', (req, res) => {
+  if (!isServerReady) {
+    return res.status(503).json({ status: 'starting', message: 'Server is initializing...' });
+  }
+  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
 // Routes
 app.get('/', (req, res) => {
   res.json({ 
@@ -119,6 +128,8 @@ async function startServer() {
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
+      // Mark server as ready for health checks
+      isServerReady = true;
       console.log(`📊 Ready to receive RUT200 telemetry via:`);
       console.log(`   - MQTT (if configured)`);
       console.log(`   - HTTPS POST to /api/log`);
