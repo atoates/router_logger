@@ -459,31 +459,46 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
       {/* Being Returned Modal */}
       {showBeingReturnedModal && (
         <div className="task-modal-overlay" onClick={() => setShowBeingReturnedModal(false)}>
-          <div className="task-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="task-modal return-modal" onClick={(e) => e.stopPropagation()}>
             <div className="task-modal-header">
-              <h3>📦 Mark Router as Being Returned</h3>
-              <button className="task-modal-close" onClick={() => setShowBeingReturnedModal(false)}>×</button>
+              <div className="modal-header-content">
+                <div className="modal-icon">📦</div>
+                <div>
+                  <h3>Mark Router as Being Returned</h3>
+                  <p className="modal-subtitle">Router #{router?.router_id}</p>
+                </div>
+              </div>
+              <button className="task-modal-close" onClick={() => {
+                setShowBeingReturnedModal(false);
+                setBeingReturnedNotes('');
+              }}>
+                ×
+              </button>
             </div>
 
-            <div className="task-modal-content">
-              <p style={{ marginBottom: '16px', color: '#64748b' }}>
-                Add any notes about why this router is being returned (optional).
-              </p>
-              <textarea
-                placeholder="e.g., Property closed, router malfunction, upgrade needed..."
-                value={beingReturnedNotes}
-                onChange={(e) => setBeingReturnedNotes(e.target.value)}
-                rows={4}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontFamily: 'inherit',
-                  resize: 'vertical'
-                }}
-              />
+            <div className="task-modal-body">
+              <div className="return-notice">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M10 0C4.48 0 0 4.48 0 10C0 15.52 4.48 20 10 20C15.52 20 20 15.52 20 10C20 4.48 15.52 0 10 0ZM11 15H9V13H11V15ZM11 11H9V5H11V11Z" fill="#3b82f6"/>
+                </svg>
+                <p>This will mark the router as being returned. You can optionally add notes about the reason.</p>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="return-notes">Return Notes (Optional)</label>
+                <textarea
+                  id="return-notes"
+                  className="return-notes-input"
+                  placeholder="e.g., With Leyton office cap ind, Property closed, Router malfunction, Upgrade needed..."
+                  value={beingReturnedNotes}
+                  onChange={(e) => setBeingReturnedNotes(e.target.value)}
+                  rows={4}
+                  maxLength={500}
+                />
+                <div className="character-count">
+                  {beingReturnedNotes.length}/500 characters
+                </div>
+              </div>
             </div>
 
             <div className="task-modal-footer">
@@ -497,11 +512,23 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
                 Cancel
               </button>
               <button 
-                className="task-btn task-btn-primary" 
+                className="task-btn task-btn-return" 
                 onClick={handleBeingReturnedSubmit}
                 disabled={loading}
               >
-                {loading ? 'Updating...' : 'Mark as Being Returned'}
+                {loading ? (
+                  <>
+                    <span className="btn-spinner"></span>
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M13 8L7 2L1 8M7 3V14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Mark as Being Returned
+                  </>
+                )}
               </button>
             </div>
           </div>
