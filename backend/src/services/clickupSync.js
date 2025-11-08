@@ -228,7 +228,7 @@ async function syncRouterToClickUp(router, dataUsageMap = {}) {
     if (dataUsageMap[router.router_id] !== undefined) {
       try {
         const dataUsageValue = dataUsageMap[router.router_id];
-        logger.info(`Router ${router.router_id}: Updating data usage field to ${dataUsageValue} GB`);
+        logger.info(`Router ${router.router_id}: Updating data usage field to ${dataUsageValue} MB`);
         
         await clickupClient.updateCustomField(
           router.clickup_task_id,
@@ -236,7 +236,7 @@ async function syncRouterToClickUp(router, dataUsageMap = {}) {
           dataUsageValue,
           'default'
         );
-        logger.info(`✓ Successfully updated Data Usage for router ${router.router_id} to ${dataUsageValue} GB`);
+        logger.info(`✓ Successfully updated Data Usage for router ${router.router_id} to ${dataUsageValue} MB`);
       } catch (dataError) {
         logger.error(`Failed to update Data Usage for router ${router.router_id}:`, {
           error: dataError.message,
@@ -337,15 +337,15 @@ async function calculateAllRouterDataUsage() {
     logger.info(`Data usage query returned ${result.rows.length} routers`);
     
     for (const row of result.rows) {
-      const totalGB = parseFloat((row.total_bytes / 1024 / 1024 / 1024).toFixed(2));
-      dataUsageMap[row.router_id] = totalGB;
+      const totalMB = parseFloat((row.total_bytes / 1024 / 1024).toFixed(2));
+      dataUsageMap[row.router_id] = totalMB;
     }
     
     // Log a few sample values
     const sampleRouters = result.rows.slice(0, 3);
     for (const sample of sampleRouters) {
-      const gb = dataUsageMap[sample.router_id];
-      logger.info(`Sample data usage - Router ${sample.router_id}: ${gb} GB (${sample.total_bytes} bytes)`);
+      const mb = dataUsageMap[sample.router_id];
+      logger.info(`Sample data usage - Router ${sample.router_id}: ${mb} MB (${sample.total_bytes} bytes)`);
     }
     
     return dataUsageMap;

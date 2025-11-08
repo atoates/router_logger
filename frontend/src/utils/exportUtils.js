@@ -228,7 +228,7 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
 export function formatBytes(bytes, decimals = 2) {
   const n = Number(bytes);
   const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const sizes = ['Bytes', 'KB', 'MB'];
 
   if (!isFinite(n) || n <= 0) return '0 Bytes';
 
