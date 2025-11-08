@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getRouters, assignRouter, removeRouterAssignees } from '../../services/api';
-
-const API_BASE = process.env.REACT_APP_API_URL || 'https://routerlogger-production.up.railway.app';
+import { mobileFetch, API_BASE } from '../../utils/mobileApi';
 
 const MobileSearch = ({ onSelectRouter, selectedRouter }) => {
   const [routers, setRouters] = useState([]);
@@ -47,9 +46,7 @@ const MobileSearch = ({ onSelectRouter, selectedRouter }) => {
 
   const handleAssignToMe = async (router) => {
     try {
-      const userResponse = await fetch('/api/clickup/current-user', {
-        credentials: 'include'
-      });
+      const userResponse = await mobileFetch(`/api/clickup/current-user`);
       if (!userResponse.ok) {
         alert('Please connect to ClickUp first');
         return;
@@ -80,9 +77,8 @@ const MobileSearch = ({ onSelectRouter, selectedRouter }) => {
     if (!confirm(`Uninstall router from ${router.clickup_location_task_name}?`)) return;
     
     try {
-      const response = await fetch(`${API_BASE}/api/routers/${router.router_id}/unlink-location`, {
-        method: 'POST',
-        credentials: 'include'
+      const response = await mobileFetch(`/api/routers/${router.router_id}/unlink-location`, {
+        method: 'POST'
       });
       
       if (!response.ok) throw new Error('Failed to uninstall');

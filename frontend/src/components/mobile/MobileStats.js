@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getUsageStats, getLogs } from '../../services/api';
 import { generateInstallationReport } from '../../utils/installationReport';
+import { mobileFetch } from '../../utils/mobileApi';
 
 const MobileStats = ({ router }) => {
   const [stats, setStats] = useState(null);
@@ -62,11 +63,8 @@ const MobileStats = ({ router }) => {
   const handleRefreshFromRMS = async () => {
     try {
       setRefreshing(true);
-      const API_BASE = process.env.REACT_APP_API_URL || '';
-      const response = await fetch(`${API_BASE}/api/rms/refresh/${router.router_id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include' // Send session cookie
+      const response = await mobileFetch(`/api/rms/refresh/${router.router_id}`, {
+        method: 'POST'
       });
 
       if (!response.ok) {

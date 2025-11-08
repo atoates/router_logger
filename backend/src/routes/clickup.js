@@ -217,6 +217,30 @@ router.post('/auth/disconnect', async (req, res) => {
 });
 
 /**
+ * GET /api/clickup/current-user
+ * Get current ClickUp user info
+ */
+router.get('/current-user', async (req, res) => {
+  try {
+    const client = await clickupClient.getAuthorizedClient('default');
+    const userResponse = await client.get('/user');
+    const user = userResponse.data.user;
+    
+    res.json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      color: user.color,
+      profilePicture: user.profilePicture
+    });
+  } catch (error) {
+    logger.error('Error getting current user:', sanitizeError(error));
+    res.status(error.message.includes('No ClickUp token') ? 401 : 500)
+      .json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/clickup/workspaces
  * Get authorized workspaces
  */

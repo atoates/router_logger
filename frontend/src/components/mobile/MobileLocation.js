@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-
-const API_BASE = process.env.REACT_APP_API_URL || 'https://routerlogger-production.up.railway.app';
+import { mobileFetch, API_BASE } from '../../utils/mobileApi';
 
 const MobileLocation = ({ router }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,9 +14,7 @@ const MobileLocation = ({ router }) => {
 
     try {
       setSearching(true);
-      const response = await fetch(`${API_BASE}/api/clickup/properties/search?query=${encodeURIComponent(searchTerm)}`, {
-        credentials: 'include'
-      });
+      const response = await mobileFetch(`/api/clickup/properties/search?query=${encodeURIComponent(searchTerm)}`);
       
       console.log('Search response status:', response.status);
       
@@ -40,10 +37,8 @@ const MobileLocation = ({ router }) => {
 
   const handleLinkLocation = async (property) => {
     try {
-      const response = await fetch(`${API_BASE}/api/routers/${router.router_id}/link-location`, {
+      const response = await mobileFetch(`/api/routers/${router.router_id}/link-location`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           locationTaskId: property.id,
           locationTaskName: property.name
@@ -62,9 +57,8 @@ const MobileLocation = ({ router }) => {
 
   const handleUnlinkLocation = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/routers/${router.router_id}/unlink-location`, {
-        method: 'POST',
-        credentials: 'include'
+      const response = await mobileFetch(`/api/routers/${router.router_id}/unlink-location`, {
+        method: 'POST'
       });
       
       if (!response.ok) throw new Error('Failed to unlink location');
