@@ -217,8 +217,11 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
     }
   };
 
+  const [showBeingReturnedModal, setShowBeingReturnedModal] = useState(false);
+  const [beingReturnedNotes, setBeingReturnedNotes] = useState('');
+
   const handleDecommission = async () => {
-    if (!window.confirm('⚠️ WARNING: Are you sure you want to decommission this router?\n\nThis will mark the router as permanently retired and hide it from most views.\n\nThis action can be reversed by manually updating the status.')) {
+    if (!window.confirm('⚠️ WARNING: Are you sure you want to decommission this router?\n\nThis will:\n- Mark the router as permanently retired\n- Remove all assignees\n- Unlink from any property\n- Hide it from most views\n\nThis action can be reversed by manually updating the status.')) {
       return;
     }
 
@@ -232,7 +235,7 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
         setLinkedTask(taskResponse.data.task);
       }
       
-      toast.success('Router marked as decommissioned');
+      toast.success('Router decommissioned - unassigned and unlinked');
       
       // Optionally redirect or refresh the page
       setTimeout(() => {
@@ -246,10 +249,14 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
     }
   };
 
-  const handleBeingReturned = async () => {
+  const handleBeingReturned = () => {
+    setShowBeingReturnedModal(true);
+  };
+
+  const handleBeingReturnedSubmit = async () => {
     try {
       setLoading(true);
-      await updateRouterStatus(router.router_id, 'being returned');
+      await updateRouterStatus(router.router_id, 'being returned', beingReturnedNotes);
       
       // Reload the task to update the UI
       const taskResponse = await getRouterTask(router.router_id);
@@ -258,6 +265,8 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
       }
       
       toast.success('Router marked as being returned');
+      setShowBeingReturnedModal(false);
+      setBeingReturnedNotes('');
     } catch (error) {
       console.error('Error updating router status:', error);
       toast.error(error.response?.data?.error || 'Failed to update router status');
@@ -442,6 +451,58 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
                   {creating ? 'Creating...' : 'Create & Link'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Being Returned Modal */}
+      {showBeingReturnedModal && (
+        <div className="task-modal-overlay" onClick={() => setShowBeingReturnedModal(false)}>
+          <div className="task-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="task-modal-header">
+              <h3>📦 Mark Router as Being Returned</h3>
+              <button className="task-modal-close" onClick={() => setShowBeingReturnedModal(false)}>×</button>
+            </div>
+
+            <div className="task-modal-content">
+              <p style={{ marginBottom: '16px', color: '#64748b' }}>
+                Add any notes about why this router is being returned (optional).
+              </p>
+              <textarea
+                placeholder="e.g., Property closed, router malfunction, upgrade needed..."
+                value={beingReturnedNotes}
+                onChange={(e) => setBeingReturnedNotes(e.target.value)}
+                rows={4}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontFamily: 'inherit',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+
+            <div className="task-modal-footer">
+              <button 
+                className="task-btn task-btn-secondary" 
+                onClick={() => {
+                  setShowBeingReturnedModal(false);
+                  setBeingReturnedNotes('');
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="task-btn task-btn-primary" 
+                onClick={handleBeingReturnedSubmit}
+                disabled={loading}
+              >
+                {loading ? 'Updating...' : 'Mark as Being Returned'}
+              </button>
             </div>
           </div>
         </div>

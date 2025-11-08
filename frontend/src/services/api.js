@@ -81,6 +81,6 @@ export const assignRouter = (routerId, userId) => api.post(`/routers/${routerId}
 export const removeRouterAssignees = (routerId) => api.post(`/routers/${routerId}/remove-assignees`);
 
 // Router Status Updates
-export const updateRouterStatus = (routerId, status) => api.patch(`/routers/${routerId}/status`, { status });
+export const updateRouterStatus = (routerId, status, notes) => api.patch(`/routers/${routerId}/status`, { status, notes });
 
 export default api;

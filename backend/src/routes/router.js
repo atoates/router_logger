@@ -766,14 +766,15 @@ router.patch('/routers/:router_id/status', async (req, res) => {
       return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
     }
 
-    // Update the router's clickup_task_status in the database
-    logger.info(`Updating database for router ${router_id} with status="${normalizedStatus}"`);
+    // Update the router's clickup_task_status and notes in the database
+    logger.info(`Updating database for router ${router_id} with status="${normalizedStatus}", notes="${notes || 'none'}"`);
     const result = await pool.query(
       `UPDATE routers 
-       SET clickup_task_status = $1
-       WHERE router_id = $2
+       SET clickup_task_status = $1,
+           notes = CASE WHEN $2 IS NOT NULL THEN $2 ELSE notes END
+       WHERE router_id = $3
        RETURNING *`,
-      [normalizedStatus, router_id]
+      [normalizedStatus, notes, router_id]
     );
 
     if (result.rows.length === 0) {
@@ -783,6 +784,44 @@ router.patch('/routers/:router_id/status', async (req, res) => {
 
     const router = result.rows[0];
     logger.info(`Database updated successfully for router ${router_id}`);
+
+    // If decommissioning, unlink from location and remove assignees
+    if (normalizedStatus === 'decommissioned' && router.clickup_task_id) {
+      try {
+        // Unlink from location
+        if (router.clickup_location_task_id) {
+          await pool.query(
+            `UPDATE routers 
+             SET clickup_location_task_id = NULL, 
+                 clickup_location_task_name = NULL,
+                 clickup_location_task_url = NULL
+             WHERE router_id = $1`,
+            [router_id]
+          );
+          logger.info(`Unlinked router ${router_id} from location`);
+        }
+
+        // Remove assignees in ClickUp
+        const assignees = router.clickup_assignees ? JSON.parse(router.clickup_assignees) : [];
+        if (assignees.length > 0) {
+          await clickupClient.updateTaskAssignees(
+            router.clickup_task_id,
+            { add: [], rem: assignees.map(a => a.id) },
+            'default'
+          );
+          
+          // Update database
+          await pool.query(
+            `UPDATE routers SET clickup_assignees = '[]' WHERE router_id = $1`,
+            [router_id]
+          );
+          logger.info(`Removed all assignees from router ${router_id}`);
+        }
+      } catch (unlinkError) {
+        logger.error(`Error unlinking/unassigning decommissioned router:`, unlinkError);
+        // Don't fail the request - status update was successful
+      }
+    }
 
     // If there's a ClickUp task linked, update the status there too
     if (router.clickup_task_id) {
