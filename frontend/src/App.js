@@ -9,6 +9,7 @@ import RouterDashboard from './components/RouterDashboard';
 import HeaderRouterSelect from './components/HeaderRouterSelect';
 import MobilePage from './pages/MobilePage';
 import ReturnsPage from './components/ReturnsPage';
+import DecommissionedPage from './components/DecommissionedPage';
 import { ToastContainer, toast } from 'react-toastify';
 import { getRouters } from './services/api';
 import 'react-toastify/dist/ReactToastify.css';
@@ -91,6 +92,7 @@ function AppContent() {
     { path: '/assignments', label: 'Router Assignments', icon: '📍' },
     { path: '/stored', label: 'Stored Routers', icon: '📦' },
     { path: '/returns', label: 'Returns', icon: '🔄' },
+    { path: '/decommissioned', label: 'Decommissioned', icon: '⚠️' },
     { path: '/status', label: 'System Status', icon: '⚙️' },
   ];
 
@@ -145,6 +147,7 @@ function AppContent() {
             <Route path="/stored" element={<DashboardV3 page="stored" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />} />
             <Route path="/status" element={<DashboardV3 page="status" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />} />
             <Route path="/returns" element={<ReturnsPage />} />
+            <Route path="/decommissioned" element={<DecommissionedPage />} />
             <Route path="/router/:routerId" element={<RouterDetailPage />} />
           </Routes>
         </ErrorBoundary>

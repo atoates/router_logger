@@ -843,6 +843,27 @@ router.get('/routers/being-returned', async (req, res) => {
     );
 
     logger.info(`Retrieved ${result.rows.length} routers being returned`);
+    res.json(result.rows);
+  } catch (error) {
+    logger.error('Error fetching routers being returned:', error);
+    res.status(500).json({ error: 'Failed to fetch routers being returned' });
+  }
+});
+
+// GET decommissioned routers
+router.get('/routers/decommissioned', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        r.*,
+        (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status,
+        (SELECT timestamp FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as last_log_time
+       FROM routers r
+       WHERE LOWER(r.clickup_task_status) = 'decommissioned'
+       ORDER BY r.last_seen DESC NULLS LAST, r.created_at DESC`
+    );
+
+    logger.info(`Retrieved ${result.rows.length} decommissioned routers`);
     res.json({
       success: true,
       count: result.rows.length,

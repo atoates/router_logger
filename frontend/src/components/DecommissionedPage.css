@@ -1,0 +1,232 @@
+.decommissioned-page {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background-color: var(--bg-primary, #0f172a);
+  color: var(--text-primary, #e2e8f0);
+}
+
+.decommissioned-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header-content h1 {
+  font-size: 2rem;
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary, #e2e8f0);
+}
+
+.subtitle {
+  color: var(--text-secondary, #94a3b8);
+  margin: 0;
+  font-size: 1rem;
+}
+
+.back-button {
+  padding: 0.75rem 1.5rem;
+  background: var(--card-bg, #1e293b);
+  color: var(--text-primary, #e2e8f0);
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.back-button:hover {
+  background: var(--hover-bg, #334155);
+  transform: translateX(-4px);
+}
+
+.search-bar {
+  margin-bottom: 2rem;
+}
+
+.search-bar input {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1rem;
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 8px;
+  background: var(--card-bg, #1e293b);
+  color: var(--text-primary, #e2e8f0);
+  transition: border-color 0.2s;
+}
+
+.search-bar input::placeholder {
+  color: var(--text-secondary, #94a3b8);
+}
+
+.search-bar input:focus {
+  outline: none;
+  border-color: #f59e0b;
+}
+
+.loading,
+.error,
+.no-routers {
+  text-align: center;
+  padding: 3rem;
+  font-size: 1.2rem;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.error {
+  color: #ef4444;
+}
+
+.routers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 1.5rem;
+}
+
+.router-card {
+  background: var(--card-bg, #1e293b);
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 12px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.router-card:hover {
+  border-color: #f59e0b;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(245, 158, 11, 0.1);
+}
+
+.router-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color, #334155);
+}
+
+.router-id {
+  font-size: 1.25rem;
+  margin: 0;
+  color: var(--text-primary, #e2e8f0);
+  font-family: 'Courier New', monospace;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.status-badge.decommissioned {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.router-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.info-label {
+  color: var(--text-secondary, #94a3b8);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.info-value {
+  color: var(--text-primary, #e2e8f0);
+  font-size: 0.875rem;
+  text-align: right;
+}
+
+.info-value.task-id {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+}
+
+.notes-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  border-left: 3px solid #f59e0b;
+}
+
+.notes-text {
+  margin: 0;
+  color: var(--text-primary, #e2e8f0);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.router-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color, #334155);
+}
+
+.reactivate-button {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.reactivate-button:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  transform: scale(1.02);
+}
+
+@media (max-width: 768px) {
+  .decommissioned-page {
+    padding: 1rem;
+  }
+
+  .header-content h1 {
+    font-size: 1.5rem;
+  }
+
+  .routers-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .decommissioned-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .back-button {
+    width: 100%;
+  }
+}
