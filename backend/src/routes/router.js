@@ -745,6 +745,63 @@ router.get('/routers/status-summary', async (req, res) => {
   }
 });
 
+// PATCH update router ClickUp task status (decommissioned, held elsewhere, etc)
+router.patch('/routers/:router_id/status', async (req, res) => {
+  try {
+    const { router_id } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ error: 'Status is required' });
+    }
+
+    // Validate status values
+    const validStatuses = ['decommissioned', 'held elsewhere', 'installed', 'ready', 'needs attention'];
+    const normalizedStatus = status.toLowerCase();
+    
+    if (!validStatuses.includes(normalizedStatus)) {
+      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+    }
+
+    // Update the router's clickup_task_status in the database
+    const result = await pool.query(
+      `UPDATE routers 
+       SET clickup_task_status = $1 
+       WHERE router_id = $2
+       RETURNING *`,
+      [normalizedStatus, router_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Router not found' });
+    }
+
+    const router = result.rows[0];
+
+    // If there's a ClickUp task linked, update the status there too
+    if (router.clickup_task_id) {
+      try {
+        await clickupClient.updateTaskStatus(router.clickup_task_id, normalizedStatus);
+        logger.info(`Updated ClickUp task ${router.clickup_task_id} status to "${normalizedStatus}"`);
+      } catch (clickupError) {
+        logger.error(`Failed to update ClickUp task status:`, clickupError);
+        // Continue anyway - database was updated
+      }
+    }
+
+    logger.info(`Updated router ${router_id} status to "${normalizedStatus}"`);
+    res.json({ 
+      success: true, 
+      router: result.rows[0],
+      message: `Router status updated to "${normalizedStatus}"`
+    });
+
+  } catch (error) {
+    logger.error('Error updating router status:', error);
+    res.status(500).json({ error: 'Failed to update router status' });
+  }
+});
+
 module.exports = router;
 module.exports.invalidateAssigneeCache = invalidateAssigneeCache;
 

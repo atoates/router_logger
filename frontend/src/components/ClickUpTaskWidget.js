@@ -7,8 +7,10 @@ import {
   getClickUpTasks,
   createClickUpTask,
   linkRouterToTask,
-  unlinkRouterFromTask
+  unlinkRouterFromTask,
+  updateRouterStatus
 } from '../services/api';
+import { toast } from 'react-toastify';
 import './ClickUpTaskWidget.css';
 
 const ClickUpTaskWidget = ({ router, onStoredWith }) => {
@@ -215,6 +217,55 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
     }
   };
 
+  const handleDecommission = async () => {
+    if (!window.confirm('⚠️ WARNING: Are you sure you want to decommission this router?\n\nThis will mark the router as permanently retired and hide it from most views.\n\nThis action can be reversed by manually updating the status.')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await updateRouterStatus(router.router_id, 'decommissioned');
+      
+      // Reload the task to update the UI
+      const taskResponse = await getRouterTask(router.router_id);
+      if (taskResponse.data.linked) {
+        setLinkedTask(taskResponse.data.task);
+      }
+      
+      toast.success('Router marked as decommissioned');
+      
+      // Optionally redirect or refresh the page
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      console.error('Error decommissioning router:', error);
+      toast.error(error.response?.data?.error || 'Failed to decommission router');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleHeldElsewhere = async () => {
+    try {
+      setLoading(true);
+      await updateRouterStatus(router.router_id, 'held elsewhere');
+      
+      // Reload the task to update the UI
+      const taskResponse = await getRouterTask(router.router_id);
+      if (taskResponse.data.linked) {
+        setLinkedTask(taskResponse.data.task);
+      }
+      
+      toast.success('Router marked as held elsewhere');
+    } catch (error) {
+      console.error('Error updating router status:', error);
+      toast.error(error.response?.data?.error || 'Failed to update router status');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!authorized) {
     return null; // Don't show widget if not authorized
   }
@@ -281,6 +332,24 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
                     : 'Assign Router'}
                 </button>
               )}
+            </div>
+            
+            {/* Status Change Actions */}
+            <div className="task-actions" style={{ marginTop: '12px', borderTop: '1px solid #e5e7eb', paddingTop: '12px' }}>
+              <button 
+                onClick={handleHeldElsewhere}
+                className="task-btn task-btn-warning"
+                title="Mark this router as held at another location"
+              >
+                📦 Held Elsewhere
+              </button>
+              <button 
+                onClick={handleDecommission}
+                className="task-btn task-btn-danger"
+                title="Permanently decommission this router"
+              >
+                ⚠️ Decommission
+              </button>
             </div>
           </div>
         ) : (

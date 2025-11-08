@@ -80,4 +80,7 @@ export const submitLog = (data) => api.post('/log', data);
 export const assignRouter = (routerId, userId) => api.post(`/routers/${routerId}/assign`, { userId });
 export const removeRouterAssignees = (routerId) => api.post(`/routers/${routerId}/remove-assignees`);
 
+// Router Status Updates
+export const updateRouterStatus = (routerId, status) => api.patch(`/routers/${routerId}/status`, { status });
+
 export default api;
