@@ -783,14 +783,21 @@ router.patch('/routers/:router_id/status', async (req, res) => {
     // If there's a ClickUp task linked, update the status there too
     if (router.clickup_task_id) {
       try {
+        const clickupStatus = normalizedStatus.toUpperCase().replace(/ /g, '_');
+        logger.info(`Attempting to update ClickUp task ${router.clickup_task_id} status to "${clickupStatus}"`);
+        
         await clickupClient.updateTask(
           router.clickup_task_id, 
-          { status: normalizedStatus.toUpperCase().replace(/ /g, '_') },
+          { status: clickupStatus },
           'default'
         );
-        logger.info(`Updated ClickUp task ${router.clickup_task_id} status to "${normalizedStatus}"`);
+        logger.info(`Successfully updated ClickUp task ${router.clickup_task_id} status to "${clickupStatus}"`);
       } catch (clickupError) {
-        logger.error(`Failed to update ClickUp task status:`, clickupError);
+        logger.error(`Failed to update ClickUp task status to "${normalizedStatus}":`, {
+          error: clickupError.message,
+          status: clickupError.response?.status,
+          data: clickupError.response?.data
+        });
         // Continue anyway - database was updated
       }
     }
