@@ -195,6 +195,301 @@ router.post('/refresh/:routerId', requireSession, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/rms/status/:routerId
+ * FAST endpoint - Only fetch critical status (online/offline, last_seen)
+ * Use for frequent polling
+ */
+router.post('/status/:routerId', requireSession, async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const pool = require('../config/database').pool;
+    
+    // Quick database check
+    const routerResult = await pool.query(
+      'SELECT router_id, current_status, last_seen FROM routers WHERE router_id = $1',
+      [routerId]
+    );
+    
+    if (!routerResult.rows.length) {
+      return res.status(404).json({ error: 'Router not found' });
+    }
+
+    // Fetch only status from RMS
+    const rms = await RMSClient.createWithAuth();
+    
+    try {
+      const deviceData = await rms.getDevice(routerId);
+      const status = deviceData.status || 'unknown';
+      const lastSeen = deviceData.last_activity || null;
+      
+      // Update only status fields
+      await pool.query(
+        `UPDATE routers SET 
+          current_status = $1,
+          last_seen = $2,
+          updated_at = NOW()
+        WHERE router_id = $3`,
+        [status, lastSeen, routerId]
+      );
+      
+      logger.info(`Router ${routerId} status updated: ${status}`);
+      
+      res.json({
+        success: true,
+        router_id: routerId,
+        status,
+        last_seen: lastSeen,
+        fromRMS: true,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (rmsError) {
+      logger.warn(`Router ${routerId} status check failed, using DB:`, rmsError.message);
+      
+      // Return database values
+      const dbRouter = routerResult.rows[0];
+      res.json({
+        success: true,
+        router_id: routerId,
+        status: dbRouter.current_status,
+        last_seen: dbRouter.last_seen,
+        fromRMS: false,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+  } catch (error) {
+    logger.error('Error fetching router status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch status',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/rms/usage/:routerId
+ * MEDIUM priority - Fetch data usage statistics
+ * Use for periodic updates
+ */
+router.post('/usage/:routerId', requireSession, async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const pool = require('../config/database').pool;
+    
+    const routerResult = await pool.query(
+      'SELECT router_id FROM routers WHERE router_id = $1',
+      [routerId]
+    );
+    
+    if (!routerResult.rows.length) {
+      return res.status(404).json({ error: 'Router not found' });
+    }
+
+    const rms = await RMSClient.createWithAuth();
+    
+    try {
+      const deviceData = await rms.getDevice(routerId);
+      const monitoring = deviceData.monitoring || {};
+      const cellular = monitoring.cellular || monitoring.mobile || {};
+      
+      // Extract usage data
+      const txBytes = cellular.sent || cellular.tx_bytes || 0;
+      const rxBytes = cellular.received || cellular.rx_bytes || 0;
+      const operator = cellular.operator || null;
+      const signalStrength = cellular.signal_strength || null;
+      
+      // Log the data usage
+      await pool.query(
+        `INSERT INTO router_logs (router_id, status, tx_bytes, rx_bytes, operator, signal_strength, timestamp)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+        [routerId, deviceData.status, txBytes, rxBytes, operator, signalStrength]
+      );
+      
+      logger.info(`Router ${routerId} usage logged: TX=${txBytes}, RX=${rxBytes}`);
+      
+      res.json({
+        success: true,
+        router_id: routerId,
+        usage: {
+          tx_bytes: txBytes,
+          rx_bytes: rxBytes,
+          operator,
+          signal_strength: signalStrength
+        },
+        fromRMS: true,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (rmsError) {
+      logger.warn(`Router ${routerId} usage fetch failed:`, rmsError.message);
+      
+      // Get latest usage from database
+      const latestLog = await pool.query(
+        `SELECT tx_bytes, rx_bytes, operator, signal_strength, timestamp 
+         FROM router_logs 
+         WHERE router_id = $1 
+         ORDER BY timestamp DESC 
+         LIMIT 1`,
+        [routerId]
+      );
+      
+      const usage = latestLog.rows[0] || {};
+      res.json({
+        success: true,
+        router_id: routerId,
+        usage: {
+          tx_bytes: usage.tx_bytes || 0,
+          rx_bytes: usage.rx_bytes || 0,
+          operator: usage.operator || null,
+          signal_strength: usage.signal_strength || null
+        },
+        fromRMS: false,
+        timestamp: usage.timestamp || new Date().toISOString()
+      });
+    }
+    
+  } catch (error) {
+    logger.error('Error fetching router usage:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch usage',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/rms/details/:routerId
+ * SLOW endpoint - Fetch infrequently changing data (firmware, config)
+ * Use for manual refresh or on-demand
+ */
+router.post('/details/:routerId', requireSession, async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const pool = require('../config/database').pool;
+    
+    const routerResult = await pool.query(
+      'SELECT * FROM routers WHERE router_id = $1',
+      [routerId]
+    );
+    
+    if (!routerResult.rows.length) {
+      return res.status(404).json({ error: 'Router not found' });
+    }
+
+    const rms = await RMSClient.createWithAuth();
+    
+    try {
+      const deviceData = await rms.getDevice(routerId);
+      const monitoring = deviceData.monitoring || {};
+      
+      // Extract static/slow-changing data
+      const firmware = monitoring.system?.firmware || deviceData.firmware || null;
+      const model = deviceData.model || null;
+      const wan_ip = monitoring.network?.wan_ip || null;
+      
+      // Update router details
+      await pool.query(
+        `UPDATE routers SET
+          name = $1,
+          firmware = $2,
+          model = $3,
+          wan_ip = $4,
+          updated_at = NOW()
+        WHERE router_id = $5`,
+        [deviceData.name || routerId, firmware, model, wan_ip, routerId]
+      );
+      
+      logger.info(`Router ${routerId} details updated`);
+      
+      res.json({
+        success: true,
+        router_id: routerId,
+        details: {
+          name: deviceData.name || routerId,
+          firmware,
+          model,
+          wan_ip
+        },
+        fromRMS: true,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (rmsError) {
+      logger.warn(`Router ${routerId} details fetch failed:`, rmsError.message);
+      
+      const dbRouter = routerResult.rows[0];
+      res.json({
+        success: true,
+        router_id: routerId,
+        details: {
+          name: dbRouter.name,
+          firmware: dbRouter.firmware,
+          model: dbRouter.model,
+          wan_ip: dbRouter.wan_ip
+        },
+        fromRMS: false,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+  } catch (error) {
+    logger.error('Error fetching router details:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch details',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/rms/static/:routerId
+ * STATIC endpoint - Fetch never-changing data (IMEI, Serial)
+ * Cache this on the client side
+ */
+router.get('/static/:routerId', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const pool = require('../config/database').pool;
+    
+    const routerResult = await pool.query(
+      'SELECT router_id, serial, imei FROM routers WHERE router_id = $1',
+      [routerId]
+    );
+    
+    if (!routerResult.rows.length) {
+      return res.status(404).json({ error: 'Router not found' });
+    }
+
+    const router = routerResult.rows[0];
+    
+    // Set cache headers - this data never changes
+    res.set('Cache-Control', 'public, max-age=86400'); // 24 hours
+    
+    res.json({
+      success: true,
+      router_id: routerId,
+      static_data: {
+        serial: router.serial || routerId,
+        imei: router.imei
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    logger.error('Error fetching static router data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch static data',
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;
 
 // Admin: merge duplicate routers by name into serial-like ID
