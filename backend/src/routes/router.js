@@ -746,31 +746,32 @@ router.get('/routers/status-summary', async (req, res) => {
   }
 });
 
-// PATCH update router ClickUp task status (decommissioned, held elsewhere, etc)
+// PATCH update router ClickUp task status (decommissioned, being returned, etc)
 router.patch('/routers/:router_id/status', async (req, res) => {
   try {
     const { router_id } = req.params;
-    const { status } = req.body;
+    const { status, notes } = req.body;
 
     if (!status) {
       return res.status(400).json({ error: 'Status is required' });
     }
 
     // Validate status values
-    const validStatuses = ['decommissioned', 'held elsewhere', 'installed', 'ready', 'needs attention'];
+    const validStatuses = ['decommissioned', 'being returned', 'installed', 'ready', 'needs attention'];
     const normalizedStatus = status.toLowerCase();
     
     if (!validStatuses.includes(normalizedStatus)) {
       return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
     }
 
-    // Update the router's clickup_task_status in the database
+    // Update the router's clickup_task_status and notes in the database
     const result = await pool.query(
       `UPDATE routers 
-       SET clickup_task_status = $1 
-       WHERE router_id = $2
+       SET clickup_task_status = $1,
+           notes = COALESCE($2, notes)
+       WHERE router_id = $3
        RETURNING *`,
-      [normalizedStatus, router_id]
+      [normalizedStatus, notes, router_id]
     );
 
     if (result.rows.length === 0) {
@@ -800,6 +801,63 @@ router.patch('/routers/:router_id/status', async (req, res) => {
   } catch (error) {
     logger.error('Error updating router status:', error);
     res.status(500).json({ error: 'Failed to update router status' });
+  }
+});
+
+// GET routers being returned
+router.get('/routers/being-returned', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        r.*,
+        (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status,
+        (SELECT timestamp FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as last_log_time
+       FROM routers r
+       WHERE LOWER(r.clickup_task_status) = 'being returned'
+       ORDER BY r.updated_at DESC`
+    );
+
+    logger.info(`Retrieved ${result.rows.length} routers being returned`);
+    res.json({
+      success: true,
+      count: result.rows.length,
+      routers: result.rows
+    });
+
+  } catch (error) {
+    logger.error('Error fetching routers being returned:', error);
+    res.status(500).json({ error: 'Failed to fetch routers being returned' });
+  }
+});
+
+// PATCH update router notes
+router.patch('/routers/:router_id/notes', async (req, res) => {
+  try {
+    const { router_id } = req.params;
+    const { notes } = req.body;
+
+    const result = await pool.query(
+      `UPDATE routers 
+       SET notes = $1,
+           updated_at = NOW()
+       WHERE router_id = $2
+       RETURNING *`,
+      [notes, router_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Router not found' });
+    }
+
+    logger.info(`Updated notes for router ${router_id}`);
+    res.json({ 
+      success: true, 
+      router: result.rows[0]
+    });
+
+  } catch (error) {
+    logger.error('Error updating router notes:', error);
+    res.status(500).json({ error: 'Failed to update router notes' });
   }
 });
 

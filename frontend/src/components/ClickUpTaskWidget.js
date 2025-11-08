@@ -246,10 +246,10 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
     }
   };
 
-  const handleHeldElsewhere = async () => {
+  const handleBeingReturned = async () => {
     try {
       setLoading(true);
-      await updateRouterStatus(router.router_id, 'held elsewhere');
+      await updateRouterStatus(router.router_id, 'being returned');
       
       // Reload the task to update the UI
       const taskResponse = await getRouterTask(router.router_id);
@@ -257,7 +257,7 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
         setLinkedTask(taskResponse.data.task);
       }
       
-      toast.success('Router marked as held elsewhere');
+      toast.success('Router marked as being returned');
     } catch (error) {
       console.error('Error updating router status:', error);
       toast.error(error.response?.data?.error || 'Failed to update router status');
@@ -337,11 +337,11 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
             {/* Status Change Actions */}
             <div className="task-actions" style={{ marginTop: '12px', borderTop: '1px solid #e5e7eb', paddingTop: '12px' }}>
               <button 
-                onClick={handleHeldElsewhere}
+                onClick={handleBeingReturned}
                 className="task-btn task-btn-warning"
-                title="Mark this router as held at another location"
+                title="Mark this router as being returned"
               >
-                📦 Held Elsewhere
+                📦 Being Returned
               </button>
               <button 
                 onClick={handleDecommission}
