@@ -128,8 +128,20 @@ async function linkRouterToLocation(linkage) {
 
         // Add comment to router task linking the location
         try {
+          // Get workspace ID for proper ClickUp URL
+          const workspaceResult = await client.query(
+            'SELECT workspace_id FROM clickup_oauth_tokens WHERE user_id = $1',
+            ['default']
+          );
+          const workspaceId = workspaceResult.rows[0]?.workspace_id;
+          
+          // Construct proper ClickUp list URL
+          const locationUrl = workspaceId 
+            ? `https://app.clickup.com/${workspaceId}/v/li/${locationTaskId}`
+            : `https://app.clickup.com/list/${locationTaskId}`;
+          
           const commentText = `🤖 **System:** Router assigned to location: **${locationTaskName}**\n\n` +
-            `📍 Location: https://app.clickup.com/${locationTaskId}\n` +
+            `📍 Location: ${locationUrl}\n` +
             `🕐 Assigned at: ${new Date().toLocaleString()}` +
             (linkedBy ? `\n👤 Linked by: ${linkedBy}` : '') +
             (notes ? `\n\n📝 Notes: ${notes}` : '');
