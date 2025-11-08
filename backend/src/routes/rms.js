@@ -108,7 +108,7 @@ router.post('/refresh/:routerId', async (req, res) => {
     
     // Check if router exists - router_id IS the device ID (serial number)
     const routerResult = await pool.query(
-      'SELECT router_id FROM routers WHERE router_id = $1',
+      'SELECT * FROM routers WHERE router_id = $1',
       [routerId]
     );
     
@@ -116,20 +116,34 @@ router.post('/refresh/:routerId', async (req, res) => {
       return res.status(404).json({ error: 'Router not found' });
     }
     
-    // Fetch fresh data from RMS using router_id as device ID
+    // Try to fetch fresh data from RMS, but don't fail if router not in RMS
     const rms = await RMSClient.createWithAuth();
     
-    let deviceData;
+    let deviceData = null;
+    let fromRMS = false;
     try {
       deviceData = await rms.getDevice(routerId);
+      fromRMS = true;
+      logger.info(`Router ${routerId} data fetched from RMS`);
     } catch (rmsError) {
-      logger.error(`RMS API error for router ${routerId}:`, rmsError.message);
-      return res.status(rmsError.response?.status || 500).json({
-        error: 'RMS API error',
-        message: rmsError.response?.status === 422 
-          ? `Router ${routerId} not found in RMS or invalid device ID`
-          : rmsError.message,
-        details: rmsError.response?.data
+      logger.warn(`Router ${routerId} not in RMS, using database data only:`, rmsError.message);
+      // Don't fail - just use database data
+      // Return current database record with updated timestamp
+      await pool.query(
+        'UPDATE routers SET updated_at = NOW() WHERE router_id = $1',
+        [routerId]
+      );
+      
+      const refreshedRouter = await pool.query(
+        'SELECT * FROM routers WHERE router_id = $1',
+        [routerId]
+      );
+      
+      return res.json({
+        success: true,
+        message: 'Router refreshed from database (not available in RMS)',
+        router: refreshedRouter.rows[0],
+        fromRMS: false
       });
     }
     
@@ -167,7 +181,8 @@ router.post('/refresh/:routerId', async (req, res) => {
     res.json({
       success: true,
       message: 'Router refreshed from RMS',
-      router: updatedRouter.rows[0]
+      router: updatedRouter.rows[0],
+      fromRMS: true
     });
   } catch (error) {
     logger.error(`Failed to refresh router ${req.params.routerId}:`, error);
