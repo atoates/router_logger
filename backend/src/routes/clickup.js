@@ -17,6 +17,21 @@ const { sanitizeError } = require('../utils/errorLogger');
 // Store OAuth states temporarily (in production, use Redis)
 const oauthStates = new Map();
 
+// Clean up expired states every 2 minutes
+setInterval(() => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const [state, data] of oauthStates.entries()) {
+    if (data.expires <= now) {
+      oauthStates.delete(state);
+      cleaned++;
+    }
+  }
+  if (cleaned > 0) {
+    logger.info(`Cleaned up ${cleaned} expired OAuth states`);
+  }
+}, 2 * 60 * 1000);
+
 /**
  * GET /api/clickup/auth/status
  * Check if user has authorized ClickUp
@@ -53,10 +68,15 @@ router.get('/auth', (req, res) => {
     // Generate random state for CSRF protection
     const state = crypto.randomBytes(16).toString('hex');
     
-    // Store state with expiration (5 minutes)
+    // Store state with expiration (10 minutes for mobile compatibility)
     oauthStates.set(state, {
       created: Date.now(),
-      expires: Date.now() + 5 * 60 * 1000
+      expires: Date.now() + 10 * 60 * 1000
+    });
+
+    logger.info('Generating ClickUp OAuth state', { 
+      state, 
+      totalStates: oauthStates.size 
     });
 
     const authUrl = clickupOAuthService.getAuthorizationUrl(state);
@@ -78,10 +98,15 @@ router.get('/auth/url', (req, res) => {
     // Generate random state for CSRF protection
     const state = crypto.randomBytes(16).toString('hex');
     
-    // Store state with expiration (5 minutes)
+    // Store state with expiration (10 minutes for mobile compatibility)
     oauthStates.set(state, {
       created: Date.now(),
-      expires: Date.now() + 5 * 60 * 1000
+      expires: Date.now() + 10 * 60 * 1000
+    });
+
+    logger.info('Generating ClickUp OAuth state for URL endpoint', { 
+      state, 
+      totalStates: oauthStates.size 
     });
 
     const authUrl = clickupOAuthService.getAuthorizationUrl(state);
@@ -104,10 +129,32 @@ router.get('/auth/callback', async (req, res) => {
   const { code, state } = req.query;
 
   try {
+    logger.info('ClickUp OAuth callback received', { 
+      hasCode: !!code, 
+      hasState: !!state,
+      state: state
+    });
+
     // Verify state parameter
     const storedState = oauthStates.get(state);
+    logger.info('State verification', {
+      state: state,
+      found: !!storedState,
+      expired: storedState ? Date.now() > storedState.expires : null,
+      statesInMemory: oauthStates.size
+    });
+
     if (!storedState || Date.now() > storedState.expires) {
-      return res.status(400).json({ error: 'Invalid or expired state parameter' });
+      logger.error('State validation failed', {
+        state: state,
+        found: !!storedState,
+        expired: storedState ? Date.now() > storedState.expires : null,
+        allStates: Array.from(oauthStates.keys())
+      });
+      return res.status(400).json({ 
+        error: 'Invalid or expired state parameter',
+        details: storedState ? 'State expired' : 'State not found'
+      });
     }
     
     // Clean up used state
