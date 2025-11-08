@@ -409,7 +409,7 @@ export default function RouterDashboard({ router }) {
             >Reset</button>
             <button 
               className="btn btn-primary" 
-              onClick={()=> setRange({ type:'custom' })}
+              onClick={()=> setRange({ type:'custom', applied: Date.now() })}
               disabled={!(customStart && customEnd) || (customStart && customEnd && (new Date(customEnd) <= new Date(customStart)))}
             >Apply</button>
           </div>
