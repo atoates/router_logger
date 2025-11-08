@@ -129,12 +129,7 @@ router.post('/refresh/:routerId', requireSession, async (req, res) => {
     } catch (rmsError) {
       logger.warn(`Router ${routerId} not in RMS, using database data only:`, rmsError.message);
       // Don't fail - just use database data
-      // Return current database record with updated timestamp
-      await pool.query(
-        'UPDATE routers SET updated_at = NOW() WHERE router_id = $1',
-        [routerId]
-      );
-      
+      // Return current database record
       const refreshedRouter = await pool.query(
         'SELECT * FROM routers WHERE router_id = $1',
         [routerId]
@@ -161,8 +156,7 @@ router.post('/refresh/:routerId', requireSession, async (req, res) => {
         current_status = $4,
         last_seen = $5,
         operator = $6,
-        wan_ip = $7,
-        updated_at = NOW()
+        wan_ip = $7
       WHERE router_id = $8
       RETURNING *
     `;
@@ -227,8 +221,7 @@ router.post('/status/:routerId', requireSession, async (req, res) => {
       await pool.query(
         `UPDATE routers SET 
           current_status = $1,
-          last_seen = $2,
-          updated_at = NOW()
+          last_seen = $2
         WHERE router_id = $3`,
         [status, lastSeen, routerId]
       );
@@ -397,8 +390,7 @@ router.post('/details/:routerId', requireSession, async (req, res) => {
           name = $1,
           firmware = $2,
           model = $3,
-          wan_ip = $4,
-          updated_at = NOW()
+          wan_ip = $4
         WHERE router_id = $5`,
         [deviceData.name || routerId, firmware, model, wan_ip, routerId]
       );

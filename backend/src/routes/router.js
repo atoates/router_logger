@@ -814,7 +814,7 @@ router.get('/routers/being-returned', async (req, res) => {
         (SELECT timestamp FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as last_log_time
        FROM routers r
        WHERE LOWER(r.clickup_task_status) = 'being returned'
-       ORDER BY r.updated_at DESC`
+       ORDER BY r.last_seen DESC NULLS LAST, r.created_at DESC`
     );
 
     logger.info(`Retrieved ${result.rows.length} routers being returned`);
@@ -838,8 +838,7 @@ router.patch('/routers/:router_id/notes', async (req, res) => {
 
     const result = await pool.query(
       `UPDATE routers 
-       SET notes = $1,
-           updated_at = NOW()
+       SET notes = $1
        WHERE router_id = $2
        RETURNING *`,
       [notes, router_id]
