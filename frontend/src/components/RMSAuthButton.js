@@ -43,20 +43,39 @@ function RMSAuthButton({ variant = 'panel' }) {
   }, []);
 
   const checkAuthStatus = async () => {
+    console.log('RMSAuthButton: Checking auth status...');
     try {
+      // Add timeout to prevent infinite loading
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.log('RMSAuthButton: Request timeout after 5s');
+        controller.abort();
+      }, 5000); // 5 second timeout
+      
       const response = await fetch(`${API_URL}/api/auth/rms/status`, {
-        credentials: 'include'
+        credentials: 'include',
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
+      
+      console.log('RMSAuthButton: Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log('RMSAuthButton: Auth status data:', data);
       
       setAuthStatus({
         loading: false,
-        authenticated: data.authenticated,
-        configured: data.configured,
-        scope: data.scope
+        authenticated: data.authenticated || false,
+        configured: data.configured || false,
+        scope: data.scope || null
       });
     } catch (error) {
-      console.error('Error checking auth status:', error);
+      console.error('RMSAuthButton: Error checking auth status:', error);
       setAuthStatus({
         loading: false,
         authenticated: false,
