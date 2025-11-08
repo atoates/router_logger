@@ -768,14 +768,33 @@ router.patch('/routers/:router_id/status', async (req, res) => {
 
     // Update the router's clickup_task_status and notes in the database
     logger.info(`Updating database for router ${router_id} with status="${normalizedStatus}", notes="${notes || 'none'}"`);
-    const result = await pool.query(
-      `UPDATE routers 
-       SET clickup_task_status = $1,
-           notes = CASE WHEN $2 IS NOT NULL THEN $2 ELSE notes END
-       WHERE router_id = $3
-       RETURNING *`,
-      [normalizedStatus, notes, router_id]
-    );
+    
+    // Try to update with notes, fallback to without notes if column doesn't exist
+    let result;
+    try {
+      result = await pool.query(
+        `UPDATE routers 
+         SET clickup_task_status = $1,
+             notes = CASE WHEN $2 IS NOT NULL THEN $2 ELSE notes END
+         WHERE router_id = $3
+         RETURNING *`,
+        [normalizedStatus, notes, router_id]
+      );
+    } catch (notesError) {
+      // If notes column doesn't exist yet, update without it
+      if (notesError.message && notesError.message.includes('column "notes" does not exist')) {
+        logger.warn('Notes column does not exist yet, updating without notes');
+        result = await pool.query(
+          `UPDATE routers 
+           SET clickup_task_status = $1
+           WHERE router_id = $2
+           RETURNING *`,
+          [normalizedStatus, router_id]
+        );
+      } else {
+        throw notesError;
+      }
+    }
 
     if (result.rows.length === 0) {
       logger.warn(`Router ${router_id} not found in database`);
