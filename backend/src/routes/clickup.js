@@ -552,14 +552,31 @@ router.get('/properties/search', async (req, res) => {
     logger.info('Search results:', { taskCount: tasks?.length });
     
     // Filter for location/property tasks and format
+    // Properties are identified by having address keywords OR being in certain lists
+    const propertyListNames = ['properties', 'locations', 'addresses', 'lettings'];
+    
     const properties = tasks
       .filter(task => {
-        // Include tasks that might be properties
         const name = (task.name || '').toLowerCase();
-        const hasAddress = name.includes('flat') || name.includes('street') || 
+        const listName = (task.list?.name || '').toLowerCase();
+        
+        // Include if list name suggests it's a property list
+        const isInPropertyList = propertyListNames.some(propList => listName.includes(propList));
+        
+        // Include if task name has address/property keywords
+        const hasAddressKeywords = name.includes('flat') || name.includes('street') || 
                           name.includes('avenue') || name.includes('road') ||
-                          name.includes('#');
-        return hasAddress || task.custom_fields?.some(f => f.name?.toLowerCase().includes('address'));
+                          name.includes('#') || name.includes('apt') ||
+                          name.includes('unit') || name.includes('property');
+        
+        // Include if has address custom field
+        const hasAddressField = task.custom_fields?.some(f => 
+          f.name?.toLowerCase().includes('address') ||
+          f.name?.toLowerCase().includes('postcode') ||
+          f.name?.toLowerCase().includes('property')
+        );
+        
+        return isInPropertyList || hasAddressKeywords || hasAddressField;
       })
       .map(task => ({
         id: task.id,

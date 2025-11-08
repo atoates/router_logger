@@ -65,12 +65,13 @@ const MobileStats = ({ router }) => {
       const API_BASE = process.env.REACT_APP_API_URL || '';
       const response = await fetch(`${API_BASE}/api/rms/refresh/${router.router_id}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include' // Send session cookie
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to refresh');
+        throw new Error(error.error || error.message || 'Failed to refresh');
       }
 
       const result = await response.json();

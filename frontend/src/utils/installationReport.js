@@ -71,7 +71,10 @@ export async function generateInstallationReport({ router, stats, logs, gpsLocat
   }
 
   addSpacer(5);
-  addText(`Installation Date: ${new Date(technician.timestamp).toLocaleString()}`, margin, 11);
+  
+  // Installation date - use technician timestamp if available, otherwise use current date
+  const installDate = technician?.timestamp ? new Date(technician.timestamp) : new Date();
+  addText(`Installation Date: ${installDate.toLocaleString()}`, margin, 11);
   
   if (router.clickup_location_task_name) {
     addText(`Location: ${router.clickup_location_task_name}`, margin, 11);
