@@ -752,6 +752,8 @@ router.patch('/routers/:router_id/status', async (req, res) => {
     const { router_id } = req.params;
     const { status, notes } = req.body;
 
+    logger.info(`Status update request for router ${router_id}: status="${status}", notes="${notes}"`);
+
     if (!status) {
       return res.status(400).json({ error: 'Status is required' });
     }
@@ -765,6 +767,7 @@ router.patch('/routers/:router_id/status', async (req, res) => {
     }
 
     // Update the router's clickup_task_status and notes in the database
+    logger.info(`Updating database for router ${router_id} with status="${normalizedStatus}"`);
     const result = await pool.query(
       `UPDATE routers 
        SET clickup_task_status = $1,
@@ -775,13 +778,16 @@ router.patch('/routers/:router_id/status', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
+      logger.warn(`Router ${router_id} not found in database`);
       return res.status(404).json({ error: 'Router not found' });
     }
 
     const router = result.rows[0];
+    logger.info(`Database updated successfully for router ${router_id}`);
 
     // If there's a ClickUp task linked, update the status there too
     if (router.clickup_task_id) {
+      // This should NOT throw - all errors are caught
       try {
         const clickupStatus = normalizedStatus.toUpperCase().replace(/ /g, '_');
         logger.info(`Attempting to update ClickUp task ${router.clickup_task_id} status to "${clickupStatus}"`);
@@ -796,13 +802,16 @@ router.patch('/routers/:router_id/status', async (req, res) => {
         logger.error(`Failed to update ClickUp task status to "${normalizedStatus}":`, {
           error: clickupError.message,
           status: clickupError.response?.status,
-          data: clickupError.response?.data
+          data: clickupError.response?.data,
+          stack: clickupError.stack
         });
         // Continue anyway - database was updated
       }
+    } else {
+      logger.info(`No ClickUp task linked for router ${router_id}, skipping ClickUp sync`);
     }
 
-    logger.info(`Updated router ${router_id} status to "${normalizedStatus}"`);
+    logger.info(`Sending success response for router ${router_id} status update`);
     res.json({ 
       success: true, 
       router: result.rows[0],
@@ -810,8 +819,13 @@ router.patch('/routers/:router_id/status', async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('Error updating router status:', error);
-    res.status(500).json({ error: 'Failed to update router status' });
+    logger.error('CRITICAL ERROR updating router status:', {
+      error: error.message,
+      stack: error.stack,
+      router_id: req.params.router_id,
+      body: req.body
+    });
+    res.status(500).json({ error: 'Failed to update router status', details: error.message });
   }
 });
 
