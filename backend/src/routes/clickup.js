@@ -60,6 +60,50 @@ router.get('/auth/status', async (req, res) => {
 });
 
 /**
+ * GET /api/clickup/auth/status
+ * Check ClickUp connection status and token validity
+ */
+router.get('/auth/status', async (req, res) => {
+  try {
+    const hasToken = await clickupOAuthService.hasValidToken('default');
+    
+    if (!hasToken) {
+      return res.json({
+        connected: false,
+        valid: false,
+        message: 'Not connected to ClickUp'
+      });
+    }
+
+    // Test the token by making a simple API call
+    try {
+      const client = await clickupClient.getAuthorizedClient('default');
+      await client.get('/user');
+      
+      res.json({
+        connected: true,
+        valid: true,
+        message: 'ClickUp connection is active'
+      });
+    } catch (error) {
+      // Token exists but is invalid
+      if (error.response?.status === 401) {
+        res.json({
+          connected: true,
+          valid: false,
+          message: 'ClickUp token expired. Please reconnect.'
+        });
+      } else {
+        throw error;
+      }
+    }
+  } catch (error) {
+    logger.error('Error checking ClickUp status:', sanitizeError(error));
+    res.status(500).json({ error: 'Failed to check ClickUp status' });
+  }
+});
+
+/**
  * GET /api/clickup/auth
  * Direct redirect to ClickUp OAuth (for mobile/simple flows)
  */

@@ -53,7 +53,7 @@ class ClickUpClient {
       throw new Error('No ClickUp token found. Please authorize the application.');
     }
 
-    return axios.create({
+    const client = axios.create({
       baseURL: CLICKUP_API_BASE,
       headers: {
         'Authorization': token,
@@ -61,6 +61,23 @@ class ClickUpClient {
       },
       timeout: 15000
     });
+
+    // Add response interceptor to handle auth errors
+    client.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response?.status === 401) {
+          logger.error('ClickUp token is invalid or expired - please re-authorize');
+          error.message = 'ClickUp authentication expired. Please reconnect ClickUp.';
+        } else if (error.code === 'ECONNABORTED') {
+          logger.error('ClickUp API request timed out', { url: error.config?.url });
+          error.message = 'ClickUp API request timed out. Please try again.';
+        }
+        throw error;
+      }
+    );
+
+    return client;
   }
 
   /**
