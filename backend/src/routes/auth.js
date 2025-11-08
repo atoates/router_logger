@@ -9,6 +9,19 @@ const oauthService = require('../services/oauthService');
 const { startRMSSync, isRMSSyncRunning } = require('../services/rmsSync');
 const { logger } = require('../config/database');
 
+// Server-side state storage for OAuth (fixes mobile cookie issues)
+const oauthStates = new Map();
+
+// Clean up expired states every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [state, data] of oauthStates.entries()) {
+    if (data.expiresAt <= now) {
+      oauthStates.delete(state);
+    }
+  }
+}, 5 * 60 * 1000);
+
 /**
  * GET /api/auth/rms/login
  * Redirect user to RMS OAuth authorization page
@@ -24,7 +37,13 @@ router.get('/rms/login', (req, res) => {
 
     const { authUrl, state } = oauthService.getAuthorizationUrl();
     
-    // Store state in session cookie for CSRF protection
+    // Store state server-side for CSRF protection (mobile-friendly)
+    oauthStates.set(state, {
+      createdAt: Date.now(),
+      expiresAt: Date.now() + (10 * 60 * 1000) // 10 minutes
+    });
+    
+    // Also set cookie as backup for desktop
     res.cookie('oauth_state', state, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -72,11 +91,19 @@ router.get('/rms/callback', async (req, res) => {
     }
 
     // Verify state matches (CSRF protection)
-    const storedState = req.cookies.oauth_state;
-    if (!storedState || storedState !== state) {
+    // Check server-side store first (mobile-friendly), then cookie (desktop fallback)
+    const serverState = oauthStates.get(state);
+    const cookieState = req.cookies.oauth_state;
+    
+    const isValidState = (serverState && serverState.expiresAt > Date.now()) || (cookieState === state);
+    
+    if (!isValidState) {
       logger.error('State mismatch - possible CSRF attack', {
         received: state,
-        stored: storedState
+        hasServerState: !!serverState,
+        serverStateExpired: serverState ? serverState.expiresAt <= Date.now() : null,
+        hasCookieState: !!cookieState,
+        cookieMatches: cookieState === state
       });
       return res.status(400).json({
         success: false,
@@ -84,7 +111,8 @@ router.get('/rms/callback', async (req, res) => {
       });
     }
 
-    // Clear state cookie
+    // Clear state from both stores
+    oauthStates.delete(state);
     res.clearCookie('oauth_state');
 
     // Exchange code for token
