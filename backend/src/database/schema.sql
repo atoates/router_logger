@@ -1,0 +1,170 @@
+-- Router Logger Database Schema
+-- Complete schema with all columns defined from the start
+
+-- Main routers table with all columns
+CREATE TABLE IF NOT EXISTS routers (
+  id SERIAL PRIMARY KEY,
+  router_id VARCHAR(255) UNIQUE NOT NULL,
+  device_serial VARCHAR(255),
+  imei VARCHAR(255),
+  name VARCHAR(255),
+  location VARCHAR(255),
+  site_id VARCHAR(255),
+  firmware_version VARCHAR(100),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  
+  -- RMS integration
+  rms_created_at TIMESTAMP,
+  
+  -- Status and notes
+  notes TEXT,
+  
+  -- ClickUp integration
+  clickup_task_id VARCHAR(50),
+  clickup_task_url TEXT,
+  clickup_list_id VARCHAR(50),
+  clickup_location_task_id VARCHAR(50),
+  clickup_location_task_name VARCHAR(255),
+  location_linked_at TIMESTAMP,
+  date_installed BIGINT,
+  last_clickup_sync_hash TEXT,
+  clickup_assignees JSONB,
+  clickup_task_status VARCHAR(50)
+);
+
+-- Router telemetry logs (RUT200 format)
+CREATE TABLE IF NOT EXISTS router_logs (
+  id SERIAL PRIMARY KEY,
+  router_id VARCHAR(255) NOT NULL,
+  imei VARCHAR(255),
+  timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  
+  -- WAN & Network Info
+  wan_ip VARCHAR(45),
+  wan_ipv6 VARCHAR(45),
+  wan_type VARCHAR(50),
+  operator VARCHAR(100),
+  mcc VARCHAR(10),
+  mnc VARCHAR(10),
+  network_type VARCHAR(50),
+  
+  -- Cell Tower Info
+  lac VARCHAR(50),
+  tac VARCHAR(50),
+  cell_id VARCHAR(50),
+  rsrp INTEGER,
+  rsrq INTEGER,
+  rssi INTEGER,
+  sinr INTEGER,
+  
+  -- SIM Card Info
+  iccid VARCHAR(32),
+  imsi VARCHAR(32),
+  
+  -- Location (enriched from cell tower)
+  latitude DECIMAL(10, 8),
+  longitude DECIMAL(11, 8),
+  location_accuracy VARCHAR(50),
+  
+  -- Data Counters (cumulative)
+  total_tx_bytes BIGINT DEFAULT 0,
+  total_rx_bytes BIGINT DEFAULT 0,
+  
+  -- Device Status & Hardware
+  uptime_seconds INTEGER DEFAULT 0,
+  conn_uptime_seconds INTEGER,
+  firmware_version VARCHAR(100),
+  cpu_usage DECIMAL(5,2),
+  cpu_temp_c DECIMAL(5,2),
+  board_temp_c DECIMAL(5,2),
+  input_voltage_mv INTEGER,
+  memory_free INTEGER,
+  status VARCHAR(50) DEFAULT 'online',
+  
+  -- Network Connections
+  vpn_status VARCHAR(50),
+  vpn_name VARCHAR(100),
+  eth_link_up BOOLEAN,
+  
+  -- Wi-Fi Clients (JSON array)
+  wifi_clients JSONB,
+  wifi_client_count INTEGER DEFAULT 0,
+  
+  -- Additional data
+  raw_data JSONB,
+  
+  FOREIGN KEY (router_id) REFERENCES routers(router_id) ON DELETE CASCADE
+);
+
+-- Device inspection tracking
+CREATE TABLE IF NOT EXISTS inspection_logs (
+  id SERIAL PRIMARY KEY,
+  router_id VARCHAR(255) NOT NULL,
+  inspected_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  inspected_by VARCHAR(255),
+  notes TEXT,
+  FOREIGN KEY (router_id) REFERENCES routers(router_id) ON DELETE CASCADE
+);
+
+-- RMS OAuth tokens
+CREATE TABLE IF NOT EXISTS oauth_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id VARCHAR(255) NOT NULL UNIQUE,
+  access_token TEXT NOT NULL,
+  refresh_token TEXT,
+  token_type VARCHAR(50) DEFAULT 'Bearer',
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  scope TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ClickUp OAuth tokens
+CREATE TABLE IF NOT EXISTS clickup_oauth_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id VARCHAR(100) NOT NULL,
+  access_token TEXT NOT NULL,
+  token_type VARCHAR(50) DEFAULT 'Bearer',
+  workspace_id VARCHAR(50),
+  workspace_name VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id)
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_router_logs_router_id ON router_logs(router_id);
+CREATE INDEX IF NOT EXISTS idx_router_logs_timestamp ON router_logs(timestamp);
+CREATE INDEX IF NOT EXISTS idx_router_logs_router_timestamp ON router_logs(router_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_router_logs_router_ts ON router_logs (router_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_router_logs_ts ON router_logs (timestamp DESC);
+
+CREATE INDEX IF NOT EXISTS idx_inspection_logs_router_id ON inspection_logs(router_id);
+CREATE INDEX IF NOT EXISTS idx_inspection_logs_inspected_at ON inspection_logs(inspected_at DESC);
+CREATE INDEX IF NOT EXISTS idx_inspection_logs_router_ts ON inspection_logs (router_id, inspected_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_oauth_tokens_user_id ON oauth_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_tokens_expires_at ON oauth_tokens(expires_at);
+
+CREATE INDEX IF NOT EXISTS idx_routers_clickup_task ON routers(clickup_task_id);
+CREATE INDEX IF NOT EXISTS idx_clickup_tokens_user ON clickup_oauth_tokens(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_routers_location_task ON routers(clickup_location_task_id) WHERE clickup_location_task_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_routers_date_installed ON routers(date_installed) WHERE date_installed IS NOT NULL;
+
+-- Triggers
+CREATE OR REPLACE FUNCTION update_oauth_tokens_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS oauth_tokens_updated_at ON oauth_tokens;
+
+CREATE TRIGGER oauth_tokens_updated_at
+BEFORE UPDATE ON oauth_tokens
+FOR EACH ROW
+EXECUTE FUNCTION update_oauth_tokens_updated_at();
