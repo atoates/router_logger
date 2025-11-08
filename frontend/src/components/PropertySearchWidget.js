@@ -108,8 +108,10 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
         }
         
         // Filter lists by search query (case insensitive)
+        // If query is only digits, prepend '#' for property number search
+        const searchTerm = /^\d+$/.test(searchQuery) ? `#${searchQuery}` : searchQuery;
         const filtered = allLists.filter(list => 
-          list.name.toLowerCase().includes(searchQuery.toLowerCase())
+          list.name.toLowerCase().includes(searchTerm.toLowerCase())
         );
         
         // Format for the dropdown
@@ -396,7 +398,7 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
               <div className="psw-search-input-wrapper">
                 <input
                   type="text"
-                  placeholder="Search locations (e.g., Cambridge, Colchester)..."
+                  placeholder="Search locations (e.g., 123 or Cambridge)..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
