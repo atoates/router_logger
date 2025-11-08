@@ -783,7 +783,11 @@ router.patch('/routers/:router_id/status', async (req, res) => {
     // If there's a ClickUp task linked, update the status there too
     if (router.clickup_task_id) {
       try {
-        await clickupClient.updateTaskStatus(router.clickup_task_id, normalizedStatus);
+        await clickupClient.updateTask(
+          router.clickup_task_id, 
+          { status: normalizedStatus.toUpperCase().replace(/ /g, '_') },
+          'default'
+        );
         logger.info(`Updated ClickUp task ${router.clickup_task_id} status to "${normalizedStatus}"`);
       } catch (clickupError) {
         logger.error(`Failed to update ClickUp task status:`, clickupError);
