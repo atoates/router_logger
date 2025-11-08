@@ -505,7 +505,8 @@ router.get('/routers/by-assignees', async (req, res) => {
         r.clickup_location_task_id,
         r.clickup_location_task_name,
         r.location_linked_at,
-        r.clickup_assignees
+        r.clickup_assignees,
+        r.clickup_task_status
       FROM routers r
       LEFT JOIN LATERAL (
         SELECT status
@@ -523,6 +524,12 @@ router.get('/routers/by-assignees', async (req, res) => {
     const routers = routersResult.rows;
     
     for (const router of routers) {
+      // Skip decommissioned routers entirely - they're gone and shouldn't appear anywhere
+      const isDecommissioned = router.clickup_task_status?.toLowerCase() === 'decommissioned';
+      if (isDecommissioned) {
+        continue;
+      }
+
       try {
         // Parse assignees from database
         let assignees = null;

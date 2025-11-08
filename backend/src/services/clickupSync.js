@@ -182,6 +182,12 @@ async function syncRouterToClickUp(router, dataUsageMap = {}) {
           locationTaskId: router.clickup_location_task_id
         });
       }
+      
+      // Always update status in database (even if ClickUp update was skipped)
+      await pool.query(
+        'UPDATE routers SET clickup_task_status = $1 WHERE router_id = $2',
+        [desiredStatus, router.router_id]
+      );
     } catch (statusError) {
       logger.warn(`Failed to update task status for router ${router.router_id}:`, statusError.message);
       // Don't fail the whole sync if status update fails
