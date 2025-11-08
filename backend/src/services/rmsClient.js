@@ -26,8 +26,8 @@ class RMSClient {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      // Slightly longer timeout for RMS API
-      timeout: 15000
+      // Longer timeout for RMS API (can be slow with many devices)
+      timeout: 30000
     });
   }
 

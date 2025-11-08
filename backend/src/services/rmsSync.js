@@ -316,10 +316,13 @@ function startRMSSync(intervalMinutes = 15) {
   const intervalMs = intervalMinutes * 60 * 1000;
   logger.info(`Starting RMS sync scheduler (every ${intervalMinutes} minutes)`);
 
-  // Run immediately on startup
-  syncFromRMS().catch(error => {
-    logger.error('Initial RMS sync failed:', error.message);
-  });
+  // Run shortly after startup (delayed to not block server initialization)
+  setTimeout(() => {
+    logger.info('Running initial RMS sync...');
+    syncFromRMS().catch(error => {
+      logger.error('Initial RMS sync failed:', error.message);
+    });
+  }, 5000); // 5 second delay
 
   // Then run on schedule
   syncIntervalId = setInterval(() => {
