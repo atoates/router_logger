@@ -766,15 +766,14 @@ router.patch('/routers/:router_id/status', async (req, res) => {
       return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
     }
 
-    // Update the router's clickup_task_status and notes in the database
+    // Update the router's clickup_task_status in the database
     logger.info(`Updating database for router ${router_id} with status="${normalizedStatus}"`);
     const result = await pool.query(
       `UPDATE routers 
-       SET clickup_task_status = $1,
-           notes = COALESCE($2, notes)
-       WHERE router_id = $3
+       SET clickup_task_status = $1
+       WHERE router_id = $2
        RETURNING *`,
-      [normalizedStatus, notes, router_id]
+      [normalizedStatus, router_id]
     );
 
     if (result.rows.length === 0) {
