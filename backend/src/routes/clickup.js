@@ -528,7 +528,7 @@ router.get('/properties/search', async (req, res) => {
     // Get workspace/team ID from environment or use the first available one
     let workspaces;
     try {
-      workspaces = await clickupClient.getTeams('default');
+      workspaces = await clickupClient.getWorkspaces('default');
       logger.info('Got workspaces:', { count: workspaces?.length });
     } catch (error) {
       logger.error('Failed to get ClickUp workspaces:', { error: error.message, stack: error.stack });
