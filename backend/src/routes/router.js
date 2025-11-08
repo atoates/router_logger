@@ -864,15 +864,11 @@ router.get('/routers/decommissioned', async (req, res) => {
     );
 
     logger.info(`Retrieved ${result.rows.length} decommissioned routers`);
-    res.json({
-      success: true,
-      count: result.rows.length,
-      routers: result.rows
-    });
+    res.json(result.rows);
 
   } catch (error) {
-    logger.error('Error fetching routers being returned:', error);
-    res.status(500).json({ error: 'Failed to fetch routers being returned' });
+    logger.error('Error fetching decommissioned routers:', error);
+    res.status(500).json({ error: 'Failed to fetch decommissioned routers' });
   }
 });
 
