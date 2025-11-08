@@ -45,6 +45,7 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // Health check endpoint (for Railway health checks)
+// Returns 503 until server is fully initialized, then 200
 let isServerReady = false;
 app.get('/health', (req, res) => {
   if (!isServerReady) {
