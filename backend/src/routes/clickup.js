@@ -95,17 +95,21 @@ router.get('/auth', (req, res) => {
  */
 router.get('/auth/url', (req, res) => {
   try {
+    const { mobile } = req.query;
+    
     // Generate random state for CSRF protection
     const state = crypto.randomBytes(16).toString('hex');
     
-    // Store state with expiration (10 minutes for mobile compatibility)
+    // Store state with longer expiration for mobile (20 minutes to handle slow auth flows)
     oauthStates.set(state, {
       created: Date.now(),
-      expires: Date.now() + 10 * 60 * 1000
+      expires: Date.now() + 20 * 60 * 1000,
+      mobile: mobile === 'true'
     });
 
     logger.info('Generating ClickUp OAuth state for URL endpoint', { 
       state, 
+      mobile: mobile === 'true',
       totalStates: oauthStates.size 
     });
 
@@ -137,10 +141,13 @@ router.get('/auth/callback', async (req, res) => {
 
     // Verify state parameter
     const storedState = oauthStates.get(state);
+    const isMobile = storedState?.mobile || false;
+    
     logger.info('State verification', {
       state: state,
       found: !!storedState,
       expired: storedState ? Date.now() > storedState.expires : null,
+      mobile: isMobile,
       statesInMemory: oauthStates.size
     });
 
@@ -151,6 +158,65 @@ router.get('/auth/callback', async (req, res) => {
         expired: storedState ? Date.now() > storedState.expires : null,
         allStates: Array.from(oauthStates.keys())
       });
+      
+      // For mobile, show user-friendly error page instead of JSON
+      if (req.headers['user-agent']?.match(/Mobile|Android|iPhone/i)) {
+        return res.send(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+              body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                margin: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                padding: 20px;
+              }
+              .container {
+                background: white;
+                border-radius: 16px;
+                padding: 32px;
+                max-width: 400px;
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+              }
+              .error-icon { font-size: 64px; margin-bottom: 16px; }
+              h1 { color: #dc2626; margin: 0 0 12px 0; font-size: 24px; }
+              p { color: #6b7280; margin: 0 0 24px 0; line-height: 1.5; }
+              button {
+                width: 100%;
+                padding: 14px;
+                background: #667eea;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="error-icon">❌</div>
+              <h1>Connection Failed</h1>
+              <p>Invalid state parameter - possible CSRF attack</p>
+              <p style="font-size: 14px;">Redirecting to dashboard...</p>
+              <button onclick="window.location.href='/mobile'">Go to Dashboard</button>
+            </div>
+            <script>
+              setTimeout(() => { window.location.href = '/mobile'; }, 3000);
+            </script>
+          </body>
+          </html>
+        `);
+      }
+      
       return res.status(400).json({ 
         error: 'Invalid or expired state parameter',
         details: storedState ? 'State expired' : 'State not found'
@@ -185,9 +251,69 @@ router.get('/auth/callback', async (req, res) => {
     });
 
     logger.info('ClickUp OAuth authorization successful', { 
-      workspace: workspace?.name 
+      workspace: workspace?.name,
+      mobile: isMobile
     });
 
+    // Redirect mobile users to a success page
+    if (isMobile || req.headers['user-agent']?.match(/Mobile|Android|iPhone/i)) {
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+              margin: 0;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              padding: 20px;
+            }
+            .container {
+              background: white;
+              border-radius: 16px;
+              padding: 32px;
+              max-width: 400px;
+              text-align: center;
+              box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            }
+            .success-icon { font-size: 64px; margin-bottom: 16px; }
+            h1 { color: #10b981; margin: 0 0 12px 0; font-size: 24px; }
+            p { color: #6b7280; margin: 0 0 24px 0; line-height: 1.5; }
+            button {
+              width: 100%;
+              padding: 14px;
+              background: #10b981;
+              color: white;
+              border: none;
+              border-radius: 8px;
+              font-size: 16px;
+              font-weight: 600;
+              cursor: pointer;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="success-icon">✅</div>
+            <h1>Connected Successfully!</h1>
+            <p>ClickUp workspace: <strong>${workspace?.name || 'Connected'}</strong></p>
+            <p style="font-size: 14px;">Redirecting to dashboard...</p>
+            <button onclick="window.location.href='/mobile'">Go to Dashboard</button>
+          </div>
+          <script>
+            setTimeout(() => { window.location.href = '/mobile'; }, 2000);
+          </script>
+        </body>
+        </html>
+      `);
+    }
+
+    // Desktop users get JSON response
     res.json({ 
       success: true,
       workspace: {
@@ -197,6 +323,61 @@ router.get('/auth/callback', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error in OAuth callback:', sanitizeError(error));
+    
+    // Mobile-friendly error page
+    if (req.headers['user-agent']?.match(/Mobile|Android|iPhone/i)) {
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+              margin: 0;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              padding: 20px;
+            }
+            .container {
+              background: white;
+              border-radius: 16px;
+              padding: 32px;
+              max-width: 400px;
+              text-align: center;
+              box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            }
+            .error-icon { font-size: 64px; margin-bottom: 16px; }
+            h1 { color: #dc2626; margin: 0 0 12px 0; font-size: 24px; }
+            p { color: #6b7280; margin: 0 0 24px 0; line-height: 1.5; }
+            button {
+              width: 100%;
+              padding: 14px;
+              background: #667eea;
+              color: white;
+              border: none;
+              border-radius: 8px;
+              font-size: 16px;
+              font-weight: 600;
+              cursor: pointer;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="error-icon">❌</div>
+            <h1>Authorization Failed</h1>
+            <p>${error.message || 'Something went wrong during authentication'}</p>
+            <button onclick="window.location.href='/mobile'">Return to Dashboard</button>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+    
     res.status(500).json({ error: 'Authorization failed' });
   }
 });
