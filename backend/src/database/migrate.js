@@ -88,6 +88,9 @@ async function initializeDatabase() {
     // Add rms_created_at column to routers table for RMS device creation date (used for inspection tracking)
     await client.query(`ALTER TABLE routers ADD COLUMN IF NOT EXISTS rms_created_at TIMESTAMP;`);
 
+    // Add notes column to routers table for storing status change notes (e.g., decommission reasons)
+    await client.query(`ALTER TABLE routers ADD COLUMN IF NOT EXISTS notes TEXT;`);
+
     // Create inspection_logs table to track device inspections
     await client.query(`
       CREATE TABLE IF NOT EXISTS inspection_logs (
