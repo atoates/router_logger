@@ -233,9 +233,9 @@ router.get('/status', async (req, res) => {
     // Check ClickUp token
     try {
       const clickupOAuthService = require('../services/clickupOAuthService');
-      const clickupToken = await clickupOAuthService.getValidToken('default');
-      status.clickup.connected = !!clickupToken;
-      if (clickupToken) {
+      const hasToken = await clickupOAuthService.hasValidToken('default');
+      status.clickup.connected = hasToken;
+      if (hasToken) {
         status.clickup.hasToken = true;
       }
     } catch (error) {
@@ -248,6 +248,23 @@ router.get('/status', async (req, res) => {
     logger.error('Error checking auth status:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+/**
+ * GET /api/auth/clickup/callback
+ * Redirect for ClickUp OAuth callback (fallback for misconfigured redirect URI)
+ * Redirects to correct callback endpoint
+ */
+router.get('/clickup/callback', (req, res) => {
+  const { code, state } = req.query;
+  logger.info('Redirecting ClickUp OAuth callback to correct endpoint', { 
+    hasCode: !!code, 
+    hasState: !!state 
+  });
+  
+  // Redirect to the correct ClickUp callback endpoint
+  const redirectUrl = `/api/clickup/auth/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`;
+  res.redirect(redirectUrl);
 });
 
 module.exports = router;
