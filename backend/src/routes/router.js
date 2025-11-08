@@ -688,8 +688,8 @@ router.get('/routers/status-summary', async (req, res) => {
     // Get current status counts (excluding decommissioned routers)
     const currentResult = await pool.query(`
       SELECT 
-        COUNT(*) FILTER (WHERE current_status IN ('online', 'Online', '1', 1)) as online_count,
-        COUNT(*) FILTER (WHERE current_status NOT IN ('online', 'Online', '1', 1) OR current_status IS NULL) as offline_count,
+        COUNT(*) FILTER (WHERE current_status IN ('online', 'Online', '1')) as online_count,
+        COUNT(*) FILTER (WHERE current_status NOT IN ('online', 'Online', '1') OR current_status IS NULL) as offline_count,
         COUNT(*) as total_count
       FROM (
         SELECT 
@@ -703,8 +703,8 @@ router.get('/routers/status-summary', async (req, res) => {
     // Get status counts from 48 hours ago
     const historicalResult = await pool.query(`
       SELECT 
-        COUNT(*) FILTER (WHERE historical_status IN ('online', 'Online', '1', 1)) as online_count,
-        COUNT(*) FILTER (WHERE historical_status NOT IN ('online', 'Online', '1', 1) OR historical_status IS NULL) as offline_count
+        COUNT(*) FILTER (WHERE historical_status IN ('online', 'Online', '1')) as online_count,
+        COUNT(*) FILTER (WHERE historical_status NOT IN ('online', 'Online', '1') OR historical_status IS NULL) as offline_count
       FROM (
         SELECT 
           r.router_id,
