@@ -682,6 +682,72 @@ router.post('/routers/:routerId/remove-assignees', async (req, res) => {
   }
 });
 
+// GET router online/offline status with 48h comparison
+router.get('/routers/status-summary', async (req, res) => {
+  try {
+    // Get current status counts (excluding decommissioned routers)
+    const currentResult = await pool.query(`
+      WITH latest_logs AS (
+        SELECT DISTINCT ON (router_id) 
+          router_id, 
+          status,
+          timestamp
+        FROM router_logs
+        ORDER BY router_id, timestamp DESC
+      )
+      SELECT 
+        COUNT(*) FILTER (WHERE l.status IN ('online', 'Online', '1', 1)) as online_count,
+        COUNT(*) FILTER (WHERE l.status NOT IN ('online', 'Online', '1', 1) OR l.status IS NULL) as offline_count,
+        COUNT(*) as total_count
+      FROM routers r
+      LEFT JOIN latest_logs l ON r.router_id = l.router_id
+      WHERE r.clickup_task_status IS NULL OR LOWER(r.clickup_task_status) != 'decommissioned'
+    `);
+
+    // Get status counts from 48 hours ago
+    const historicalResult = await pool.query(`
+      WITH logs_48h_ago AS (
+        SELECT DISTINCT ON (router_id)
+          router_id,
+          status,
+          timestamp
+        FROM router_logs
+        WHERE timestamp <= NOW() - INTERVAL '48 hours'
+          AND timestamp >= NOW() - INTERVAL '50 hours'
+        ORDER BY router_id, timestamp DESC
+      )
+      SELECT 
+        COUNT(*) FILTER (WHERE l.status IN ('online', 'Online', '1', 1)) as online_count,
+        COUNT(*) FILTER (WHERE l.status NOT IN ('online', 'Online', '1', 1) OR l.status IS NULL) as offline_count
+      FROM routers r
+      LEFT JOIN logs_48h_ago l ON r.router_id = l.router_id
+      WHERE r.clickup_task_status IS NULL OR LOWER(r.clickup_task_status) != 'decommissioned'
+    `);
+
+    const current = currentResult.rows[0];
+    const historical = historicalResult.rows[0];
+
+    res.json({
+      current: {
+        online: parseInt(current.online_count) || 0,
+        offline: parseInt(current.offline_count) || 0,
+        total: parseInt(current.total_count) || 0
+      },
+      historical: {
+        online: parseInt(historical.online_count) || 0,
+        offline: parseInt(historical.offline_count) || 0
+      },
+      change: {
+        online: (parseInt(current.online_count) || 0) - (parseInt(historical.online_count) || 0),
+        offline: (parseInt(current.offline_count) || 0) - (parseInt(historical.offline_count) || 0)
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching router status summary:', error);
+    res.status(500).json({ error: 'Failed to fetch router status summary' });
+  }
+});
+
 module.exports = router;
 module.exports.invalidateAssigneeCache = invalidateAssigneeCache;
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getRouters, getNetworkUsageRolling, getNetworkUsage, getTopRoutersRolling, getTopRouters, getOperators, getStorageStats, getInspectionStatus, getRMSUsage, getClickUpUsage } from '../services/api';
+import { getRouters, getNetworkUsageRolling, getNetworkUsage, getTopRoutersRolling, getTopRouters, getOperators, getStorageStats, getInspectionStatus, getRMSUsage, getClickUpUsage, getRouterStatusSummary } from '../services/api';
 import api from '../services/api';
 import { AreaChart, Area, BarChart, Bar, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
 import ClickUpAuthButton from './ClickUpAuthButton';
@@ -149,6 +149,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
   const [inspections, setInspections] = useState([]);
   const [rmsUsage, setRMSUsage] = useState(null);
   const [clickupUsage, setClickUpUsage] = useState(null);
+  const [statusSummary, setStatusSummary] = useState(null);
   const [smartSyncEnabled, setSmartSyncEnabled] = useState(true);
   const [smartSyncLoading, setSmartSyncLoading] = useState(false);
   const [manualSyncLoading, setManualSyncLoading] = useState(false);
@@ -191,11 +192,17 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
           console.error('ClickUp usage fetch error:', err);
           return { data: null };
         });
+        // Also fetch router status summary
+        const statusSummaryPromise = getRouterStatusSummary().catch((err)=>{
+          console.error('Status summary fetch error:', err);
+          return { data: null };
+        });
         const [rRes, sRes, uRes, tRes, oRes] = await Promise.all(promises);
         const dbRes = await dbSizePromise;
         const inspRes = await inspectionPromise;
         const rmsRes = await rmsUsagePromise;
         const clickupRes = await clickupUsagePromise;
+        const statusRes = await statusSummaryPromise;
         console.log('DB size response:', dbRes);
         setRouters(rRes.data || []);
         setStorage(sRes.data || null);
@@ -207,6 +214,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
         setInspections(inspRes?.data || []);
         setRMSUsage(rmsRes?.data || null);
         setClickUpUsage(clickupRes?.data || null);
+        setStatusSummary(statusRes?.data || null);
 
         // Previous period for network-level delta
         if (mode==='rolling') {
@@ -327,6 +335,12 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
           <div className="v3-metrics">
         <Metric label="Network Health" value={`${total ? Math.round(online/total*100) : 0}%`} sub={`${online}/${total} online`} color="#10b981" />
         <Metric label={`${mode==='rolling'?value+'h':'Last '+value+'d'} Data`} value={formatBytes(totalNow)} sub={<DeltaBadge current={totalNow} previous={totalPrev} />} color="#6366f1" />
+        <Metric 
+          label="Router Status" 
+          value={`${statusSummary?.current?.online || 0}/${statusSummary?.current?.offline || 0}`} 
+          sub={statusSummary?.change ? <DeltaBadge current={statusSummary.current.online} previous={statusSummary.historical.online} label="online (48h)" /> : 'Loading...'} 
+          color="#8b5cf6" 
+        />
         <Metric label="Top Router Share" value={`${top.length? Math.round((top[0].total_bytes||0)/Math.max(totalNow,1)*100):0}%`} sub={top.length? top[0].name: ''} color="#f59e0b" />
       </div>
 

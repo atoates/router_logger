@@ -53,6 +53,9 @@ export const getInspectionStatus = () => api.get('/stats/inspections');
 export const logInspection = (routerId, data) => api.post(`/inspections/${routerId}`, data);
 export const getInspectionHistory = (routerId) => api.get(`/inspections/${routerId}`);
 
+// Router Status
+export const getRouterStatusSummary = () => api.get('/routers/status-summary');
+
 // Monitoring
 export const getRMSUsage = () => api.get('/monitoring/rms-usage');
 export const getClickUpUsage = () => api.get('/monitoring/clickup-usage');
