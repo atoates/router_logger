@@ -372,6 +372,24 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
                 Link Existing Task
               </button>
             </div>
+            
+            {/* Status Change Actions (available even without ClickUp task) */}
+            <div className="task-actions" style={{ marginTop: '12px', borderTop: '1px solid #e5e7eb', paddingTop: '12px' }}>
+              <button 
+                onClick={handleBeingReturned}
+                className="task-btn task-btn-warning"
+                title="Mark this router as being returned"
+              >
+                📦 Being Returned
+              </button>
+              <button 
+                onClick={handleDecommission}
+                className="task-btn task-btn-danger"
+                title="Permanently decommission this router"
+              >
+                ⚠️ Decommission
+              </button>
+            </div>
           </div>
         )}
       </div>
