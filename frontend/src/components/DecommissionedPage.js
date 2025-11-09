@@ -154,18 +154,18 @@ function DecommissionedPage() {
 
               <div className="router-info">
                 <div className="info-row">
+                  <span className="info-label">Serial:</span>
+                  <span className="info-value">{router.router_id || 'N/A'}</span>
+                </div>
+
+                <div className="info-row">
                   <span className="info-label">IMEI:</span>
                   <span className="info-value">{router.imei || 'N/A'}</span>
                 </div>
 
                 <div className="info-row">
-                  <span className="info-label">Serial:</span>
-                  <span className="info-value">{router.serial_number || 'N/A'}</span>
-                </div>
-
-                <div className="info-row">
-                  <span className="info-label">Router Name:</span>
-                  <span className="info-value">{router.name || `Router #${router.router_id}`}</span>
+                  <span className="info-label">Firmware:</span>
+                  <span className="info-value">{router.firmware_version || 'N/A'}</span>
                 </div>
 
                 {router.notes && (
