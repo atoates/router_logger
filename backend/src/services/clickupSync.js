@@ -381,6 +381,7 @@ async function syncAllRoutersToClickUp() {
          r.clickup_task_id, 
          r.clickup_location_task_id,
          r.clickup_location_task_name,
+         r.clickup_task_status,
          r.imei, 
          r.firmware_version, 
          r.last_seen, 
