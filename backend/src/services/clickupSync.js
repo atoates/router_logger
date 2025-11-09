@@ -375,6 +375,7 @@ async function syncAllRoutersToClickUp() {
 
   try {
     // Get all routers with ClickUp tasks
+    // Exclude routers with manual statuses (being returned, decommissioned) from automatic sync
     const result = await pool.query(
       `SELECT 
          r.router_id, 
@@ -390,6 +391,7 @@ async function syncAllRoutersToClickUp() {
          (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status
        FROM routers r
        WHERE r.clickup_task_id IS NOT NULL
+         AND LOWER(r.clickup_task_status) NOT IN ('being returned', 'decommissioned')
        ORDER BY r.router_id`
     );
 
