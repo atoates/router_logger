@@ -660,6 +660,33 @@ router.post('/routers/:routerId/assign', async (req, res) => {
       assigneeUsernames: assignee_usernames || []
     });
     
+    // When assigning a router, change status to 'ready' (stored with someone)
+    // This applies even if router was 'being returned' - assignment means it's ready for use
+    try {
+      await pool.query(
+        `UPDATE routers SET clickup_task_status = 'ready' WHERE router_id = $1`,
+        [routerId]
+      );
+      
+      // Also update in ClickUp
+      const routerResult = await pool.query(
+        'SELECT clickup_task_id FROM routers WHERE router_id = $1',
+        [routerId]
+      );
+      
+      if (routerResult.rows[0]?.clickup_task_id) {
+        await clickupClient.updateTask(
+          routerResult.rows[0].clickup_task_id,
+          { status: 'ready' },
+          'default'
+        );
+        logger.info(`Updated router ${routerId} status to 'ready' after assignment`);
+      }
+    } catch (statusError) {
+      logger.warn(`Failed to update status to ready for router ${routerId}:`, statusError.message);
+      // Don't fail the request - assignment was successful
+    }
+    
     logger.info(`Router ${routerId} assigned to users`, { assignees: assignee_usernames });
     res.json(result);
   } catch (error) {
