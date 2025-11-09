@@ -775,7 +775,7 @@ router.patch('/routers/:router_id/status', async (req, res) => {
       result = await pool.query(
         `UPDATE routers 
          SET clickup_task_status = $1,
-             notes = CASE WHEN $2 IS NOT NULL THEN $2 ELSE notes END
+             notes = COALESCE($2::text, notes)
          WHERE router_id = $3
          RETURNING *`,
         [normalizedStatus, notes, router_id]
