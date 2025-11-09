@@ -101,8 +101,8 @@ router.get('/debug/:deviceId', async (req, res) => {
   }
 });
 
-// Refresh single router from RMS (requires authentication for mobile app)
-router.post('/refresh/:routerId', requireSession, async (req, res) => {
+// Refresh single router from RMS
+router.post('/refresh/:routerId', async (req, res) => {
   try {
     const { routerId } = req.params;
     const pool = require('../config/database').pool;
