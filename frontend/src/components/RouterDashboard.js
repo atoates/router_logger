@@ -42,6 +42,7 @@ export default function RouterDashboard({ router }) {
   const [inspections, setInspections] = useState([]);
   const [showRawData, setShowRawData] = useState(false); // Toggle for chart scale (false = normalized)
   const [useRollingAverage, setUseRollingAverage] = useState(true); // Toggle for rolling average (true = smoothed by default)
+  const [expandedSection, setExpandedSection] = useState('latest'); // Accordion state: 'latest', 'uptime', or 'inspections'
   const propertyWidgetRef = useRef(null);
 
   const routerId = router?.router_id;
@@ -415,129 +416,157 @@ export default function RouterDashboard({ router }) {
         </div>
       )}
 
-      <div className="rd-grid">
-        <div className="col">
-          <div className="card">
-            <div className="card-title latest-title">Latest</div>
-            <div className="kv">
-              <div><span>IMEI</span><strong>{router?.imei || latest?.imei || '—'}</strong></div>
-              <div><span>Operator</span><strong>{latest?.operator || '—'}</strong></div>
-              <div><span>Network</span><strong>{latest?.network_type || '—'}</strong></div>
-              <div><span>Firmware</span><strong>{latest?.firmware_version || router?.firmware_version || '—'}</strong></div>
-              <div><span>WAN IP</span><strong>{latest?.wan_ip || '—'}</strong></div>
-            </div>
+      {/* Accordion Sections */}
+      <div className="rd-accordion">
+        {/* Latest Section */}
+        <div className={`accordion-item ${expandedSection === 'latest' ? 'expanded' : ''}`}>
+          <div 
+            className="accordion-header" 
+            onClick={() => setExpandedSection(expandedSection === 'latest' ? null : 'latest')}
+          >
+            <span className="accordion-title">Latest</span>
+            <span className="accordion-icon">{expandedSection === 'latest' ? '▼' : '▶'}</span>
           </div>
+          {expandedSection === 'latest' && (
+            <div className="accordion-content">
+              <div className="kv">
+                <div><span>IMEI</span><strong>{router?.imei || latest?.imei || '—'}</strong></div>
+                <div><span>Operator</span><strong>{latest?.operator || '—'}</strong></div>
+                <div><span>Network</span><strong>{latest?.network_type || '—'}</strong></div>
+                <div><span>Firmware</span><strong>{latest?.firmware_version || router?.firmware_version || '—'}</strong></div>
+                <div><span>WAN IP</span><strong>{latest?.wan_ip || '—'}</strong></div>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="col">
-          <div className="card">
-            <div className="card-title uptime-title">Uptime samples</div>
-            <div style={{ height: 140 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart 
-                  data={(uptime||[]).map(d => {
-                    const isOnline = (d.status === 'online' || d.status === 1 || d.status === '1' || d.status === true);
-                    return {
-                      ...d,
-                      online: isOnline ? 1 : null,
-                      offline: !isOnline ? 0 : null
-                    };
-                  })} 
-                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis 
-                    dataKey="timestamp" 
-                    tickFormatter={(t)=> { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleDateString([], { month: 'short', day: 'numeric' }); }}
-                    tick={{ fontSize: 10 }}
-                    interval="preserveStartEnd"
-                    minTickGap={20}
-                  />
-                  <YAxis 
-                    domain={[0, 1]} 
-                    ticks={[0, 1]} 
-                    tickFormatter={(v) => v === 1 ? 'Online' : 'Offline'}
-                    tick={{ fontSize: 10 }}
-                    width={50}
-                  />
-                  <Tooltip 
-                    labelFormatter={(t)=> new Date(t).toLocaleString()} 
-                    formatter={(value, name) => {
-                      if (name === 'online') return ['Online', 'Status'];
-                      if (name === 'offline') return ['Offline', 'Status'];
-                      return [value, name];
-                    }}
-                    contentStyle={{ fontSize: '12px' }}
-                  />
-                  <Line 
-                    type="stepAfter" 
-                    dataKey="online" 
-                    stroke="#10b981" 
-                    strokeWidth={2.5}
-                    dot={false}
-                    name="online"
-                    isAnimationActive={false}
-                    connectNulls={false}
-                  />
-                  <Line 
-                    type="stepAfter" 
-                    dataKey="offline" 
-                    stroke="transparent" 
-                    strokeWidth={0}
-                    dot={{ fill: '#ef4444', r: 3 }}
-                    name="offline"
-                    isAnimationActive={false}
-                    connectNulls={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+        {/* Uptime Samples Section */}
+        <div className={`accordion-item ${expandedSection === 'uptime' ? 'expanded' : ''}`}>
+          <div 
+            className="accordion-header" 
+            onClick={() => setExpandedSection(expandedSection === 'uptime' ? null : 'uptime')}
+          >
+            <span className="accordion-title">Uptime Samples</span>
+            <span className="accordion-icon">{expandedSection === 'uptime' ? '▼' : '▶'}</span>
           </div>
+          {expandedSection === 'uptime' && (
+            <div className="accordion-content">
+              <div style={{ height: 180 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart 
+                    data={(uptime||[]).map(d => {
+                      const isOnline = (d.status === 'online' || d.status === 1 || d.status === '1' || d.status === true);
+                      return {
+                        ...d,
+                        online: isOnline ? 1 : null,
+                        offline: !isOnline ? 0 : null
+                      };
+                    })} 
+                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis 
+                      dataKey="timestamp" 
+                      tickFormatter={(t)=> { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleDateString([], { month: 'short', day: 'numeric' }); }}
+                      tick={{ fontSize: 10 }}
+                      interval="preserveStartEnd"
+                      minTickGap={20}
+                    />
+                    <YAxis 
+                      domain={[0, 1]} 
+                      ticks={[0, 1]} 
+                      tickFormatter={(v) => v === 1 ? 'Online' : 'Offline'}
+                      tick={{ fontSize: 10 }}
+                      width={50}
+                    />
+                    <Tooltip 
+                      labelFormatter={(t)=> new Date(t).toLocaleString()} 
+                      formatter={(value, name) => {
+                        if (name === 'online') return ['Online', 'Status'];
+                        if (name === 'offline') return ['Offline', 'Status'];
+                        return [value, name];
+                      }}
+                      contentStyle={{ fontSize: '12px' }}
+                    />
+                    <Line 
+                      type="stepAfter" 
+                      dataKey="online" 
+                      stroke="#10b981" 
+                      strokeWidth={2.5}
+                      dot={false}
+                      name="online"
+                      isAnimationActive={false}
+                      connectNulls={false}
+                    />
+                    <Line 
+                      type="stepAfter" 
+                      dataKey="offline" 
+                      stroke="transparent" 
+                      strokeWidth={0}
+                      dot={{ fill: '#ef4444', r: 3 }}
+                      name="offline"
+                      isAnimationActive={false}
+                      connectNulls={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </div>
 
-          <div className="card">
-            <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Inspections</span>
+        {/* Inspections Section */}
+        <div className={`accordion-item ${expandedSection === 'inspections' ? 'expanded' : ''}`}>
+          <div 
+            className="accordion-header" 
+            onClick={() => setExpandedSection(expandedSection === 'inspections' ? null : 'inspections')}
+          >
+            <span className="accordion-title">Inspections</span>
+            <span className="accordion-icon">{expandedSection === 'inspections' ? '▼' : '▶'}</span>
+          </div>
+          {expandedSection === 'inspections' && (
+            <div className="accordion-content">
               <button 
                 className="btn btn-sm btn-primary" 
-                style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '6px' }}
+                style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '6px', marginBottom: '12px' }}
                 onClick={handleLogInspection}
               >
                 ✓ Log Inspection
               </button>
-            </div>
-            <div className="inspections-list">
-              {inspections.length === 0 ? (
-                <div className="inspections-empty">
-                  No inspections logged yet
-                </div>
-              ) : (
-                <>
-                  {inspections.map((insp, idx) => (
-                    <div key={insp.id} className={`inspection-item ${idx === 0 ? 'latest' : ''}`}>
-                      <div className="inspection-header">
-                        <span className="inspection-date">
-                          {new Date(insp.inspected_at).toLocaleDateString()}
-                        </span>
-                        <span className="inspection-time">
-                          {new Date(insp.inspected_at).toLocaleTimeString()}
-                        </span>
+              <div className="inspections-list">
+                {inspections.length === 0 ? (
+                  <div className="inspections-empty">
+                    No inspections logged yet
+                  </div>
+                ) : (
+                  <>
+                    {inspections.map((insp, idx) => (
+                      <div key={insp.id} className={`inspection-item ${idx === 0 ? 'latest' : ''}`}>
+                        <div className="inspection-header">
+                          <span className="inspection-date">
+                            {new Date(insp.inspected_at).toLocaleDateString()}
+                          </span>
+                          <span className="inspection-time">
+                            {new Date(insp.inspected_at).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        {insp.inspected_by && (
+                          <div className="inspection-by">
+                            By: {insp.inspected_by}
+                          </div>
+                        )}
+                        {insp.notes && (
+                          <div className="inspection-notes">
+                            {insp.notes}
+                          </div>
+                        )}
                       </div>
-                      {insp.inspected_by && (
-                        <div className="inspection-by">
-                          By: {insp.inspected_by}
-                        </div>
-                      )}
-                      {insp.notes && (
-                        <div className="inspection-notes">
-                          {insp.notes}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </>
-              )}
+                    ))}
+                  </>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

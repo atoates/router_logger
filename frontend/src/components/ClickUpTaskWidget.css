@@ -6,6 +6,28 @@
   padding: 16px;
   margin-top: 16px;
   position: relative;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Status-based card highlighting */
+.clickup-task-widget.status-ready {
+  border-left-color: #10b981;
+  background: linear-gradient(to right, rgba(16, 185, 129, 0.02), #f8fafc);
+}
+
+.clickup-task-widget.status-attention {
+  border-left-color: #f59e0b;
+  background: linear-gradient(to right, rgba(245, 158, 11, 0.02), #f8fafc);
+}
+
+.clickup-task-widget.status-returning {
+  border-left-color: #3b82f6;
+  background: linear-gradient(to right, rgba(59, 130, 246, 0.02), #f8fafc);
+}
+
+.clickup-task-widget.status-decommissioned {
+  border-left-color: #ef4444;
+  background: linear-gradient(to right, rgba(239, 68, 68, 0.02), #f8fafc);
 }
 
 .clickup-task-widget h4 {
@@ -26,6 +48,87 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* Header with ClickUp icon and status pill */
+.task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.task-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.clickup-icon-link {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  transition: transform 0.2s ease;
+}
+
+.clickup-icon-link:hover {
+  transform: scale(1.1);
+}
+
+.clickup-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.task-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Status pill - top right */
+.task-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.task-status-pill.installed,
+.task-status-pill.ready {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1.5px solid #10b981;
+}
+
+.task-status-pill.needs-attention {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1.5px solid #f59e0b;
+}
+
+.task-status-pill.being-returned {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1.5px solid #3b82f6;
+}
+
+.task-status-pill.decommissioned {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1.5px solid #ef4444;
 }
 
 .task-assigned-to {
@@ -60,44 +163,12 @@
   font-weight: 600;
 }
 
-.task-info {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.task-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e293b;
-}
-
 .task-meta {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
   font-size: 12px;
-}
-
-.task-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border-radius: 12px;
-  background: #e0e7ff;
-  color: #3730a3;
-  font-weight: 500;
-}
-
-.task-status.in-progress {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.task-status.complete {
-  background: #d1fae5;
-  color: #065f46;
+  color: #64748b;
 }
 
 .task-assignees {
@@ -143,25 +214,7 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* View in ClickUp - positioned top right */
-.task-btn-view-clickup {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  padding: 6px 14px;
-  background: #7c3aed;
-  border-color: #7c3aed;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  z-index: 10;
-}
 
-.task-btn-view-clickup:hover {
-  background: #6d28d9;
-  border-color: #6d28d9;
-  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
-}
 
 /* Primary button (Create New Task) */
 .task-btn-primary {

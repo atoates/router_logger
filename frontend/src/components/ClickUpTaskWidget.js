@@ -287,20 +287,48 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
     task.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Get status class for card highlighting
+  const getStatusClass = () => {
+    if (!linkedTask?.status) return '';
+    const status = linkedTask.status.toLowerCase();
+    if (status === 'installed' || status === 'ready') return 'status-ready';
+    if (status === 'needs attention') return 'status-attention';
+    if (status === 'being returned') return 'status-returning';
+    if (status === 'decommissioned') return 'status-decommissioned';
+    return '';
+  };
+
   return (
     <>
-      <div className="clickup-task-widget">
+      <div className={`clickup-task-widget ${getStatusClass()}`}>
         {linkedTask ? (
           <div className="task-linked">
-            {/* View in ClickUp button - top right */}
-            <a 
-              href={linkedTask.url} 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="task-btn task-btn-view-clickup"
-            >
-              View in ClickUp →
-            </a>
+            {/* Header with ClickUp icon and link */}
+            <div className="task-header">
+              <div className="task-header-left">
+                <a 
+                  href={linkedTask.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="clickup-icon-link"
+                  title="View in ClickUp"
+                >
+                  <img 
+                    src="https://clickup.com/images/for-se-page/clickup.png" 
+                    alt="ClickUp" 
+                    className="clickup-icon"
+                  />
+                </a>
+                <div className="task-name">{linkedTask.name}</div>
+              </div>
+              
+              {/* Status pill - top right */}
+              {linkedTask.status && (
+                <span className={`task-status-pill ${linkedTask.status.toLowerCase().replace(/\s+/g, '-')}`}>
+                  {linkedTask.status}
+                </span>
+              )}
+            </div>
 
             {/* Show assignee prominently if router is assigned to someone */}
             {linkedTask.assignees && linkedTask.assignees.length > 0 && (
@@ -313,20 +341,12 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
               </div>
             )}
             
-            <div className="task-info">
-              <div className="task-name">{linkedTask.name}</div>
-              <div className="task-meta">
-                {linkedTask.status && (
-                  <span className={`task-status ${linkedTask.status.toLowerCase().replace(/\s+/g, '-')}`}>
-                    {linkedTask.status}
-                  </span>
-                )}
-                {linkedTask.due_date && (
-                  <span className="task-due">
-                    📅 {new Date(parseInt(linkedTask.due_date)).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
+            <div className="task-meta">
+              {linkedTask.due_date && (
+                <span className="task-due">
+                  📅 {new Date(parseInt(linkedTask.due_date)).toLocaleDateString()}
+                </span>
+              )}
             </div>
 
             {/* Assignment actions */}
