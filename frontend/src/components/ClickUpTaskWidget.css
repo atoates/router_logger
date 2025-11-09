@@ -532,6 +532,63 @@ body.dark-mode .error-message {
   cursor: not-allowed;
 }
 
+.task-btn-danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.task-btn-danger:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.task-btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.decommission-notice {
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.decommission-notice p {
+  margin: 0 0 8px 0;
+  color: #e2e8f0;
+  font-size: 14px;
+}
+
+.decommission-notice ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+.decommission-notice li {
+  margin: 4px 0;
+}
+
+.modal-icon.warning {
+  font-size: 32px;
+}
+
 .btn-spinner {
   width: 14px;
   height: 14px;

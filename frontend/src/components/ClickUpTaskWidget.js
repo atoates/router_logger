@@ -211,15 +211,17 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
 
   const [showBeingReturnedModal, setShowBeingReturnedModal] = useState(false);
   const [beingReturnedNotes, setBeingReturnedNotes] = useState('');
+  const [showDecommissionModal, setShowDecommissionModal] = useState(false);
+  const [decommissionNotes, setDecommissionNotes] = useState('');
 
-  const handleDecommission = async () => {
-    if (!window.confirm('⚠️ WARNING: Are you sure you want to decommission this router?\n\nThis will:\n- Mark the router as permanently retired\n- Remove all assignees\n- Unlink from any property\n- Hide it from most views\n\nThis action can be reversed by manually updating the status.')) {
-      return;
-    }
+  const handleDecommission = () => {
+    setShowDecommissionModal(true);
+  };
 
+  const handleDecommissionSubmit = async () => {
     try {
       setLoading(true);
-      await updateRouterStatus(router.router_id, 'decommissioned');
+      await updateRouterStatus(router.router_id, 'decommissioned', decommissionNotes);
       
       // Reload the task to update the UI
       const taskResponse = await getRouterTask(router.router_id);
@@ -227,6 +229,8 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
         setLinkedTask(taskResponse.data.task);
       }
       
+      setShowDecommissionModal(false);
+      setDecommissionNotes('');
       toast.success('Router decommissioned - unassigned and unlinked');
       
       // Optionally redirect or refresh the page
@@ -537,6 +541,88 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
                       <path d="M13 8L7 2L1 8M7 3V14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                     Mark as Being Returned
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Decommission Modal */}
+      {showDecommissionModal && (
+        <div className="task-modal-overlay" onClick={() => setShowDecommissionModal(false)}>
+          <div className="task-modal decommission-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="task-modal-header">
+              <div className="modal-header-content">
+                <div className="modal-icon warning">⚠️</div>
+                <div>
+                  <h3>Decommission Router</h3>
+                  <p className="modal-subtitle">Router #{router?.router_id}</p>
+                </div>
+              </div>
+              <button className="task-modal-close" onClick={() => {
+                setShowDecommissionModal(false);
+                setDecommissionNotes('');
+              }}>
+                ×
+              </button>
+            </div>
+
+            <div className="task-modal-body">
+              <div className="decommission-notice">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M10 0C4.48 0 0 4.48 0 10C0 15.52 4.48 20 10 20C15.52 20 20 15.52 20 10C20 4.48 15.52 0 10 0ZM11 15H9V13H11V15ZM11 11H9V5H11V11Z" fill="#ef4444"/>
+                </svg>
+                <p><strong>This will permanently decommission the router:</strong></p>
+                <ul>
+                  <li>Mark router as permanently retired</li>
+                  <li>Remove all assignees</li>
+                  <li>Unlink from any property</li>
+                  <li>Hide from most views</li>
+                </ul>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="decommission-notes">Decommission Reason (Optional)</label>
+                <textarea
+                  id="decommission-notes"
+                  className="return-notes-input"
+                  placeholder="e.g., Hardware failure, End of life, Lost/stolen, Replaced with new model..."
+                  value={decommissionNotes}
+                  onChange={(e) => setDecommissionNotes(e.target.value)}
+                  rows={4}
+                  maxLength={500}
+                />
+                <div className="character-count">
+                  {decommissionNotes.length}/500 characters
+                </div>
+              </div>
+            </div>
+
+            <div className="task-modal-footer">
+              <button 
+                className="task-btn task-btn-secondary" 
+                onClick={() => {
+                  setShowDecommissionModal(false);
+                  setDecommissionNotes('');
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="task-btn task-btn-danger" 
+                onClick={handleDecommissionSubmit}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <span className="btn-spinner"></span>
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    ⚠️ Decommission Router
                   </>
                 )}
               </button>
