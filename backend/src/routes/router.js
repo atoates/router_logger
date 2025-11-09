@@ -900,10 +900,10 @@ router.get('/routers/being-returned', async (req, res) => {
     );
 
     logger.info(`Retrieved ${result.rows.length} routers being returned`);
-    res.json(result.rows);
+    res.json({ success: true, routers: result.rows });
   } catch (error) {
     logger.error('Error fetching routers being returned:', error);
-    res.status(500).json({ error: 'Failed to fetch routers being returned' });
+    res.status(500).json({ success: false, error: 'Failed to fetch routers being returned' });
   }
 });
 
@@ -921,11 +921,11 @@ router.get('/routers/decommissioned', async (req, res) => {
     );
 
     logger.info(`Retrieved ${result.rows.length} decommissioned routers`);
-    res.json(result.rows);
+    res.json({ success: true, routers: result.rows });
 
   } catch (error) {
     logger.error('Error fetching decommissioned routers:', error);
-    res.status(500).json({ error: 'Failed to fetch decommissioned routers' });
+    res.status(500).json({ success: false, error: 'Failed to fetch decommissioned routers' });
   }
 });
 

@@ -27,7 +27,7 @@ function DecommissionedPage() {
       }
       
       const data = await response.json();
-      setRouters(data);
+      setRouters(data.routers || data);
       setError(null);
     } catch (err) {
       console.error('Error fetching decommissioned routers:', err);
