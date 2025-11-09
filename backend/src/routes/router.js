@@ -846,19 +846,16 @@ router.patch('/routers/:router_id/status', async (req, res) => {
     if (router.clickup_task_id) {
       // This should NOT throw - all errors are caught
       try {
-        // ClickUp status format: capitalize each word, keep spaces
-        const clickupStatus = normalizedStatus
-          .split(' ')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-        logger.info(`Attempting to update ClickUp task ${router.clickup_task_id} status to "${clickupStatus}"`);
+        // ClickUp status format: lowercase with spaces (same as normalizedStatus)
+        // Based on clickupSync.js which uses 'installed', 'needs attention', 'ready', etc.
+        logger.info(`Attempting to update ClickUp task ${router.clickup_task_id} status to "${normalizedStatus}"`);
         
         await clickupClient.updateTask(
           router.clickup_task_id, 
-          { status: clickupStatus },
+          { status: normalizedStatus },
           'default'
         );
-        logger.info(`Successfully updated ClickUp task ${router.clickup_task_id} status to "${clickupStatus}"`);
+        logger.info(`Successfully updated ClickUp task ${router.clickup_task_id} status to "${normalizedStatus}"`);
       } catch (clickupError) {
         logger.error(`Failed to update ClickUp task status to "${normalizedStatus}":`, {
           error: clickupError.message,
