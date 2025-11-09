@@ -525,9 +525,10 @@ router.get('/routers/by-assignees', async (req, res) => {
     const routers = routersResult.rows;
     
     for (const router of routers) {
-      // Skip decommissioned routers entirely - they're gone and shouldn't appear anywhere
-      const isDecommissioned = router.clickup_task_status?.toLowerCase() === 'decommissioned';
-      if (isDecommissioned) {
+      // Skip decommissioned and being returned routers - they shouldn't appear in assignments/stored pages
+      const status = router.clickup_task_status?.toLowerCase();
+      const isExcluded = status === 'decommissioned' || status === 'being returned';
+      if (isExcluded) {
         continue;
       }
 
@@ -804,8 +805,8 @@ router.patch('/routers/:router_id/status', async (req, res) => {
     const router = result.rows[0];
     logger.info(`Database updated successfully for router ${router_id}`);
 
-    // If decommissioning, unlink from location and remove assignees
-    if (normalizedStatus === 'decommissioned' && router.clickup_task_id) {
+    // If decommissioning or being returned, unlink from location and remove assignees
+    if ((normalizedStatus === 'decommissioned' || normalizedStatus === 'being returned') && router.clickup_task_id) {
       try {
         // Unlink from location
         if (router.clickup_location_task_id) {
@@ -817,7 +818,7 @@ router.patch('/routers/:router_id/status', async (req, res) => {
              WHERE router_id = $1`,
             [router_id]
           );
-          logger.info(`Unlinked router ${router_id} from location`);
+          logger.info(`Unlinked router ${router_id} from location (status: ${normalizedStatus})`);
         }
 
         // Remove assignees in ClickUp
@@ -834,10 +835,10 @@ router.patch('/routers/:router_id/status', async (req, res) => {
             `UPDATE routers SET clickup_assignees = '[]' WHERE router_id = $1`,
             [router_id]
           );
-          logger.info(`Removed all assignees from router ${router_id}`);
+          logger.info(`Removed all assignees from router ${router_id} (status: ${normalizedStatus})`);
         }
       } catch (unlinkError) {
-        logger.error(`Error unlinking/unassigning decommissioned router:`, unlinkError);
+        logger.error(`Error unlinking/unassigning router (status: ${normalizedStatus}):`, unlinkError);
         // Don't fail the request - status update was successful
       }
     }
