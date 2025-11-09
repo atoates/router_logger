@@ -5,6 +5,7 @@
   border-radius: 8px;
   padding: 16px;
   margin-top: 16px;
+  position: relative;
 }
 
 .clickup-task-widget h4 {
@@ -24,7 +25,7 @@
 .task-linked {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .task-assigned-to {
@@ -121,16 +122,48 @@
   margin-top: 4px;
 }
 
+/* Base button styling - consistent across all button types */
 .task-btn {
-  padding: 6px 12px;
+  padding: 8px 16px;
   border-radius: 6px;
-  border: 1px solid;
+  border: 1.5px solid;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
+.task-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* View in ClickUp - positioned top right */
+.task-btn-view-clickup {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 6px 14px;
+  background: #7c3aed;
+  border-color: #7c3aed;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 10;
+}
+
+.task-btn-view-clickup:hover {
+  background: #6d28d9;
+  border-color: #6d28d9;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+}
+
+/* Primary button (Create New Task) */
 .task-btn-primary {
   background: #7c3aed;
   border-color: #7c3aed;
@@ -139,47 +172,59 @@
 
 .task-btn-primary:hover {
   background: #6d28d9;
-  transform: translateY(-1px);
+  border-color: #6d28d9;
   box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
 }
 
+/* Secondary button (Assign/Remove Assignment, Link Existing Task) */
 .task-btn-secondary {
   background: #fff;
-  border-color: #e2e8f0;
+  border-color: #cbd5e1;
   color: #475569;
 }
 
 .task-btn-secondary:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: #f1f5f9;
+  border-color: #94a3b8;
 }
 
-.task-btn-danger {
-  background: #fff;
-  border-color: #fca5a5;
-  color: #991b1b;
-}
-
-.task-btn-danger:hover {
-  background: #fef2f2;
-  border-color: #f87171;
-}
-
+/* Warning button (Being Returned) */
 .task-btn-warning {
   background: #fff;
-  border-color: #fcd34d;
-  color: #f59e0b;
+  border-color: #fbbf24;
+  color: #b45309;
 }
 
 .task-btn-warning:hover {
-  background: #fffbeb;
+  background: #fef3c7;
   border-color: #f59e0b;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
 }
 
-.task-actions {
+/* Danger button (Decommission) */
+.task-btn-danger {
+  background: #fff;
+  border-color: #f87171;
+  color: #dc2626;
+}
+
+.task-btn-danger:hover {
+  background: #fee2e2;
+  border-color: #ef4444;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+}
+
+/* Action rows - buttons in horizontal layout */
+.task-actions-row {
   display: flex;
-  flex-direction: column;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Add top border for status actions */
+.task-status-actions {
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
   margin-top: 4px;
 }
 

@@ -292,6 +292,16 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
       <div className="clickup-task-widget">
         {linkedTask ? (
           <div className="task-linked">
+            {/* View in ClickUp button - top right */}
+            <a 
+              href={linkedTask.url} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="task-btn task-btn-view-clickup"
+            >
+              View in ClickUp →
+            </a>
+
             {/* Show assignee prominently if router is assigned to someone */}
             {linkedTask.assignees && linkedTask.assignees.length > 0 && (
               <div className="task-assigned-to">
@@ -318,16 +328,10 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
                 )}
               </div>
             </div>
-            <div className="task-actions">
-              <a 
-                href={linkedTask.url} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="task-btn task-btn-primary"
-              >
-                View in ClickUp
-              </a>
-              {onStoredWith && (
+
+            {/* Assignment actions */}
+            {onStoredWith && (
+              <div className="task-actions-row">
                 <button 
                   onClick={linkedTask.assignees && linkedTask.assignees.length > 0 ? handleRemoveAssignment : onStoredWith}
                   className="task-btn task-btn-secondary"
@@ -336,11 +340,11 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
                     ? 'Remove Assignment' 
                     : 'Assign Router'}
                 </button>
-              )}
-            </div>
+              </div>
+            )}
             
-            {/* Status Change Actions */}
-            <div className="task-actions" style={{ marginTop: '12px', borderTop: '1px solid #e5e7eb', paddingTop: '12px' }}>
+            {/* Status Change Actions - same row */}
+            <div className="task-actions-row task-status-actions">
               <button 
                 onClick={handleBeingReturned}
                 className="task-btn task-btn-warning"
@@ -360,7 +364,7 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
         ) : (
           <div className="task-not-linked">
             <p>No ClickUp task linked to this router</p>
-            <div className="task-actions">
+            <div className="task-actions-row">
               <button className="task-btn task-btn-primary" onClick={handleOpenCreateModal}>
                 Create New Task
               </button>
@@ -369,8 +373,8 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
               </button>
             </div>
             
-            {/* Status Change Actions (available even without ClickUp task) */}
-            <div className="task-actions" style={{ marginTop: '12px', borderTop: '1px solid #e5e7eb', paddingTop: '12px' }}>
+            {/* Status Change Actions (available even without ClickUp task) - same row */}
+            <div className="task-actions-row task-status-actions">
               <button 
                 onClick={handleBeingReturned}
                 className="task-btn task-btn-warning"
