@@ -8,7 +8,8 @@ import {
   createClickUpTask,
   linkRouterToTask,
   unlinkRouterFromTask,
-  updateRouterStatus
+  updateRouterStatus,
+  removeRouterAssignees
 } from '../services/api';
 import { toast } from 'react-toastify';
 import './ClickUpTaskWidget.css';
@@ -191,27 +192,18 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
 
     try {
       setLoading(true);
-      const API_BASE = process.env.REACT_APP_API_URL || 'https://routerlogger-production.up.railway.app';
-      const response = await fetch(`${API_BASE}/api/routers/${router.router_id}/remove-assignees`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // Reload the task to update the UI
-        const taskResponse = await getRouterTask(router.router_id);
-        if (taskResponse.data.linked) {
-          setLinkedTask(taskResponse.data.task);
-        }
-        alert('Assignees removed successfully');
-      } else {
-        throw new Error(data.error || 'Failed to remove assignees');
+      await removeRouterAssignees(router.router_id);
+      
+      // Reload the task to update the UI
+      const taskResponse = await getRouterTask(router.router_id);
+      if (taskResponse.data.linked) {
+        setLinkedTask(taskResponse.data.task);
       }
+      
+      toast.success('Assignees removed successfully');
     } catch (error) {
       console.error('Error removing assignees:', error);
-      alert(error.message || 'Failed to remove assignees');
+      toast.error(error.message || 'Failed to remove assignees');
     } finally {
       setLoading(false);
     }
