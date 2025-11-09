@@ -642,7 +642,7 @@ router.post('/routers/:routerId/unlink-location', async (req, res) => {
 
 // POST assign router to ClickUp user(s)
 // Updates the ClickUp task assignees field
-router.post('/routers/:routerId/assign', requireSession, async (req, res) => {
+router.post('/routers/:routerId/assign', async (req, res) => {
   try {
     const { routerId } = req.params;
     const { assignee_user_ids, assignee_usernames } = req.body;
@@ -669,7 +669,7 @@ router.post('/routers/:routerId/assign', requireSession, async (req, res) => {
 
 // POST remove all assignees from router
 // Removes all assignees from the ClickUp task
-router.post('/routers/:routerId/remove-assignees', requireSession, async (req, res) => {
+router.post('/routers/:routerId/remove-assignees', async (req, res) => {
   try {
     const { routerId } = req.params;
     
