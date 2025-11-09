@@ -146,48 +146,59 @@ async function syncRouterToClickUp(router, dataUsageMap = {}) {
     // - Has location + offline = 'needs attention'
     // - Has assignee (no location) = 'ready'
     // - No location and no assignee = 'needs attention'
+    // IMPORTANT: Don't override manual statuses like 'being returned' or 'decommissioned'
     try {
-      let desiredStatus;
-      const hasLocation = !!router.clickup_location_task_id;
-      const hasAssignee = updatedTask && updatedTask.assignees && updatedTask.assignees.length > 0;
-      const isOnline = router.current_status === 'online';
+      // Check if router has a manual status that should be preserved
+      const currentDbStatus = router.clickup_task_status?.toLowerCase();
+      const manualStatuses = ['being returned', 'decommissioned'];
+      const hasManualStatus = manualStatuses.includes(currentDbStatus);
       
-      if (hasLocation) {
-        // Router is at a location
-        if (isOnline) {
-          desiredStatus = 'installed';
-        } else {
-          desiredStatus = 'needs attention'; // Installed but offline
-        }
-      } else if (hasAssignee) {
-        // Router is with someone (stored with)
-        desiredStatus = 'ready';
+      if (hasManualStatus) {
+        logger.info(`Router ${router.router_id} has manual status "${currentDbStatus}" - skipping automatic status sync`);
       } else {
-        // Router has no location and no assignee
-        desiredStatus = 'needs attention';
-      }
-      
-      // Only update if status is different from current
-      const currentStatus = updatedTask && updatedTask.status ? updatedTask.status.status : null;
-      if (currentStatus !== desiredStatus) {
-        await clickupClient.updateTask(
-          router.clickup_task_id,
-          { status: desiredStatus },
-          'default'
+        // Calculate desired status based on router state
+        let desiredStatus;
+        const hasLocation = !!router.clickup_location_task_id;
+        const hasAssignee = updatedTask && updatedTask.assignees && updatedTask.assignees.length > 0;
+        const isOnline = router.current_status === 'online';
+        
+        if (hasLocation) {
+          // Router is at a location
+          if (isOnline) {
+            desiredStatus = 'installed';
+          } else {
+            desiredStatus = 'needs attention'; // Installed but offline
+          }
+        } else if (hasAssignee) {
+          // Router is with someone (stored with)
+          desiredStatus = 'ready';
+        } else {
+          // Router has no location and no assignee
+          desiredStatus = 'needs attention';
+        }
+        
+        // Only update if status is different from current
+        const currentStatus = updatedTask && updatedTask.status ? updatedTask.status.status : null;
+        if (currentStatus !== desiredStatus) {
+          await clickupClient.updateTask(
+            router.clickup_task_id,
+            { status: desiredStatus },
+            'default'
+          );
+          logger.info(`Updated task status for router ${router.router_id}: ${currentStatus} → ${desiredStatus.toUpperCase()}`, {
+            hasLocation,
+            hasAssignee,
+            isOnline,
+            locationTaskId: router.clickup_location_task_id
+          });
+        }
+        
+        // Always update status in database (even if ClickUp update was skipped)
+        await pool.query(
+          'UPDATE routers SET clickup_task_status = $1 WHERE router_id = $2',
+          [desiredStatus, router.router_id]
         );
-        logger.info(`Updated task status for router ${router.router_id}: ${currentStatus} → ${desiredStatus.toUpperCase()}`, {
-          hasLocation,
-          hasAssignee,
-          isOnline,
-          locationTaskId: router.clickup_location_task_id
-        });
       }
-      
-      // Always update status in database (even if ClickUp update was skipped)
-      await pool.query(
-        'UPDATE routers SET clickup_task_status = $1 WHERE router_id = $2',
-        [desiredStatus, router.router_id]
-      );
     } catch (statusError) {
       logger.warn(`Failed to update task status for router ${router.router_id}:`, statusError.message);
       // Don't fail the whole sync if status update fails
