@@ -148,7 +148,7 @@ function DecommissionedPage() {
               onClick={() => handleRouterClick(router.router_id)}
             >
               <div className="router-header">
-                <h3 className="router-id">{router.router_id}</h3>
+                <h3 className="router-id">{router.name || `Router #${router.router_id}`}</h3>
                 <span className="status-badge decommissioned">Decommissioned</span>
               </div>
 
@@ -174,12 +174,18 @@ function DecommissionedPage() {
                   </div>
                 )}
 
-                {router.clickup_task_id && (
+                {router.clickup_task_url && (
                   <div className="info-row">
                     <span className="info-label">ClickUp Task:</span>
-                    <span className="info-value task-id">
-                      {router.clickup_task_id.substring(0, 8)}...
-                    </span>
+                    <a 
+                      href={router.clickup_task_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="clickup-link"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      View Task →
+                    </a>
                   </div>
                 )}
               </div>

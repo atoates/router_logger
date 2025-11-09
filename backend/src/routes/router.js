@@ -884,6 +884,35 @@ router.patch('/routers/:router_id/status', async (req, res) => {
           'default'
         );
         logger.info(`Successfully updated ClickUp task ${router.clickup_task_id} status to "${normalizedStatus}"`);
+        
+        // Add comment to ClickUp task for significant status changes
+        try {
+          let commentText = '';
+          if (normalizedStatus === 'decommissioned') {
+            commentText = `🗑️ **Router Decommissioned**\n\nThis router has been permanently decommissioned and removed from service.`;
+            if (notes) {
+              commentText += `\n\n**Notes:** ${notes}`;
+            }
+          } else if (normalizedStatus === 'being returned') {
+            commentText = `📦 **Router Being Returned**\n\nThis router is being returned and is no longer in use.`;
+            if (notes) {
+              commentText += `\n\n**Notes:** ${notes}`;
+            }
+          }
+          
+          if (commentText) {
+            await clickupClient.createTaskComment(
+              router.clickup_task_id,
+              commentText,
+              {},
+              'default'
+            );
+            logger.info(`Added comment to ClickUp task ${router.clickup_task_id} for status change to ${normalizedStatus}`);
+          }
+        } catch (commentError) {
+          logger.warn(`Failed to add comment to ClickUp task:`, commentError.message);
+          // Don't fail the request
+        }
       } catch (clickupError) {
         logger.error(`Failed to update ClickUp task status to "${normalizedStatus}":`, {
           error: clickupError.message,
