@@ -39,8 +39,18 @@ async function explore() {
   console.log(`Base URL: ${BASE_URL}`);
   console.log(`API Key: ${API_KEY.substring(0, 20)}...`);
   
+  // Get account info first to get company ID
+  console.log('📋 Getting account info...');
+  const accountResult = await testEndpoint('/account');
+  const companyId = accountResult.data?.company_id;
+  
+  if (companyId) {
+    console.log(`✅ Company ID found: ${companyId}\n`);
+  }
+
   // Common endpoints to test
   const endpoints = [
+    '/account',
     '/networks',
     '/access-points',
     '/aps',
@@ -58,8 +68,20 @@ async function explore() {
     '/reports',
     '/splash-pages',
     '/locations',
-    '/controllers'
+    '/controllers',
+    '/venues'
   ];
+  
+  // Add company-scoped endpoints if we have a company ID
+  if (companyId) {
+    endpoints.push(
+      `/${companyId}/radacct`,
+      `/${companyId}/access-points`,
+      `/${companyId}/devices`,
+      `/${companyId}/networks`,
+      `/${companyId}/aps`
+    );
+  }
 
   const results = [];
   for (const endpoint of endpoints) {
