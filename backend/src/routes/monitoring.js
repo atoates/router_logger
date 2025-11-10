@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const { requireAdmin } = require('./session');
 const { pool, logger } = require('../config/database');
+
+// All monitoring routes require admin access
+router.use(requireAdmin);
 
 // Track API call metrics (in-memory for now)
 let apiMetrics = {

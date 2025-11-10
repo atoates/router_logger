@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const axios = require('axios');
+const { requireAdmin } = require('./session');
 const clickupOAuthService = require('../services/clickupOAuthService');
 const clickupClient = require('../services/clickupClient');
 const { syncAllRoutersToClickUp, getSyncStats, syncAssigneesFromClickUp } = require('../services/clickupSync');
@@ -31,6 +32,9 @@ setInterval(() => {
     logger.info(`Cleaned up ${cleaned} expired OAuth states`);
   }
 }, 2 * 60 * 1000);
+
+// All ClickUp routes require admin access
+router.use(requireAdmin);
 
 /**
  * GET /api/clickup/auth/status

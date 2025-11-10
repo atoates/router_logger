@@ -7,12 +7,16 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const { logger, pool } = require('../config/database');
+const authService = require('../services/authService');
 
 // Simple in-memory session store (use Redis in production)
 const sessions = new Map();
 
 // Session expiry: 7 days
 const SESSION_EXPIRY = 7 * 24 * 60 * 60 * 1000;
+
+// Feature flag for authentication (set via environment)
+const AUTH_ENABLED = process.env.ENABLE_AUTH === 'true';
 
 /**
  * GET /api/session/login (for mobile OAuth-style flow)
@@ -47,41 +51,53 @@ router.get('/login', async (req, res) => {
 
 /**
  * POST /api/session/login
- * Simple password-based login
+ * User authentication with username/password
  */
 router.post('/login', async (req, res) => {
   try {
-    const { password } = req.body;
+    const { username, password } = req.body;
     
-    if (!password) {
-      return res.status(400).json({ error: 'Password required' });
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password required' });
     }
 
-    // Check against environment variable password
-    const correctPassword = process.env.MOBILE_PASSWORD || 'router123';
-    
-    if (password !== correctPassword) {
-      logger.warn('Failed login attempt');
-      return res.status(401).json({ error: 'Invalid password' });
+    // Get client info for logging
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+
+    // Authenticate user
+    const user = await authService.authenticateUser(username, password, ipAddress, userAgent);
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid username or password' });
     }
 
     // Generate session token
     const sessionToken = crypto.randomBytes(32).toString('hex');
     const expiresAt = Date.now() + SESSION_EXPIRY;
 
-    // Store session
+    // Store session with user info
     sessions.set(sessionToken, {
       createdAt: Date.now(),
       expiresAt,
-      userId: 'default_user'
+      userId: user.id,
+      username: user.username,
+      role: user.role
     });
 
-    logger.info('User logged in successfully');
+    logger.info(`User logged in: ${user.username} (${user.role})`);
 
     res.json({
       success: true,
       sessionToken,
-      expiresAt: new Date(expiresAt).toISOString()
+      expiresAt: new Date(expiresAt).toISOString(),
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        email: user.email,
+        fullName: user.full_name
+      }
     });
 
   } catch (error) {
@@ -133,9 +149,15 @@ router.get('/verify', (req, res) => {
 });
 
 /**
- * Middleware to validate session
+ * Middleware to validate session (any authenticated user)
  */
-function requireSession(req, res, next) {
+function requireAuth(req, res, next) {
+  // If auth is disabled, allow all requests
+  if (!AUTH_ENABLED) {
+    req.user = { id: 1, username: 'admin', role: 'admin' }; // Mock admin user
+    return next();
+  }
+
   const sessionToken = req.headers.authorization?.replace('Bearer ', '');
   
   if (!sessionToken) {
@@ -149,8 +171,115 @@ function requireSession(req, res, next) {
     return res.status(401).json({ error: 'Invalid or expired session' });
   }
 
-  req.userId = session.userId;
+  // Attach user info to request
+  req.user = {
+    id: session.userId,
+    username: session.username,
+    role: session.role
+  };
+
   next();
+}
+
+/**
+ * Middleware to require admin role
+ */
+function requireAdmin(req, res, next) {
+  // If auth is disabled, allow all requests
+  if (!AUTH_ENABLED) {
+    req.user = { id: 1, username: 'admin', role: 'admin' };
+    return next();
+  }
+
+  const sessionToken = req.headers.authorization?.replace('Bearer ', '');
+  
+  if (!sessionToken) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const session = sessions.get(sessionToken);
+  
+  if (!session || session.expiresAt < Date.now()) {
+    if (session) sessions.delete(sessionToken);
+    return res.status(401).json({ error: 'Invalid or expired session' });
+  }
+
+  // Check if user is admin
+  if (session.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  // Attach user info to request
+  req.user = {
+    id: session.userId,
+    username: session.username,
+    role: session.role
+  };
+
+  next();
+}
+
+/**
+ * Middleware to check router access for current user
+ * Use this on routes that access specific routers
+ */
+function requireRouterAccess(req, res, next) {
+  // If auth is disabled, allow all requests
+  if (!AUTH_ENABLED) {
+    req.user = { id: 1, username: 'admin', role: 'admin' };
+    return next();
+  }
+
+  const sessionToken = req.headers.authorization?.replace('Bearer ', '');
+  
+  if (!sessionToken) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const session = sessions.get(sessionToken);
+  
+  if (!session || session.expiresAt < Date.now()) {
+    if (session) sessions.delete(sessionToken);
+    return res.status(401).json({ error: 'Invalid or expired session' });
+  }
+
+  // Attach user info to request
+  req.user = {
+    id: session.userId,
+    username: session.username,
+    role: session.role
+  };
+
+  // Admins have access to all routers
+  if (session.role === 'admin') {
+    return next();
+  }
+
+  // For guests, check router assignment
+  // Extract router_id from params or body
+  const routerId = req.params.routerId || req.body.router_id || req.query.router_id;
+
+  if (!routerId) {
+    return res.status(400).json({ error: 'Router ID required' });
+  }
+
+  // Check access asynchronously
+  authService.hasRouterAccess(session.userId, routerId)
+    .then(hasAccess => {
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'Access denied to this router' });
+      }
+      next();
+    })
+    .catch(error => {
+      logger.error('Error checking router access:', error);
+      res.status(500).json({ error: 'Failed to verify access' });
+    });
+}
+
+// Backwards compatibility alias
+function requireSession(req, res, next) {
+  return requireAuth(req, res, next);
 }
 
 // Cleanup expired sessions every hour
@@ -164,4 +293,7 @@ setInterval(() => {
 }, 60 * 60 * 1000);
 
 module.exports = router;
-module.exports.requireSession = requireSession;
+module.exports.requireAuth = requireAuth;
+module.exports.requireAdmin = requireAdmin;
+module.exports.requireRouterAccess = requireRouterAccess;
+module.exports.requireSession = requireSession; // Backwards compatibility

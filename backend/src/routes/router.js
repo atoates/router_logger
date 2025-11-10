@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
-const { requireSession } = require('./session');
+const { requireAuth, requireAdmin, requireRouterAccess } = require('./session');
 const { 
   upsertRouter, 
   insertLog, 
@@ -34,7 +34,7 @@ const routersWithLocationsCache = {
 };
 
 // Temporary endpoint to sync date_installed from ClickUp to database
-router.post('/admin/sync-dates', async (req, res) => {
+router.post('/admin/sync-dates', requireAdmin, async (req, res) => {
   const DATE_INSTALLED_FIELD_ID = '9f31c21a-630d-49f2-8a79-354de03e24d1';
   
   try {
@@ -357,7 +357,7 @@ router.get('/stats/inspections', async (req, res) => {
 });
 
 // POST log inspection for a router
-router.post('/inspections/:routerId', async (req, res) => {
+router.post('/inspections/:routerId', requireAdmin, async (req, res) => {
   try {
     const { routerId } = req.params;
     const { inspected_by, notes } = req.body;
@@ -382,7 +382,7 @@ router.get('/inspections/:routerId', async (req, res) => {
 });
 
 // POST clear all ClickUp task associations
-router.post('/clear-clickup-tasks', async (req, res) => {
+router.post('/clear-clickup-tasks', requireAdmin, async (req, res) => {
   try {
     await pool.query(
       'UPDATE routers SET clickup_task_id = NULL, clickup_task_url = NULL, clickup_list_id = NULL'
@@ -589,7 +589,7 @@ router.get('/routers/by-assignees', async (req, res) => {
 
 // POST link router to a location (ClickUp location task)
 // This will remove the assignee from the router task
-router.post('/routers/:routerId/link-location', async (req, res) => {
+router.post('/routers/:routerId/link-location', requireAdmin, async (req, res) => {
   try {
     const { routerId } = req.params;
     const { location_task_id, location_task_name, notes } = req.body;
@@ -619,7 +619,7 @@ router.post('/routers/:routerId/link-location', async (req, res) => {
 
 // POST unlink router from location
 // This will add assignee back if router is out-of-service
-router.post('/routers/:routerId/unlink-location', async (req, res) => {
+router.post('/routers/:routerId/unlink-location', requireAdmin, async (req, res) => {
   try {
     const { routerId } = req.params;
     const { reassign_to_user_id, reassign_to_username, notes } = req.body;
@@ -643,7 +643,7 @@ router.post('/routers/:routerId/unlink-location', async (req, res) => {
 
 // POST assign router to ClickUp user(s)
 // Updates the ClickUp task assignees field
-router.post('/routers/:routerId/assign', async (req, res) => {
+router.post('/routers/:routerId/assign', requireAdmin, async (req, res) => {
   try {
     const { routerId } = req.params;
     const { assignee_user_ids, assignee_usernames } = req.body;
@@ -697,7 +697,7 @@ router.post('/routers/:routerId/assign', async (req, res) => {
 
 // POST remove all assignees from router
 // Removes all assignees from the ClickUp task
-router.post('/routers/:routerId/remove-assignees', async (req, res) => {
+router.post('/routers/:routerId/remove-assignees', requireAdmin, async (req, res) => {
   try {
     const { routerId } = req.params;
     
@@ -775,7 +775,7 @@ router.get('/routers/status-summary', async (req, res) => {
 });
 
 // PATCH update router ClickUp task status (decommissioned, being returned, etc)
-router.patch('/routers/:router_id/status', async (req, res) => {
+router.patch('/routers/:router_id/status', requireAdmin, async (req, res) => {
   try {
     const { router_id } = req.params;
     const { status, notes } = req.body;
@@ -1043,7 +1043,7 @@ router.get('/routers/needs-attention', async (req, res) => {
 });
 
 // PATCH update router notes
-router.patch('/routers/:router_id/notes', async (req, res) => {
+router.patch('/routers/:router_id/notes', requireAdmin, async (req, res) => {
   try {
     const { router_id } = req.params;
     const { notes } = req.body;

@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { requireSession } = require('./session');
+const { requireAdmin } = require('./session');
+
+// All RMS routes require admin access
+router.use(requireAdmin);
 const { syncFromRMS } = require('../services/rmsSync');
 const { mergeDuplicateRouters } = require('../models/router');
 const RMSClient = require('../services/rmsClient');

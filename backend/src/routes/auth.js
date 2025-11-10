@@ -5,7 +5,11 @@
 
 const express = require('express');
 const router = express.Router();
+const { requireAdmin } = require('./session');
 const oauthService = require('../services/oauthService');
+
+// All OAuth routes require admin access
+router.use(requireAdmin);
 const { startRMSSync, isRMSSyncRunning } = require('../services/rmsSync');
 const { logger } = require('../config/database');
 

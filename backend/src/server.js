@@ -17,6 +17,7 @@ const rmsRoutes = require('./routes/rms');
 const authRoutes = require('./routes/auth');
 const clickupRoutes = require('./routes/clickup');
 const sessionRoutes = require('./routes/session');
+const userRoutes = require('./routes/users');
 const ironwifiWebhookRoutes = require('./routes/ironwifiWebhook');
 const { router: monitoringRoutes } = require('./routes/monitoring');
 
@@ -83,6 +84,7 @@ app.use('/api/rms', rmsRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/clickup', clickupRoutes);
 app.use('/api/session', sessionRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/ironwifi', ironwifiWebhookRoutes); // Webhook-only (no API polling)
 app.use(monitoringRoutes);
 
