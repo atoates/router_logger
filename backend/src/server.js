@@ -174,7 +174,11 @@ async function startServer() {
       logger.info('   - admin2 / VacatAd2025!Admin2');
       logger.info('   - admin3 / VacatAd2025!Admin3');
     } catch (seedError) {
-      logger.warn('Failed to update admin passwords:', seedError.message);
+      logger.error('Failed to update admin passwords:', {
+        message: seedError.message,
+        code: seedError.code,
+        stack: seedError.stack
+      });
       // Don't exit - server can still start
     }
     
