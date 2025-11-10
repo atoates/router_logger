@@ -1052,6 +1052,25 @@ router.post('/sync/assignees', async (req, res) => {
 });
 
 /**
+ * POST /api/clickup/sync/mac-addresses
+ * Sync MAC addresses FROM ClickUp TO local database
+ */
+router.post('/sync/mac-addresses', async (req, res) => {
+  try {
+    logger.info('Manual ClickUp MAC address sync triggered');
+    const { syncMacAddressesFromClickUp } = require('../services/clickupSync');
+    const result = await syncMacAddressesFromClickUp();
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    logger.error('Error during MAC address sync:', sanitizeError(error));
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/clickup/sync/:routerId
  * Manually sync a single router to ClickUp (for debugging)
  */

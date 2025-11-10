@@ -17,7 +17,8 @@ const CUSTOM_FIELDS = {
   ROUTER_ID: 'dfe0016c-4ab0-4dd9-bb38-b338411e9b47', // This is actually "Serial" in ClickUp
   LAST_ONLINE: '684e19a1-06c3-4bfd-94dd-6aca4a9b85fe',
   DATA_USAGE: 'c58206db-e995-4717-8e62-d36e15d0a3e2',
-  ROUTER_DASHBOARD: 'b9cf2e41-dc79-4768-985a-bda52b9dad1f'
+  ROUTER_DASHBOARD: 'b9cf2e41-dc79-4768-985a-bda52b9dad1f',
+  MAC_ADDRESS: null // Will be auto-discovered on first sync
 };
 
 // Operational status options (dropdown orderindex values)
@@ -37,18 +38,69 @@ let syncStats = {
 };
 
 /**
- * Check if smart sync is enabled
+ * Check if smart sync is enabled in settings
  */
 async function isSmartSyncEnabled() {
   try {
     const result = await pool.query(
       'SELECT value FROM settings WHERE key = $1',
-      ['smart_sync_enabled']
+      ['clickup_smart_sync_enabled']
     );
-    return result.rows.length > 0 ? result.rows[0].value === 'true' : true;
+    
+    if (result.rows.length > 0) {
+      return result.rows[0].value === 'true';
+    }
+    
+    return true; // Default to enabled
   } catch (error) {
     logger.error('Error checking smart sync setting:', error);
     return true; // Default to enabled if there's an error
+  }
+}
+
+/**
+ * Auto-discover MAC Address custom field ID from ClickUp
+ */
+async function discoverMacAddressField() {
+  if (CUSTOM_FIELDS.MAC_ADDRESS) {
+    return CUSTOM_FIELDS.MAC_ADDRESS; // Already discovered
+  }
+
+  try {
+    // Get a sample router with a ClickUp task to inspect its custom fields
+    const result = await pool.query(`
+      SELECT clickup_task_id 
+      FROM routers 
+      WHERE clickup_task_id IS NOT NULL 
+      LIMIT 1
+    `);
+
+    if (result.rows.length === 0) {
+      logger.warn('No routers with ClickUp tasks found - cannot auto-discover MAC Address field');
+      return null;
+    }
+
+    const taskId = result.rows[0].clickup_task_id;
+    const task = await clickupClient.getTask(taskId, 'default');
+
+    if (task && task.custom_fields) {
+      // Look for a field named "MAC Address" or similar
+      const macField = task.custom_fields.find(field => 
+        field.name && field.name.toLowerCase().includes('mac')
+      );
+
+      if (macField) {
+        CUSTOM_FIELDS.MAC_ADDRESS = macField.id;
+        logger.info(`✓ Auto-discovered MAC Address field ID: ${macField.id} (name: "${macField.name}")`);
+        return macField.id;
+      }
+    }
+
+    logger.warn('Could not find MAC Address custom field in ClickUp task');
+    return null;
+  } catch (error) {
+    logger.error('Error auto-discovering MAC Address field:', error.message);
+    return null;
   }
 }
 
@@ -106,6 +158,17 @@ async function syncRouterToClickUp(router, dataUsageMap = {}) {
         id: CUSTOM_FIELDS.FIRMWARE,
         value: router.firmware_version
       });
+    }
+
+    // MAC Address (text) - auto-discover field ID on first use
+    if (router.mac_address) {
+      const macFieldId = await discoverMacAddressField();
+      if (macFieldId) {
+        customFields.push({
+          id: macFieldId,
+          value: router.mac_address
+        });
+      }
     }
 
     // Last Online (date timestamp in milliseconds)
@@ -387,6 +450,7 @@ async function syncAllRoutersToClickUp() {
          r.firmware_version, 
          r.last_seen, 
          r.name,
+         r.mac_address,
          r.last_clickup_sync_hash,
          (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status
        FROM routers r
@@ -474,6 +538,80 @@ async function syncAllRoutersToClickUp() {
 
   } catch (error) {
     logger.error('Error during ClickUp sync:', error);
+    throw error;
+  }
+}
+
+/**
+ * Sync MAC addresses FROM ClickUp TO database
+ * Reads MAC Address custom field from ClickUp and updates local database
+ */
+async function syncMacAddressesFromClickUp() {
+  try {
+    logger.info('Starting MAC address sync from ClickUp...');
+    const startTime = Date.now();
+    let synced = 0;
+    let errors = 0;
+
+    // Auto-discover MAC Address field ID
+    const macFieldId = await discoverMacAddressField();
+    if (!macFieldId) {
+      logger.warn('Cannot sync MAC addresses - field ID not found');
+      return { success: false, error: 'MAC Address field not found' };
+    }
+
+    // Get all routers with ClickUp tasks
+    const result = await pool.query(`
+      SELECT router_id, clickup_task_id, name, mac_address
+      FROM routers
+      WHERE clickup_task_id IS NOT NULL
+    `);
+
+    logger.info(`Found ${result.rows.length} routers with ClickUp tasks`);
+
+    for (const router of result.rows) {
+      try {
+        // Fetch the full task to get custom fields
+        const task = await clickupClient.getTask(router.clickup_task_id, 'default');
+        
+        if (task && task.custom_fields) {
+          // Find MAC Address field
+          const macField = task.custom_fields.find(field => field.id === macFieldId);
+          
+          if (macField && macField.value) {
+            const clickupMac = macField.value;
+            
+            // Only update if different from current value
+            if (clickupMac !== router.mac_address) {
+              await pool.query(
+                'UPDATE routers SET mac_address = $1 WHERE router_id = $2',
+                [clickupMac, router.router_id]
+              );
+              synced++;
+              logger.info(`Router ${router.router_id} (${router.name}): Updated MAC address from ClickUp - ${clickupMac}`);
+            }
+          }
+        }
+        
+        // Add delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        errors++;
+        logger.warn(`Failed to sync MAC address for router ${router.router_id}:`, error.message);
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    logger.info(`MAC address sync complete: ${synced} synced, ${errors} errors in ${duration}ms`);
+
+    return {
+      success: true,
+      synced,
+      errors,
+      duration
+    };
+  } catch (error) {
+    logger.error('MAC address sync failed:', error);
     throw error;
   }
 }
@@ -609,6 +747,7 @@ module.exports = {
   syncRouterToClickUp,
   syncAllRoutersToClickUp,
   syncAssigneesFromClickUp,
+  syncMacAddressesFromClickUp,
   startClickUpSync,
   stopClickUpSync,
   getSyncStats
