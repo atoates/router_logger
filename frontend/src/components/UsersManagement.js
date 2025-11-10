@@ -138,7 +138,7 @@ function UsersManagement() {
     e.preventDefault();
 
     try {
-      const response = await fetch(`${API_URL}/api/users/${selectedUser.user_id}`, {
+      const response = await fetch(`${API_URL}/api/users/${selectedUser.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -180,7 +180,7 @@ function UsersManagement() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/users/${selectedUser.user_id}/password`, {
+      const response = await fetch(`${API_URL}/api/users/${selectedUser.id}/password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -207,8 +207,8 @@ function UsersManagement() {
   const handleToggleUserStatus = async (user) => {
     const action = user.is_active ? 'deactivate' : 'reactivate';
     const endpoint = user.is_active 
-      ? `${API_URL}/api/users/${user.user_id}`
-      : `${API_URL}/api/users/${user.user_id}/reactivate`;
+      ? `${API_URL}/api/users/${user.id}`
+      : `${API_URL}/api/users/${user.id}/reactivate`;
 
     try {
       const response = await fetch(endpoint, {
@@ -236,7 +236,7 @@ function UsersManagement() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/users/${user.user_id}/routers`,
+        `${API_URL}/api/users/${user.id}/routers`,
         { headers: getAuthHeaders() }
       );
 
@@ -254,7 +254,7 @@ function UsersManagement() {
   const handleAssignRouter = async (routerId) => {
     try {
       const response = await fetch(
-        `${API_URL}/api/users/${selectedUser.user_id}/routers/${routerId}`,
+        `${API_URL}/api/users/${selectedUser.id}/routers/${routerId}`,
         {
           method: 'POST',
           headers: getAuthHeaders()
@@ -278,7 +278,7 @@ function UsersManagement() {
   const handleUnassignRouter = async (routerId) => {
     try {
       const response = await fetch(
-        `${API_URL}/api/users/${selectedUser.user_id}/routers/${routerId}`,
+        `${API_URL}/api/users/${selectedUser.id}/routers/${routerId}`,
         {
           method: 'DELETE',
           headers: getAuthHeaders()
@@ -305,7 +305,7 @@ function UsersManagement() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/users/${user.user_id}/login-history?limit=20`,
+        `${API_URL}/api/users/${user.id}/login-history?limit=20`,
         { headers: getAuthHeaders() }
       );
 
@@ -385,7 +385,7 @@ function UsersManagement() {
           </thead>
           <tbody>
             {filteredUsers.map(user => (
-              <tr key={user.user_id} className={!user.is_active ? 'inactive-row' : ''}>
+              <tr key={user.id} className={!user.is_active ? 'inactive-row' : ''}>
                 <td className="username-cell">{user.username}</td>
                 <td>
                   <span className={`role-badge ${user.role}`}>
