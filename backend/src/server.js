@@ -98,6 +98,32 @@ async function startServer() {
     await initializeDatabase();
     logger.info('Database initialized successfully');
     
+    // Run migrations on startup
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const { pool } = require('./config/database');
+      
+      logger.info('Running database migrations...');
+      const migrationPath = path.join(__dirname, '../database/migrations/007_add_ironwifi_tables.sql');
+      
+      if (fs.existsSync(migrationPath)) {
+        const sql = fs.readFileSync(migrationPath, 'utf8');
+        await pool.query(sql);
+        logger.info('✅ Migration 007_add_ironwifi_tables.sql completed successfully');
+      } else {
+        logger.warn('Migration file not found, skipping');
+      }
+    } catch (migrationError) {
+      // Check if error is because columns/tables already exist (safe to ignore)
+      if (migrationError.code === '42701' || migrationError.code === '42P07') {
+        logger.info('Migration already applied, skipping');
+      } else {
+        logger.error('Migration failed:', migrationError.message);
+        // Don't exit - allow server to start anyway
+      }
+    }
+    
     // Initialize MQTT if configured
     initMQTT();
     
