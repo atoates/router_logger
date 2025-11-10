@@ -164,8 +164,9 @@ async function startServer() {
         }
       }
     } catch (migrationError) {
-      // Check if error is because columns/tables already exist (safe to ignore)
-      if (migrationError.code === '42701' || migrationError.code === '42P07' || migrationError.code === '42P16') {
+      // Check if error is because columns/tables/triggers already exist (safe to ignore)
+      // 42701 = duplicate column, 42P07 = duplicate table, 42P16 = invalid table definition, 42710 = duplicate object
+      if (migrationError.code === '42701' || migrationError.code === '42P07' || migrationError.code === '42P16' || migrationError.code === '42710') {
         logger.info('Migration already applied, skipping');
       } else {
         logger.error('Migration failed:', {
