@@ -44,20 +44,53 @@ Add these to your `.env` file:
 ```bash
 # IronWifi API Configuration
 IRONWIFI_API_KEY=779cfe99-f15d-4318-8d30-9fafeb46ed7d
-IRONWIFI_API_SECRET=optional-api-secret
-IRONWIFI_API_URL=https://api.ironwifi.com
+IRONWIFI_API_URL=https://console.ironwifi.com/api
 IRONWIFI_NETWORK_ID=your-network-id
 
 # Sync Configuration (⚠️ BE CAREFUL WITH API LIMITS!)
 IRONWIFI_SYNC_INTERVAL_MINUTES=15
 IRONWIFI_HOURLY_LIMIT=1000
+
+# NOTE: IRONWIFI_API_SECRET is NOT needed - API uses Bearer token auth only
 ```
 
 ### Getting Your Credentials
 
-1. **API Key**: `779cfe99-f15d-4318-8d30-9fafeb46ed7d` (already provided)
-2. **Network ID**: Find in IronWifi Console → Networks section
-3. **API URL**: Use `https://api.ironwifi.com` (default)
+1. **API Key**: `779cfe99-f15d-4318-8d30-9fafeb46ed7d` ✅ (already provided, tested and working!)
+2. **API URL**: `https://console.ironwifi.com/api` ✅ (confirmed working)
+3. **Network ID**: ⚠️ **You need to create this in IronWifi Console first**
+
+### ⚠️ IMPORTANT: Account Setup Required
+
+**Current Status**: API Key is valid, but your IronWifi account has no networks configured yet.
+
+**Before this integration will work, you must:**
+
+1. **Log into IronWifi Console**: https://console.ironwifi.com/
+2. **Create a Network**:
+   - Go to Networks section
+   - Click "Add Network"
+   - Give it a name (e.g., "Router Network")
+   - Copy the Network ID after creation
+3. **Add Access Points**:
+   - Your routers must be registered as Access Points in IronWifi
+   - Each router needs to be added with its MAC address
+   - Go to Networks → Your Network → Access Points
+4. **Configure Captive Portal** (optional but recommended):
+   - Set up splash page for user authentication
+   - This enables user session tracking
+5. **Get Network ID**:
+   - After creating network, note the ID
+   - Add it to your `.env` file
+
+**Testing Current Status**:
+```bash
+# Run the API test script
+cd backend
+node test-ironwifi-api.js
+```
+
+Once you see data in `/networks` and `/devices`, you're ready to integrate!
 
 ### ⚠️ IMPORTANT: API Rate Limits
 

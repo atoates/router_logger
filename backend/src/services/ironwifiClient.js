@@ -23,7 +23,7 @@ const API_CALL_WARNING_THRESHOLD = API_CALL_LIMIT_PER_HOUR * 0.8; // Warn at 80%
 
 class IronWifiClient {
   constructor() {
-    this.baseURL = process.env.IRONWIFI_API_URL || 'https://api.ironwifi.com';
+    this.baseURL = process.env.IRONWIFI_API_URL || 'https://console.ironwifi.com/api';
     this.apiKey = process.env.IRONWIFI_API_KEY;
     this.apiSecret = process.env.IRONWIFI_API_SECRET;
     this.networkId = process.env.IRONWIFI_NETWORK_ID;
@@ -71,14 +71,8 @@ class IronWifiClient {
       logger.debug(`IronWifi API call #${apiCallCount}: ${config.method?.toUpperCase()} ${config.url}`);
 
       if (this.apiKey) {
-        // IronWifi typically uses X-API-Key or Authorization Bearer
-        config.headers['X-API-Key'] = this.apiKey;
-        
-        // Some APIs use Basic Auth or Bearer token
-        if (this.apiSecret) {
-          const token = Buffer.from(`${this.apiKey}:${this.apiSecret}`).toString('base64');
-          config.headers['Authorization'] = `Basic ${token}`;
-        }
+        // IronWifi uses Bearer token authentication
+        config.headers['Authorization'] = `Bearer ${this.apiKey}`;
       }
       return config;
     });
@@ -134,38 +128,26 @@ class IronWifiClient {
     try {
       logger.info('Testing IronWifi API connection...');
       
-      // Try common health/info endpoints
-      const endpoints = [
-        '/v1/networks',
-        '/networks',
-        '/api/v1/networks',
-        '/health',
-        '/status'
-      ];
-
-      for (const endpoint of endpoints) {
-        try {
-          const response = await this.client.get(endpoint);
-          logger.info(`IronWifi API connected successfully via ${endpoint}`, {
-            status: response.status
-          });
-          return {
-            success: true,
-            endpoint,
-            status: response.status,
-            data: response.data
-          };
-        } catch (err) {
-          logger.debug(`Endpoint ${endpoint} failed: ${err.message}`);
-        }
-      }
-
-      throw new Error('Could not find working IronWifi API endpoint');
+      // Test with networks endpoint
+      const response = await this.client.get('/networks');
+      logger.info(`IronWifi API connected successfully`, {
+        status: response.status,
+        totalNetworks: response.data?.total_items || 0
+      });
+      
+      return {
+        success: true,
+        endpoint: '/networks',
+        status: response.status,
+        data: response.data,
+        totalNetworks: response.data?.total_items || 0
+      };
     } catch (error) {
       logger.error('IronWifi API connection test failed:', error.message);
       return {
         success: false,
-        error: error.message
+        error: error.message,
+        details: error.response?.data || null
       };
     }
   }
@@ -175,7 +157,7 @@ class IronWifiClient {
    */
   async getNetworks() {
     try {
-      const response = await this.client.get('/v1/networks');
+      const response = await this.client.get('/networks');
       return response.data;
     } catch (error) {
       logger.error('Failed to get networks:', error.message);
@@ -192,7 +174,7 @@ class IronWifiClient {
       if (!id) {
         throw new Error('Network ID not provided');
       }
-      const response = await this.client.get(`/v1/networks/${id}`);
+      const response = await this.client.get(`/networks/${id}`);
       return response.data;
     } catch (error) {
       logger.error(`Failed to get network ${networkId}:`, error.message);
