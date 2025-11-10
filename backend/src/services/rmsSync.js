@@ -9,6 +9,18 @@ const { isApproachingQuota, getQuotaStatus } = require('../routes/monitoring');
 const DELAY_BETWEEN_DEVICES_MS = parseInt(process.env.RMS_SYNC_DELAY_MS || '500', 10);
 const INITIAL_SYNC_DELAY_MS = parseInt(process.env.RMS_INITIAL_SYNC_DELAY_MS || '2000', 10); // Longer delay for initial sync
 
+// RMS Sync Statistics Tracking
+let rmsSyncStats = {
+  lastSyncTime: null,
+  lastSyncSuccess: 0,
+  lastSyncErrors: 0,
+  lastSyncTotal: 0,
+  lastSyncDuration: 0,
+  totalSyncs24h: 0,
+  syncHistory24h: [], // Array of { timestamp, success, errors, total, duration }
+  isRunning: false
+};
+
 /**
  * Sleep helper for throttling
  */
@@ -131,6 +143,7 @@ async function syncFromRMS() {
   }
 
   isSyncing = true;
+  rmsSyncStats.isRunning = true;
   const startTime = Date.now();
 
   try {
@@ -295,12 +308,49 @@ async function syncFromRMS() {
     logger.info(`RMS sync complete: ${successCount} successful, ${errorCount} errors`);
     const duration = Date.now() - startTime;
     logger.info(`Sync duration: ${(duration / 1000).toFixed(2)}s for ${devices.length} devices`);
+    
+    // Update sync statistics
+    const now = new Date();
+    rmsSyncStats.lastSyncTime = now;
+    rmsSyncStats.lastSyncSuccess = successCount;
+    rmsSyncStats.lastSyncErrors = errorCount;
+    rmsSyncStats.lastSyncTotal = devices.length;
+    rmsSyncStats.lastSyncDuration = duration;
+    
+    // Add to 24-hour history
+    rmsSyncStats.syncHistory24h.push({
+      timestamp: now,
+      success: successCount,
+      errors: errorCount,
+      total: devices.length,
+      duration
+    });
+    
+    // Keep only last 24 hours of history
+    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+    rmsSyncStats.syncHistory24h = rmsSyncStats.syncHistory24h.filter(
+      sync => new Date(sync.timestamp).getTime() > twentyFourHoursAgo
+    );
+    
+    rmsSyncStats.totalSyncs24h = rmsSyncStats.syncHistory24h.length;
+    
     return { successCount, errorCount, total: devices.length, duration };
   } catch (error) {
     logger.error('RMS sync failed:', error.message);
+    
+    // Track failed sync
+    const now = new Date();
+    const duration = Date.now() - startTime;
+    rmsSyncStats.lastSyncTime = now;
+    rmsSyncStats.lastSyncErrors = 1;
+    rmsSyncStats.lastSyncSuccess = 0;
+    rmsSyncStats.lastSyncTotal = 0;
+    rmsSyncStats.lastSyncDuration = duration;
+    
     throw error;
   } finally {
     isSyncing = false;
+    rmsSyncStats.isRunning = false;
   }
 }
 
@@ -341,9 +391,20 @@ function isRMSSyncRunning() {
   return !!syncIntervalId;
 }
 
+function getRMSSyncStats() {
+  return {
+    ...rmsSyncStats,
+    syncHistory24h: rmsSyncStats.syncHistory24h.map(sync => ({
+      ...sync,
+      timestamp: sync.timestamp
+    }))
+  };
+}
+
 module.exports = {
   syncFromRMS,
   startRMSSync,
   isRMSSyncRunning,
+  getRMSSyncStats,
   transformRMSDeviceToTelemetry
 };

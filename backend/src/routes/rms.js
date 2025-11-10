@@ -38,13 +38,27 @@ router.get('/status', async (req, res) => {
   const hasPat = !!process.env.RMS_ACCESS_TOKEN;
   const hasOAuth = !!(await oauthService.getValidToken('default_rms_user'));
   const rmsEnabled = hasPat || hasOAuth;
+  
+  // Import sync stats
+  const { getRMSSyncStats } = require('../services/rmsSync');
+  const syncStats = getRMSSyncStats();
+  
   res.json({
     enabled: rmsEnabled,
     syncInterval: process.env.RMS_SYNC_INTERVAL_MINUTES || 60,
     tokenType: hasOAuth ? 'oauth' : (hasPat ? 'pat' : 'none'),
     message: rmsEnabled 
       ? `RMS integration is enabled via ${hasOAuth ? 'OAuth' : 'PAT'}` 
-      : 'RMS integration is disabled (no token)'
+      : 'RMS integration is disabled (no token)',
+    syncStats: {
+      lastSyncTime: syncStats.lastSyncTime,
+      lastSyncSuccess: syncStats.lastSyncSuccess,
+      lastSyncErrors: syncStats.lastSyncErrors,
+      lastSyncTotal: syncStats.lastSyncTotal,
+      lastSyncDuration: syncStats.lastSyncDuration,
+      totalSyncs24h: syncStats.totalSyncs24h,
+      isRunning: syncStats.isRunning
+    }
   });
 });
 

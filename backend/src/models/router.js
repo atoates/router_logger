@@ -123,7 +123,9 @@ async function getAllRouters() {
   const query = `
     SELECT r.*, 
       (SELECT COUNT(*) FROM router_logs WHERE router_id = r.router_id) as log_count,
-      (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status
+      (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status,
+      (SELECT imei FROM router_logs WHERE router_id = r.router_id AND imei IS NOT NULL ORDER BY timestamp DESC LIMIT 1) as imei,
+      (SELECT firmware_version FROM router_logs WHERE router_id = r.router_id AND firmware_version IS NOT NULL ORDER BY timestamp DESC LIMIT 1) as firmware_version
     FROM routers r
     ORDER BY r.last_seen DESC;
   `;

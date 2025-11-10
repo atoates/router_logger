@@ -149,6 +149,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
   const [dbSize, setDbSize] = useState(null);
   const [inspections, setInspections] = useState([]);
   const [rmsUsage, setRMSUsage] = useState(null);
+  const [rmsSyncStatus, setRMSSyncStatus] = useState(null);
   const [clickupUsage, setClickUpUsage] = useState(null);
   const [statusSummary, setStatusSummary] = useState(null);
   const [smartSyncEnabled, setSmartSyncEnabled] = useState(true);
@@ -245,7 +246,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
     load();
   }, [mode, value]);
 
-  // Fetch smart sync setting when on status page
+  // Fetch smart sync setting and RMS sync status when on status page
   useEffect(() => {
     if (page === 'status') {
       const fetchSmartSync = async () => {
@@ -256,7 +257,18 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
           console.error('Failed to fetch smart sync setting:', error);
         }
       };
+      
+      const fetchRMSSyncStatus = async () => {
+        try {
+          const response = await api.get('/rms/status');
+          setRMSSyncStatus(response.data);
+        } catch (error) {
+          console.error('Failed to fetch RMS sync status:', error);
+        }
+      };
+      
       fetchSmartSync();
+      fetchRMSSyncStatus();
     }
   }, [page]);
 
@@ -638,6 +650,93 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
                 <div style={{ fontSize:11, color:'#94a3b8', paddingTop:8, borderTop: `1px solid ${dark ? '#334155' : '#e5e7eb'}` }}>
                   Tracking since: {new Date(rmsUsage.apiUsage?.since).toLocaleString()}
                   <div style={{ marginTop:4 }}>Elapsed: {rmsUsage.apiUsage?.hoursSinceReset || 0}h</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* RMS Sync Status */}
+          {rmsSyncStatus && (
+            <div className="v3-card">
+              <div className="v3-card-title">🔄 RMS Sync Status</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {/* Status Indicator */}
+                <div style={{ display:'flex', justifyContent:'space-between', padding:10, background: rmsSyncStatus.enabled ? (dark ? '#1f2937' : '#f0fdf4') : (dark ? '#1f2937' : '#fee2e2'), borderRadius:6, borderLeft: `3px solid ${rmsSyncStatus.enabled ? '#10b981' : '#ef4444'}` }}>
+                  <span style={{ fontSize:13, fontWeight:600 }}>Connection Status</span>
+                  <strong style={{ color: rmsSyncStatus.enabled ? '#10b981' : '#ef4444' }}>
+                    {rmsSyncStatus.enabled ? '🟢 Online' : '🔴 Offline'}
+                  </strong>
+                </div>
+
+                {rmsSyncStatus.enabled && rmsSyncStatus.syncStats && (
+                  <>
+                    {/* Last Sync */}
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                      <span style={{ fontSize:13, color:'#64748b' }}>Last Sync</span>
+                      <strong>
+                        {rmsSyncStatus.syncStats.lastSyncTime 
+                          ? (() => {
+                              const diff = Date.now() - new Date(rmsSyncStatus.syncStats.lastSyncTime);
+                              const mins = Math.floor(diff / 60000);
+                              const hrs = Math.floor(mins / 60);
+                              if (hrs > 0) return `${hrs}h ${mins % 60}m ago`;
+                              if (mins > 0) return `${mins}m ago`;
+                              return 'Just now';
+                            })()
+                          : 'Never'
+                        }
+                      </strong>
+                    </div>
+
+                    {/* 24-Hour Sync Count */}
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                      <span style={{ fontSize:13, color:'#64748b' }}>24h Sync Count</span>
+                      <strong>{rmsSyncStatus.syncStats.totalSyncs24h || 0}</strong>
+                    </div>
+
+                    {/* Routers Synced */}
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                      <span style={{ fontSize:13, color:'#64748b' }}>Routers Synced</span>
+                      <strong>{rmsSyncStatus.syncStats.lastSyncSuccess || 0} <span style={{ fontSize:11, color:'#94a3b8' }}>of {rmsSyncStatus.syncStats.lastSyncTotal || 0}</span></strong>
+                    </div>
+
+                    {/* Sync Duration */}
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                      <span style={{ fontSize:13, color:'#64748b' }}>Last Sync Duration</span>
+                      <strong>{rmsSyncStatus.syncStats.lastSyncDuration ? `${(rmsSyncStatus.syncStats.lastSyncDuration / 1000).toFixed(2)}s` : '—'}</strong>
+                    </div>
+
+                    {/* Sync Interval */}
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:8, background: dark ? '#1f2937' : '#f8fafc', borderRadius:6 }}>
+                      <span style={{ fontSize:13, color:'#64748b' }}>Sync Interval</span>
+                      <strong>Every {rmsSyncStatus.syncInterval} minutes</strong>
+                    </div>
+
+                    {/* Running Status */}
+                    {rmsSyncStatus.syncStats.isRunning && (
+                      <div style={{ padding:8, background: dark ? '#172554' : '#eff6ff', borderRadius:6, borderLeft:'3px solid #3b82f6', fontSize:12 }}>
+                        <div style={{ fontWeight:600, color:'#2563eb' }}>⏳ Sync in progress...</div>
+                      </div>
+                    )}
+
+                    {/* Errors */}
+                    {rmsSyncStatus.syncStats.lastSyncErrors > 0 && (
+                      <div style={{ padding:8, background:'#fef2f2', borderRadius:6, borderLeft:'3px solid #ef4444', fontSize:12 }}>
+                        <div style={{ fontWeight:600, color:'#991b1b' }}>⚠️ Last Sync Errors: {rmsSyncStatus.syncStats.lastSyncErrors}</div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {!rmsSyncStatus.enabled && (
+                  <div style={{ padding:8, fontSize:12, color:'#64748b', fontStyle:'italic' }}>
+                    {rmsSyncStatus.message}
+                  </div>
+                )}
+
+                {/* Token Type Info */}
+                <div style={{ fontSize:11, color:'#94a3b8', paddingTop:8, borderTop: `1px solid ${dark ? '#334155' : '#e5e7eb'}` }}>
+                  Auth Method: <strong>{rmsSyncStatus.tokenType.toUpperCase()}</strong>
                 </div>
               </div>
             </div>
