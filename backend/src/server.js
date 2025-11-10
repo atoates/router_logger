@@ -131,13 +131,15 @@ async function startServer() {
     startClickUpSync(parseInt(clickupSyncInterval), false); // false = skip initial sync
     logger.info(`ClickUp sync scheduler started (every ${clickupSyncInterval} minutes, no startup sync)`);
     
-    // Start IronWifi sync if configured
-    if (process.env.IRONWIFI_API_KEY && process.env.IRONWIFI_NETWORK_ID) {
-      const ironwifiInterval = process.env.IRONWIFI_SYNC_INTERVAL_MINUTES || 15; // Default 15 min to avoid rate limits
+    // IronWifi: Using webhook instead of polling (see /api/ironwifi/webhook)
+    // Webhook provides better data access without API rate limits
+    // Keeping API client available for manual sync and status checks
+    if (process.env.IRONWIFI_ENABLE_POLLING === 'true' && process.env.IRONWIFI_API_KEY && process.env.IRONWIFI_NETWORK_ID) {
+      const ironwifiInterval = process.env.IRONWIFI_SYNC_INTERVAL_MINUTES || 15;
       startIronWifiSync(parseInt(ironwifiInterval));
-      logger.info(`IronWifi sync scheduler started (every ${ironwifiInterval} minutes) - Rate limit protection enabled`);
+      logger.info(`IronWifi API polling enabled (every ${ironwifiInterval} minutes) - Rate limit protection enabled`);
     } else {
-      logger.info('IronWifi sync not configured (missing API_KEY or NETWORK_ID)');
+      logger.info('IronWifi using webhook-based integration (API polling disabled). Configure webhook in IronWifi Console → Reports → Report Scheduler');
     }
     
     app.listen(PORT, () => {
