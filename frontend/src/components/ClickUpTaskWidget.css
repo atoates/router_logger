@@ -182,13 +182,13 @@
 }
 
 .detail-label {
-  color: #64748b;
+  color: #64748b !important;
   font-weight: 500;
   white-space: nowrap;
 }
 
 .detail-value {
-  color: #0f172a;
+  color: #0f172a !important;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;

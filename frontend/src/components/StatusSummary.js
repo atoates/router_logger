@@ -28,7 +28,7 @@ function StatusSummary({ onRoutersLoaded }) {
       }
     };
     load();
-    const interval = setInterval(load, 300000); // refresh every 5 minutes (reduced from 1 min)
+    const interval = setInterval(load, 30000); // refresh every 30 seconds (was 5 minutes)
     return () => { mounted = false; clearInterval(interval); };
   }, [onRoutersLoaded]);
 

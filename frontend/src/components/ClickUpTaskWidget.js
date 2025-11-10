@@ -391,23 +391,25 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
               </div>
             )}
             
-            {/* Status Change Actions - same row */}
-            <div className="task-actions-row task-status-actions">
-              <button 
-                onClick={handleBeingReturned}
-                className="task-btn task-btn-warning"
-                title="Mark this router as being returned"
-              >
-                📦 Being Returned
-              </button>
-              <button 
-                onClick={handleDecommission}
-                className="task-btn task-btn-danger"
-                title="Permanently decommission this router"
-              >
-                ⚠️ Decommission
-              </button>
-            </div>
+            {/* Status Change Actions - same row (hide when router is assigned to someone) */}
+            {(!linkedTask.assignees || linkedTask.assignees.length === 0) && (
+              <div className="task-actions-row task-status-actions">
+                <button 
+                  onClick={handleBeingReturned}
+                  className="task-btn task-btn-warning"
+                  title="Mark this router as being returned"
+                >
+                  📦 Being Returned
+                </button>
+                <button 
+                  onClick={handleDecommission}
+                  className="task-btn task-btn-danger"
+                  title="Permanently decommission this router"
+                >
+                  ⚠️ Decommission
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="task-not-linked">

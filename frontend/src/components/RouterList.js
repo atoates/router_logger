@@ -9,7 +9,7 @@ function RouterList({ onSelectRouter }) {
 
   useEffect(() => {
     fetchRouters();
-    const interval = setInterval(fetchRouters, 300000); // Refresh every 5 minutes
+    const interval = setInterval(fetchRouters, 30000); // Refresh every 30 seconds (was 5 minutes)
     return () => clearInterval(interval);
   }, []);
 

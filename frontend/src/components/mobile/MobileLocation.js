@@ -1,10 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { mobileFetch, API_BASE } from '../../utils/mobileApi';
 
 const MobileLocation = ({ router }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [properties, setProperties] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [spaceId, setSpaceId] = useState(null);
+
+  // Get Active Accounts space ID on mount
+  useEffect(() => {
+    const getSpaceId = async () => {
+      try {
+        const authRes = await mobileFetch(`/api/clickup/auth/status`);
+        const authData = await authRes.json();
+        
+        if (authData.authorized && authData.workspace) {
+          const spacesRes = await mobileFetch(`/api/clickup/spaces/${authData.workspace.workspace_id}`);
+          const spacesData = await spacesRes.json();
+          
+          const activeAccounts = spacesData.spaces?.find(s => s.name === 'Active Accounts');
+          if (activeAccounts) {
+            setSpaceId(activeAccounts.id);
+          }
+        }
+      } catch (error) {
+        console.error('Error getting space info:', error);
+      }
+    };
+
+    getSpaceId();
+  }, []);
 
   const searchProperties = async () => {
     if (searchTerm.length < 2) {
@@ -12,21 +37,53 @@ const MobileLocation = ({ router }) => {
       return;
     }
 
+    if (!spaceId) {
+      alert('ClickUp not connected. Please connect to ClickUp first.');
+      return;
+    }
+
     try {
       setSearching(true);
-      const response = await mobileFetch(`/api/clickup/properties/search?query=${encodeURIComponent(searchTerm)}`);
       
-      console.log('Search response status:', response.status);
+      // Use the same endpoint as desktop - get all lists from Active Accounts space
+      const response = await mobileFetch(`/api/clickup/debug/space-lists/${spaceId}`);
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Search error response:', errorText);
         throw new Error('Search failed');
       }
       
       const data = await response.json();
-      console.log('Search results:', data);
-      setProperties(data.properties || []);
+      
+      // Extract all lists from all folders
+      let allLists = [];
+      if (data.folderless && data.folderless.length > 0) {
+        allLists = allLists.concat(data.folderless);
+      }
+      if (data.folders && data.folders.length > 0) {
+        data.folders.forEach(folder => {
+          if (folder.lists && folder.lists.length > 0) {
+            allLists = allLists.concat(folder.lists.map(list => ({
+              ...list,
+              folderName: folder.folder.name
+            })));
+          }
+        });
+      }
+      
+      // Filter lists by search query (case insensitive)
+      const searchTermLower = /^\d+$/.test(searchTerm) ? `#${searchTerm}` : searchTerm;
+      const filtered = allLists.filter(list => 
+        list.name.toLowerCase().includes(searchTermLower.toLowerCase())
+      );
+      
+      // Format for display
+      const formattedResults = filtered.map(list => ({
+        id: list.id,
+        name: list.name,
+        folderName: list.folderName
+      }));
+      
+      setProperties(formattedResults);
     } catch (error) {
       console.error('Failed to search properties:', error);
       alert('Failed to search properties. Make sure you are connected to ClickUp.');
@@ -169,9 +226,9 @@ const MobileLocation = ({ router }) => {
               <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>
                 {property.name}
               </div>
-              {property.custom_fields?.Address && (
+              {property.folderName && (
                 <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px' }}>
-                  {property.custom_fields.Address}
+                  📁 {property.folderName}
                 </div>
               )}
               <button

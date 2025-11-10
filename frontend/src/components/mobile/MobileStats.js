@@ -9,10 +9,18 @@ const MobileStats = ({ router }) => {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
 
   useEffect(() => {
     if (router) {
       loadStats();
+      
+      // Auto-refresh every 30 seconds for installers to see status changes quickly
+      const interval = setInterval(() => {
+        loadStats();
+      }, 30000); // 30 seconds
+      
+      return () => clearInterval(interval);
     }
   }, [router]);
 
@@ -53,6 +61,7 @@ const MobileStats = ({ router }) => {
       
       setStats(statsData);
       setLogs(logsResponse.data || []);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Failed to load stats:', error);
     } finally {
@@ -159,6 +168,23 @@ const MobileStats = ({ router }) => {
 
   return (
     <div style={{ padding: '16px' }}>
+      {/* Auto-refresh Indicator */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '8px 12px',
+        background: '#f0f9ff',
+        border: '1px solid #bae6fd',
+        borderRadius: '8px',
+        marginBottom: '12px',
+        fontSize: '12px',
+        color: '#0c4a6e'
+      }}>
+        <span>🔄 Auto-refreshing every 30s</span>
+        <span>Updated {Math.round((new Date() - lastUpdated) / 1000)}s ago</span>
+      </div>
+      
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>
           {router.name || `Router #${router.router_id}`}
