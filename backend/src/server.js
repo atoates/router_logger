@@ -145,48 +145,9 @@ async function startServer() {
       }
     }
     
-    // Update admin user passwords (run after migrations, regardless of migration success)
-    try {
-      const bcrypt = require('bcrypt');
-      
-      logger.info('Ensuring admin users have proper passwords...');
-      
-      const admin1Password = process.env.ADMIN1_PASSWORD || 'VacatAd2025!Admin1';
-      const admin2Password = process.env.ADMIN2_PASSWORD || 'VacatAd2025!Admin2';
-      const admin3Password = process.env.ADMIN3_PASSWORD || 'VacatAd2025!Admin3';
-      
-      // Hash passwords
-      const admin1Hash = await bcrypt.hash(admin1Password, 10);
-      const admin2Hash = await bcrypt.hash(admin2Password, 10);
-      const admin3Hash = await bcrypt.hash(admin3Password, 10);
-      
-      // Update passwords (upsert with proper hashes)
-      await pool.query(`
-        INSERT INTO users (username, password_hash, role, email, full_name, is_active)
-        VALUES 
-          ('admin1', $1, 'admin', 'admin1@vacatracker.com', 'Administrator 1', TRUE),
-          ('admin2', $2, 'admin', 'admin2@vacatracker.com', 'Administrator 2', TRUE),
-          ('admin3', $3, 'admin', 'admin3@vacatracker.com', 'Administrator 3', TRUE)
-        ON CONFLICT (username) 
-        DO UPDATE SET 
-          password_hash = EXCLUDED.password_hash,
-          email = EXCLUDED.email,
-          full_name = EXCLUDED.full_name,
-          is_active = EXCLUDED.is_active
-      `, [admin1Hash, admin2Hash, admin3Hash]);
-      
-      logger.info('✅ Admin user passwords updated successfully');
-      logger.info('   - admin1 / VacatAd2025!Admin1');
-      logger.info('   - admin2 / VacatAd2025!Admin2');
-      logger.info('   - admin3 / VacatAd2025!Admin3');
-    } catch (seedError) {
-      logger.error('Failed to update admin passwords:', {
-        message: seedError.message,
-        code: seedError.code,
-        stack: seedError.stack
-      });
-      // Don't exit - server can still start
-    }
+    // Admin users are now managed through the Users Management page
+    // Migration 008 creates initial admin users via seed_admins.js
+    // No need to update passwords on every server restart
     
     // Initialize MQTT if configured
     initMQTT();
