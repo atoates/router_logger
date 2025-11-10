@@ -19,6 +19,7 @@ const authRoutes = require('./routes/auth');
 const clickupRoutes = require('./routes/clickup');
 const sessionRoutes = require('./routes/session');
 const ironwifiRoutes = require('./routes/ironwifi');
+const ironwifiWebhookRoutes = require('./routes/ironwifiWebhook');
 const { router: monitoringRoutes } = require('./routes/monitoring');
 
 const app = express();
@@ -85,6 +86,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/clickup', clickupRoutes);
 app.use('/api/session', sessionRoutes);
 app.use('/api/ironwifi', ironwifiRoutes);
+app.use('/api/ironwifi', ironwifiWebhookRoutes); // Webhook endpoint (no auth check)
 app.use(monitoringRoutes);
 
 // Error handling middleware
