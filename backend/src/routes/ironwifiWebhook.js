@@ -7,7 +7,6 @@
 const express = require('express');
 const router = express.Router();
 const { pool, logger } = require('../config/database');
-const { syncIronWifiSessions } = require('../services/ironwifiSync');
 
 /**
  * POST /api/ironwifi/webhook

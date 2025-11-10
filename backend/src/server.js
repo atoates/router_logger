@@ -11,14 +11,12 @@ const { initializeDatabase } = require('./database/migrate');
 const { initMQTT, closeMQTT } = require('./services/mqttService');
 const { startRMSSync } = require('./services/rmsSync');
 const { startClickUpSync } = require('./services/clickupSync');
-const { startIronWifiSync } = require('./services/ironwifiSync');
 const oauthService = require('./services/oauthService');
 const routerRoutes = require('./routes/router');
 const rmsRoutes = require('./routes/rms');
 const authRoutes = require('./routes/auth');
 const clickupRoutes = require('./routes/clickup');
 const sessionRoutes = require('./routes/session');
-const ironwifiRoutes = require('./routes/ironwifi');
 const ironwifiWebhookRoutes = require('./routes/ironwifiWebhook');
 const { router: monitoringRoutes } = require('./routes/monitoring');
 
@@ -85,8 +83,7 @@ app.use('/api/rms', rmsRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/clickup', clickupRoutes);
 app.use('/api/session', sessionRoutes);
-app.use('/api/ironwifi', ironwifiRoutes);
-app.use('/api/ironwifi', ironwifiWebhookRoutes); // Webhook endpoint (no auth check)
+app.use('/api/ironwifi', ironwifiWebhookRoutes); // Webhook-only (no API polling)
 app.use(monitoringRoutes);
 
 // Error handling middleware
@@ -131,16 +128,10 @@ async function startServer() {
     startClickUpSync(parseInt(clickupSyncInterval), false); // false = skip initial sync
     logger.info(`ClickUp sync scheduler started (every ${clickupSyncInterval} minutes, no startup sync)`);
     
-    // IronWifi: Using webhook instead of polling (see /api/ironwifi/webhook)
-    // Webhook provides better data access without API rate limits
-    // Keeping API client available for manual sync and status checks
-    if (process.env.IRONWIFI_ENABLE_POLLING === 'true' && process.env.IRONWIFI_API_KEY && process.env.IRONWIFI_NETWORK_ID) {
-      const ironwifiInterval = process.env.IRONWIFI_SYNC_INTERVAL_MINUTES || 15;
-      startIronWifiSync(parseInt(ironwifiInterval));
-      logger.info(`IronWifi API polling enabled (every ${ironwifiInterval} minutes) - Rate limit protection enabled`);
-    } else {
-      logger.info('IronWifi using webhook-based integration (API polling disabled). Configure webhook in IronWifi Console → Reports → Report Scheduler');
-    }
+    // IronWifi: Webhook-only integration (no API polling)
+    // Configure webhook in IronWifi Console → Reports → Report Scheduler
+    // Webhook URL: /api/ironwifi/webhook
+    logger.info('IronWifi webhook endpoint ready at /api/ironwifi/webhook');
     
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
