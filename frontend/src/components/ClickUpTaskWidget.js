@@ -330,6 +330,34 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
               )}
             </div>
 
+            {/* Router Details */}
+            <div className="router-details">
+              {router?.imei && (
+                <div className="router-detail-item">
+                  <span className="detail-label">IMEI:</span>
+                  <span className="detail-value">{router.imei}</span>
+                </div>
+              )}
+              {router?.current_status === 'online' && router?.operator && (
+                <div className="router-detail-item">
+                  <span className="detail-label">Network:</span>
+                  <span className="detail-value">{router.operator}</span>
+                </div>
+              )}
+              {router?.wan_ip && (
+                <div className="router-detail-item">
+                  <span className="detail-label">IP:</span>
+                  <span className="detail-value">{router.wan_ip}</span>
+                </div>
+              )}
+              {router?.firmware_version && (
+                <div className="router-detail-item">
+                  <span className="detail-label">Firmware:</span>
+                  <span className="detail-value">{router.firmware_version}</span>
+                </div>
+              )}
+            </div>
+
             {/* Show assignee prominently if router is assigned to someone */}
             {linkedTask.assignees && linkedTask.assignees.length > 0 && (
               <div className="task-assigned-to">

@@ -163,6 +163,37 @@
   font-weight: 600;
 }
 
+/* Router Details Section */
+.router-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.router-detail-item {
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  align-items: baseline;
+}
+
+.detail-label {
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.detail-value {
+  color: #0f172a;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .task-meta {
   display: flex;
   gap: 12px;
