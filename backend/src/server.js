@@ -100,12 +100,13 @@ async function startServer() {
     await initializeDatabase();
     logger.info('Database initialized successfully');
     
+    // Get pool for migrations and seeding
+    const fs = require('fs');
+    const path = require('path');
+    const { pool } = require('./config/database');
+    
     // Run migrations on startup
     try {
-      const fs = require('fs');
-      const path = require('path');
-      const { pool } = require('./config/database');
-      
       logger.info('Running database migrations...');
       
       // Run migration 007 (IronWifi tables)
