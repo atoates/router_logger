@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { toast } from 'react-toastify';
+import api from '../services/api';
 import './PropertySearchWidget.css';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'https://routerlogger-production.up.railway.app';
@@ -24,15 +25,15 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
   useEffect(() => {
     const getWorkspaceInfo = async () => {
       try {
-        const authRes = await fetch(`${API_BASE}/api/clickup/auth/status`);
-        const authData = await authRes.json();
+        const authRes = await api.get('/clickup/auth/status');
+        const authData = authRes.data;
         
         if (authData.authorized && authData.workspace) {
           setWorkspaceId(authData.workspace.workspace_id);
           
           // Get spaces to find Active Accounts
-          const spacesRes = await fetch(`${API_BASE}/api/clickup/spaces/${authData.workspace.workspace_id}`);
-          const spacesData = await spacesRes.json();
+          const spacesRes = await api.get(`/clickup/spaces/${authData.workspace.workspace_id}`);
+          const spacesData = spacesRes.data;
           
           const activeAccounts = spacesData.spaces?.find(s => s.name === 'Active Accounts');
           if (activeAccounts) {
@@ -53,8 +54,8 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
       if (!routerId) return;
       
       try {
-        const res = await fetch(`${API_BASE}/api/routers/${routerId}/current-location`);
-        const data = await res.json();
+        const res = await api.get(`/routers/${routerId}/current-location`);
+        const data = res.data;
         
         if (data.location) {
           setCurrentLocation({
@@ -86,10 +87,8 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
       setSearching(true);
       try {
         // Get the space's folder structure with all lists
-        const res = await fetch(
-          `${API_BASE}/api/clickup/debug/space-lists/${spaceId}`
-        );
-        const data = await res.json();
+        const res = await api.get(`/clickup/debug/space-lists/${spaceId}`);
+        const data = res.data;
         
         // Extract all lists from all folders
         let allLists = [];
@@ -139,19 +138,15 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/routers/${routerId}/link-location`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location_task_id: locationId,
-          location_task_name: locationName,
-          notes: 'Assigned via dashboard'
-        })
+      const res = await api.post(`/routers/${routerId}/link-location`, {
+        location_task_id: locationId,
+        location_task_name: locationName,
+        notes: 'Assigned via dashboard'
       });
 
-      const data = await res.json();
+      const data = res.data;
 
-      if (res.ok && data.success) {
+      if (data.success) {
         setCurrentLocation({
           id: locationId,
           name: locationName,
@@ -181,17 +176,13 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/routers/${routerId}/unlink-location`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          notes: 'Unlinked via dashboard'
-        })
+      const res = await api.post(`/routers/${routerId}/unlink-location`, {
+        notes: 'Unlinked via dashboard'
       });
 
-      const data = await res.json();
+      const data = res.data;
 
-      if (res.ok && data.success) {
+      if (data.success) {
         setCurrentLocation(null);
         toast.success('Router unlinked from location');
       } else {
@@ -222,8 +213,8 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
       // Load workspace members when opening modal
       if (workspaceId) {
         try {
-          const res = await fetch(`${API_BASE}/api/clickup/workspaces/${workspaceId}/members`);
-          const data = await res.json();
+          const res = await api.get(`/clickup/workspaces/${workspaceId}/members`);
+          const data = res.data;
           console.log('Workspace members response:', data);
           if (data.members) {
             console.log('Setting available users:', data.members);
@@ -273,19 +264,15 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
       console.log('Assigning to:', { userIds: selectedAssignees, usernames });
 
       // Call backend to update ClickUp assignees
-      const res = await fetch(`${API_BASE}/api/routers/${routerId}/assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          assignee_user_ids: selectedAssignees.map(String),
-          assignee_usernames: usernames
-        })
+      const res = await api.post(`/routers/${routerId}/assign`, {
+        assignee_user_ids: selectedAssignees.map(String),
+        assignee_usernames: usernames
       });
 
-      const data = await res.json();
+      const data = res.data;
       console.log('Assignment response:', data);
 
-      if (res.ok) {
+      if (data) {
         toast.success(`Router assigned to ${usernames.join(', ')}`);
         setShowStoredWithModal(false);
         setSelectedAssignees([]);
