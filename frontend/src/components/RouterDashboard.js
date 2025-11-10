@@ -560,6 +560,7 @@ export default function RouterDashboard({ router }) {
             <div className="accordion-content">
               <div className="kv">
                 <div><span>IMEI</span><strong>{router?.imei || latest?.imei || '—'}</strong></div>
+                <div><span>MAC Address</span><strong>{router?.mac_address || '—'}</strong></div>
                 <div><span>Operator</span><strong>{latest?.operator || '—'}</strong></div>
                 <div><span>Network</span><strong>{latest?.network_type || '—'}</strong></div>
                 <div><span>Firmware</span><strong>{latest?.firmware_version || router?.firmware_version || '—'}</strong></div>
