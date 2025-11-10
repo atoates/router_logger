@@ -168,7 +168,12 @@ async function startServer() {
       if (migrationError.code === '42701' || migrationError.code === '42P07' || migrationError.code === '42P16') {
         logger.info('Migration already applied, skipping');
       } else {
-        logger.error('Migration failed:', migrationError.message);
+        logger.error('Migration failed:', {
+          message: migrationError.message,
+          code: migrationError.code,
+          detail: migrationError.detail,
+          stack: migrationError.stack
+        });
         // Don't exit - allow server to start anyway
       }
     }
