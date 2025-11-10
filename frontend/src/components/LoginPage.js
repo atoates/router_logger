@@ -94,12 +94,6 @@ function LoginPage() {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-
-        <div className="login-footer">
-          <p className="login-hint">
-            Default credentials: admin1 / VacatAd2025!Admin1
-          </p>
-        </div>
       </div>
     </div>
   );

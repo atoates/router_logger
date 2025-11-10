@@ -9,6 +9,20 @@ const api = axios.create({
   },
 });
 
+// Add authentication token to all requests
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('sessionToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Simple in-module cache for routers with TTL and in-flight dedupe
 let _routersCache = { data: null, expiresAt: 0 };
 let _routersInflight = null;
