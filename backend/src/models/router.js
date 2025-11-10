@@ -127,8 +127,7 @@ async function getAllRouters() {
       r.clickup_task_id, r.clickup_task_url, r.clickup_list_id, 
       r.clickup_location_task_id, r.clickup_location_task_name, 
       r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
-      r.clickup_assignees, r.clickup_task_status, r.current_state, 
-      r.service_status, r.service_status_notes, r.mac_address,
+      r.clickup_assignees, r.clickup_task_status, r.mac_address,
       (SELECT COUNT(*) FROM router_logs WHERE router_id = r.router_id) as log_count,
       (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status,
       COALESCE(
