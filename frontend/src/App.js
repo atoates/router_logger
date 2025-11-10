@@ -10,6 +10,10 @@ import HeaderRouterSelect from './components/HeaderRouterSelect';
 import MobilePage from './pages/MobilePage';
 import ReturnsPage from './components/ReturnsPage';
 import DecommissionedPage from './components/DecommissionedPage';
+import LoginPage from './components/LoginPage';
+import ProtectedRoute from './components/ProtectedRoute';
+import UsersManagement from './components/UsersManagement';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer, toast } from 'react-toastify';
 import { getRouters } from './services/api';
 import 'react-toastify/dist/ReactToastify.css';
@@ -64,6 +68,7 @@ function AppContent() {
   const [darkMode] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
+  const { currentUser, logout, isAdmin } = useAuth();
 
   // Auto-redirect mobile users to /mobile (only on homepage)
   useEffect(() => {
@@ -82,9 +87,17 @@ function AppContent() {
     toast.success(`Opening ${label}`);
   };
 
-  // Determine if we're on a router page or mobile page
+  // Handle logout
+  const handleLogout = async () => {
+    await logout();
+    toast.info('Logged out successfully');
+    navigate('/login');
+  };
+
+  // Determine if we're on a router page, mobile page, or login page
   const isRouterPage = location.pathname.startsWith('/router/');
   const isMobilePage = location.pathname === '/mobile';
+  const isLoginPage = location.pathname === '/login';
   
   // Navigation menu items
   const navItems = [
@@ -96,13 +109,22 @@ function AppContent() {
     { path: '/status', label: 'System Status', icon: '⚙️' },
   ];
 
-  // If mobile page, render it standalone without header/nav
+  // Admin-only navigation items
+  const adminNavItems = [
+    { path: '/users', label: 'User Management', icon: '👥' },
+  ];
+
+  // If mobile page or login page, render standalone without header/nav
   if (isMobilePage) {
     return (
       <ErrorBoundary>
         <MobilePage />
       </ErrorBoundary>
     );
+  }
+
+  if (isLoginPage) {
+    return <LoginPage />;
   }
 
   return (
@@ -118,6 +140,36 @@ function AppContent() {
           </div>
           <div className="app-header-right">
             <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
+            {currentUser && (
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '12px',
+                color: '#e2e8f0',
+                fontSize: '14px'
+              }}>
+                <span>
+                  {currentUser.username} <span style={{ color: '#a0aec0' }}>({currentUser.role})</span>
+                </span>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    padding: '8px 16px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.2)'}
+                  onMouseOut={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.1)'}
+                >
+                  Logout
+                </button>
+              </div>
+            )}
             <ClickUpAuthButton />
             <RMSAuthButton variant="header" />
           </div>
@@ -136,19 +188,63 @@ function AppContent() {
                 <span className="app-nav-label">{item.label}</span>
               </Link>
             ))}
+            {isAdmin && adminNavItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`app-nav-link ${location.pathname === item.path ? 'active' : ''}`}
+              >
+                <span className="app-nav-icon">{item.icon}</span>
+                <span className="app-nav-label">{item.label}</span>
+              </Link>
+            ))}
           </nav>
         )}
 
         {/* Main Content */}
         <ErrorBoundary>
           <Routes>
-            <Route path="/" element={<DashboardV3 page="network" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />} />
-            <Route path="/assignments" element={<DashboardV3 page="assignments" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />} />
-            <Route path="/stored" element={<DashboardV3 page="stored" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />} />
-            <Route path="/status" element={<DashboardV3 page="status" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />} />
-            <Route path="/returns" element={<ReturnsPage />} />
-            <Route path="/decommissioned" element={<DecommissionedPage />} />
-            <Route path="/router/:routerId" element={<RouterDetailPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/" element={
+              <ProtectedRoute>
+                <DashboardV3 page="network" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
+              </ProtectedRoute>
+            } />
+            <Route path="/assignments" element={
+              <ProtectedRoute>
+                <DashboardV3 page="assignments" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
+              </ProtectedRoute>
+            } />
+            <Route path="/stored" element={
+              <ProtectedRoute>
+                <DashboardV3 page="stored" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
+              </ProtectedRoute>
+            } />
+            <Route path="/status" element={
+              <ProtectedRoute>
+                <DashboardV3 page="status" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
+              </ProtectedRoute>
+            } />
+            <Route path="/returns" element={
+              <ProtectedRoute>
+                <ReturnsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/decommissioned" element={
+              <ProtectedRoute>
+                <DecommissionedPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/router/:routerId" element={
+              <ProtectedRoute>
+                <RouterDetailPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/users" element={
+              <ProtectedRoute requireAdmin>
+                <UsersManagement />
+              </ProtectedRoute>
+            } />
           </Routes>
         </ErrorBoundary>
       </div>
@@ -158,7 +254,11 @@ function AppContent() {
 }
 
 function App() {
-  return <AppContent />;
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
 }
 
 export default App;
