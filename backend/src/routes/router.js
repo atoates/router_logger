@@ -949,7 +949,21 @@ router.get('/routers/being-returned', async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT 
-        r.*,
+        r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id,
+        r.created_at, r.last_seen, r.rms_created_at, r.notes,
+        r.clickup_task_id, r.clickup_task_url, r.clickup_list_id,
+        r.clickup_location_task_id, r.clickup_location_task_name,
+        r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
+        r.clickup_assignees, r.clickup_task_status, r.current_state,
+        r.service_status, r.service_status_notes, r.mac_address,
+        COALESCE(
+          (SELECT imei FROM router_logs WHERE router_id = r.router_id AND imei IS NOT NULL ORDER BY timestamp DESC LIMIT 1),
+          r.imei
+        ) as imei,
+        COALESCE(
+          (SELECT firmware_version FROM router_logs WHERE router_id = r.router_id AND firmware_version IS NOT NULL ORDER BY timestamp DESC LIMIT 1),
+          r.firmware_version
+        ) as firmware_version,
         (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status,
         (SELECT timestamp FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as last_log_time
        FROM routers r
@@ -970,7 +984,21 @@ router.get('/routers/decommissioned', async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT 
-        r.*,
+        r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id,
+        r.created_at, r.last_seen, r.rms_created_at, r.notes,
+        r.clickup_task_id, r.clickup_task_url, r.clickup_list_id,
+        r.clickup_location_task_id, r.clickup_location_task_name,
+        r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
+        r.clickup_assignees, r.clickup_task_status, r.current_state,
+        r.service_status, r.service_status_notes, r.mac_address,
+        COALESCE(
+          (SELECT imei FROM router_logs WHERE router_id = r.router_id AND imei IS NOT NULL ORDER BY timestamp DESC LIMIT 1),
+          r.imei
+        ) as imei,
+        COALESCE(
+          (SELECT firmware_version FROM router_logs WHERE router_id = r.router_id AND firmware_version IS NOT NULL ORDER BY timestamp DESC LIMIT 1),
+          r.firmware_version
+        ) as firmware_version,
         (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status,
         (SELECT timestamp FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as last_log_time
        FROM routers r

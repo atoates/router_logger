@@ -121,11 +121,24 @@ async function insertLog(logData) {
 // Get all routers
 async function getAllRouters() {
   const query = `
-    SELECT r.*, 
+    SELECT 
+      r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id, 
+      r.created_at, r.last_seen, r.rms_created_at, r.notes,
+      r.clickup_task_id, r.clickup_task_url, r.clickup_list_id, 
+      r.clickup_location_task_id, r.clickup_location_task_name, 
+      r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
+      r.clickup_assignees, r.clickup_task_status, r.current_state, 
+      r.service_status, r.service_status_notes, r.mac_address,
       (SELECT COUNT(*) FROM router_logs WHERE router_id = r.router_id) as log_count,
       (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status,
-      (SELECT imei FROM router_logs WHERE router_id = r.router_id AND imei IS NOT NULL ORDER BY timestamp DESC LIMIT 1) as imei,
-      (SELECT firmware_version FROM router_logs WHERE router_id = r.router_id AND firmware_version IS NOT NULL ORDER BY timestamp DESC LIMIT 1) as firmware_version
+      COALESCE(
+        (SELECT imei FROM router_logs WHERE router_id = r.router_id AND imei IS NOT NULL ORDER BY timestamp DESC LIMIT 1),
+        r.imei
+      ) as imei,
+      COALESCE(
+        (SELECT firmware_version FROM router_logs WHERE router_id = r.router_id AND firmware_version IS NOT NULL ORDER BY timestamp DESC LIMIT 1),
+        r.firmware_version
+      ) as firmware_version
     FROM routers r
     ORDER BY r.last_seen DESC;
   `;
