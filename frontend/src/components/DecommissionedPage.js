@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
 import './DecommissionedPage.css';
-
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 function DecommissionedPage() {
   const [routers, setRouters] = useState([]);
@@ -18,15 +17,8 @@ function DecommissionedPage() {
   const fetchDecommissionedRouters = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/api/routers/decommissioned`, {
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch decommissioned routers');
-      }
-      
-      const data = await response.json();
+      const response = await api.get('/routers/decommissioned');
+      const data = response.data;
       setRouters(data.routers || data);
       setError(null);
     } catch (err) {
@@ -49,22 +41,10 @@ function DecommissionedPage() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/routers/${routerId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ 
-          status: 'ready',
-          notes: 'Reactivated from decommissioned status'
-        })
+      await api.patch(`/routers/${routerId}/status`, { 
+        status: 'ready',
+        notes: 'Reactivated from decommissioned status'
       });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to reactivate router');
-      }
 
       // Refresh the list
       await fetchDecommissionedRouters();

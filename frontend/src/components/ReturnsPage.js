@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import api from '../services/api';
 import './ReturnsPage.css';
-
-const API_BASE = process.env.REACT_APP_API_URL || 'https://routerlogger-production.up.railway.app';
 
 function ReturnsPage() {
   const [routers, setRouters] = useState([]);
@@ -17,8 +16,8 @@ function ReturnsPage() {
   const loadReturns = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/api/routers/being-returned`);
-      const data = await res.json();
+      const res = await api.get('/routers/being-returned');
+      const data = res.data;
       
       if (data.success) {
         setRouters(data.routers);
@@ -44,13 +43,11 @@ function ReturnsPage() {
     try {
       setSavingNotes(prev => ({ ...prev, [routerId]: true }));
       
-      const res = await fetch(`${API_BASE}/api/routers/${routerId}/notes`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes: editingNotes[routerId] || '' })
+      const res = await api.patch(`/routers/${routerId}/notes`, {
+        notes: editingNotes[routerId] || ''
       });
 
-      const data = await res.json();
+      const data = res.data;
       
       if (data.success) {
         // Update the router in state
@@ -75,13 +72,11 @@ function ReturnsPage() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/routers/${routerId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'installed' })
+      const res = await api.patch(`/routers/${routerId}/status`, {
+        status: 'installed'
       });
 
-      const data = await res.json();
+      const data = res.data;
       
       if (data.success) {
         toast.success('Router marked as installed');

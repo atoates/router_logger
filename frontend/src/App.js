@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import './App.css';
 import ErrorBoundary from './components/ErrorBoundary';
-import RMSAuthButton from './components/RMSAuthButton';
 import ClickUpAuthButton from './components/ClickUpAuthButton';
 import DashboardV3 from './components/DashboardV3';
 import RouterDashboard from './components/RouterDashboard';
@@ -17,6 +16,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer, toast } from 'react-toastify';
 import { getRouters } from './services/api';
 import 'react-toastify/dist/ReactToastify.css';
+
+// Note: RMS sync happens automatically on backend - no frontend button needed
 
 // Wrapper component for router detail page that loads router data from URL
 function RouterDetailPage() {
@@ -171,7 +172,6 @@ function AppContent() {
               </div>
             )}
             <ClickUpAuthButton />
-            <RMSAuthButton variant="header" />
           </div>
         </div>
 
