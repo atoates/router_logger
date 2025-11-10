@@ -197,7 +197,7 @@ router.post('/refresh/:routerId', async (req, res) => {
  * FAST endpoint - Only fetch critical status (online/offline, last_seen)
  * Use for frequent polling
  */
-router.post('/status/:routerId', requireSession, async (req, res) => {
+router.post('/status/:routerId', async (req, res) => {
   try {
     const { routerId } = req.params;
     const pool = require('../config/database').pool;
@@ -270,7 +270,7 @@ router.post('/status/:routerId', requireSession, async (req, res) => {
  * MEDIUM priority - Fetch data usage statistics
  * Use for periodic updates
  */
-router.post('/usage/:routerId', requireSession, async (req, res) => {
+router.post('/usage/:routerId', async (req, res) => {
   try {
     const { routerId } = req.params;
     const pool = require('../config/database').pool;
@@ -362,7 +362,7 @@ router.post('/usage/:routerId', requireSession, async (req, res) => {
  * SLOW endpoint - Fetch infrequently changing data (firmware, config)
  * Use for manual refresh or on-demand
  */
-router.post('/details/:routerId', requireSession, async (req, res) => {
+router.post('/details/:routerId', async (req, res) => {
   try {
     const { routerId } = req.params;
     const pool = require('../config/database').pool;
