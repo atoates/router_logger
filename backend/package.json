@@ -8,24 +8,29 @@
     "dev": "nodemon src/server.js",
     "migrate": "node src/database/migrate.js"
   },
-  "keywords": ["router", "logging", "rut200"],
+  "keywords": [
+    "router",
+    "logging",
+    "rut200"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "pg": "^8.11.3",
-    "body-parser": "^1.20.2",
-    "helmet": "^7.1.0",
-    "express-rate-limit": "^7.1.5",
-    "winston": "^3.11.0",
-    "date-fns": "^2.30.0",
-    "mqtt": "^5.3.0",
     "axios": "^1.6.2",
-    "simple-oauth2": "^5.0.0",
+    "bcrypt": "^6.0.0",
+    "body-parser": "^1.20.2",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
     "crypto": "^1.0.1",
-    "cookie-parser": "^1.4.6"
+    "date-fns": "^2.30.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "mqtt": "^5.3.0",
+    "pg": "^8.11.3",
+    "simple-oauth2": "^5.0.0",
+    "winston": "^3.11.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
