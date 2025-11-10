@@ -123,55 +123,43 @@ async function startServer() {
         await pool.query(sql);
         logger.info('✅ Migration 008_add_user_authentication.sql completed successfully');
         
-        // Seed admin users if they don't exist (one-time setup)
+        // Update admin user passwords (fixes placeholder passwords from migration)
         try {
           const authService = require('./services/authService');
           const bcrypt = require('bcrypt');
           
-          // Check if any admin users exist
-          const adminCheck = await pool.query('SELECT COUNT(*) FROM users WHERE role = $1', ['admin']);
-          const adminCount = parseInt(adminCheck.rows[0].count);
+          logger.info('Ensuring admin users have proper passwords...');
           
-          if (adminCount === 0) {
-            logger.info('No admin users found, seeding default admins...');
-            
-            const admin1Password = process.env.ADMIN1_PASSWORD || 'VacatAd2025!Admin1';
-            const admin2Password = process.env.ADMIN2_PASSWORD || 'VacatAd2025!Admin2';
-            const admin3Password = process.env.ADMIN3_PASSWORD || 'VacatAd2025!Admin3';
-            
-            await authService.createUser({
-              username: 'admin1',
-              password: admin1Password,
-              role: 'admin',
-              email: 'admin1@vacatracker.com',
-              fullName: 'Admin User 1'
-            });
-            
-            await authService.createUser({
-              username: 'admin2',
-              password: admin2Password,
-              role: 'admin',
-              email: 'admin2@vacatracker.com',
-              fullName: 'Admin User 2'
-            });
-            
-            await authService.createUser({
-              username: 'admin3',
-              password: admin3Password,
-              role: 'admin',
-              email: 'admin3@vacatracker.com',
-              fullName: 'Admin User 3'
-            });
-            
-            logger.info('✅ Seeded 3 admin users successfully');
-            logger.info('   - admin1 / VacatAd2025!Admin1');
-            logger.info('   - admin2 / VacatAd2025!Admin2');
-            logger.info('   - admin3 / VacatAd2025!Admin3');
-          } else {
-            logger.info(`Admin users already exist (${adminCount} found), skipping seed`);
-          }
+          const admin1Password = process.env.ADMIN1_PASSWORD || 'VacatAd2025!Admin1';
+          const admin2Password = process.env.ADMIN2_PASSWORD || 'VacatAd2025!Admin2';
+          const admin3Password = process.env.ADMIN3_PASSWORD || 'VacatAd2025!Admin3';
+          
+          // Hash passwords
+          const admin1Hash = await bcrypt.hash(admin1Password, 10);
+          const admin2Hash = await bcrypt.hash(admin2Password, 10);
+          const admin3Hash = await bcrypt.hash(admin3Password, 10);
+          
+          // Update passwords (upsert with proper hashes)
+          await pool.query(`
+            INSERT INTO users (username, password_hash, role, email, full_name, is_active)
+            VALUES 
+              ('admin1', $1, 'admin', 'admin1@vacatracker.com', 'Administrator 1', TRUE),
+              ('admin2', $2, 'admin', 'admin2@vacatracker.com', 'Administrator 2', TRUE),
+              ('admin3', $3, 'admin', 'admin3@vacatracker.com', 'Administrator 3', TRUE)
+            ON CONFLICT (username) 
+            DO UPDATE SET 
+              password_hash = EXCLUDED.password_hash,
+              email = EXCLUDED.email,
+              full_name = EXCLUDED.full_name,
+              is_active = EXCLUDED.is_active
+          `, [admin1Hash, admin2Hash, admin3Hash]);
+          
+          logger.info('✅ Admin user passwords updated successfully');
+          logger.info('   - admin1 / VacatAd2025!Admin1');
+          logger.info('   - admin2 / VacatAd2025!Admin2');
+          logger.info('   - admin3 / VacatAd2025!Admin3');
         } catch (seedError) {
-          logger.warn('Failed to seed admin users:', seedError.message);
+          logger.warn('Failed to update admin passwords:', seedError.message);
           // Don't exit - server can still start
         }
       }
