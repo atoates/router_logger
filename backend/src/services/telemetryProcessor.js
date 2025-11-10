@@ -22,7 +22,8 @@ async function processRouterTelemetry(data) {
       location: data.location,
       site_id: data.site_id,
       firmware_version: data.fw_version || data.firmware_version,
-      rms_created_at: data.rms_created_at || null
+      rms_created_at: data.rms_created_at || null,
+      mac_address: data.mac_address || null
     });
 
     // Enrich with geolocation if cell info is available

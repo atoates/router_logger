@@ -11,12 +11,14 @@ const { initializeDatabase } = require('./database/migrate');
 const { initMQTT, closeMQTT } = require('./services/mqttService');
 const { startRMSSync } = require('./services/rmsSync');
 const { startClickUpSync } = require('./services/clickupSync');
+const { startIronWifiSync } = require('./services/ironwifiSync');
 const oauthService = require('./services/oauthService');
 const routerRoutes = require('./routes/router');
 const rmsRoutes = require('./routes/rms');
 const authRoutes = require('./routes/auth');
 const clickupRoutes = require('./routes/clickup');
 const sessionRoutes = require('./routes/session');
+const ironwifiRoutes = require('./routes/ironwifi');
 const { router: monitoringRoutes } = require('./routes/monitoring');
 
 const app = express();
@@ -82,6 +84,7 @@ app.use('/api/rms', rmsRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/clickup', clickupRoutes);
 app.use('/api/session', sessionRoutes);
+app.use('/api/ironwifi', ironwifiRoutes);
 app.use(monitoringRoutes);
 
 // Error handling middleware
@@ -126,6 +129,15 @@ async function startServer() {
     startClickUpSync(parseInt(clickupSyncInterval), false); // false = skip initial sync
     logger.info(`ClickUp sync scheduler started (every ${clickupSyncInterval} minutes, no startup sync)`);
     
+    // Start IronWifi sync if configured
+    if (process.env.IRONWIFI_API_KEY && process.env.IRONWIFI_NETWORK_ID) {
+      const ironwifiInterval = process.env.IRONWIFI_SYNC_INTERVAL_MINUTES || 15; // Default 15 min to avoid rate limits
+      startIronWifiSync(parseInt(ironwifiInterval));
+      logger.info(`IronWifi sync scheduler started (every ${ironwifiInterval} minutes) - Rate limit protection enabled`);
+    } else {
+      logger.info('IronWifi sync not configured (missing API_KEY or NETWORK_ID)');
+    }
+    
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
@@ -135,6 +147,7 @@ async function startServer() {
       console.log(`   - MQTT (if configured)`);
       console.log(`   - HTTPS POST to /api/log`);
       console.log(`   - RMS API Sync (if configured)`);
+      console.log(`   - IronWifi Session Sync (if configured)`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

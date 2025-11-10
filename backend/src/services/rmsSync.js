@@ -76,6 +76,9 @@ function transformRMSDeviceToTelemetry(device, monitoring) {
     site_id: device.group || device.company_id,
     rms_created_at: device.created_at || device.createdAt || device.created || null,
     
+    // MAC Address (for IronWifi integration)
+    mac_address: device.mac_address || device.mac || hw.mac_address || network.mac || wifi.mac_address || null,
+    
     // WAN & Network
   wan_ip: network.wan_ip || network.ip || device.wan_ip,
   operator: cellular.operator || cellular.network_name || device.operator,
