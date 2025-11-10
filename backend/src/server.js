@@ -107,18 +107,77 @@ async function startServer() {
       const { pool } = require('./config/database');
       
       logger.info('Running database migrations...');
-      const migrationPath = path.join(__dirname, '../database/migrations/007_add_ironwifi_tables.sql');
       
-      if (fs.existsSync(migrationPath)) {
-        const sql = fs.readFileSync(migrationPath, 'utf8');
+      // Run migration 007 (IronWifi tables)
+      const migration007Path = path.join(__dirname, '../database/migrations/007_add_ironwifi_tables.sql');
+      if (fs.existsSync(migration007Path)) {
+        const sql = fs.readFileSync(migration007Path, 'utf8');
         await pool.query(sql);
         logger.info('✅ Migration 007_add_ironwifi_tables.sql completed successfully');
-      } else {
-        logger.warn('Migration file not found, skipping');
+      }
+      
+      // Run migration 008 (User authentication)
+      const migration008Path = path.join(__dirname, '../database/migrations/008_add_user_authentication.sql');
+      if (fs.existsSync(migration008Path)) {
+        const sql = fs.readFileSync(migration008Path, 'utf8');
+        await pool.query(sql);
+        logger.info('✅ Migration 008_add_user_authentication.sql completed successfully');
+        
+        // Seed admin users if they don't exist (one-time setup)
+        try {
+          const authService = require('./services/authService');
+          const bcrypt = require('bcrypt');
+          
+          // Check if any admin users exist
+          const adminCheck = await pool.query('SELECT COUNT(*) FROM users WHERE role = $1', ['admin']);
+          const adminCount = parseInt(adminCheck.rows[0].count);
+          
+          if (adminCount === 0) {
+            logger.info('No admin users found, seeding default admins...');
+            
+            const admin1Password = process.env.ADMIN1_PASSWORD || 'VacatAd2025!Admin1';
+            const admin2Password = process.env.ADMIN2_PASSWORD || 'VacatAd2025!Admin2';
+            const admin3Password = process.env.ADMIN3_PASSWORD || 'VacatAd2025!Admin3';
+            
+            await authService.createUser({
+              username: 'admin1',
+              password: admin1Password,
+              role: 'admin',
+              email: 'admin1@vacatracker.com',
+              fullName: 'Admin User 1'
+            });
+            
+            await authService.createUser({
+              username: 'admin2',
+              password: admin2Password,
+              role: 'admin',
+              email: 'admin2@vacatracker.com',
+              fullName: 'Admin User 2'
+            });
+            
+            await authService.createUser({
+              username: 'admin3',
+              password: admin3Password,
+              role: 'admin',
+              email: 'admin3@vacatracker.com',
+              fullName: 'Admin User 3'
+            });
+            
+            logger.info('✅ Seeded 3 admin users successfully');
+            logger.info('   - admin1 / VacatAd2025!Admin1');
+            logger.info('   - admin2 / VacatAd2025!Admin2');
+            logger.info('   - admin3 / VacatAd2025!Admin3');
+          } else {
+            logger.info(`Admin users already exist (${adminCount} found), skipping seed`);
+          }
+        } catch (seedError) {
+          logger.warn('Failed to seed admin users:', seedError.message);
+          // Don't exit - server can still start
+        }
       }
     } catch (migrationError) {
       // Check if error is because columns/tables already exist (safe to ignore)
-      if (migrationError.code === '42701' || migrationError.code === '42P07') {
+      if (migrationError.code === '42701' || migrationError.code === '42P07' || migrationError.code === '42P16') {
         logger.info('Migration already applied, skipping');
       } else {
         logger.error('Migration failed:', migrationError.message);
