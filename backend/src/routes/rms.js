@@ -45,7 +45,7 @@ router.get('/status', async (req, res) => {
   
   res.json({
     enabled: rmsEnabled,
-    syncInterval: process.env.RMS_SYNC_INTERVAL_MINUTES || 60,
+    syncInterval: process.env.RMS_SYNC_INTERVAL_MINUTES || 5,
     tokenType: hasOAuth ? 'oauth' : (hasPat ? 'pat' : 'none'),
     message: rmsEnabled 
       ? `RMS integration is enabled via ${hasOAuth ? 'OAuth' : 'PAT'}` 
