@@ -42,7 +42,7 @@ export default function RouterDashboard({ router }) {
   const [inspections, setInspections] = useState([]);
   const [showRawData, setShowRawData] = useState(false); // Toggle for chart scale (false = normalized)
   const [useRollingAverage, setUseRollingAverage] = useState(true); // Toggle for rolling average (true = smoothed by default)
-  const [expandedSection, setExpandedSection] = useState('latest'); // Accordion state: 'latest', 'uptime', or 'inspections'
+  const [expandedSection, setExpandedSection] = useState('uptime'); // Accordion state: 'latest', 'uptime', or 'inspections'
   const propertyWidgetRef = useRef(null);
 
   const routerId = router?.router_id;
@@ -418,28 +418,6 @@ export default function RouterDashboard({ router }) {
 
       {/* Accordion Sections */}
       <div className="rd-accordion">
-        {/* Latest Section */}
-        <div className={`accordion-item ${expandedSection === 'latest' ? 'expanded' : ''}`}>
-          <div 
-            className="accordion-header" 
-            onClick={() => setExpandedSection(expandedSection === 'latest' ? null : 'latest')}
-          >
-            <span className="accordion-title">Latest</span>
-            <span className="accordion-icon">{expandedSection === 'latest' ? '▼' : '▶'}</span>
-          </div>
-          {expandedSection === 'latest' && (
-            <div className="accordion-content">
-              <div className="kv">
-                <div><span>IMEI</span><strong>{router?.imei || latest?.imei || '—'}</strong></div>
-                <div><span>Operator</span><strong>{latest?.operator || '—'}</strong></div>
-                <div><span>Network</span><strong>{latest?.network_type || '—'}</strong></div>
-                <div><span>Firmware</span><strong>{latest?.firmware_version || router?.firmware_version || '—'}</strong></div>
-                <div><span>WAN IP</span><strong>{latest?.wan_ip || '—'}</strong></div>
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Uptime Samples Section */}
         <div className={`accordion-item ${expandedSection === 'uptime' ? 'expanded' : ''}`}>
           <div 
@@ -564,6 +542,28 @@ export default function RouterDashboard({ router }) {
                     ))}
                   </>
                 )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Latest Section */}
+        <div className={`accordion-item ${expandedSection === 'latest' ? 'expanded' : ''}`}>
+          <div 
+            className="accordion-header" 
+            onClick={() => setExpandedSection(expandedSection === 'latest' ? null : 'latest')}
+          >
+            <span className="accordion-title">Latest</span>
+            <span className="accordion-icon">{expandedSection === 'latest' ? '▼' : '▶'}</span>
+          </div>
+          {expandedSection === 'latest' && (
+            <div className="accordion-content">
+              <div className="kv">
+                <div><span>IMEI</span><strong>{router?.imei || latest?.imei || '—'}</strong></div>
+                <div><span>Operator</span><strong>{latest?.operator || '—'}</strong></div>
+                <div><span>Network</span><strong>{latest?.network_type || '—'}</strong></div>
+                <div><span>Firmware</span><strong>{latest?.firmware_version || router?.firmware_version || '—'}</strong></div>
+                <div><span>WAN IP</span><strong>{latest?.wan_ip || '—'}</strong></div>
               </div>
             </div>
           )}

@@ -6,28 +6,28 @@
   padding: 16px;
   margin-top: 16px;
   position: relative;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  transition: border-color 0.3s ease, background-color 0.3s ease;
 }
 
-/* Status-based card highlighting */
+/* Status-based card highlighting - solid colors like ClickUp */
 .clickup-task-widget.status-ready {
-  border-left-color: #10b981;
-  background: linear-gradient(to right, rgba(16, 185, 129, 0.02), #f8fafc);
+  border-left-color: #3b82f6;
+  background: #dbeafe;
 }
 
 .clickup-task-widget.status-attention {
-  border-left-color: #f59e0b;
-  background: linear-gradient(to right, rgba(245, 158, 11, 0.02), #f8fafc);
+  border-left-color: #ef4444;
+  background: #fee2e2;
 }
 
 .clickup-task-widget.status-returning {
-  border-left-color: #3b82f6;
-  background: linear-gradient(to right, rgba(59, 130, 246, 0.02), #f8fafc);
+  border-left-color: #f97316;
+  background: #ffedd5;
 }
 
 .clickup-task-widget.status-decommissioned {
   border-left-color: #ef4444;
-  background: linear-gradient(to right, rgba(239, 68, 68, 0.02), #f8fafc);
+  background: #fee2e2;
 }
 
 .clickup-task-widget h4 {
