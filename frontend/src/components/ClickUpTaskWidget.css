@@ -182,13 +182,13 @@
 }
 
 .detail-label {
-  color: #64748b !important;
+  color: #64748b;
   font-weight: 500;
   white-space: nowrap;
 }
 
 .detail-value {
-  color: #0f172a !important;
+  color: #0f172a;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -495,6 +495,19 @@ body.dark-mode .error-message {
   background: #7f1d1d;
   border-color: #991b1b;
   color: #fca5a5;
+}
+
+body.dark-mode .router-details {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+body.dark-mode .detail-label {
+  color: #94a3b8;
+}
+
+body.dark-mode .detail-value {
+  color: #f1f5f9;
 }
 
 /* Enhanced Return Modal Styles */

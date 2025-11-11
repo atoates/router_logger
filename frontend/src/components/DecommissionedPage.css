@@ -94,6 +94,9 @@
   padding: 1.5rem;
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .router-card:hover {
