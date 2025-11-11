@@ -103,19 +103,19 @@ function AppContent() {
   
   // Navigation menu items - guests only see "My Routers"
   const navItems = isGuest ? [
-    { path: '/', label: 'My Routers', icon: '📱' },
+    { path: '/', label: 'My Routers', icon: '📱', title: 'My Routers' },
   ] : [
-    { path: '/', label: 'Network Analytics', icon: '📊' },
-    { path: '/assignments', label: 'Router Assignments', icon: '📍' },
-    { path: '/stored', label: 'Stored Routers', icon: '📦' },
-    { path: '/returns', label: 'Returns', icon: '🔄' },
-    { path: '/decommissioned', label: 'Decommissioned', icon: '⚠️' },
-    { path: '/status', label: 'System Status', icon: '⚙️' },
+    { path: '/', label: 'Analytics', icon: '📊', title: 'Network Analytics' },
+    { path: '/assignments', label: 'Assign', icon: '📍', title: 'Router Assignments' },
+    { path: '/stored', label: 'Stored', icon: '📦', title: 'Stored Routers' },
+    { path: '/returns', label: 'Returns', icon: '🔄', title: 'Returns' },
+    { path: '/decommissioned', label: 'Decom', icon: '⚠️', title: 'Decommissioned' },
+    { path: '/status', label: 'Status', icon: '⚙️', title: 'System Status' },
   ];
 
   // Admin-only navigation items
   const adminNavItems = [
-    { path: '/users', label: 'User Management', icon: '👥' },
+    { path: '/users', label: 'Users', icon: '👥', title: 'User Management' },
   ];
 
   // If mobile page or login page, render standalone without header/nav
@@ -186,6 +186,7 @@ function AppContent() {
                 key={item.path}
                 to={item.path}
                 className={`app-nav-link ${location.pathname === item.path ? 'active' : ''}`}
+                title={item.title || item.label}
               >
                 <span className="app-nav-icon">{item.icon}</span>
                 <span className="app-nav-label">{item.label}</span>
@@ -196,6 +197,7 @@ function AppContent() {
                 key={item.path}
                 to={item.path}
                 className={`app-nav-link ${location.pathname === item.path ? 'active' : ''}`}
+                title={item.title || item.label}
               >
                 <span className="app-nav-icon">{item.icon}</span>
                 <span className="app-nav-label">{item.label}</span>
