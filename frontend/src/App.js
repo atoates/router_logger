@@ -143,7 +143,7 @@ function AppContent() {
             </Link>
           </div>
           <div className="app-header-right">
-            <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />
+            {!isGuest && <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />}
             {currentUser && (
               <div style={{ 
                 display: 'flex', 
