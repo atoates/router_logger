@@ -87,9 +87,11 @@ function UsersManagement() {
       if (!response.ok) throw new Error('Failed to load routers');
       
       const data = await response.json();
-      setRouters(data.data || []);
+      // API returns array directly, not wrapped in data object
+      setRouters(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error loading routers:', error);
+      toast.error('Failed to load routers');
     }
   };
 
