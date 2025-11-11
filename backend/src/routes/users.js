@@ -209,9 +209,17 @@ router.post('/:userId/reactivate', requireAdmin, async (req, res) => {
 /**
  * GET /api/users/:userId/routers
  * Get user's assigned routers
+ * Guests can only view their own routers
  */
-router.get('/:userId/routers', requireAdmin, async (req, res) => {
+router.get('/:userId/routers', requireAuth, async (req, res) => {
   try {
+    const requestedUserId = parseInt(req.params.userId);
+    
+    // Guests can only view their own routers
+    if (req.user.role === 'guest' && req.user.id !== requestedUserId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     const routers = await authService.getUserRouters(req.params.userId);
 
     res.json({

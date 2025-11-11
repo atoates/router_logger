@@ -12,6 +12,7 @@ import DecommissionedPage from './components/DecommissionedPage';
 import LoginPage from './components/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import UsersManagement from './components/UsersManagement';
+import GuestDashboard from './components/GuestDashboard';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer, toast } from 'react-toastify';
 import { getRouters } from './services/api';
@@ -100,8 +101,10 @@ function AppContent() {
   const isMobilePage = location.pathname === '/mobile';
   const isLoginPage = location.pathname === '/login';
   
-  // Navigation menu items
-  const navItems = [
+  // Navigation menu items - guests only see "My Routers"
+  const navItems = isGuest ? [
+    { path: '/', label: 'My Routers', icon: '📱' },
+  ] : [
     { path: '/', label: 'Network Analytics', icon: '📊' },
     { path: '/assignments', label: 'Router Assignments', icon: '📍' },
     { path: '/stored', label: 'Stored Routers', icon: '📦' },
@@ -207,31 +210,35 @@ function AppContent() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/" element={
               <ProtectedRoute>
-                <DashboardV3 page="network" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
+                {isGuest ? (
+                  <GuestDashboard />
+                ) : (
+                  <DashboardV3 page="network" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
+                )}
               </ProtectedRoute>
             } />
             <Route path="/assignments" element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <DashboardV3 page="assignments" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
               </ProtectedRoute>
             } />
             <Route path="/stored" element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <DashboardV3 page="stored" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
               </ProtectedRoute>
             } />
             <Route path="/status" element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <DashboardV3 page="status" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
               </ProtectedRoute>
             } />
             <Route path="/returns" element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <ReturnsPage />
               </ProtectedRoute>
             } />
             <Route path="/decommissioned" element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <DecommissionedPage />
               </ProtectedRoute>
             } />
