@@ -70,7 +70,7 @@ function AppContent() {
   const [darkMode] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, logout, isAdmin } = useAuth();
+  const { currentUser, logout, isAdmin, isGuest } = useAuth();
 
   // Auto-redirect mobile users to /mobile (only on homepage)
   useEffect(() => {
