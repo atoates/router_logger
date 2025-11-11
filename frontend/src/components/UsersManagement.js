@@ -620,8 +620,8 @@ function UsersManagement() {
                   {routerAssignments.map(router => (
                     <div key={router.router_id} className="router-card">
                       <div className="router-info">
-                        <strong>{router.router_id}</strong>
-                        {router.name && <span> - {router.name}</span>}
+                        <strong>{router.name || `Router #${router.router_id}`}</strong>
+                        <span style={{ display: 'block', fontSize: '12px', marginTop: '4px' }}>Serial: {router.router_id}</span>
                       </div>
                       <button
                         className="btn-unassign"
@@ -639,14 +639,30 @@ function UsersManagement() {
 
             <div className="routers-section">
               <h4>Available Routers</h4>
+              <div className="router-search">
+                <input
+                  type="text"
+                  placeholder="Search routers..."
+                  value={routerSearchTerm}
+                  onChange={(e) => setRouterSearchTerm(e.target.value)}
+                  className="search-input"
+                />
+              </div>
               <div className="available-routers">
                 {routers
                   .filter(r => !routerAssignments.some(ar => ar.router_id === r.router_id))
+                  .filter(r => {
+                    if (!routerSearchTerm) return true;
+                    const searchLower = routerSearchTerm.toLowerCase();
+                    const routerName = r.name || `Router #${r.router_id}`;
+                    return routerName.toLowerCase().includes(searchLower) || 
+                           r.router_id.toLowerCase().includes(searchLower);
+                  })
                   .map(router => (
-                    <div key={router.router_id} className="router-card">
-                      <div className="router-info">
-                        <strong>{router.router_id}</strong>
-                        {router.name && <span> - {router.name}</span>}
+                    <div key={router.router_id} className="router-card-available">
+                      <div className="router-info-available">
+                        <div className="router-name">{router.name || `Router #${router.router_id}`}</div>
+                        <div className="router-serial">Serial: {router.router_id}</div>
                       </div>
                       <button
                         className="btn-assign"
