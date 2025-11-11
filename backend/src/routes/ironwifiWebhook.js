@@ -80,37 +80,55 @@ async function processWebhookData(data) {
 
 /**
  * Process JSON-formatted report data
+ * Supports both standard RADIUS accounting fields and IronWifi-specific fields
  */
 async function processJsonReport(records) {
   logger.info(`Processing ${records.length} records from webhook`);
 
   for (const record of records) {
     try {
-      // Extract session/device data
-      // Fields we're looking for:
-      // - MAC address (nas_identifier, calling_station_id, ap_mac)
-      // - Username
-      // - Session start/end times
-      // - Bytes transferred
-      // - Device/AP identification
+      // IronWifi RADIUS Accounting fields (actual format from your reports):
+      // - calledstationid: AP MAC (router)
+      // - callingstationid: User device MAC
+      // - username: User email
+      // - acctsessionid: Unique session ID
+      // - acctstarttime: Session start (ISO format)
+      // - acctstoptime: Session stop (ISO format)
+      // - acctinputoctets: Bytes downloaded by user
+      // - acctoutputoctets: Bytes uploaded by user
+      // - acctsessiontime: Duration in seconds
+      // - framedipaddress: User's IP address
+      // - nasipaddress: NAS/Controller IP
 
       const sessionData = {
-        ap_mac: record.nas_identifier || record.ap_mac || record.called_station_id,
-        user_mac: record.calling_station_id || record.mac_address,
+        // AP MAC (Router) - IronWifi uses calledstationid
+        ap_mac: record.calledstationid || record.called_station_id || record.nas_identifier || record.ap_mac,
+        // User device MAC
+        user_mac: record.callingstationid || record.calling_station_id || record.mac_address,
+        // Username
         username: record.username || record.user_name,
-        session_id: record.acct_session_id || record.session_id,
-        session_start: record.acct_start_time || record.start_time,
-        session_stop: record.acct_stop_time || record.stop_time,
-        bytes_in: record.acct_input_octets || record.input_octets || 0,
-        bytes_out: record.acct_output_octets || record.output_octets || 0,
-        duration: record.acct_session_time || record.session_time || 0,
-        nas_ip: record.nas_ip_address || record.nas_ip,
-        framed_ip: record.framed_ip_address || record.ip_address
+        // Session ID
+        session_id: record.acctsessionid || record.acct_session_id || record.session_id,
+        // Session timing
+        session_start: record.acctstarttime || record.acct_start_time || record.start_time,
+        session_stop: record.acctstoptime || record.acct_stop_time || record.stop_time,
+        // Bandwidth (IronWifi: input=download, output=upload)
+        bytes_in: parseInt(record.acctinputoctets || record.acct_input_octets || record.input_octets || 0),
+        bytes_out: parseInt(record.acctoutputoctets || record.acct_output_octets || record.output_octets || 0),
+        // Duration
+        duration: parseInt(record.acctsessiontime || record.acct_session_time || record.session_time || 0),
+        // Network info
+        nas_ip: record.nasipaddress || record.nas_ip_address || record.nas_ip,
+        framed_ip: record.framedipaddress || record.framed_ip_address || record.ip_address,
+        // Termination reason
+        terminate_cause: record.acctterminatecause || record.acct_terminate_cause || record.status
       };
 
       // If we have valid session data, store it
       if (sessionData.ap_mac || sessionData.session_id) {
         await storeSessionFromWebhook(sessionData);
+      } else {
+        logger.debug('Skipping record without AP MAC or session ID', record);
       }
 
     } catch (error) {
@@ -123,33 +141,41 @@ async function processJsonReport(records) {
 
 /**
  * Process text/CSV-formatted report data
+ * Handles IronWifi RADIUS Accounting CSV format
  */
 async function processTextReport(text) {
   logger.info('Processing text/CSV report from webhook');
   
-  // Parse CSV or text format
-  // This will depend on the actual format IronWifi sends
-  const lines = text.split('\n');
+  // Parse CSV format from IronWifi
+  const lines = text.split('\n').filter(line => line.trim());
   const records = [];
 
-  // Assuming first line is headers
   if (lines.length > 1) {
+    // First line is headers
     const headers = lines[0].split(',').map(h => h.trim());
+    logger.info(`CSV headers: ${headers.join(', ')}`);
     
+    // Parse each data line
     for (let i = 1; i < lines.length; i++) {
       if (!lines[i].trim()) continue;
       
-      const values = lines[i].split(',');
+      // Split by comma, handling quoted values
+      const values = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
       const record = {};
       
       headers.forEach((header, index) => {
-        record[header] = values[index]?.trim();
+        let value = values[index] || '';
+        // Remove quotes if present
+        value = value.replace(/^"|"$/g, '').trim();
+        record[header] = value;
       });
       
       records.push(record);
     }
   }
 
+  logger.info(`Parsed ${records.length} records from CSV`);
+  
   // Process the parsed records
   if (records.length > 0) {
     await processJsonReport(records);
