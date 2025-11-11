@@ -50,6 +50,7 @@ function UsersManagement() {
     confirmPassword: ''
   });
   const [routerAssignments, setRouterAssignments] = useState([]);
+  const [routerSearchTerm, setRouterSearchTerm] = useState('');
   const [loginHistory, setLoginHistory] = useState([]);
 
   const API_URL = process.env.REACT_APP_API_URL || 'https://routerlogger-production.up.railway.app';
