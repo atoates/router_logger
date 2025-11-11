@@ -6,13 +6,14 @@ A comprehensive logging and monitoring system for Teltonika RUT200 routers with 
 
 - **Real-time Telemetry Collection**: MQTT and HTTPS endpoints for RUT200 data ingestion
 - **RMS API Integration**: Automatically pull device data directly from Teltonika RMS (no router config needed!)
+- **IronWifi Session Tracking**: Monitor user sessions and bandwidth via webhook integration
 - **Cell Tower Geolocation**: Approximate GPS coordinates from cell tower information
 - **Data Usage Tracking**: Monitor data sent/received with delta calculations
 - **Signal Quality Monitoring**: Track RSRP, RSRQ, RSSI, and SINR metrics
-- **WiFi Client Monitoring**: Track connected clients and their usage
+- **WiFi User Analytics**: Track connected users, session duration, and bandwidth per router
 - **Interactive Dashboards**: Beautiful charts and graphs for data visualization
 - **Export Capabilities**: Generate CSV and PDF reports for any date range
-- **RMS Integration**: Works seamlessly with Teltonika RMS for device management
+- **ClickUp Integration**: Property tracking and smart sync for work orders
 - **Scalable Architecture**: Built to handle 100+ routers efficiently
 
 ## 📋 Architecture
@@ -154,19 +155,21 @@ React Dashboard (Recharts visualization)
 
 ## 📊 RUT200 Configuration
 
-### Option 1: RMS API Integration (Recommended - Easiest!)
+### Option 1: RMS OAuth Integration (Recommended - Full Access!)
 
-**No router configuration needed!** The system pulls data directly from RMS.
+**No router configuration needed!** The system pulls data directly from RMS with OAuth.
 
-1. **Get RMS Personal Access Token** from https://rms.teltonika-networks.com/
+1. **Set up OAuth in RMS Developer Settings**
 2. **Add to Railway environment**:
    ```env
-   RMS_ACCESS_TOKEN=your-token-here
-   RMS_SYNC_INTERVAL_MINUTES=15
+   RMS_OAUTH_CLIENT_ID=your-client-id
+   RMS_OAUTH_CLIENT_SECRET=your-client-secret
+   RMS_OAUTH_REDIRECT_URI=https://your-backend.railway.app/api/auth/rms/callback
+   RMS_SYNC_INTERVAL_MINUTES=5
    ```
-3. **Done!** Data syncs automatically every 15 minutes
+3. **Done!** Data syncs automatically every 5 minutes with full monitoring access
 
-See [RMS-API-INTEGRATION.md](docs/RMS-API-INTEGRATION.md) for detailed instructions.
+See [RMS-OAUTH-SETUP.md](docs/RMS-OAUTH-SETUP.md) for detailed instructions.
 
 ### Option 2: Using Teltonika RMS (Router Push)
 
@@ -216,6 +219,35 @@ If using MQTT, routers should publish to:
 ```
 vacatad/rut200/<site_id>/<device_id>/telemetry
 ```
+
+## 👥 IronWifi User Session Tracking
+
+Track WiFi users connecting through your routers with **webhook integration** (no API polling needed!).
+
+### Setup IronWifi Webhook
+
+1. **Login to IronWifi Console**: https://console.ironwifi.com/
+2. **Navigate to Reports** → **Report Scheduler**
+3. **Create New Report**:
+   - **Report Type**: RADIUS Accounting
+   - **Delivery Method**: Webhook
+   - **Webhook URL**: `https://your-backend.railway.app/api/ironwifi/webhook`
+   - **Frequency**: Hourly (recommended)
+   - **Format**: CSV or JSON
+
+4. **Done!** Session data flows automatically:
+   - User logins/logouts
+   - Session duration
+   - Bandwidth usage (upload/download)
+   - Device information
+
+**Dashboard Features**:
+- Active users per router
+- Session history and analytics
+- Bandwidth tracking
+- User connection patterns
+
+See [IRONWIFI-WEBHOOK-SETUP.md](docs/IRONWIFI-WEBHOOK-SETUP.md) for detailed instructions.
 
 ## 📈 Dashboard Features
 

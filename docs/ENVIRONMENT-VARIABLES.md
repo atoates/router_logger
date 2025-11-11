@@ -16,21 +16,22 @@ NODE_ENV=production
 FRONTEND_URL=https://your-frontend.up.railway.app
 ```
 
-### RMS Integration - Personal Access Token (Limited)
+### RMS Integration - Personal Access Token (Legacy - Not Recommended)
 
 ```bash
 # RMS API Personal Access Token (Limited scope - cannot access device monitoring)
+# Use OAuth instead for full access
 RMS_ACCESS_TOKEN=your_personal_access_token_here
 
-# RMS Sync interval in minutes (default: 15)
-RMS_SYNC_INTERVAL_MINUTES=15
+# RMS Sync interval in minutes (default: 5)
+RMS_SYNC_INTERVAL_MINUTES=5
 
 # Optional: Override RMS API endpoints
 RMS_API_BASE_URL=https://api.rms.teltonika-networks.com
 RMS_API_PREFIX=
 ```
 
-### RMS Integration - OAuth (Recommended - Full Access)
+### RMS Integration - OAuth (✅ Recommended - Full Access)
 
 ```bash
 # RMS OAuth Client Credentials (from RMS Developer Settings)
@@ -38,10 +39,28 @@ RMS_OAUTH_CLIENT_ID=your_client_id_from_rms
 RMS_OAUTH_CLIENT_SECRET=your_client_secret_from_rms
 RMS_OAUTH_REDIRECT_URI=https://your-backend.up.railway.app/api/auth/rms/callback
 
+# Sync interval (default: 5 minutes for near real-time data)
+RMS_SYNC_INTERVAL_MINUTES=5
+
 # Note: With OAuth configured, RMS_ACCESS_TOKEN becomes optional fallback
 # Optional: override default scopes (space or comma separated). Default: "devices:read monitoring:read statistics:read"
 # Example to include company-level stats:
 # RMS_OAUTH_SCOPES="devices:read monitoring:read statistics:read company_device_statistics:read"
+```
+
+### IronWifi Integration - Webhook (✅ Recommended)
+
+```bash
+# IronWifi webhook integration (NO API KEY NEEDED!)
+# Simply configure webhook in IronWifi Console:
+# Reports → Report Scheduler → New Report
+# - Type: RADIUS Accounting
+# - Delivery: Webhook
+# - URL: https://your-backend.railway.app/api/ironwifi/webhook
+# - Frequency: Hourly
+
+# No environment variables required for webhook!
+# Data flows automatically when IronWifi sends reports
 ```
 
 ### MQTT (Optional - for router push)

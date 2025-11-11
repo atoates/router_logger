@@ -4,12 +4,24 @@
 
 This integration connects your router tracking system with IronWifi's captive portal service to monitor which routers have active users connecting. The system tracks user sessions, connection statistics, and provides insights into router usage patterns.
 
+## ✅ Recommended Method: Webhook Integration
+
+**Use webhooks, not API polling!** Webhooks provide:
+- ✅ No rate limits (IronWifi pushes to you)
+- ✅ Real-time data delivery
+- ✅ No API key management
+- ✅ Lower server load
+- ✅ More reliable data flow
+
+See [IRONWIFI-WEBHOOK-SETUP.md](IRONWIFI-WEBHOOK-SETUP.md) for complete webhook setup instructions.
+
 ## How It Works
 
-1. **MAC Address Matching**: Routers are matched to IronWifi access points using their MAC addresses
-2. **Session Tracking**: Active user sessions are synced every 5 minutes from IronWifi
-3. **Database Storage**: Sessions and statistics are stored locally for fast querying
-4. **REST API**: Frontend components access user data through standardized endpoints
+1. **IronWifi Sends Webhook**: Hourly RADIUS Accounting reports delivered via POST
+2. **MAC Address Matching**: Routers matched to IronWifi access points using MAC addresses
+3. **Session Processing**: Parse CSV/JSON data, normalize MACs, extract session details
+4. **Database Storage**: Sessions and statistics stored locally for fast querying
+5. **REST API**: Frontend components access user data through standardized endpoints
 
 ## Database Schema
 
@@ -39,20 +51,31 @@ Three new columns added to the `routers` table:
 
 ## Environment Variables
 
-Add these to your `.env` file:
+### For Webhook Integration (Recommended)
+
+**NO environment variables needed!** Webhooks work out of the box.
+
+Just configure the webhook in IronWifi Console to point to:
+```
+https://your-backend.railway.app/api/ironwifi/webhook
+```
+
+### For API Polling (Not Recommended - Use Webhook Instead)
+
+Only if you can't use webhooks (not recommended due to rate limits):
 
 ```bash
-# IronWifi API Configuration
-IRONWIFI_API_KEY=779cfe99-f15d-4318-8d30-9fafeb46ed7d
+# IronWifi API Configuration (API Polling - NOT RECOMMENDED)
+IRONWIFI_API_KEY=your-api-key
 IRONWIFI_API_URL=https://console.ironwifi.com/api
 IRONWIFI_NETWORK_ID=your-network-id
 
 # Sync Configuration (⚠️ BE CAREFUL WITH API LIMITS!)
 IRONWIFI_SYNC_INTERVAL_MINUTES=15
 IRONWIFI_HOURLY_LIMIT=1000
-
-# NOTE: IRONWIFI_API_SECRET is NOT needed - API uses Bearer token auth only
 ```
+
+**Note**: API polling has strict rate limits. Webhooks are strongly recommended.
 
 ### Getting Your Credentials
 
