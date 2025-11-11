@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+// Reuse returns page styling for consistent cards
+import './ReturnsPage.css';
 import './DecommissionedPage.css';
 
 function DecommissionedPage() {
@@ -93,85 +95,79 @@ function DecommissionedPage() {
   }
 
   return (
-    <div className="decommissioned-page">
-      <div className="decommissioned-header">
-        <div className="header-content">
-          <h1>⚠️ Decommissioned Routers</h1>
-          <p className="subtitle">
-            {routers.length} router{routers.length !== 1 ? 's' : ''} permanently retired
-          </p>
+    <div className="returns-page">{/* reuse layout container */}
+      <div className="returns-header">
+        <h1>⚠️ Decommissioned Routers</h1>
+        <div className="returns-count">
+          {routers.length} router{routers.length !== 1 ? 's' : ''} decommissioned
         </div>
-        <button className="back-button" onClick={() => navigate('/')}>
-          ← Back to Dashboard
-        </button>
       </div>
 
-      <div className="search-bar">
+      <div className="search-bar" style={{ marginBottom: '24px' }}>
         <input
           type="text"
-          placeholder="Search by Router ID, location, or notes..."
+          placeholder="Search by Router ID, name, or IMEI..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
 
       {filteredRouters.length === 0 ? (
-        <div className="no-routers">
+        <div className="returns-empty">
           {searchTerm ? 'No matching routers found' : 'No decommissioned routers'}
         </div>
       ) : (
-        <div className="routers-grid">
+        <div className="returns-list">
           {filteredRouters.map(router => (
-            <div 
-              key={router.id} 
-              className="router-card"
-              onClick={() => handleRouterClick(router.router_id)}
-            >
-              <div className="router-header">
-                <h3 className="router-id">{router.name || `Router #${router.router_id}`}</h3>
-                <span className="status-badge decommissioned">Decommissioned</span>
+            <div key={router.router_id} className="return-card" onClick={() => handleRouterClick(router.router_id)}>
+              <div className="return-header">
+                <div className="return-title">
+                  <h3>{router.name || `Router #${router.router_id}`}</h3>
+                  <span className="status-badge status-offline">Decommissioned</span>
+                </div>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleReactivate(router.router_id, e); }}
+                  className="btn-mark-installed btn-reactivate"
+                  title="Reactivate router"
+                >
+                  ♻️ Reactivate
+                </button>
               </div>
 
-              <div className="router-info">
-                <div className="info-row">
-                  <span className="info-label">Serial:</span>
-                  <span className="info-value">{router.router_id || 'N/A'}</span>
+              <div className="return-details">
+                <div className="detail-row">
+                  <span className="detail-label">Router ID:</span>
+                  <span className="detail-value">{router.router_id}</span>
                 </div>
-
-                <div className="info-row">
-                  <span className="info-label">IMEI:</span>
-                  <span className="info-value">{router.imei || 'N/A'}</span>
-                </div>
-
-                <div className="info-row">
-                  <span className="info-label">Firmware:</span>
-                  <span className="info-value">{router.firmware_version || 'N/A'}</span>
-                </div>
-
+                {router.imei && (
+                  <div className="detail-row">
+                    <span className="detail-label">IMEI:</span>
+                    <span className="detail-value">{router.imei}</span>
+                  </div>
+                )}
+                {router.firmware_version && (
+                  <div className="detail-row">
+                    <span className="detail-label">Firmware:</span>
+                    <span className="detail-value">{router.firmware_version}</span>
+                  </div>
+                )}
                 {router.clickup_task_url && (
-                  <div className="info-row">
-                    <span className="info-label">ClickUp Task:</span>
-                    <a 
-                      href={router.clickup_task_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="info-value"
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ color: '#60a5fa', textDecoration: 'none' }}
-                    >
-                      View Task →
-                    </a>
+                  <div className="detail-row">
+                    <span className="detail-label">ClickUp Task:</span>
+                    <span className="detail-value">
+                      <a
+                        href={router.clickup_task_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ color: '#60a5fa', textDecoration: 'none' }}
+                      >
+                        View Task →
+                      </a>
+                    </span>
                   </div>
                 )}
               </div>
-
-              <button
-                className="reactivate-button"
-                onClick={(e) => handleReactivate(router.router_id, e)}
-                title="Reactivate this router and mark as ready"
-              >
-                ♻️ Reactivate
-              </button>
             </div>
           ))}
         </div>
