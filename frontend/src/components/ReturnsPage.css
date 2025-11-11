@@ -134,13 +134,13 @@
   padding: 6px 0;
 }
 
-.detail-label {
+.return-card .detail-label {
   font-weight: 500;
   color: var(--text-secondary, #cbd5e1) !important;
   font-size: 14px;
 }
 
-.detail-value {
+.return-card .detail-value {
   color: #f1f5f9 !important;
   font-size: 14px;
   font-weight: 600;

@@ -181,17 +181,25 @@
   align-items: baseline;
 }
 
-.detail-label {
-  color: #64748b;
+/* Ensure readable contrast when embedded inside a light router card container */
+.router-details .detail-label {
+  color: #475569;
   font-weight: 500;
   white-space: nowrap;
 }
 
-.detail-value {
-  color: #0f172a;
+.router-details .detail-value {
+  color: #1e293b;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+body.dark-mode .router-details .detail-label {
+  color: #94a3b8;
+}
+body.dark-mode .router-details .detail-value {
+  color: #f1f5f9;
 }
 
 .task-meta {
