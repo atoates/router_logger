@@ -148,13 +148,6 @@ function DecommissionedPage() {
                   <span className="info-value">{router.firmware_version || 'N/A'}</span>
                 </div>
 
-                {router.notes && (
-                  <div className="notes-section">
-                    <span className="info-label">Notes:</span>
-                    <p className="notes-text">{router.notes}</p>
-                  </div>
-                )}
-
                 {router.clickup_task_url && (
                   <div className="info-row">
                     <span className="info-label">ClickUp Task:</span>
@@ -162,8 +155,9 @@ function DecommissionedPage() {
                       href={router.clickup_task_url} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="clickup-link"
+                      className="info-value"
                       onClick={(e) => e.stopPropagation()}
+                      style={{ color: '#60a5fa', textDecoration: 'none' }}
                     >
                       View Task →
                     </a>
@@ -171,15 +165,13 @@ function DecommissionedPage() {
                 )}
               </div>
 
-              <div className="router-actions">
-                <button
-                  className="reactivate-button"
-                  onClick={(e) => handleReactivate(router.router_id, e)}
-                  title="Reactivate this router and mark as ready"
-                >
-                  ♻️ Reactivate
-                </button>
-              </div>
+              <button
+                className="reactivate-button"
+                onClick={(e) => handleReactivate(router.router_id, e)}
+                title="Reactivate this router and mark as ready"
+              >
+                ♻️ Reactivate
+              </button>
             </div>
           ))}
         </div>

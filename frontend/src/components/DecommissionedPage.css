@@ -94,12 +94,8 @@
   border: 1px solid var(--border-color, #334155);
   border-radius: 12px;
   padding: 20px;
-  cursor: pointer;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   transition: box-shadow 0.2s;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 }
 
 .router-card:hover {
@@ -154,63 +150,18 @@
 
 .info-label {
   font-weight: 500;
-  color: var(--text-secondary, #cbd5e1);
+  color: var(--text-secondary, #cbd5e1) !important;
   font-size: 14px;
 }
 
 .info-value {
-  color: #f1f5f9;
+  color: #f1f5f9 !important;
   font-size: 14px;
   font-weight: 600;
   font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
-  text-align: right;
-}
-
-.clickup-link {
-  color: #60a5fa;
-  text-decoration: none;
-  font-weight: 500;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.clickup-link:hover {
-  color: #93c5fd;
-  text-decoration: underline;
-}
-
-.notes-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-  border-left: 3px solid #f59e0b;
-  margin-top: 8px;
-}
-
-.notes-text {
-  margin: 0;
-  color: var(--text-primary, #e2e8f0);
-  font-size: 14px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.router-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-color, #334155);
 }
 
 .reactivate-button {
-  flex: 1;
   padding: 8px 16px;
   background: #10b981;
   color: white;
