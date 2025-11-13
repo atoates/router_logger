@@ -16,7 +16,8 @@
     "react-scripts": "5.0.1",
     "react-toastify": "^9.1.3",
     "recharts": "^2.10.3",
-    "serve": "^14.2.1"
+    "serve": "^14.2.1",
+    "typescript": "^4.9.5"
   },
   "scripts": {
     "start": "react-scripts start",
