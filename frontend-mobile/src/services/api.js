@@ -76,7 +76,11 @@ export const updateRouterStatus = (routerId, status, notes) =>
 
 // Location linking (mobile installer workflow)
 export const linkRouterToLocation = (routerId, data) => 
-  api.post(`/routers/${routerId}/link-location`, data);
+  api.post(`/routers/${routerId}/link-location`, {
+    location_task_id: data.location_task_id || data.taskId,
+    location_task_name: data.location_task_name || data.taskName || data.name,
+    notes: data.notes || 'Assigned via mobile app'
+  });
 
 // Get current location for router
 export const getCurrentLocation = (routerId) => 

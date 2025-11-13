@@ -11,9 +11,8 @@ function LocationPage() {
   const [selectedWorkspace, setSelectedWorkspace] = useState(null);
   const [spaces, setSpaces] = useState([]);
   const [selectedSpace, setSelectedSpace] = useState(null);
-  const [lists, setLists] = useState([]);
-  const [selectedList, setSelectedList] = useState(null);
-  const [tasks, setTasks] = useState([]);
+  const [allLists, setAllLists] = useState([]);
+  const [filteredLists, setFilteredLists] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -37,10 +36,10 @@ function LocationPage() {
   }, [selectedSpace]);
 
   useEffect(() => {
-    if (selectedList) {
-      fetchTasks(selectedList);
+    if (selectedSpace && allLists.length > 0) {
+      filterLists();
     }
-  }, [selectedList, searchQuery]);
+  }, [searchQuery, allLists, selectedSpace]);
 
   const fetchRouters = async () => {
     try {
@@ -87,9 +86,9 @@ function LocationPage() {
       const data = response.data;
       
       // Extract all lists from folderless and folders
-      let allLists = [];
+      let lists = [];
       if (data.folderless && data.folderless.length > 0) {
-        allLists = allLists.concat(data.folderless.map(list => ({
+        lists = lists.concat(data.folderless.map(list => ({
           ...list,
           folderName: null
         })));
@@ -97,7 +96,7 @@ function LocationPage() {
       if (data.folders && data.folders.length > 0) {
         data.folders.forEach(folder => {
           if (folder.lists && folder.lists.length > 0) {
-            allLists = allLists.concat(folder.lists.map(list => ({
+            lists = lists.concat(folder.lists.map(list => ({
               ...list,
               folderName: folder.folder?.name
             })));
@@ -105,7 +104,8 @@ function LocationPage() {
         });
       }
       
-      setLists(allLists);
+      setAllLists(lists);
+      setFilteredLists(lists); // Initially show all lists
     } catch (err) {
       setError('Failed to load lists');
     } finally {
@@ -113,19 +113,22 @@ function LocationPage() {
     }
   };
 
-  const fetchTasks = async (listId) => {
-    try {
-      setLoading(true);
-      const response = await getClickUpTasks(listId, searchQuery);
-      setTasks(response.data.tasks || []);
-    } catch (err) {
-      setError('Failed to load tasks');
-    } finally {
-      setLoading(false);
+  const filterLists = () => {
+    if (!searchQuery || searchQuery.length < 2) {
+      setFilteredLists(allLists);
+      return;
     }
+
+    // If query is only digits, prepend '#' for property number search (like desktop)
+    const searchTerm = /^\d+$/.test(searchQuery) ? `#${searchQuery}` : searchQuery;
+    const filtered = allLists.filter(list => 
+      list.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    setFilteredLists(filtered);
   };
 
-  const handleLinkRouter = async (taskId) => {
+  const handleLinkRouter = async (list) => {
     if (!selectedRouter) {
       setError('Please select a router first');
       return;
@@ -134,12 +137,15 @@ function LocationPage() {
     try {
       setLoading(true);
       setError(null);
+      // Link to the list (not a task) - the list name is the location
       await linkRouterToLocation(selectedRouter.router_id, {
-        taskId,
-        listId: selectedList
+        location_task_id: list.id,
+        location_task_name: list.name
       });
-      setSuccess(`Router #${selectedRouter.router_id} linked to location successfully!`);
+      setSuccess(`Router #${selectedRouter.router_id} linked to ${list.name} successfully!`);
       setSelectedRouter(null);
+      setSearchQuery('');
+      setFilteredLists([]);
       fetchRouters(); // Refresh router list
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to link router to location');
@@ -198,8 +204,9 @@ function LocationPage() {
           onChange={(e) => {
             setSelectedWorkspace(e.target.value);
             setSelectedSpace(null);
-            setSelectedList(null);
-            setTasks([]);
+            setAllLists([]);
+            setFilteredLists([]);
+            setSearchQuery('');
             setSpaces([]);
           }}
           className="location-select"
@@ -224,8 +231,9 @@ function LocationPage() {
               value={selectedSpace || ''}
               onChange={(e) => {
                 setSelectedSpace(e.target.value);
-                setSelectedList(null);
-                setTasks([]);
+                setAllLists([]);
+                setFilteredLists([]);
+                setSearchQuery('');
               }}
               className="location-select"
             >
@@ -240,61 +248,39 @@ function LocationPage() {
         </div>
       )}
 
-      {/* Step 4: Select List */}
+      {/* Step 4: Search and Select Location (List) */}
       {selectedSpace && (
         <div className="location-section">
-          <h2>4. Select List</h2>
-          {loading ? (
-            <LoadingSpinner size="small" />
-          ) : (
-            <select
-              value={selectedList || ''}
-              onChange={(e) => {
-                setSelectedList(e.target.value);
-                setTasks([]);
-              }}
-              className="location-select"
-            >
-              <option value="">Choose a list...</option>
-              {lists.map(list => (
-                <option key={list.id} value={list.id}>
-                  {list.folderName ? `${list.folderName} / ${list.name}` : list.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-      )}
-
-      {/* Step 5: Search and Select Task */}
-      {selectedList && (
-        <div className="location-section">
-          <h2>5. Search and Select Location</h2>
+          <h2>4. Search and Select Location</h2>
           <input
             type="text"
-            placeholder="Search locations..."
+            placeholder="Search by property number (e.g. 69) or name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="search-input"
           />
           
-          {loading ? (
-            <LoadingSpinner size="small" text="Loading tasks..." />
+          {loading && allLists.length === 0 ? (
+            <LoadingSpinner size="small" text="Loading locations..." />
           ) : (
             <div className="tasks-list">
-              {tasks.length === 0 ? (
-                <p className="empty-hint">No locations found. Try a different search.</p>
+              {filteredLists.length === 0 ? (
+                <p className="empty-hint">
+                  {searchQuery.length < 2 
+                    ? 'Enter at least 2 characters to search' 
+                    : 'No locations found. Try a different search.'}
+                </p>
               ) : (
-                tasks.map(task => (
-                  <div key={task.id} className="task-item">
+                filteredLists.map(list => (
+                  <div key={list.id} className="task-item">
                     <div className="task-info">
-                      <div className="task-name">{task.name}</div>
-                      {task.status && (
-                        <div className="task-status">{task.status.status}</div>
+                      <div className="task-name">{list.name}</div>
+                      {list.folderName && (
+                        <div className="task-status">📁 {list.folderName}</div>
                       )}
                     </div>
                     <button
-                      onClick={() => handleLinkRouter(task.id)}
+                      onClick={() => handleLinkRouter(list)}
                       className="link-button"
                       disabled={!selectedRouter || loading}
                     >
