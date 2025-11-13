@@ -275,36 +275,45 @@ const MobileStats = ({ router, onSelectRouter }) => {
         <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
           <input
             type="text"
-            placeholder="Search router..."
+            placeholder="🔍 Search router by ID, name, or IMEI..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setShowRouterSelector(true); // Always show when typing
+            }}
             onFocus={() => setShowRouterSelector(true)}
             style={{
               flex: 1,
-              padding: '10px 12px',
-              border: '1px solid #e5e7eb',
+              padding: '12px 16px',
+              border: '2px solid #3b82f6',
               borderRadius: '8px',
-              fontSize: '14px'
+              fontSize: '15px',
+              fontWeight: '500'
             }}
           />
-          <button
-            onClick={() => setShowRouterSelector(!showRouterSelector)}
-            style={{
-              padding: '10px 16px',
-              background: showRouterSelector ? '#3b82f6' : '#f3f4f6',
-              color: showRouterSelector ? 'white' : '#374151',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer'
-            }}
-          >
-            {showRouterSelector ? '✕' : '🔍'}
-          </button>
+          {showRouterSelector && (
+            <button
+              onClick={() => {
+                setShowRouterSelector(false);
+                setSearchTerm('');
+              }}
+              style={{
+                padding: '12px 16px',
+                background: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
+            >
+              ✕
+            </button>
+          )}
         </div>
         
-        {showRouterSelector && (
+        {(showRouterSelector || searchTerm) && (
           <div style={{
             background: '#fff',
             border: '1px solid #e5e7eb',
