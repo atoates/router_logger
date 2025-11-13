@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
 import './OutOfServiceRouters.css';
-
-const API_BASE = process.env.REACT_APP_API_URL || 'https://routerlogger-production.up.railway.app';
 
 const StoredWithRouters = () => {
   const [routersByAssignee, setRoutersByAssignee] = useState({});
@@ -18,12 +17,8 @@ const StoredWithRouters = () => {
   const fetchRoutersByAssignees = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/api/routers/by-assignees`);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to fetch routers by assignees (${response.status})`);
-      }
-      const data = await response.json();
+      const response = await api.get('/routers/by-assignees');
+      const data = response.data;
       
       // Filter out routers that have location assignments
       // Only show routers that are truly "stored with" someone (not installed at a location)
@@ -41,7 +36,8 @@ const StoredWithRouters = () => {
       setError(null);
     } catch (err) {
       console.error('Error fetching routers by assignees:', err);
-      setError(err.message);
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to fetch routers';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -63,15 +59,7 @@ const StoredWithRouters = () => {
       setError(null);
       
       // Trigger assignee sync from ClickUp (this makes API calls but only fetches assignees)
-      const syncResponse = await fetch(`${API_BASE}/api/clickup/sync/assignees`, {
-        method: 'POST',
-        credentials: 'include'
-      });
-      
-      if (!syncResponse.ok) {
-        const errorData = await syncResponse.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to sync assignees from ClickUp');
-      }
+      await api.post('/clickup/sync/assignees');
       
       // Wait a moment for the sync to complete
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -80,7 +68,8 @@ const StoredWithRouters = () => {
       await fetchRoutersByAssignees();
     } catch (err) {
       console.error('Error refreshing data:', err);
-      setError(err.message);
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to sync assignees';
+      setError(errorMessage);
     } finally {
       setSyncing(false);
     }
