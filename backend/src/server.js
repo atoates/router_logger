@@ -70,17 +70,8 @@ const corsOrigin = (() => {
       logger.info(`✅ CORS configured for desktop: ${process.env.FRONTEND_URL}`);
     }
     
-    // Return function to check if origin is allowed
-    return (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or Postman)
-      if (!origin) {
-        return callback(null, true);
-      }
-      if (origins.includes(origin)) {
-        return callback(null, true);
-      }
-      callback(new Error('Not allowed by CORS'));
-    };
+    // Return array of allowed origins (cors library handles this natively)
+    return origins;
   } else {
     // Development: allow wildcard for local testing
     return process.env.FRONTEND_URL || '*';
