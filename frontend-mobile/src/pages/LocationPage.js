@@ -9,10 +9,8 @@ function LocationPage() {
   const [filteredRouters, setFilteredRouters] = useState([]);
   const [routerSearchQuery, setRouterSearchQuery] = useState('');
   const [selectedRouter, setSelectedRouter] = useState(null);
-  const [workspaces, setWorkspaces] = useState([]);
-  const [selectedWorkspace, setSelectedWorkspace] = useState(null);
-  const [spaces, setSpaces] = useState([]);
-  const [selectedSpace, setSelectedSpace] = useState(null);
+  const [workspace, setWorkspace] = useState(null);
+  const [space, setSpace] = useState(null);
   const [allLists, setAllLists] = useState([]);
   const [filteredLists, setFilteredLists] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,7 +20,7 @@ function LocationPage() {
 
   useEffect(() => {
     fetchRouters();
-    fetchWorkspaces();
+    initializeClickUp();
   }, []);
 
   useEffect(() => {
@@ -30,16 +28,10 @@ function LocationPage() {
   }, [routerSearchQuery, routers]);
 
   useEffect(() => {
-    if (selectedWorkspace) {
-      fetchSpaces(selectedWorkspace);
+    if (space) {
+      fetchLists(space.id);
     }
-  }, [selectedWorkspace]);
-
-  useEffect(() => {
-    if (selectedSpace) {
-      fetchLists(selectedSpace);
-    }
-  }, [selectedSpace]);
+  }, [space]);
 
   useEffect(() => {
     if (selectedSpace && allLists.length > 0) {
@@ -77,27 +69,34 @@ function LocationPage() {
     setFilteredRouters(filtered);
   };
 
-  const fetchWorkspaces = async () => {
-    try {
-      const response = await getClickUpSpaces();
-      setWorkspaces(response.data.workspaces || []);
-    } catch (err) {
-      setError('Failed to load ClickUp workspaces');
-    }
-  };
-
-  const fetchSpaces = async (workspaceId) => {
+  const initializeClickUp = async () => {
     try {
       setLoading(true);
-      const response = await getClickUpSpacesForWorkspace(workspaceId);
-      setSpaces(response.data.spaces || []);
-      // Auto-select "Active Accounts" space if it exists
-      const activeAccounts = response.data.spaces?.find(s => s.name === 'Active Accounts');
-      if (activeAccounts) {
-        setSelectedSpace(activeAccounts.id);
+      // Get workspaces and auto-select "VacatAd"
+      const workspacesResponse = await getClickUpSpaces();
+      const workspaces = workspacesResponse.data.workspaces || [];
+      const vacatAd = workspaces.find(w => w.name === 'VacatAd');
+      
+      if (!vacatAd) {
+        setError('VacatAd workspace not found');
+        return;
       }
+      
+      setWorkspace(vacatAd);
+      
+      // Get spaces and auto-select "Active Accounts"
+      const spacesResponse = await getClickUpSpacesForWorkspace(vacatAd.id);
+      const spaces = spacesResponse.data.spaces || [];
+      const activeAccounts = spaces.find(s => s.name === 'Active Accounts');
+      
+      if (!activeAccounts) {
+        setError('Active Accounts space not found');
+        return;
+      }
+      
+      setSpace(activeAccounts);
     } catch (err) {
-      setError('Failed to load spaces');
+      setError('Failed to initialize ClickUp: ' + (err.response?.data?.error || err.message));
     } finally {
       setLoading(false);
     }
@@ -234,62 +233,19 @@ function LocationPage() {
         </div>
       </div>
 
-      {/* Step 2: Select Workspace */}
-      <div className="location-section">
-        <h2>2. Select ClickUp Workspace</h2>
-        <select
-          value={selectedWorkspace || ''}
-          onChange={(e) => {
-            setSelectedWorkspace(e.target.value);
-            setSelectedSpace(null);
-            setAllLists([]);
-            setFilteredLists([]);
-            setSearchQuery('');
-            setSpaces([]);
-          }}
-          className="location-select"
-        >
-          <option value="">Choose a workspace...</option>
-          {workspaces.map(workspace => (
-            <option key={workspace.id} value={workspace.id}>
-              {workspace.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Step 3: Select Space (e.g., "Active Accounts") */}
-      {selectedWorkspace && (
-        <div className="location-section">
-          <h2>3. Select Space</h2>
-          {loading ? (
-            <LoadingSpinner size="small" />
-          ) : (
-            <select
-              value={selectedSpace || ''}
-              onChange={(e) => {
-                setSelectedSpace(e.target.value);
-                setAllLists([]);
-                setFilteredLists([]);
-                setSearchQuery('');
-              }}
-              className="location-select"
-            >
-              <option value="">Choose a space...</option>
-              {spaces.map(space => (
-                <option key={space.id} value={space.id}>
-                  {space.name}
-                </option>
-              ))}
-            </select>
-          )}
+      {/* Breadcrumbs */}
+      {workspace && space && (
+        <div className="location-breadcrumbs">
+          <span className="breadcrumb-item">{workspace.name}</span>
+          <span className="breadcrumb-separator">›</span>
+          <span className="breadcrumb-item">{space.name}</span>
         </div>
       )}
 
-      {/* Step 4: Search and Select Location (List) */}
-      {selectedSpace && (
+      {/* Step 2: Search and Select Location (List) */}
+      {space && (
         <div className="location-section">
-          <h2>4. Search and Select Location</h2>
+          <h2>2. Search and Select Location</h2>
           <input
             type="text"
             placeholder="Search by property number (e.g. 69) or name..."
