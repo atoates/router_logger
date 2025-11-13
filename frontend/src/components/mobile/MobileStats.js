@@ -1,15 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { getUsageStats, getLogs } from '../../services/api';
+import { getUsageStats, getLogs, getRouters } from '../../services/api';
 import { generateInstallationReport } from '../../utils/installationReport';
 import { mobileFetch } from '../../utils/mobileApi';
 
-const MobileStats = ({ router }) => {
+const MobileStats = ({ router, onSelectRouter }) => {
   const [stats, setStats] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [routers, setRouters] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showRouterSelector, setShowRouterSelector] = useState(false);
+
+  useEffect(() => {
+    loadRoutersList();
+  }, []);
 
   useEffect(() => {
     if (router) {
@@ -23,6 +30,15 @@ const MobileStats = ({ router }) => {
       return () => clearInterval(interval);
     }
   }, [router]);
+
+  const loadRoutersList = async () => {
+    try {
+      const response = await getRouters();
+      setRouters(response.data || []);
+    } catch (error) {
+      console.error('Failed to load routers list:', error);
+    }
+  };
 
   const loadStats = async () => {
     try {
@@ -155,8 +171,94 @@ const MobileStats = ({ router }) => {
     );
   };
 
+  const filteredRouters = routers.filter(r => {
+    if (!searchTerm) return true;
+    const search = searchTerm.toLowerCase();
+    return (
+      r.name?.toLowerCase().includes(search) ||
+      r.router_id?.toString().includes(search) ||
+      r.imei?.toLowerCase().includes(search)
+    );
+  });
+
+  const handleRouterSelect = (selectedRouter) => {
+    if (onSelectRouter) {
+      onSelectRouter(selectedRouter);
+    }
+    setShowRouterSelector(false);
+    setSearchTerm('');
+  };
+
+  // Close selector when clicking outside
+  useEffect(() => {
+    if (!showRouterSelector) return;
+    
+    const handleClickOutside = (event) => {
+      const target = event.target;
+      // Check if click is outside the search/selector area
+      if (!target.closest('[data-router-selector]')) {
+        setShowRouterSelector(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showRouterSelector]);
+
   if (!router) {
-    return <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>Select a router first</div>;
+    return (
+      <div style={{ padding: '20px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: '600' }}>Select Router</h2>
+          <input
+            type="text"
+            placeholder="Search by ID, name, or IMEI..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              fontSize: '14px',
+              marginBottom: '12px'
+            }}
+          />
+          <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+            {filteredRouters.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>
+                {searchTerm ? 'No routers found' : 'No routers available'}
+              </div>
+            ) : (
+              filteredRouters.map(r => (
+                <div
+                  key={r.router_id}
+                  onClick={() => handleRouterSelect(r)}
+                  style={{
+                    background: '#fff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    marginBottom: '8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.background = '#f9fafb'}
+                  onMouseLeave={(e) => e.target.style.background = '#fff'}
+                >
+                  <div style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>
+                    {r.name || `Router #${r.router_id}`}
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>
+                    ID: {r.router_id} • IMEI: {r.imei || 'N/A'}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {
@@ -168,6 +270,94 @@ const MobileStats = ({ router }) => {
 
   return (
     <div style={{ padding: '16px' }}>
+      {/* Router Search/Selector */}
+      <div style={{ marginBottom: '12px' }} data-router-selector>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+          <input
+            type="text"
+            placeholder="Search router..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onFocus={() => setShowRouterSelector(true)}
+            style={{
+              flex: 1,
+              padding: '10px 12px',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              fontSize: '14px'
+            }}
+          />
+          <button
+            onClick={() => setShowRouterSelector(!showRouterSelector)}
+            style={{
+              padding: '10px 16px',
+              background: showRouterSelector ? '#3b82f6' : '#f3f4f6',
+              color: showRouterSelector ? 'white' : '#374151',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer'
+            }}
+          >
+            {showRouterSelector ? '✕' : '🔍'}
+          </button>
+        </div>
+        
+        {showRouterSelector && (
+          <div style={{
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            padding: '8px',
+            maxHeight: '300px',
+            overflowY: 'auto',
+            marginBottom: '8px',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+          }}>
+            {filteredRouters.length === 0 ? (
+              <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280', fontSize: '14px' }}>
+                {searchTerm ? 'No routers found' : 'Type to search...'}
+              </div>
+            ) : (
+              filteredRouters.map(r => (
+                <div
+                  key={r.router_id}
+                  onClick={() => handleRouterSelect(r)}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    background: r.router_id === router.router_id ? '#eff6ff' : 'transparent',
+                    border: r.router_id === router.router_id ? '1px solid #3b82f6' : '1px solid transparent',
+                    marginBottom: '4px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (r.router_id !== router.router_id) {
+                      e.currentTarget.style.background = '#f9fafb';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (r.router_id !== router.router_id) {
+                      e.currentTarget.style.background = 'transparent';
+                    }
+                  }}
+                >
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: '#111827' }}>
+                    {r.name || `Router #${r.router_id}`}
+                    {r.router_id === router.router_id && <span style={{ marginLeft: '8px', color: '#3b82f6' }}>✓</span>}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+                    ID: {r.router_id} {r.imei && `• IMEI: ${r.imei}`}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Auto-refresh Indicator */}
       <div style={{
         display: 'flex',

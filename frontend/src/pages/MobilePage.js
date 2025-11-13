@@ -27,8 +27,8 @@ const MobilePage = () => {
           <MobileLocation router={selectedRouter} />
         )}
         
-        {activeTab === 'stats' && selectedRouter && (
-          <MobileStats router={selectedRouter} />
+        {activeTab === 'stats' && (
+          <MobileStats router={selectedRouter} onSelectRouter={handleSelectRouter} />
         )}
 
         {activeTab === 'settings' && (
