@@ -6,6 +6,8 @@ import './LocationPage.css';
 
 function LocationPage() {
   const [routers, setRouters] = useState([]);
+  const [filteredRouters, setFilteredRouters] = useState([]);
+  const [routerSearchQuery, setRouterSearchQuery] = useState('');
   const [selectedRouter, setSelectedRouter] = useState(null);
   const [workspaces, setWorkspaces] = useState([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState(null);
@@ -22,6 +24,10 @@ function LocationPage() {
     fetchRouters();
     fetchWorkspaces();
   }, []);
+
+  useEffect(() => {
+    filterRouters();
+  }, [routerSearchQuery, routers]);
 
   useEffect(() => {
     if (selectedWorkspace) {
@@ -45,12 +51,30 @@ function LocationPage() {
     try {
       setLoading(true);
       const response = await getRouters();
-      setRouters(Array.isArray(response.data) ? response.data : []);
+      const routerList = Array.isArray(response.data) ? response.data : [];
+      setRouters(routerList);
+      setFilteredRouters(routerList);
     } catch (err) {
       setError('Failed to load routers');
     } finally {
       setLoading(false);
     }
+  };
+
+  const filterRouters = () => {
+    if (!routerSearchQuery) {
+      setFilteredRouters(routers);
+      return;
+    }
+
+    const query = routerSearchQuery.toLowerCase();
+    const filtered = routers.filter(router => {
+      const id = router.router_id?.toString().toLowerCase() || '';
+      const name = router.name?.toLowerCase() || '';
+      return id.includes(query) || name.includes(query);
+    });
+
+    setFilteredRouters(filtered);
   };
 
   const fetchWorkspaces = async () => {
@@ -183,16 +207,30 @@ function LocationPage() {
       {/* Step 1: Select Router */}
       <div className="location-section">
         <h2>1. Select Router</h2>
+        <input
+          type="text"
+          placeholder="Search by router ID or name..."
+          value={routerSearchQuery}
+          onChange={(e) => setRouterSearchQuery(e.target.value)}
+          className="search-input"
+          style={{ marginBottom: '12px' }}
+        />
         <div className="router-selector">
-          {routers.map(router => (
-            <button
-              key={router.router_id}
-              className={`router-select-button ${selectedRouter?.router_id === router.router_id ? 'active' : ''}`}
-              onClick={() => setSelectedRouter(router)}
-            >
-              #{router.router_id} {router.name && `- ${router.name}`}
-            </button>
-          ))}
+          {filteredRouters.length === 0 ? (
+            <p className="empty-hint" style={{ padding: '20px', textAlign: 'center' }}>
+              {routerSearchQuery ? 'No routers found' : 'No routers available'}
+            </p>
+          ) : (
+            filteredRouters.map(router => (
+              <button
+                key={router.router_id}
+                className={`router-select-button ${selectedRouter?.router_id === router.router_id ? 'active' : ''}`}
+                onClick={() => setSelectedRouter(router)}
+              >
+                #{router.router_id} {router.name && `- ${router.name}`}
+              </button>
+            ))
+          )}
         </div>
       </div>
 
