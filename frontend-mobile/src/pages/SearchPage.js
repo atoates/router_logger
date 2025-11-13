@@ -136,7 +136,11 @@ function SearchPage() {
           </div>
         ) : (
           filteredRouters.map(router => (
-            <RouterCard key={router.router_id} router={router} />
+            <RouterCard 
+              key={router.router_id} 
+              router={router}
+              onUpdate={fetchRouters}
+            />
           ))
         )}
       </div>

@@ -1,9 +1,9 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import RouterDetailModal from './RouterDetailModal';
 import './RouterCard.css';
 
-function RouterCard({ router }) {
-  const navigate = useNavigate();
+function RouterCard({ router, onUpdate }) {
+  const [showModal, setShowModal] = useState(false);
   
   // Handle both current_status and current_state (for compatibility)
   // Handle various formats: 'online', 'offline', 1, 0, '1', '0', true, false, 'Online'
@@ -16,8 +16,11 @@ function RouterCard({ router }) {
                    (typeof state === 'string' && state.toLowerCase() === 'online');
 
   const handleClick = () => {
-    // For now, just show router info
-    alert(`Router #${router.router_id}\nName: ${router.name || 'N/A'}\nStatus: ${isOnline ? 'Online' : 'Offline'}`);
+    setShowModal(true);
+  };
+
+  const handleClose = () => {
+    setShowModal(false);
   };
 
   return (
@@ -51,6 +54,14 @@ function RouterCard({ router }) {
       >
         View Details
       </button>
+      
+      {showModal && (
+        <RouterDetailModal
+          router={router}
+          onClose={handleClose}
+          onUpdate={onUpdate}
+        />
+      )}
     </div>
   );
 }
