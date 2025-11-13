@@ -34,10 +34,10 @@ function LocationPage() {
   }, [space]);
 
   useEffect(() => {
-    if (selectedSpace && allLists.length > 0) {
+    if (space && allLists.length > 0) {
       filterLists();
     }
-  }, [searchQuery, allLists, selectedSpace]);
+  }, [searchQuery, allLists, space]);
 
   const fetchRouters = async () => {
     try {
