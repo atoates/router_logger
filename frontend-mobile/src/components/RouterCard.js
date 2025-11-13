@@ -5,9 +5,11 @@ import './RouterCard.css';
 function RouterCard({ router }) {
   const navigate = useNavigate();
   
-  // Handle various formats: 'online', 'offline', 1, 0, '1', '0', true, false
-  const state = router.current_state;
+  // Handle both current_status and current_state (for compatibility)
+  // Handle various formats: 'online', 'offline', 1, 0, '1', '0', true, false, 'Online'
+  const state = router.current_status || router.current_state;
   const isOnline = state === 'online' || 
+                   state === 'Online' ||
                    state === 1 || 
                    state === '1' || 
                    state === true ||
