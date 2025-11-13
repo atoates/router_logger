@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import api from '../services/api';
 // Reuse returns page styling for consistent cards
 import './ReturnsPage.css';
@@ -10,6 +11,8 @@ function DecommissionedPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingNotes, setEditingNotes] = useState({});
+  const [savingNotes, setSavingNotes] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -50,10 +53,50 @@ function DecommissionedPage() {
 
       // Refresh the list
       await fetchDecommissionedRouters();
-      alert('Router reactivated successfully and marked as ready for deployment');
+      toast.success('Router reactivated successfully and marked as ready for deployment');
     } catch (err) {
       console.error('Error reactivating router:', err);
-      alert(`Failed to reactivate router: ${err.message}`);
+      toast.error(`Failed to reactivate router: ${err.message}`);
+    }
+  };
+
+  const handleNotesChange = (routerId, value) => {
+    setEditingNotes(prev => ({
+      ...prev,
+      [routerId]: value
+    }));
+  };
+
+  const saveNotes = async (routerId) => {
+    try {
+      setSavingNotes(prev => ({ ...prev, [routerId]: true }));
+      
+      const res = await api.patch(`/routers/${routerId}/notes`, {
+        notes: editingNotes[routerId] !== undefined ? editingNotes[routerId] : ''
+      });
+
+      const data = res.data;
+      
+      if (data.success) {
+        // Update the router in state
+        setRouters(prev => prev.map(r => 
+          r.router_id === routerId ? data.router : r
+        ));
+        // Clear the editing state for this router
+        setEditingNotes(prev => {
+          const next = { ...prev };
+          delete next[routerId];
+          return next;
+        });
+        toast.success('Notes saved');
+      } else {
+        toast.error('Failed to save notes');
+      }
+    } catch (error) {
+      console.error('Error saving notes:', error);
+      toast.error('Failed to save notes');
+    } finally {
+      setSavingNotes(prev => ({ ...prev, [routerId]: false }));
     }
   };
 
@@ -167,6 +210,26 @@ function DecommissionedPage() {
                     </span>
                   </div>
                 )}
+              </div>
+
+              <div className="return-notes">
+                <label htmlFor={`notes-${router.router_id}`}>Notes:</label>
+                <textarea
+                  id={`notes-${router.router_id}`}
+                  value={editingNotes[router.router_id] !== undefined ? editingNotes[router.router_id] : (router.notes || '')}
+                  onChange={(e) => handleNotesChange(router.router_id, e.target.value)}
+                  placeholder="Add notes about this decommissioned router..."
+                  rows={3}
+                  disabled={savingNotes[router.router_id]}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <button 
+                  onClick={(e) => { e.stopPropagation(); saveNotes(router.router_id); }}
+                  className="btn-save-notes"
+                  disabled={savingNotes[router.router_id]}
+                >
+                  {savingNotes[router.router_id] ? 'Saving...' : '💾 Save Notes'}
+                </button>
               </div>
             </div>
           ))}
