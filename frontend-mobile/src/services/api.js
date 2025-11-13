@@ -84,6 +84,8 @@ export const getCurrentLocation = (routerId) =>
 
 // ClickUp integration (for location search)
 export const getClickUpSpaces = () => api.get('/clickup/workspaces');
+export const getClickUpSpacesForWorkspace = (workspaceId) => api.get(`/clickup/spaces/${workspaceId}`);
+export const getClickUpSpaceLists = (spaceId) => api.get(`/clickup/debug/space-lists/${spaceId}`);
 export const getClickUpLists = (workspaceId) => api.get(`/clickup/lists/${workspaceId}`);
 export const getClickUpTasks = (listId, search = '') => 
   api.get(`/clickup/tasks/${listId}`, { params: { search } });
