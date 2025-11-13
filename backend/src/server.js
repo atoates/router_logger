@@ -24,13 +24,52 @@ const { router: monitoringRoutes } = require('./routes/monitoring');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Validate critical environment variables
+function validateEnvironment() {
+  const required = ['DATABASE_URL'];
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+  
+  // Warn about production security settings
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.FRONTEND_URL) {
+      logger.warn('⚠️  FRONTEND_URL not set in production - CORS will be restricted for security');
+    }
+  }
+  
+  logger.info('Environment validation passed');
+}
+
+// Validate environment before starting
+validateEnvironment();
+
 // Trust Railway proxy for rate limiting and secure cookies
 app.set('trust proxy', 1);
+
+// CORS configuration - secure by default
+// In production: require FRONTEND_URL (fail if missing)
+// In development: allow wildcard for local testing
+const corsOrigin = (() => {
+  if (process.env.NODE_ENV === 'production') {
+    // Production: require explicit FRONTEND_URL
+    if (!process.env.FRONTEND_URL) {
+      logger.warn('⚠️  FRONTEND_URL not set in production - CORS will reject all origins');
+      return false; // Reject all origins if not configured
+    }
+    return process.env.FRONTEND_URL;
+  } else {
+    // Development: allow wildcard for local testing
+    return process.env.FRONTEND_URL || '*';
+  }
+})();
 
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: corsOrigin,
   credentials: true
 }));
 app.use(cookieParser());
@@ -90,8 +129,22 @@ app.use(monitoringRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  logger.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  // Log full error details (always log for debugging)
+  logger.error('Error caught by middleware:', {
+    message: err.message,
+    stack: err.stack,
+    url: req.url,
+    method: req.method
+  });
+  
+  // In production, don't expose stack traces to clients
+  // In development, include more details for debugging
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  res.status(err.status || 500).json({
+    error: isProduction ? 'Something went wrong!' : err.message,
+    ...(isProduction ? {} : { stack: err.stack })
+  });
 });
 
 // Initialize database and start server
