@@ -179,11 +179,20 @@ function RouterDetailModal({ router, onClose, onUpdate }) {
               <h3>Assigned To</h3>
               <div className="detail-row">
                 <span className="detail-value">
-                  {Array.isArray(router.clickup_assignees) 
-                    ? router.clickup_assignees.map(a => a.username || a).join(', ')
-                    : typeof router.clickup_assignees === 'string'
-                    ? JSON.parse(router.clickup_assignees).map(a => a.username || a).join(', ')
-                    : router.clickup_assignees}
+                  {(() => {
+                    try {
+                      let assignees = router.clickup_assignees;
+                      if (typeof assignees === 'string') {
+                        assignees = JSON.parse(assignees);
+                      }
+                      if (Array.isArray(assignees)) {
+                        return assignees.map(a => a.username || a.name || a).join(', ') || 'None';
+                      }
+                      return assignees || 'None';
+                    } catch {
+                      return router.clickup_assignees || 'None';
+                    }
+                  })()}
                 </span>
               </div>
             </div>
