@@ -234,6 +234,7 @@ const MobileStats = ({ router }) => {
       </div>
 
       {/* 24h Stats */}
+      {/* NOTE: Do not add "Avg Uptime" (hours) or "Avg WiFi Clients" cards - these have been removed per request */}
       <div style={{ marginBottom: '16px' }}>
         <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: '600', color: '#374151' }}>
           24-Hour Performance
