@@ -44,17 +44,24 @@
   color: #6b7280;
   cursor: pointer;
   padding: 0;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
   transition: background 0.2s;
+  flex-shrink: 0;
+  z-index: 10;
+  position: relative;
 }
 
 .modal-close:hover {
   background: #f3f4f6;
+}
+
+.modal-close:active {
+  background: #e5e7eb;
 }
 
 .modal-body {

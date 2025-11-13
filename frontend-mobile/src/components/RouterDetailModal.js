@@ -76,7 +76,16 @@ function RouterDetailModal({ router, onClose, onUpdate }) {
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Router #{router.router_id}</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <button 
+            className="modal-close" 
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            type="button"
+          >
+            ×
+          </button>
         </div>
 
         <div className="modal-body">
@@ -124,18 +133,6 @@ function RouterDetailModal({ router, onClose, onUpdate }) {
               <div className="detail-row">
                 <span className="detail-label">Name:</span>
                 <span className="detail-value">{router.name}</span>
-              </div>
-            )}
-            {router.imei && (
-              <div className="detail-row">
-                <span className="detail-label">IMEI:</span>
-                <span className="detail-value">{router.imei}</span>
-              </div>
-            )}
-            {router.mac_address && (
-              <div className="detail-row">
-                <span className="detail-label">MAC Address:</span>
-                <span className="detail-value">{router.mac_address}</span>
               </div>
             )}
             {router.firmware_version && (
