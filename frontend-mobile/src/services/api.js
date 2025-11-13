@@ -82,6 +82,12 @@ export const linkRouterToLocation = (routerId, data) =>
     notes: data.notes || 'Assigned via mobile app'
   });
 
+// Unlink location (uninstall)
+export const unlinkRouterFromLocation = (routerId, data) =>
+  api.post(`/routers/${routerId}/unlink-location`, {
+    notes: data?.notes || 'Uninstalled via mobile app'
+  });
+
 // Get current location for router
 export const getCurrentLocation = (routerId) => 
   api.get(`/routers/${routerId}/current-location`);
