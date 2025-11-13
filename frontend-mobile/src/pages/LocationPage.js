@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getRouters, getClickUpSpaces, getClickUpLists, getClickUpTasks, linkRouterToLocation } from '../services/api';
+import { getRouters, getClickUpSpaces, getClickUpSpacesForWorkspace, getClickUpSpaceLists, getClickUpTasks, linkRouterToLocation } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import './LocationPage.css';
@@ -9,6 +9,8 @@ function LocationPage() {
   const [selectedRouter, setSelectedRouter] = useState(null);
   const [workspaces, setWorkspaces] = useState([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState(null);
+  const [spaces, setSpaces] = useState([]);
+  const [selectedSpace, setSelectedSpace] = useState(null);
   const [lists, setLists] = useState([]);
   const [selectedList, setSelectedList] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -24,9 +26,15 @@ function LocationPage() {
 
   useEffect(() => {
     if (selectedWorkspace) {
-      fetchLists(selectedWorkspace);
+      fetchSpaces(selectedWorkspace);
     }
   }, [selectedWorkspace]);
+
+  useEffect(() => {
+    if (selectedSpace) {
+      fetchLists(selectedSpace);
+    }
+  }, [selectedSpace]);
 
   useEffect(() => {
     if (selectedList) {
@@ -55,11 +63,49 @@ function LocationPage() {
     }
   };
 
-  const fetchLists = async (workspaceId) => {
+  const fetchSpaces = async (workspaceId) => {
     try {
       setLoading(true);
-      const response = await getClickUpLists(workspaceId);
-      setLists(response.data.lists || []);
+      const response = await getClickUpSpacesForWorkspace(workspaceId);
+      setSpaces(response.data.spaces || []);
+      // Auto-select "Active Accounts" space if it exists
+      const activeAccounts = response.data.spaces?.find(s => s.name === 'Active Accounts');
+      if (activeAccounts) {
+        setSelectedSpace(activeAccounts.id);
+      }
+    } catch (err) {
+      setError('Failed to load spaces');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchLists = async (spaceId) => {
+    try {
+      setLoading(true);
+      const response = await getClickUpSpaceLists(spaceId);
+      const data = response.data;
+      
+      // Extract all lists from folderless and folders
+      let allLists = [];
+      if (data.folderless && data.folderless.length > 0) {
+        allLists = allLists.concat(data.folderless.map(list => ({
+          ...list,
+          folderName: null
+        })));
+      }
+      if (data.folders && data.folders.length > 0) {
+        data.folders.forEach(folder => {
+          if (folder.lists && folder.lists.length > 0) {
+            allLists = allLists.concat(folder.lists.map(list => ({
+              ...list,
+              folderName: folder.folder?.name
+            })));
+          }
+        });
+      }
+      
+      setLists(allLists);
     } catch (err) {
       setError('Failed to load lists');
     } finally {
@@ -151,8 +197,10 @@ function LocationPage() {
           value={selectedWorkspace || ''}
           onChange={(e) => {
             setSelectedWorkspace(e.target.value);
+            setSelectedSpace(null);
             setSelectedList(null);
             setTasks([]);
+            setSpaces([]);
           }}
           className="location-select"
         >
@@ -165,10 +213,37 @@ function LocationPage() {
         </select>
       </div>
 
-      {/* Step 3: Select List */}
+      {/* Step 3: Select Space (e.g., "Active Accounts") */}
       {selectedWorkspace && (
         <div className="location-section">
-          <h2>3. Select List</h2>
+          <h2>3. Select Space</h2>
+          {loading ? (
+            <LoadingSpinner size="small" />
+          ) : (
+            <select
+              value={selectedSpace || ''}
+              onChange={(e) => {
+                setSelectedSpace(e.target.value);
+                setSelectedList(null);
+                setTasks([]);
+              }}
+              className="location-select"
+            >
+              <option value="">Choose a space...</option>
+              {spaces.map(space => (
+                <option key={space.id} value={space.id}>
+                  {space.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
+      {/* Step 4: Select List */}
+      {selectedSpace && (
+        <div className="location-section">
+          <h2>4. Select List</h2>
           {loading ? (
             <LoadingSpinner size="small" />
           ) : (
@@ -183,7 +258,7 @@ function LocationPage() {
               <option value="">Choose a list...</option>
               {lists.map(list => (
                 <option key={list.id} value={list.id}>
-                  {list.name}
+                  {list.folderName ? `${list.folderName} / ${list.name}` : list.name}
                 </option>
               ))}
             </select>
@@ -191,10 +266,10 @@ function LocationPage() {
         </div>
       )}
 
-      {/* Step 4: Search and Select Task */}
+      {/* Step 5: Search and Select Task */}
       {selectedList && (
         <div className="location-section">
-          <h2>4. Search and Select Location</h2>
+          <h2>5. Search and Select Location</h2>
           <input
             type="text"
             placeholder="Search locations..."
