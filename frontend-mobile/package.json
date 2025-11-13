@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Mobile frontend for RUT200 router logging system - Field installer app",
   "private": true,
+  "_comment": "Trigger redeploy with TypeScript 4.9.5 fix",
   "dependencies": {
     "axios": "^1.6.2",
     "jspdf": "^2.5.1",
