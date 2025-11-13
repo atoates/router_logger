@@ -1,0 +1,84 @@
+.settings-section {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.settings-section h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 16px;
+}
+
+.user-info,
+.app-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 14px;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.logout-button {
+  width: 100%;
+  padding: 14px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  min-height: 48px; /* Touch-friendly */
+}
+
+.logout-button:hover {
+  background: #b91c1c;
+}
+
+.logout-button:active {
+  background: #991b1b;
+}
+
+.about-text {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.about-text p {
+  font-size: 16px;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.about-subtitle {
+  font-size: 14px;
+  color: #6b7280;
+}
+
