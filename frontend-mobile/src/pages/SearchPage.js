@@ -139,7 +139,6 @@ function SearchPage() {
             <RouterCard 
               key={router.router_id} 
               router={router}
-              onUpdate={fetchRouters}
             />
           ))
         )}

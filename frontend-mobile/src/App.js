@@ -8,6 +8,7 @@ import SearchPage from './pages/SearchPage';
 import LocationPage from './pages/LocationPage';
 import StatsPage from './pages/StatsPage';
 import SettingsPage from './pages/SettingsPage';
+import RouterDetailPage from './pages/RouterDetailPage';
 import './App.css';
 
 function App() {
@@ -57,6 +58,15 @@ function App() {
                 <MobileLayout>
                   <SettingsPage />
                 </MobileLayout>
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/router/:routerId"
+            element={
+              <ProtectedRoute>
+                <RouterDetailPage />
               </ProtectedRoute>
             }
           />

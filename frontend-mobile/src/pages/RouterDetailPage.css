@@ -1,0 +1,133 @@
+.back-button {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 0;
+  margin-bottom: 8px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.back-button:active {
+  opacity: 0.7;
+}
+
+.detail-section {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.detail-section h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 16px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+  flex-shrink: 0;
+  margin-right: 16px;
+}
+
+.detail-value {
+  font-size: 14px;
+  color: #1f2937;
+  font-weight: 600;
+  text-align: right;
+  flex: 1;
+  word-break: break-word;
+}
+
+.status-badge-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-online {
+  background: #d1fae5;
+  color: #10b981;
+}
+
+.status-offline {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.status-installed {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.status-returning {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.status-decommissioned {
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+.status-ready {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.action-button {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  min-height: 48px;
+}
+
+.action-button-danger {
+  background: #dc2626;
+  color: white;
+}
+
+.action-button-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.action-button-danger:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
