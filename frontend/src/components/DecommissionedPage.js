@@ -212,7 +212,7 @@ function DecommissionedPage() {
                 )}
               </div>
 
-              <div className="return-notes">
+              <div className="return-notes" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color, #334155)' }}>
                 <label htmlFor={`notes-${router.router_id}`}>Notes:</label>
                 <textarea
                   id={`notes-${router.router_id}`}
