@@ -51,6 +51,7 @@ app.set('trust proxy', 1);
 
 // CORS configuration - secure by default
 // In production: require FRONTEND_URL (fail if missing)
+// Supports multiple origins: FRONTEND_URL (desktop) + MOBILE_FRONTEND_URL (mobile)
 // In development: allow wildcard for local testing
 const corsOrigin = (() => {
   if (process.env.NODE_ENV === 'production') {
@@ -59,7 +60,27 @@ const corsOrigin = (() => {
       logger.warn('⚠️  FRONTEND_URL not set in production - CORS will reject all origins');
       return false; // Reject all origins if not configured
     }
-    return process.env.FRONTEND_URL;
+    
+    // Support multiple origins: desktop + mobile
+    const origins = [process.env.FRONTEND_URL];
+    if (process.env.MOBILE_FRONTEND_URL) {
+      origins.push(process.env.MOBILE_FRONTEND_URL);
+      logger.info(`✅ CORS configured for desktop (${process.env.FRONTEND_URL}) and mobile (${process.env.MOBILE_FRONTEND_URL})`);
+    } else {
+      logger.info(`✅ CORS configured for desktop: ${process.env.FRONTEND_URL}`);
+    }
+    
+    // Return function to check if origin is allowed
+    return (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or Postman)
+      if (!origin) {
+        return callback(null, true);
+      }
+      if (origins.includes(origin)) {
+        return callback(null, true);
+      }
+      callback(new Error('Not allowed by CORS'));
+    };
   } else {
     // Development: allow wildcard for local testing
     return process.env.FRONTEND_URL || '*';
