@@ -191,7 +191,7 @@ async function startServer() {
       }
       
       // Run migration 014 (Database optimizations)
-      const migration014Path = path.join(__dirname, '../database/migrations/014_database_optimizations.sql');
+      const migration014Path = path.join(__dirname, 'database/migrations/014_database_optimizations.sql');
       if (fs.existsSync(migration014Path)) {
         const sql = fs.readFileSync(migration014Path, 'utf8');
         await pool.query(sql);
