@@ -9,3 +9,18 @@
   background: #fee2e2;
   color: #991b1b;
 }
+
+/* Notes section styling */
+.notes-row {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, #334155);
+}
+
+.notes-value {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  color: var(--text-secondary, #cbd5e1);
+  font-style: italic;
+}

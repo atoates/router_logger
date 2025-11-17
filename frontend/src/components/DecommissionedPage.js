@@ -167,6 +167,12 @@ function DecommissionedPage() {
                     </span>
                   </div>
                 )}
+                {router.notes && (
+                  <div className="detail-row notes-row">
+                    <span className="detail-label">Notes:</span>
+                    <span className="detail-value notes-value">{router.notes}</span>
+                  </div>
+                )}
               </div>
             </div>
           ))}
