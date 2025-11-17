@@ -27,7 +27,7 @@
   margin-bottom: 8px;
 }
 
-.router-card-id {
+.router-card-name {
   font-size: 18px;
   font-weight: 700;
   color: #1f2937;
@@ -50,11 +50,11 @@
   background: #fee2e2;
 }
 
-.router-card-name {
-  font-size: 16px;
-  color: #374151;
+.router-card-id {
+  font-size: 14px;
+  color: #6b7280;
   margin-bottom: 8px;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .router-card-assignees {

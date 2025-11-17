@@ -22,15 +22,15 @@ function RouterCard({ router }) {
   return (
     <div className={`router-card ${isOnline ? 'router-card-online' : 'router-card-offline'}`}>
       <div className="router-card-header">
-        <div className="router-card-id">#{router.router_id}</div>
+        <div className="router-card-name">
+          {router.name || `Router #${router.router_id}`}
+        </div>
         <div className={`router-card-status ${isOnline ? 'status-online' : 'status-offline'}`}>
           {isOnline ? '● Online' : '○ Offline'}
         </div>
       </div>
       
-      {router.name && (
-        <div className="router-card-name">{router.name}</div>
-      )}
+      <div className="router-card-id">#{router.router_id}</div>
       
       {router.clickup_assignees && router.clickup_assignees.length > 0 && (
         <div className="router-card-assignees">

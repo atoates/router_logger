@@ -129,10 +129,10 @@ function StatsPage() {
               onClick={() => handleRouterClick(router.router_id)}
             >
               <div className="stats-router-header">
+                <div className="stats-router-name">
+                  {router.name || `Router #${router.router_id}`}
+                </div>
                 <div className="stats-router-id">#{router.router_id}</div>
-                {router.name && (
-                  <div className="stats-router-name">{router.name}</div>
-                )}
               </div>
               
               <div className="stats-router-usage">
