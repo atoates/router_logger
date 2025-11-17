@@ -53,16 +53,47 @@ function RouterCard({ router }) {
       {(() => {
         try {
           let assignees = router.clickup_assignees;
+          if (!assignees) {
+            return null;
+          }
           if (typeof assignees === 'string') {
+            // Check if it's a string like "Not assigned" or empty
+            if (!assignees.trim() || assignees.toLowerCase().includes('not assigned') || assignees.toLowerCase() === 'none') {
+              return null;
+            }
             assignees = JSON.parse(assignees);
           }
-          if (Array.isArray(assignees) && assignees.length > 0) {
-            const assigneeNames = assignees.map(a => a.username || a.name || a.email || 'Unknown').join(', ');
-            return (
-              <div className="router-card-assignees">
-                Assigned to: {assigneeNames}
-              </div>
-            );
+          // Handle array case
+          if (Array.isArray(assignees)) {
+            // Filter out any invalid entries and check if we have valid assignees
+            const validAssignees = assignees.filter(a => {
+              if (!a) return false;
+              // Check if it's an object with at least one identifier
+              if (typeof a === 'object') {
+                return !!(a.username || a.name || a.email || a.id);
+              }
+              // Check if it's a string that's not "not assigned" or "none"
+              if (typeof a === 'string') {
+                const lower = a.toLowerCase();
+                return !lower.includes('not assigned') && lower !== 'none' && a.trim().length > 0;
+              }
+              return true;
+            });
+            
+            if (validAssignees.length > 0) {
+              const assigneeNames = validAssignees.map(a => {
+                if (typeof a === 'object') {
+                  return a.username || a.name || a.email || 'Unknown';
+                }
+                return a;
+              }).join(', ');
+              
+              return (
+                <div className="router-card-assignees">
+                  Assigned to: {assigneeNames}
+                </div>
+              );
+            }
           }
           return null;
         } catch {
