@@ -36,7 +36,7 @@ function RouterCard({ router }) {
         <div className="router-card-location">
           {router.clickup_location_task_id ? (
             <a
-              href={`https://app.clickup.com/t/${router.clickup_location_task_id}`}
+              href={`https://app.clickup.com/list/${router.clickup_location_task_id}`}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
