@@ -921,39 +921,95 @@ router.get('/search-tasks/:workspaceId', async (req, res) => {
 /**
  * GET /api/clickup/debug/space-lists/:spaceId
  * Debug endpoint to check what lists are in a space
+ * Includes rate limiting protection with retries and delays
  */
 router.get('/debug/space-lists/:spaceId', async (req, res) => {
   try {
     const { spaceId } = req.params;
     const client = await clickupClient.getAuthorizedClient('default');
     
-    // Get space details
-    const spaceResponse = await client.get(`/space/${spaceId}`);
+    // Helper function to retry API calls with backoff
+    const retryWithBackoff = async (fn, operation, maxRetries = 3) => {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          return await fn();
+        } catch (error) {
+          const isRateLimited = error.response?.status === 429;
+          const isLastAttempt = attempt === maxRetries;
+          
+          if (isRateLimited && !isLastAttempt) {
+            const retryAfter = error.response?.headers?.['retry-after'];
+            const backoffDelay = retryAfter ? parseInt(retryAfter) * 1000 : Math.min(1000 * Math.pow(2, attempt), 60000);
+            
+            logger.warn(`Rate limited on ${operation}, retrying in ${backoffDelay}ms (attempt ${attempt}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, backoffDelay));
+          } else {
+            throw error;
+          }
+        }
+      }
+    };
+    
+    // Get space details with retry
+    const spaceResponse = await retryWithBackoff(
+      () => client.get(`/space/${spaceId}`),
+      `getSpace(${spaceId})`
+    );
     const space = spaceResponse.data;
     
-    // Get lists (folderless)
-    const listsResponse = await client.get(`/space/${spaceId}/list`, {
-      params: { archived: false }
-    });
+    // Get lists (folderless) with retry
+    const listsResponse = await retryWithBackoff(
+      () => client.get(`/space/${spaceId}/list`, { params: { archived: false } }),
+      `getSpaceLists(${spaceId})`
+    );
     const lists = listsResponse.data.lists || [];
     
-    // Get folders
-    const foldersResponse = await client.get(`/space/${spaceId}/folder`, {
-      params: { archived: false }
-    });
+    // Get folders with retry
+    const foldersResponse = await retryWithBackoff(
+      () => client.get(`/space/${spaceId}/folder`, { params: { archived: false } }),
+      `getSpaceFolders(${spaceId})`
+    );
     const folders = foldersResponse.data.folders || [];
     
-    // Get lists from each folder
+    // Get lists from each folder with retry and delays to prevent rate limiting
     const folderLists = [];
-    for (const folder of folders) {
-      const folderListsResponse = await client.get(`/folder/${folder.id}/list`, {
-        params: { archived: false }
-      });
-      const fLists = folderListsResponse.data.lists || [];
-      folderLists.push({
-        folder: { id: folder.id, name: folder.name },
-        lists: fLists.map(l => ({ id: l.id, name: l.name, task_count: l.task_count }))
-      });
+    for (let i = 0; i < folders.length; i++) {
+      const folder = folders[i];
+      
+      // Add delay between requests (except for first one)
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 200)); // 200ms delay between folder requests
+      }
+      
+      try {
+        const folderListsResponse = await retryWithBackoff(
+          () => client.get(`/folder/${folder.id}/list`, { params: { archived: false } }),
+          `getFolderLists(${folder.id})`
+        );
+        const fLists = folderListsResponse.data.lists || [];
+        folderLists.push({
+          folder: { id: folder.id, name: folder.name },
+          lists: fLists.map(l => ({ id: l.id, name: l.name, task_count: l.task_count }))
+        });
+      } catch (error) {
+        // If rate limited, stop processing and return partial results
+        if (error.response?.status === 429) {
+          logger.error(`Rate limit reached while fetching folder ${folder.id}. Returning partial results.`);
+          res.status(429).json({ 
+            error: 'Rate limit reached',
+            message: 'ClickUp API rate limit exceeded. Please try again later.',
+            partial: true,
+            space: { id: space.id, name: space.name },
+            folderlessLists: lists.map(l => ({ id: l.id, name: l.name, task_count: l.task_count })),
+            folders: folderLists,
+            failedAtFolder: folder.name,
+            retryAfter: error.response?.headers?.['retry-after'] || 60
+          });
+          return;
+        }
+        // For other errors, log and continue with next folder
+        logger.warn(`Error fetching lists for folder ${folder.id}:`, error.message);
+      }
     }
     
     res.json({ 
@@ -967,6 +1023,22 @@ router.get('/debug/space-lists/:spaceId', async (req, res) => {
       }
     });
   } catch (error) {
+    // Handle rate limit errors specifically
+    if (error.response?.status === 429) {
+      const retryAfter = error.response?.headers?.['retry-after'] || 60;
+      logger.error('Rate limit reached getting space structure:', {
+        spaceId,
+        retryAfter,
+        error: error.response?.data
+      });
+      res.status(429).json({ 
+        error: 'Rate limit reached',
+        message: 'ClickUp API rate limit exceeded. Please try again later.',
+        retryAfter: parseInt(retryAfter)
+      });
+      return;
+    }
+    
     logger.error('Error getting space structure:', sanitizeError(error));
     res.status(500).json({ error: error.message, details: error.response?.data });
   }

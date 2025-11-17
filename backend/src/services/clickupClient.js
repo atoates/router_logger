@@ -580,17 +580,26 @@ class ClickUpClient {
       let lists = listsResponse.data.lists || [];
       
       // Also get lists from folders
-      const foldersResponse = await client.get(`/space/${spaceId}/folder`, {
-        params: { archived: false }
-      });
+      const foldersResponse = await retryWithBackoff(
+        () => client.get(`/space/${spaceId}/folder`, { params: { archived: false } }),
+        `getSpaceFolders(${spaceId})`
+      );
       const folders = foldersResponse.data.folders || [];
       
-      // Get lists from each folder
-      for (const folder of folders) {
+      // Get lists from each folder with delays to prevent rate limiting
+      for (let i = 0; i < folders.length; i++) {
+        const folder = folders[i];
+        
+        // Add delay between requests (except for first one)
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 200)); // 200ms delay between folder requests
+        }
+        
         try {
-          const folderListsResponse = await client.get(`/folder/${folder.id}/list`, {
-            params: { archived: false }
-          });
+          const folderListsResponse = await retryWithBackoff(
+            () => client.get(`/folder/${folder.id}/list`, { params: { archived: false } }),
+            `getFolderLists(${folder.id})`
+          );
           const folderLists = folderListsResponse.data.lists || [];
           lists = lists.concat(folderLists.map(list => ({
             ...list,
@@ -598,6 +607,12 @@ class ClickUpClient {
             folder_id: folder.id
           })));
         } catch (error) {
+          // If rate limited, stop processing and return partial results
+          if (error.response?.status === 429) {
+            logger.error(`Rate limit reached while fetching folder ${folder.id}. Returning partial lists.`);
+            // Return what we have so far
+            break;
+          }
           logger.warn(`Error getting lists from folder ${folder.id}:`, error.message);
         }
       }
