@@ -103,6 +103,8 @@ export const getClickUpTasks = (listId, search = '') =>
 // Statistics (for mobile stats view)
 export const getUsageStats = (params) => api.get('/stats/usage', { params });
 export const getUptimeData = (params) => api.get('/stats/uptime', { params });
+export const getTopRouters = (days = 1, limit = 100) => 
+  api.get('/stats/top-routers', { params: { days, limit } });
 
 // Session management
 export const login = (username, password) => 

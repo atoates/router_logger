@@ -1,73 +1,84 @@
-import React, { useState, useEffect } from 'react';
-import { getRouters, getUsageStats, getUptimeData } from '../services/api';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getTopRouters } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import './StatsPage.css';
 
+const ITEMS_PER_PAGE = 10;
+
 function StatsPage() {
   const [routers, setRouters] = useState([]);
-  const [selectedRouter, setSelectedRouter] = useState(null);
-  const [stats, setStats] = useState(null);
-  const [uptime, setUptime] = useState(null);
+  const [displayedRouters, setDisplayedRouters] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
+  const observerTarget = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchRouters();
   }, []);
 
   useEffect(() => {
-    if (selectedRouter) {
-      fetchStats();
-    }
-  }, [selectedRouter]);
+    // Display first 10 routers
+    setDisplayedRouters(routers.slice(0, ITEMS_PER_PAGE));
+    setHasMore(routers.length > ITEMS_PER_PAGE);
+  }, [routers]);
 
   const fetchRouters = async () => {
     try {
       setLoading(true);
-      const response = await getRouters();
-      setRouters(Array.isArray(response.data) ? response.data : []);
-    } catch (err) {
-      setError('Failed to load routers');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchStats = async () => {
-    if (!selectedRouter) return;
-
-    try {
-      setLoading(true);
       setError(null);
-      
-      // Get last 24 hours
-      const endDate = new Date();
-      const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
-      
-      const [statsRes, uptimeRes] = await Promise.all([
-        getUsageStats({
-          router_id: selectedRouter.router_id,
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString()
-        }),
-        getUptimeData({
-          router_id: selectedRouter.router_id,
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString()
-        })
-      ]);
-
-      // Handle nested data structure
-      const extractedStats = statsRes.data?.data?.[0] || statsRes.data?.[0] || statsRes.data || null;
-      setStats(extractedStats);
-      setUptime(Array.isArray(uptimeRes.data) ? uptimeRes.data : []);
+      // Fetch top routers for last 24 hours (days=1), limit 100
+      const response = await getTopRouters(1, 100);
+      const routersData = Array.isArray(response.data) ? response.data : [];
+      // Already sorted by total_bytes DESC from API
+      setRouters(routersData);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load statistics');
+      setError(err.response?.data?.error || 'Failed to load routers');
     } finally {
       setLoading(false);
     }
   };
+
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore) return;
+    
+    setLoadingMore(true);
+    // Simulate slight delay for better UX
+    setTimeout(() => {
+      const currentCount = displayedRouters.length;
+      const nextRouters = routers.slice(0, currentCount + ITEMS_PER_PAGE);
+      setDisplayedRouters(nextRouters);
+      setHasMore(nextRouters.length < routers.length);
+      setLoadingMore(false);
+    }, 300);
+  }, [loadingMore, hasMore, displayedRouters.length, routers]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMore, loadingMore, loadMore]);
 
   const formatBytes = (bytes) => {
     if (!bytes || bytes === 0) return '0 B';
@@ -77,16 +88,14 @@ function StatsPage() {
     return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
   };
 
-  const calculateUptimePercent = () => {
-    if (!uptime || uptime.length === 0) return 0;
-    const online = uptime.filter(u => u.status === 'online' || u.status === 1).length;
-    return ((online / uptime.length) * 100).toFixed(1);
+  const handleRouterClick = (routerId) => {
+    navigate(`/router/${routerId}`);
   };
 
   if (loading && routers.length === 0) {
     return (
       <div className="page-container">
-        <LoadingSpinner text="Loading..." />
+        <LoadingSpinner text="Loading routers..." />
       </div>
     );
   }
@@ -95,103 +104,67 @@ function StatsPage() {
     <div className="page-container">
       <div className="page-header">
         <h1>24h Statistics</h1>
+        <p className="page-subtitle">Routers sorted by data usage</p>
       </div>
 
       {error && (
-        <div className="alert alert-error">
-          {error}
+        <ErrorMessage 
+          message={error} 
+          onRetry={fetchRouters}
+        />
+      )}
+
+      {routers.length === 0 && !loading && (
+        <div className="empty-state">
+          <p>No routers found</p>
         </div>
       )}
 
-      {/* Router Selector */}
-      <div className="stats-section">
-        <h2>Select Router</h2>
-        <select
-          value={selectedRouter?.router_id || ''}
-          onChange={(e) => {
-            const router = routers.find(r => r.router_id.toString() === e.target.value);
-            setSelectedRouter(router);
-            setStats(null);
-            setUptime(null);
-          }}
-          className="router-select"
-        >
-          <option value="">Choose a router...</option>
-          {routers.map(router => (
-            <option key={router.router_id} value={router.router_id}>
-              #{router.router_id} {router.name && `- ${router.name}`}
-            </option>
+      {displayedRouters.length > 0 && (
+        <div className="stats-router-list">
+          {displayedRouters.map((router) => (
+            <div
+              key={router.router_id}
+              className="stats-router-card"
+              onClick={() => handleRouterClick(router.router_id)}
+            >
+              <div className="stats-router-header">
+                <div className="stats-router-id">#{router.router_id}</div>
+                {router.name && (
+                  <div className="stats-router-name">{router.name}</div>
+                )}
+              </div>
+              
+              <div className="stats-router-usage">
+                <div className="stats-usage-item">
+                  <span className="stats-usage-label">Total Usage:</span>
+                  <span className="stats-usage-value">
+                    {formatBytes(router.total_bytes || 0)}
+                  </span>
+                </div>
+                <div className="stats-usage-breakdown">
+                  <span className="stats-usage-sent">
+                    ↑ {formatBytes(router.tx_bytes || 0)}
+                  </span>
+                  <span className="stats-usage-received">
+                    ↓ {formatBytes(router.rx_bytes || 0)}
+                  </span>
+                </div>
+              </div>
+            </div>
           ))}
-        </select>
-      </div>
-
-      {/* Stats Display */}
-      {selectedRouter && (
-        <>
-          {loading ? (
-            <LoadingSpinner text="Loading statistics..." />
-          ) : stats ? (
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-label">Total Data Sent</div>
-                <div className="stat-value">
-                  {formatBytes(stats.period_tx_bytes || 0)}
-                </div>
+          
+          {/* Infinite scroll trigger */}
+          <div ref={observerTarget} className="infinite-scroll-trigger">
+            {loadingMore && (
+              <LoadingSpinner text="Loading more..." />
+            )}
+            {!hasMore && displayedRouters.length > 0 && (
+              <div className="end-of-list">
+                <p>All routers loaded</p>
               </div>
-
-              <div className="stat-card">
-                <div className="stat-label">Total Data Received</div>
-                <div className="stat-value">
-                  {formatBytes(stats.period_rx_bytes || 0)}
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-label">Total Usage</div>
-                <div className="stat-value">
-                  {formatBytes(stats.total_data_usage || 0)}
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-label">Total Logs</div>
-                <div className="stat-value">
-                  {stats.total_logs || 0}
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-label">Avg Uptime</div>
-                <div className="stat-value">
-                  {stats.avg_uptime ? `${(stats.avg_uptime / 3600).toFixed(1)} hrs` : 'N/A'}
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-label">Uptime %</div>
-                <div className="stat-value">
-                  {calculateUptimePercent()}%
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-label">Avg WiFi Clients</div>
-                <div className="stat-value">
-                  {stats.avg_clients ? Number(stats.avg_clients).toFixed(1) : '0'}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="empty-state">
-              <p>No statistics available for this router</p>
-            </div>
-          )}
-        </>
-      )}
-
-      {!selectedRouter && (
-        <div className="empty-state">
-          <p>Select a router to view statistics</p>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -1,59 +1,116 @@
-.stats-section {
-  margin-bottom: 20px;
-  padding: 16px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.page-subtitle {
+  font-size: 14px;
+  color: #6b7280;
+  margin-top: 4px;
+  font-weight: 400;
 }
 
-.stats-section h2 {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1f2937;
+.stats-router-list {
+  margin-top: 16px;
+}
+
+.stats-router-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #2563eb;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stats-router-card:active {
+  transform: scale(0.98);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.stats-router-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 12px;
 }
 
-.router-select {
-  width: 100%;
-  padding: 12px;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 16px;
-  background: white;
-  min-height: 44px;
+.stats-router-id {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
 }
 
-.router-select:focus {
-  outline: none;
-  border-color: #2563eb;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin-top: 20px;
-}
-
-.stat-card {
-  background: white;
-  padding: 16px;
-  border-radius: 12px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  text-align: center;
-}
-
-.stat-label {
-  font-size: 12px;
+.stats-router-name {
+  font-size: 14px;
   color: #6b7280;
-  margin-bottom: 8px;
   font-weight: 500;
 }
 
-.stat-value {
-  font-size: 20px;
+.stats-router-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stats-usage-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stats-usage-label {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.stats-usage-value {
+  font-size: 18px;
   font-weight: 700;
-  color: #1f2937;
+  color: #2563eb;
+}
+
+.stats-usage-breakdown {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.stats-usage-sent {
+  color: #10b981;
+}
+
+.stats-usage-received {
+  color: #3b82f6;
+}
+
+.infinite-scroll-trigger {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.end-of-list {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+  padding: 20px;
+}
+
+.end-of-list p {
+  margin: 0;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+.empty-state p {
+  font-size: 16px;
+  margin: 0;
 }
 
 
