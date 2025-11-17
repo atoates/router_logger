@@ -138,8 +138,40 @@ async function insertLog(logData) {
 }
 
 // Get all routers
+// Optimized to avoid N+1 query problem by using CTEs and aggregations instead of correlated subqueries
 async function getAllRouters() {
   const query = `
+    WITH latest_logs AS (
+      SELECT DISTINCT ON (router_id)
+        router_id,
+        status as current_status,
+        timestamp
+      FROM router_logs
+      ORDER BY router_id, timestamp DESC
+    ),
+    latest_imei AS (
+      SELECT DISTINCT ON (router_id)
+        router_id,
+        imei
+      FROM router_logs
+      WHERE imei IS NOT NULL
+      ORDER BY router_id, timestamp DESC
+    ),
+    latest_firmware AS (
+      SELECT DISTINCT ON (router_id)
+        router_id,
+        firmware_version
+      FROM router_logs
+      WHERE firmware_version IS NOT NULL
+      ORDER BY router_id, timestamp DESC
+    ),
+    log_counts AS (
+      SELECT 
+        router_id,
+        COUNT(*) as log_count
+      FROM router_logs
+      GROUP BY router_id
+    )
     SELECT 
       r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id, 
       r.created_at, r.last_seen, r.rms_created_at, r.notes,
@@ -147,18 +179,16 @@ async function getAllRouters() {
       r.clickup_location_task_id, r.clickup_location_task_name, 
       r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
       r.clickup_assignees, r.clickup_task_status, r.mac_address,
-      (SELECT COUNT(*) FROM router_logs WHERE router_id = r.router_id) as log_count,
-      (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status,
-      COALESCE(
-        (SELECT imei FROM router_logs WHERE router_id = r.router_id AND imei IS NOT NULL ORDER BY timestamp DESC LIMIT 1),
-        r.imei
-      ) as imei,
-      COALESCE(
-        (SELECT firmware_version FROM router_logs WHERE router_id = r.router_id AND firmware_version IS NOT NULL ORDER BY timestamp DESC LIMIT 1),
-        r.firmware_version
-      ) as firmware_version
+      COALESCE(lc.log_count, 0) as log_count,
+      ll.current_status,
+      COALESCE(li.imei, r.imei) as imei,
+      COALESCE(lf.firmware_version, r.firmware_version) as firmware_version
     FROM routers r
-    ORDER BY r.last_seen DESC;
+    LEFT JOIN latest_logs ll ON ll.router_id = r.router_id
+    LEFT JOIN latest_imei li ON li.router_id = r.router_id
+    LEFT JOIN latest_firmware lf ON lf.router_id = r.router_id
+    LEFT JOIN log_counts lc ON lc.router_id = r.router_id
+    ORDER BY r.last_seen DESC NULLS LAST;
   `;
   
   try {
