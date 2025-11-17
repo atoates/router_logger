@@ -47,7 +47,7 @@ function LoginPage() {
     <div className="login-container">
       <div className="login-card">
         <div className="login-header">
-          <h1>Router Logger</h1>
+          <h1>VacatAd Router Logger</h1>
           <p>Sign in to continue</p>
         </div>
 

@@ -255,10 +255,10 @@ router.get('/auth/callback', async (req, res) => {
               <h1>Connection Failed</h1>
               <p>Invalid state parameter - possible CSRF attack</p>
               <p style="font-size: 14px;">Redirecting to dashboard...</p>
-              <button onclick="window.location.href='/mobile'">Go to Dashboard</button>
+              <button onclick="window.location.href='/'">Go to Dashboard</button>
             </div>
             <script>
-              setTimeout(() => { window.location.href = '/mobile'; }, 3000);
+              setTimeout(() => { window.location.href = '/'; }, 3000);
             </script>
           </body>
           </html>
@@ -351,10 +351,10 @@ router.get('/auth/callback', async (req, res) => {
             <h1>Connected Successfully!</h1>
             <p>ClickUp workspace: <strong>${workspace?.name || 'Connected'}</strong></p>
             <p style="font-size: 14px;">Redirecting to dashboard...</p>
-            <button onclick="window.location.href='/mobile'">Go to Dashboard</button>
+            <button onclick="window.location.href='/'">Go to Dashboard</button>
           </div>
           <script>
-            setTimeout(() => { window.location.href = '/mobile'; }, 2000);
+            setTimeout(() => { window.location.href = '/'; }, 2000);
           </script>
         </body>
         </html>
@@ -419,7 +419,7 @@ router.get('/auth/callback', async (req, res) => {
             <div class="error-icon">❌</div>
             <h1>Authorization Failed</h1>
             <p>${error.message || 'Something went wrong during authentication'}</p>
-            <button onclick="window.location.href='/mobile'">Return to Dashboard</button>
+            <button onclick="window.location.href='/'">Return to Dashboard</button>
           </div>
         </body>
         </html>
