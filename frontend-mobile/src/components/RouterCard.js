@@ -32,6 +32,12 @@ function RouterCard({ router }) {
       
       <div className="router-card-id">#{router.router_id}</div>
       
+      {router.clickup_location_task_name && (
+        <div className="router-card-location">
+          📍 {router.clickup_location_task_name}
+        </div>
+      )}
+      
       {router.clickup_assignees && router.clickup_assignees.length > 0 && (
         <div className="router-card-assignees">
           Assigned to: {router.clickup_assignees.join(', ')}

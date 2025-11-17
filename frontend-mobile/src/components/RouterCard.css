@@ -57,6 +57,16 @@
   font-weight: 400;
 }
 
+.router-card-location {
+  font-size: 14px;
+  color: #2563eb;
+  font-weight: 500;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .router-card-assignees {
   font-size: 14px;
   color: #6b7280;
