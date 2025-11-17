@@ -120,14 +120,22 @@ function RouterDetailPage() {
     return assignees && assignees.length > 0;
   };
 
-  const formatDate = (dateValue) => {
+  const formatDate = (dateValue, includeTime = false) => {
     if (!dateValue) return 'N/A';
     try {
-      return new Date(dateValue).toLocaleDateString('en-GB', {
+      const date = new Date(dateValue);
+      const options = {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
-      });
+      };
+      
+      if (includeTime) {
+        options.hour = '2-digit';
+        options.minute = '2-digit';
+      }
+      
+      return date.toLocaleDateString('en-GB', options);
     } catch {
       return 'Invalid date';
     }
@@ -234,7 +242,7 @@ function RouterDetailPage() {
         )}
         <div className="detail-row">
           <span className="detail-label">Last Seen:</span>
-          <span className="detail-value">{formatDate(router.last_seen)}</span>
+          <span className="detail-value">{formatDate(router.last_seen, true)}</span>
         </div>
       </div>
 
