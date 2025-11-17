@@ -60,6 +60,21 @@
   word-break: break-word;
 }
 
+.detail-value-link {
+  color: #2563eb;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.detail-value-link:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.detail-value-link:active {
+  opacity: 0.6;
+}
+
 .status-badge-container {
   display: flex;
   flex-wrap: wrap;

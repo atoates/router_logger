@@ -244,7 +244,20 @@ function RouterDetailPage() {
           <h2>Location</h2>
           <div className="detail-row">
             <span className="detail-label">Location:</span>
-            <span className="detail-value">{router.clickup_location_task_name || 'Unknown'}</span>
+            <span className="detail-value">
+              {router.clickup_location_task_id ? (
+                <a
+                  href={`https://app.clickup.com/t/${router.clickup_location_task_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="detail-value-link"
+                >
+                  {router.clickup_location_task_name || 'Unknown'}
+                </a>
+              ) : (
+                router.clickup_location_task_name || 'Unknown'
+              )}
+            </span>
           </div>
           {router.location_linked_at && (
             <div className="detail-row">
