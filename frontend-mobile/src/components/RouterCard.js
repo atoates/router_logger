@@ -57,7 +57,7 @@ function RouterCard({ router }) {
           return null;
         }
       })()}
-      
+
       {router.last_seen && (
         <div className="router-card-last-seen">
           Last seen: {new Date(router.last_seen).toLocaleDateString()}
