@@ -402,6 +402,35 @@ async function assignRouterToUsers(assignment) {
       usernames: assigneeUsernames
     });
 
+    // Add comment to router task about assignment
+    try {
+      const assigneeNames = assigneeUsernames.length > 0 
+        ? assigneeUsernames.join(', ')
+        : userIds.map(id => `User ${id}`).join(', ');
+      
+      const commentText = `👤 **System:** Router assigned to: **${assigneeNames}**\n\n` +
+        `🕐 Assigned at: ${new Date().toLocaleString()}`;
+
+      await clickupClient.createTaskComment(
+        clickupTaskId,
+        commentText,
+        { notifyAll: false },
+        'default'
+      );
+      
+      logger.info('Added assignment comment to router task', {
+        routerId,
+        clickupTaskId,
+        assignees: assigneeNames
+      });
+    } catch (commentError) {
+      logger.warn('Failed to add assignment comment (assignment still recorded)', {
+        routerId,
+        clickupTaskId,
+        error: commentError.message
+      });
+    }
+
     return {
       success: true,
       routerId,
@@ -466,6 +495,33 @@ async function removeRouterAssignees(routerId) {
       clickupTaskId,
       removedAssignees: currentAssigneeIds
     });
+
+    // Add comment to router task about unassignment
+    try {
+      // Get assignee names if available
+      const assigneeNames = task.assignees?.map(a => a.username || a.email || `User ${a.id}`).join(', ') || 'assignees';
+      
+      const commentText = `👤 **System:** Router unassigned from: **${assigneeNames}**\n\n` +
+        `🕐 Unassigned at: ${new Date().toLocaleString()}`;
+
+      await clickupClient.createTaskComment(
+        clickupTaskId,
+        commentText,
+        { notifyAll: false },
+        'default'
+      );
+      
+      logger.info('Added unassignment comment to router task', {
+        routerId,
+        clickupTaskId
+      });
+    } catch (commentError) {
+      logger.warn('Failed to add unassignment comment (unassignment still recorded)', {
+        routerId,
+        clickupTaskId,
+        error: commentError.message
+      });
+    }
 
     return {
       success: true,
