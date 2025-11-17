@@ -6,7 +6,6 @@ import ClickUpAuthButton from './components/ClickUpAuthButton';
 import DashboardV3 from './components/DashboardV3';
 import RouterDashboard from './components/RouterDashboard';
 import HeaderRouterSelect from './components/HeaderRouterSelect';
-import MobilePage from './pages/MobilePage';
 import ReturnsPage from './components/ReturnsPage';
 import DecommissionedPage from './components/DecommissionedPage';
 import LoginPage from './components/LoginPage';
@@ -72,15 +71,6 @@ function AppContent() {
   const location = useLocation();
   const { currentUser, logout, isAdmin, isGuest } = useAuth();
 
-  // Auto-redirect mobile users to /mobile (only on homepage)
-  useEffect(() => {
-    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const isHomePage = location.pathname === '/';
-    
-    if (isMobileDevice && isHomePage) {
-      navigate('/mobile');
-    }
-  }, [location.pathname, navigate]);
 
   // Header router selector opens the Router details page
   const handleHeaderRouterSelect = (router) => {
@@ -96,9 +86,8 @@ function AppContent() {
     navigate('/login');
   };
 
-  // Determine if we're on a router page, mobile page, or login page
+  // Determine if we're on a router page or login page
   const isRouterPage = location.pathname.startsWith('/router/');
-  const isMobilePage = location.pathname === '/mobile';
   const isLoginPage = location.pathname === '/login';
   
   // Navigation menu items - guests only see "My Routers"
@@ -118,15 +107,7 @@ function AppContent() {
     { path: '/users', label: 'Users', icon: '👥', title: 'User Management' },
   ];
 
-  // If mobile page or login page, render standalone without header/nav
-  if (isMobilePage) {
-    return (
-      <ErrorBoundary>
-        <MobilePage />
-      </ErrorBoundary>
-    );
-  }
-
+  // If login page, render standalone without header/nav
   if (isLoginPage) {
     return <LoginPage />;
   }

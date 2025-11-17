@@ -19,37 +19,6 @@ const SESSION_EXPIRY = 7 * 24 * 60 * 60 * 1000;
 const AUTH_ENABLED = process.env.ENABLE_AUTH === 'true';
 
 /**
- * GET /api/session/login (for mobile OAuth-style flow)
- * Auto-login with default credentials
- */
-router.get('/login', async (req, res) => {
-  try {
-    // Auto-login for mobile compatibility
-    const sessionToken = crypto.randomBytes(32).toString('hex');
-    const expiresAt = Date.now() + SESSION_EXPIRY;
-
-    sessions.set(sessionToken, {
-      createdAt: Date.now(),
-      expiresAt,
-      userId: 'mobile_user'
-    });
-
-    logger.info('Mobile user auto-logged in');
-
-    res.json({
-      success: true,
-      sessionToken,
-      expiresAt: new Date(expiresAt).toISOString(),
-      message: 'Auto-login successful'
-    });
-
-  } catch (error) {
-    logger.error('Auto-login error:', error);
-    res.status(500).json({ error: 'Login failed' });
-  }
-});
-
-/**
  * POST /api/session/login
  * User authentication with username/password
  */
