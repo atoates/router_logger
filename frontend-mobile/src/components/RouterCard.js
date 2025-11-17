@@ -38,11 +38,25 @@ function RouterCard({ router }) {
         </div>
       )}
       
-      {router.clickup_assignees && router.clickup_assignees.length > 0 && (
-        <div className="router-card-assignees">
-          Assigned to: {router.clickup_assignees.join(', ')}
-        </div>
-      )}
+      {(() => {
+        try {
+          let assignees = router.clickup_assignees;
+          if (typeof assignees === 'string') {
+            assignees = JSON.parse(assignees);
+          }
+          if (Array.isArray(assignees) && assignees.length > 0) {
+            const assigneeNames = assignees.map(a => a.username || a.name || a.email || 'Unknown').join(', ');
+            return (
+              <div className="router-card-assignees">
+                Assigned to: {assigneeNames}
+              </div>
+            );
+          }
+          return null;
+        } catch {
+          return null;
+        }
+      })()}
       
       {router.last_seen && (
         <div className="router-card-last-seen">
