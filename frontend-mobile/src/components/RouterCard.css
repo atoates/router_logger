@@ -3,8 +3,8 @@
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 12px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  border-left: 4px solid #e5e7eb;
+  box-shadow: 0 2px 4px rgba(35, 37, 35, 0.1);
+  border-left: 4px solid #747975; /* Grey */
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
@@ -13,11 +13,11 @@
 }
 
 .router-card-online {
-  border-left-color: #10b981;
+  border-left-color: #5b7f5c; /* Green */
 }
 
 .router-card-offline {
-  border-left-color: #ef4444;
+  border-left-color: #dc2626;
 }
 
 .router-card-header {
@@ -30,7 +30,7 @@
 .router-card-name {
   font-size: 18px;
   font-weight: 700;
-  color: #1f2937;
+  color: #232523; /* Eerie Black */
 }
 
 .router-card-status {
@@ -41,25 +41,25 @@
 }
 
 .status-online {
-  color: #10b981;
-  background: #d1fae5;
+  color: #5b7f5c; /* Green */
+  background: #C7DFB9; /* Tea Green */
 }
 
 .status-offline {
-  color: #ef4444;
+  color: #dc2626;
   background: #fee2e2;
 }
 
 .router-card-id {
   font-size: 14px;
-  color: #6b7280;
+  color: #747975; /* Grey */
   margin-bottom: 8px;
   font-weight: 400;
 }
 
 .router-card-location {
   font-size: 14px;
-  color: #2563eb;
+  color: #6dced1; /* Blue */
   font-weight: 500;
   margin-bottom: 8px;
   display: flex;
@@ -68,7 +68,7 @@
 }
 
 .router-card-location-link {
-  color: #2563eb;
+  color: #6dced1; /* Blue */
   text-decoration: none;
   display: flex;
   align-items: center;
@@ -87,20 +87,20 @@
 
 .router-card-assignees {
   font-size: 14px;
-  color: #6b7280;
+  color: #747975; /* Grey */
   margin-bottom: 4px;
 }
 
 .router-card-last-seen {
   font-size: 12px;
-  color: #9ca3af;
+  color: #747975; /* Grey */
   margin-bottom: 12px;
 }
 
 .router-card-button {
   width: 100%;
   padding: 10px;
-  background: #2563eb;
+  background: #5b7f5c; /* Green */
   color: white;
   border: none;
   border-radius: 8px;
@@ -112,11 +112,11 @@
 }
 
 .router-card-button:hover {
-  background: #1d4ed8;
+  background: #4a6b4b;
 }
 
 .router-card-button:active {
-  background: #1e40af;
+  background: #3d5a3e;
 }
 
 

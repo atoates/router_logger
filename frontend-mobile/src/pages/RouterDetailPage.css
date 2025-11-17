@@ -1,7 +1,7 @@
 .back-button {
   background: none;
   border: none;
-  color: #2563eb;
+  color: #5b7f5c; /* Green */
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -21,13 +21,13 @@
   padding: 16px;
   background: white;
   border-radius: 12px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(35, 37, 35, 0.1);
 }
 
 .detail-section h2 {
   font-size: 18px;
   font-weight: 600;
-  color: #1f2937;
+  color: #232523; /* Eerie Black */
   margin-bottom: 16px;
 }
 
@@ -36,7 +36,7 @@
   justify-content: space-between;
   align-items: flex-start;
   padding: 12px 0;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid #F6F7F8; /* Seasalt */
 }
 
 .detail-row:last-child {
@@ -45,7 +45,7 @@
 
 .detail-label {
   font-size: 14px;
-  color: #6b7280;
+  color: #747975; /* Grey */
   font-weight: 500;
   flex-shrink: 0;
   margin-right: 16px;
@@ -53,7 +53,7 @@
 
 .detail-value {
   font-size: 14px;
-  color: #1f2937;
+  color: #232523; /* Eerie Black */
   font-weight: 600;
   text-align: right;
   flex: 1;
@@ -61,7 +61,7 @@
 }
 
 .detail-value-link {
-  color: #2563eb;
+  color: #6dced1; /* Blue */
   text-decoration: none;
   transition: opacity 0.2s;
 }
@@ -91,18 +91,18 @@
 }
 
 .status-online {
-  background: #d1fae5;
-  color: #10b981;
+  background: #C7DFB9; /* Tea Green */
+  color: #5b7f5c; /* Green */
 }
 
 .status-offline {
   background: #fee2e2;
-  color: #ef4444;
+  color: #dc2626;
 }
 
 .status-installed {
-  background: #dbeafe;
-  color: #2563eb;
+  background: #C7DFB9; /* Tea Green */
+  color: #5b7f5c; /* Green */
 }
 
 .status-returning {
@@ -111,13 +111,13 @@
 }
 
 .status-decommissioned {
-  background: #e5e7eb;
-  color: #6b7280;
+  background: #F6F7F8; /* Seasalt */
+  color: #747975; /* Grey */
 }
 
 .status-ready {
-  background: #d1fae5;
-  color: #059669;
+  background: #C7DFB9; /* Tea Green */
+  color: #5b7f5c; /* Green */
 }
 
 .action-button {
@@ -142,7 +142,7 @@
 }
 
 .action-button-danger:disabled {
-  background: #9ca3af;
+  background: #747975; /* Grey */
   cursor: not-allowed;
 }
 
@@ -157,22 +157,22 @@
 }
 
 .action-button-warning:disabled {
-  background: #9ca3af;
+  background: #747975; /* Grey */
   cursor: not-allowed;
 }
 
 .action-button-primary {
-  background: #10b981;
+  background: #5b7f5c; /* Green */
   color: white;
   margin-bottom: 12px;
 }
 
 .action-button-primary:hover:not(:disabled) {
-  background: #059669;
+  background: #4a6b4b;
 }
 
 .action-button-primary:disabled {
-  background: #9ca3af;
+  background: #747975; /* Grey */
   cursor: not-allowed;
 }
 

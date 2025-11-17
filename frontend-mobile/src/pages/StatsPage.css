@@ -1,6 +1,6 @@
 .page-subtitle {
   font-size: 14px;
-  color: #6b7280;
+  color: #747975; /* Grey */
   margin-top: 4px;
   font-weight: 400;
 }
@@ -14,8 +14,8 @@
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 12px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  border-left: 4px solid #2563eb;
+  box-shadow: 0 2px 4px rgba(35, 37, 35, 0.1);
+  border-left: 4px solid #5b7f5c; /* Green */
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
 }
@@ -36,12 +36,12 @@
 .stats-router-name {
   font-size: 18px;
   font-weight: 700;
-  color: #1f2937;
+  color: #232523; /* Eerie Black */
 }
 
 .stats-router-id {
   font-size: 14px;
-  color: #6b7280;
+  color: #747975; /* Grey */
   font-weight: 400;
 }
 
@@ -59,14 +59,14 @@
 
 .stats-usage-label {
   font-size: 14px;
-  color: #6b7280;
+  color: #747975; /* Grey */
   font-weight: 500;
 }
 
 .stats-usage-value {
   font-size: 18px;
   font-weight: 700;
-  color: #2563eb;
+  color: #5b7f5c; /* Green */
 }
 
 .stats-usage-breakdown {
@@ -77,11 +77,11 @@
 }
 
 .stats-usage-sent {
-  color: #10b981;
+  color: #5b7f5c; /* Green */
 }
 
 .stats-usage-received {
-  color: #3b82f6;
+  color: #6dced1; /* Blue */
 }
 
 .infinite-scroll-trigger {
@@ -94,7 +94,7 @@
 
 .end-of-list {
   text-align: center;
-  color: #9ca3af;
+  color: #747975; /* Grey */
   font-size: 14px;
   padding: 20px;
 }
@@ -106,7 +106,7 @@
 .empty-state {
   text-align: center;
   padding: 40px 20px;
-  color: #6b7280;
+  color: #747975; /* Grey */
 }
 
 .empty-state p {

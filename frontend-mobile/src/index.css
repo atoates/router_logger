@@ -10,7 +10,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #ffffff;
+  background-color: #F6F7F8; /* Seasalt */
+  color: #232523; /* Eerie Black */
   /* Prevent text selection on mobile for better UX */
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;

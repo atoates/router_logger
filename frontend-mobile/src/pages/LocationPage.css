@@ -3,13 +3,13 @@
   padding: 16px;
   background: white;
   border-radius: 12px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(35, 37, 35, 0.1);
 }
 
 .location-section h2 {
   font-size: 18px;
   font-weight: 600;
-  color: #1f2937;
+  color: #232523; /* Eerie Black */
   margin-bottom: 12px;
 }
 
@@ -23,7 +23,7 @@
 
 .router-select-button {
   padding: 12px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid #747975; /* Grey */
   background: white;
   border-radius: 8px;
   font-size: 14px;
@@ -31,12 +31,13 @@
   cursor: pointer;
   transition: all 0.2s;
   min-height: 44px;
+  color: #232523; /* Eerie Black */
 }
 
 .router-select-button.active {
-  background: #2563eb;
+  background: #5b7f5c; /* Green */
   color: white;
-  border-color: #2563eb;
+  border-color: #5b7f5c; /* Green */
 }
 
 .router-select-button:active {
@@ -46,16 +47,17 @@
 .location-select {
   width: 100%;
   padding: 12px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid #747975; /* Grey */
   border-radius: 8px;
   font-size: 16px;
   background: white;
+  color: #232523; /* Eerie Black */
   min-height: 44px;
 }
 
 .location-select:focus {
   outline: none;
-  border-color: #2563eb;
+  border-color: #C7DFB9; /* Tea Green */
 }
 
 .tasks-list {
@@ -95,7 +97,7 @@
 
 .link-button {
   padding: 8px 16px;
-  background: #2563eb;
+  background: #5b7f5c; /* Green */
   color: white;
   border: none;
   border-radius: 6px;
@@ -107,11 +109,11 @@
 }
 
 .link-button:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: #4a6b4b;
 }
 
 .link-button:disabled {
-  background: #9ca3af;
+  background: #747975; /* Grey */
   cursor: not-allowed;
 }
 
@@ -120,13 +122,13 @@
   bottom: 100px;
   left: 16px;
   right: 16px;
-  background: #2563eb;
+  background: #5b7f5c; /* Green */
   color: white;
   padding: 12px;
   border-radius: 8px;
   text-align: center;
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(35, 37, 35, 0.15);
 }
 
 .location-breadcrumbs {
@@ -143,12 +145,12 @@
 }
 
 .breadcrumb-item {
-  color: #2563eb;
+  color: #6dced1; /* Blue */
   font-weight: 600;
 }
 
 .breadcrumb-separator {
-  color: #9ca3af;
+  color: #747975; /* Grey */
 }
 
 .alert {
@@ -164,7 +166,7 @@
 }
 
 .alert-success {
-  background: #d1fae5;
-  color: #10b981;
+  background: #C7DFB9; /* Tea Green */
+  color: #5b7f5c; /* Green */
 }
 

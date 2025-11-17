@@ -39,6 +39,7 @@ function LoginPage() {
     <div className="login-page">
       <div className="login-container">
         <div className="login-header">
+          <img src="/Logo.png" alt="Router Logger" className="login-logo" />
           <h1>Router Logger</h1>
           <p>Field Installer App</p>
         </div>

@@ -2,7 +2,7 @@
   padding: 16px;
   padding-bottom: 100px; /* Extra space for bottom nav */
   min-height: 100vh;
-  background: #f9fafb;
+  background: #F6F7F8; /* Seasalt */
 }
 
 .page-header {
@@ -15,7 +15,7 @@
 .page-header h1 {
   font-size: 24px;
   font-weight: 700;
-  color: #1f2937;
+  color: #232523; /* Eerie Black */
 }
 
 .refresh-button {
@@ -44,16 +44,18 @@
 .search-input {
   width: 100%;
   padding: 12px 16px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid #747975; /* Grey */
   border-radius: 8px;
   font-size: 16px;
+  background: white;
+  color: #232523; /* Eerie Black */
   margin-bottom: 12px;
   -webkit-appearance: none;
 }
 
 .search-input:focus {
   outline: none;
-  border-color: #2563eb;
+  border-color: #C7DFB9; /* Tea Green */
 }
 
 .status-filters {
@@ -64,21 +66,21 @@
 .filter-button {
   flex: 1;
   padding: 10px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid #747975; /* Grey */
   background: white;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #6b7280;
+  color: #747975; /* Grey */
   cursor: pointer;
   transition: all 0.2s;
   min-height: 44px; /* Touch-friendly */
 }
 
 .filter-button.active {
-  background: #2563eb;
+  background: #5b7f5c; /* Green */
   color: white;
-  border-color: #2563eb;
+  border-color: #5b7f5c; /* Green */
 }
 
 .filter-button-alert {
@@ -112,7 +114,7 @@
 .empty-state {
   text-align: center;
   padding: 48px 20px;
-  color: #6b7280;
+  color: #747975; /* Grey */
 }
 
 .empty-state p {
@@ -122,7 +124,7 @@
 
 .empty-hint {
   font-size: 14px;
-  color: #9ca3af;
+  color: #747975; /* Grey */
 }
 
 
