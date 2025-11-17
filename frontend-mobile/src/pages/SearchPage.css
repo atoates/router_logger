@@ -81,6 +81,25 @@
   border-color: #2563eb;
 }
 
+.filter-button-alert {
+  flex: 0 0 auto;
+  min-width: 50px;
+  font-size: 18px;
+  padding: 10px 12px;
+}
+
+.filter-button-alert.active {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: white;
+}
+
+.filter-button-alert:not(.active) {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
 .filter-button:active {
   transform: scale(0.98);
 }

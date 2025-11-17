@@ -11,7 +11,7 @@ function SearchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // all, online, offline
+  const [statusFilter, setStatusFilter] = useState('all'); // all, online, offline, alerts
 
   useEffect(() => {
     fetchRouters();
@@ -50,7 +50,24 @@ function SearchPage() {
     }
 
     // Status filter
-    if (statusFilter !== 'all') {
+    if (statusFilter === 'alerts') {
+      // Show only offline routers that have a location linked (should be online)
+      filtered = filtered.filter(router => {
+        // Must have a location linked
+        if (!router.clickup_location_task_id) {
+          return false;
+        }
+        // Must be offline
+        const state = router.current_status || router.current_state;
+        const isOnline = state === 'online' || 
+                        state === 'Online' ||
+                        state === 1 || 
+                        state === '1' || 
+                        state === true ||
+                        (typeof state === 'string' && state.toLowerCase() === 'online');
+        return !isOnline;
+      });
+    } else if (statusFilter !== 'all') {
       filtered = filtered.filter(router => {
         // Handle both current_status and current_state (for compatibility)
         const state = router.current_status || router.current_state;
@@ -125,14 +142,30 @@ function SearchPage() {
           >
             Offline
           </button>
+          <button
+            className={`filter-button filter-button-alert ${statusFilter === 'alerts' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('alerts')}
+            title="Offline routers with linked locations"
+          >
+            🔔
+          </button>
         </div>
       </div>
 
       <div className="routers-list">
         {filteredRouters.length === 0 ? (
           <div className="empty-state">
-            <p>No routers found</p>
-            {searchQuery && <p className="empty-hint">Try adjusting your search</p>}
+            <p>
+              {statusFilter === 'alerts' 
+                ? 'No offline routers with linked locations' 
+                : 'No routers found'}
+            </p>
+            {searchQuery && statusFilter !== 'alerts' && (
+              <p className="empty-hint">Try adjusting your search</p>
+            )}
+            {statusFilter === 'alerts' && (
+              <p className="empty-hint">All installed routers are online</p>
+            )}
           </div>
         ) : (
           filteredRouters.map(router => (
