@@ -67,6 +67,24 @@
   gap: 4px;
 }
 
+.router-card-location-link {
+  color: #2563eb;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: opacity 0.2s;
+}
+
+.router-card-location-link:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.router-card-location-link:active {
+  opacity: 0.6;
+}
+
 .router-card-assignees {
   font-size: 14px;
   color: #6b7280;
