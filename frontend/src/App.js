@@ -119,7 +119,7 @@ function AppContent() {
         <div className="app-header">
           <div className="app-header-left">
             <Link to="/" className="app-logo-link">
-              <h1 className="app-title">VacatAd Routers Dashboard</h1>
+              <h1 className="app-title">VacatAd Router Logger</h1>
               <p className="app-subtitle">Monitor router network and property assignments</p>
             </Link>
           </div>
