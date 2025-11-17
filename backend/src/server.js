@@ -189,13 +189,22 @@ async function startServer() {
         await pool.query(sql);
         logger.info('✅ Migration 008_add_user_authentication.sql completed successfully');
       }
+      
+      // Run migration 014 (Database optimizations)
+      const migration014Path = path.join(__dirname, '../database/migrations/014_database_optimizations.sql');
+      if (fs.existsSync(migration014Path)) {
+        const sql = fs.readFileSync(migration014Path, 'utf8');
+        await pool.query(sql);
+        logger.info('✅ Migration 014_database_optimizations.sql completed successfully');
+      }
     } catch (migrationError) {
-      // Check if error is because columns/tables/triggers already exist (safe to ignore)
+      // Check if error is because columns/tables/triggers/indexes/constraints already exist (safe to ignore)
       // 42701 = duplicate column
       // 42P07 = duplicate table
       // 42P16 = invalid table definition
-      // 42710 = duplicate object (triggers, functions, etc)
-      const safeErrorCodes = ['42701', '42P07', '42P16', '42710'];
+      // 42710 = duplicate object (triggers, functions, indexes, constraints, etc)
+      // 42P17 = invalid table definition (constraint already exists)
+      const safeErrorCodes = ['42701', '42P07', '42P16', '42710', '42P17'];
       
       if (safeErrorCodes.includes(migrationError.code)) {
         logger.info('Migration already applied (duplicate object exists), skipping');
