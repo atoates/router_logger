@@ -29,20 +29,35 @@ ON router_logs(router_id, status, timestamp DESC);
 
 -- 4. Add check constraint for clickup_task_status (MEDIUM PRIORITY)
 -- Ensures data integrity for status values
-ALTER TABLE routers 
-DROP CONSTRAINT IF EXISTS check_task_status;
-
-ALTER TABLE routers 
-ADD CONSTRAINT check_task_status 
-CHECK (
-  clickup_task_status IN (
-    'installed', 
-    'ready', 
-    'needs attention', 
-    'being returned', 
-    'decommissioned'
-  ) OR clickup_task_status IS NULL
-);
+-- Use DO block to make it idempotent (safe to run multiple times)
+DO $$
+BEGIN
+  -- Drop constraint if it exists
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'check_task_status' 
+    AND conrelid = 'routers'::regclass
+  ) THEN
+    ALTER TABLE routers DROP CONSTRAINT check_task_status;
+  END IF;
+  
+  -- Add constraint
+  ALTER TABLE routers 
+  ADD CONSTRAINT check_task_status 
+  CHECK (
+    clickup_task_status IN (
+      'installed', 
+      'ready', 
+      'needs attention', 
+      'being returned', 
+      'decommissioned'
+    ) OR clickup_task_status IS NULL
+  );
+EXCEPTION
+  WHEN duplicate_object THEN
+    -- Constraint already exists, ignore
+    NULL;
+END $$;
 
 -- 5. Add index on routers.name for search queries (LOW PRIORITY)
 -- Used in router search/filter operations
