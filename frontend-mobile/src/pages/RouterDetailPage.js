@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getRouters, unlinkRouterFromLocation } from '../services/api';
+import { getRouters, unlinkRouterFromLocation, removeRouterAssignees } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import './RouterDetailPage.css';
@@ -12,6 +13,9 @@ function RouterDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [uninstalling, setUninstalling] = useState(false);
+  const [unassigning, setUnassigning] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const { isAdmin } = useAuth();
 
   useEffect(() => {
     fetchRouter();
@@ -60,6 +64,55 @@ function RouterDetailPage() {
     } finally {
       setUninstalling(false);
     }
+  };
+
+  const handleUnassign = async () => {
+    if (!window.confirm(`Are you sure you want to unassign router #${router.router_id}?`)) {
+      return;
+    }
+
+    try {
+      setUnassigning(true);
+      setError(null);
+
+      await removeRouterAssignees(router.router_id);
+
+      // Refresh router data
+      await fetchRouter();
+      
+      alert('Router unassigned successfully');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to unassign router');
+    } finally {
+      setUnassigning(false);
+    }
+  };
+
+  const handleAssign = () => {
+    // Navigate to location page where assignment can be handled
+    navigate(`/location?routerId=${router.router_id}`);
+  };
+
+  const getAssignees = () => {
+    if (!router.clickup_assignees) return null;
+    
+    try {
+      let assignees = router.clickup_assignees;
+      if (typeof assignees === 'string') {
+        assignees = JSON.parse(assignees);
+      }
+      if (Array.isArray(assignees) && assignees.length > 0) {
+        return assignees;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const hasAssignees = () => {
+    const assignees = getAssignees();
+    return assignees && assignees.length > 0;
   };
 
   const formatDate = (dateValue) => {
@@ -204,33 +257,43 @@ function RouterDetailPage() {
       )}
 
       {/* Assignees */}
-      {router.clickup_assignees && (
-        <div className="detail-section">
-          <h2>Assigned To</h2>
-          <div className="detail-row">
-            <span className="detail-value">
-              {(() => {
-                try {
-                  let assignees = router.clickup_assignees;
-                  if (typeof assignees === 'string') {
-                    assignees = JSON.parse(assignees);
-                  }
-                  if (Array.isArray(assignees)) {
-                    return assignees.map(a => a.username || a.name || a).join(', ') || 'None';
-                  }
-                  return assignees || 'None';
-                } catch {
-                  return router.clickup_assignees || 'None';
-                }
-              })()}
-            </span>
-          </div>
+      <div className="detail-section">
+        <h2>Assigned To</h2>
+        <div className="detail-row">
+          <span className="detail-value">
+            {hasAssignees() ? (
+              getAssignees().map(a => a.username || a.name || a).join(', ')
+            ) : (
+              'Not assigned'
+            )}
+          </span>
         </div>
-      )}
+      </div>
 
       {/* Actions */}
       <div className="detail-section">
         <h2>Actions</h2>
+        {isAdmin && (
+          <>
+            {hasAssignees() ? (
+              <button
+                onClick={handleUnassign}
+                disabled={unassigning}
+                className="action-button action-button-warning"
+              >
+                {unassigning ? 'Unassigning...' : 'Unassign Router'}
+              </button>
+            ) : (
+              <button
+                onClick={handleAssign}
+                disabled={assigning}
+                className="action-button action-button-primary"
+              >
+                Assign Router
+              </button>
+            )}
+          </>
+        )}
         {isInstalled && (
           <button
             onClick={handleUninstall}

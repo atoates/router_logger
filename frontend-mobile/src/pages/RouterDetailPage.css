@@ -131,6 +131,36 @@
   cursor: not-allowed;
 }
 
+.action-button-warning {
+  background: #f59e0b;
+  color: white;
+  margin-bottom: 12px;
+}
+
+.action-button-warning:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.action-button-warning:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.action-button-primary {
+  background: #10b981;
+  color: white;
+  margin-bottom: 12px;
+}
+
+.action-button-primary:hover:not(:disabled) {
+  background: #059669;
+}
+
+.action-button-primary:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
 
 
 
