@@ -302,8 +302,8 @@ function RouterDetailPage() {
               )
             )}
             
-            {/* If router is installed, show uninstall button */}
-            {isInstalled ? (
+            {/* If router has a location, show uninstall button */}
+            {hasLocation ? (
               <button
                 onClick={handleUninstall}
                 disabled={uninstalling}
