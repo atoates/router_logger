@@ -44,8 +44,10 @@ function LocationPage() {
       setLoading(true);
       const response = await getRouters();
       const routerList = Array.isArray(response.data) ? response.data : [];
-      setRouters(routerList);
-      setFilteredRouters(routerList);
+      // Filter out routers that are already linked to a location
+      const unlinkedRouters = routerList.filter(router => !router.clickup_location_task_id);
+      setRouters(unlinkedRouters);
+      setFilteredRouters(unlinkedRouters);
     } catch (err) {
       setError('Failed to load routers');
     } finally {
