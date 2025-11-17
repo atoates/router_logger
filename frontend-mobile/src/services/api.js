@@ -47,14 +47,19 @@ let _routersInflight = null;
 const ROUTERS_TTL_MS = 30 * 1000; // 30 seconds (mobile refreshes more often)
 
 // Routers - core mobile functionality
-export const getRouters = async () => {
+export const getRouters = async (forceRefresh = false) => {
   const now = Date.now();
-  if (_routersCache.data && _routersCache.expiresAt > now) {
+  
+  // If force refresh, bypass cache
+  if (!forceRefresh && _routersCache.data && _routersCache.expiresAt > now) {
     return { data: _routersCache.data, fromCache: true };
   }
+  
+  // If there's already a request in flight, return it (prevents duplicate requests)
   if (_routersInflight) {
     return _routersInflight;
   }
+  
   _routersInflight = api.get('/routers')
     .then((res) => {
       _routersCache = { data: res.data, expiresAt: Date.now() + ROUTERS_TTL_MS };

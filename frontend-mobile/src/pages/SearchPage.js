@@ -12,6 +12,7 @@ function SearchPage() {
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // all, online, offline, alerts
+  const [lastRefreshTime, setLastRefreshTime] = useState(0);
 
   useEffect(() => {
     fetchRouters();
@@ -21,13 +22,23 @@ function SearchPage() {
     filterRouters();
   }, [routers, searchQuery, statusFilter]);
 
-  const fetchRouters = async () => {
+  const fetchRouters = async (forceRefresh = false) => {
     try {
+      // Debounce: prevent spam clicking (min 2 seconds between refreshes)
+      const now = Date.now();
+      if (forceRefresh && (now - lastRefreshTime) < 2000) {
+        return; // Too soon, ignore the click
+      }
+      
       setLoading(true);
       setError(null);
-      const response = await getRouters();
+      const response = await getRouters(forceRefresh);
       const routerList = Array.isArray(response.data) ? response.data : [];
       setRouters(routerList);
+      
+      if (forceRefresh) {
+        setLastRefreshTime(now);
+      }
     } catch (err) {
       console.error('Error fetching routers:', err);
       setError(err.response?.data?.error || err.message || 'Failed to load routers');
@@ -106,9 +117,10 @@ function SearchPage() {
       <div className="page-header">
         <h1>Router Search</h1>
         <button 
-          onClick={fetchRouters}
+          onClick={() => fetchRouters(true)}
           className="refresh-button"
           aria-label="Refresh"
+          disabled={loading}
         >
           🔄
         </button>
