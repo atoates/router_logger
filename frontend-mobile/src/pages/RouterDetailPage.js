@@ -93,6 +93,11 @@ function RouterDetailPage() {
     navigate(`/location?routerId=${router.router_id}`);
   };
 
+  const handleInstall = () => {
+    // Navigate to location page where installation can be handled
+    navigate(`/location?routerId=${router.router_id}`);
+  };
+
   const getAssignees = () => {
     if (!router.clickup_assignees) return null;
     
@@ -275,6 +280,7 @@ function RouterDetailPage() {
         <h2>Actions</h2>
         {isAdmin && (
           <>
+            {/* If router has assignees, show unassign button */}
             {hasAssignees() ? (
               <button
                 onClick={handleUnassign}
@@ -284,24 +290,40 @@ function RouterDetailPage() {
                 {unassigning ? 'Unassigning...' : 'Unassign Router'}
               </button>
             ) : (
+              /* If router is not installed, show assign button */
+              !hasLocation && (
+                <button
+                  onClick={handleAssign}
+                  disabled={assigning}
+                  className="action-button action-button-primary"
+                >
+                  Assign Router
+                </button>
+              )
+            )}
+            
+            {/* If router is installed, show uninstall button */}
+            {isInstalled ? (
               <button
-                onClick={handleAssign}
-                disabled={assigning}
-                className="action-button action-button-primary"
+                onClick={handleUninstall}
+                disabled={uninstalling}
+                className="action-button action-button-danger"
               >
-                Assign Router
+                {uninstalling ? 'Uninstalling...' : 'Uninstall Router'}
               </button>
+            ) : (
+              /* If router has no assignees, show install button */
+              !hasAssignees() && (
+                <button
+                  onClick={handleInstall}
+                  disabled={assigning}
+                  className="action-button action-button-primary"
+                >
+                  Install Router
+                </button>
+              )
             )}
           </>
-        )}
-        {isInstalled && (
-          <button
-            onClick={handleUninstall}
-            disabled={uninstalling}
-            className="action-button action-button-danger"
-          >
-            {uninstalling ? 'Uninstalling...' : 'Uninstall Router'}
-          </button>
         )}
       </div>
     </div>
