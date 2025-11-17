@@ -17,8 +17,9 @@ async function upsertRouter(routerData) {
       site_id = COALESCE($6, routers.site_id),
       firmware_version = COALESCE($7, routers.firmware_version),
       rms_created_at = COALESCE($8, routers.rms_created_at),
-      mac_address = COALESCE($9, routers.mac_address),
-      last_seen = CURRENT_TIMESTAMP
+      mac_address = COALESCE($9, routers.mac_address)
+      -- Note: last_seen is NOT updated here - it's updated separately using updateRouterLastSeen
+      -- with the actual log timestamp
     RETURNING *;
   `;
   
@@ -37,6 +38,24 @@ async function upsertRouter(routerData) {
     return result.rows[0];
   } catch (error) {
     logger.error('Error upserting router:', error);
+    throw error;
+  }
+}
+
+// Update router's last_seen timestamp
+async function updateRouterLastSeen(routerId, timestamp) {
+  const query = `
+    UPDATE routers 
+    SET last_seen = $1
+    WHERE router_id = $2
+    RETURNING *;
+  `;
+  
+  try {
+    const result = await pool.query(query, [timestamp, routerId]);
+    return result.rows[0];
+  } catch (error) {
+    logger.error('Error updating router last_seen:', error);
     throw error;
   }
 }
@@ -337,6 +356,7 @@ async function getLatestLog(routerId) {
 
 module.exports = {
   upsertRouter,
+  updateRouterLastSeen,
   insertLog,
   getAllRouters,
   getLogs,

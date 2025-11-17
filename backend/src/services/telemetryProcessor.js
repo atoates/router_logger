@@ -1,4 +1,4 @@
-const { upsertRouter, insertLog } = require('../models/router');
+const { upsertRouter, insertLog, updateRouterLastSeen } = require('../models/router');
 const { getCellLocation } = require('./geoService');
 const { logger } = require('../config/database');
 
@@ -97,7 +97,12 @@ async function processRouterTelemetry(data) {
 
     // Insert log entry
     const log = await insertLog(logData);
-    logger.info(`Processed telemetry from router ${data.device_id}`);
+    
+    // Update router's last_seen to use the log's timestamp (not database server time)
+    // This ensures last_seen reflects when the router actually sent the data
+    await updateRouterLastSeen(data.device_id, logData.timestamp);
+    
+    logger.info(`Processed telemetry from router ${data.device_id}, last_seen updated to ${logData.timestamp}`);
     
     return log;
   } catch (error) {
