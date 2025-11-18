@@ -123,7 +123,24 @@ function RouterDetailPage() {
   const formatDate = (dateValue, includeTime = false) => {
     if (!dateValue) return 'N/A';
     try {
-      const date = new Date(dateValue);
+      // Handle different date formats
+      let date;
+      if (dateValue instanceof Date) {
+        date = dateValue;
+      } else if (typeof dateValue === 'string') {
+        date = new Date(dateValue);
+      } else if (typeof dateValue === 'number') {
+        // Handle Unix timestamp (seconds or milliseconds)
+        date = new Date(dateValue > 1000000000000 ? dateValue : dateValue * 1000);
+      } else {
+        return 'Invalid date';
+      }
+      
+      // Validate the date
+      if (isNaN(date.getTime())) {
+        return 'Invalid date';
+      }
+      
       const options = {
         year: 'numeric',
         month: 'short',
@@ -136,7 +153,8 @@ function RouterDetailPage() {
       }
       
       return date.toLocaleDateString('en-GB', options);
-    } catch {
+    } catch (error) {
+      console.error('Error formatting date:', error, dateValue);
       return 'Invalid date';
     }
   };

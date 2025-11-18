@@ -105,9 +105,33 @@ function RouterCard({ router }) {
         <div className="router-card-last-seen">
           Last seen: {(() => {
             try {
-              const date = new Date(router.last_seen);
+              // Parse the date - handle both string and Date objects
+              let date;
+              if (router.last_seen instanceof Date) {
+                date = router.last_seen;
+              } else if (typeof router.last_seen === 'string') {
+                date = new Date(router.last_seen);
+              } else if (typeof router.last_seen === 'number') {
+                // Handle Unix timestamp (seconds or milliseconds)
+                date = new Date(router.last_seen > 1000000000000 ? router.last_seen : router.last_seen * 1000);
+              } else {
+                return 'Unknown';
+              }
+              
+              // Validate the date
+              if (isNaN(date.getTime())) {
+                console.warn('Invalid last_seen date:', router.last_seen);
+                return 'Invalid date';
+              }
+              
               const now = new Date();
-              const diffMs = now - date;
+              const diffMs = now.getTime() - date.getTime();
+              
+              // Handle negative differences (future dates) or very large differences
+              if (diffMs < 0) {
+                return 'Just now'; // Future date, treat as just now
+              }
+              
               const diffMins = Math.floor(diffMs / 60000);
               const diffHours = Math.floor(diffMs / 3600000);
               const diffDays = Math.floor(diffMs / 86400000);
@@ -126,7 +150,8 @@ function RouterCard({ router }) {
                 hour: '2-digit',
                 minute: '2-digit'
               });
-            } catch {
+            } catch (error) {
+              console.error('Error formatting last_seen:', error, router.last_seen);
               return 'Unknown';
             }
           })()}
