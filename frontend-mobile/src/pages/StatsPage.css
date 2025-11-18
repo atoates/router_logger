@@ -94,6 +94,12 @@
   opacity: 0.6;
 }
 
+.stats-router-last-seen {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
 .stats-router-usage {
   display: flex;
   flex-direction: column;

@@ -153,6 +153,41 @@ function StatsPage() {
                 </div>
               )}
               
+              {router.last_seen && (
+                <div className="stats-router-last-seen">
+                  Last seen: {(() => {
+                    try {
+                      const date = new Date(router.last_seen);
+                      if (isNaN(date.getTime())) return 'Unknown';
+                      
+                      const now = new Date();
+                      const diffMs = now.getTime() - date.getTime();
+                      
+                      if (diffMs < 0) return 'Just now';
+                      
+                      const diffMins = Math.floor(diffMs / 60000);
+                      const diffHours = Math.floor(diffMs / 3600000);
+                      const diffDays = Math.floor(diffMs / 86400000);
+                      
+                      if (diffMins < 1) return 'Just now';
+                      if (diffMins < 60) return `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`;
+                      if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+                      if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+                      
+                      return date.toLocaleDateString('en-GB', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      });
+                    } catch {
+                      return 'Unknown';
+                    }
+                  })()}
+                </div>
+              )}
+              
               <div className="stats-router-usage">
                 <div className="stats-usage-item">
                   <span className="stats-usage-label">Total Usage:</span>
