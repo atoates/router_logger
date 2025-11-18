@@ -1,6 +1,7 @@
-const { upsertRouter, insertLog, updateRouterLastSeen } = require('../models/router');
+const { upsertRouter, insertLog, updateRouterLastSeen, getLatestLog } = require('../models/router');
 const { getCellLocation } = require('./geoService');
-const { logger } = require('../config/database');
+const { logger, pool } = require('../config/database');
+const clickupClient = require('./clickupClient');
 
 /**
  * Process incoming RUT200 telemetry data
@@ -95,12 +96,72 @@ async function processRouterTelemetry(data) {
       })
     };
 
+    // Get previous status to detect changes
+    const previousLog = await getLatestLog(data.device_id);
+    const previousStatus = previousLog?.status || null;
+    const newStatus = logData.status;
+    
+    // Normalize status values for comparison
+    const normalizeStatus = (status) => {
+      if (!status) return null;
+      const s = String(status).toLowerCase();
+      return (s === 'online' || s === '1' || s === 'true') ? 'online' : 'offline';
+    };
+    
+    const prevStatusNormalized = normalizeStatus(previousStatus);
+    const newStatusNormalized = normalizeStatus(newStatus);
+    
     // Insert log entry
     const log = await insertLog(logData);
     
     // Update router's last_seen to use the log's timestamp (not database server time)
     // This ensures last_seen reflects when the router actually sent the data
     await updateRouterLastSeen(data.device_id, logData.timestamp);
+    
+    // Check if status changed between online and offline
+    if (prevStatusNormalized && newStatusNormalized && prevStatusNormalized !== newStatusNormalized) {
+      // Status changed - add comment to ClickUp task
+      try {
+        // Get router's ClickUp task ID
+        const routerResult = await pool.query(
+          'SELECT clickup_task_id FROM routers WHERE router_id = $1',
+          [data.device_id]
+        );
+        
+        if (routerResult.rows.length > 0 && routerResult.rows[0].clickup_task_id) {
+          const clickupTaskId = routerResult.rows[0].clickup_task_id;
+          
+          const statusEmoji = newStatusNormalized === 'online' ? '🟢' : '🔴';
+          const statusText = newStatusNormalized === 'online' ? 'Online' : 'Offline';
+          const previousStatusText = prevStatusNormalized === 'online' ? 'Online' : 'Offline';
+          
+          const commentText = `${statusEmoji} **System:** Router status changed\n\n` +
+            `**Previous:** ${previousStatusText}\n` +
+            `**Current:** ${statusText}\n\n` +
+            `🕐 Changed at: ${new Date(logData.timestamp).toLocaleString()}`;
+          
+          await clickupClient.createTaskComment(
+            clickupTaskId,
+            commentText,
+            { notifyAll: false },
+            'default'
+          );
+          
+          logger.info('Added status change comment to router task', {
+            routerId: data.device_id,
+            clickupTaskId,
+            previousStatus: prevStatusNormalized,
+            newStatus: newStatusNormalized
+          });
+        }
+      } catch (commentError) {
+        logger.warn('Failed to add status change comment (telemetry still processed)', {
+          routerId: data.device_id,
+          error: commentError.message
+        });
+        // Don't fail the telemetry processing if comment fails
+      }
+    }
     
     logger.info(`Processed telemetry from router ${data.device_id}, last_seen updated to ${logData.timestamp}`);
     

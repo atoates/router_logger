@@ -234,6 +234,24 @@ router.post('/status/:routerId', async (req, res) => {
       const status = deviceData.status || 'unknown';
       const lastSeen = deviceData.last_activity || null;
       
+      // Get previous status to detect changes
+      const previousResult = await pool.query(
+        'SELECT current_status, clickup_task_id FROM routers WHERE router_id = $1',
+        [routerId]
+      );
+      
+      const previousStatus = previousResult.rows[0]?.current_status || null;
+      
+      // Normalize status values for comparison
+      const normalizeStatus = (s) => {
+        if (!s) return null;
+        const normalized = String(s).toLowerCase();
+        return (normalized === 'online' || normalized === '1' || normalized === 'true') ? 'online' : 'offline';
+      };
+      
+      const prevStatusNormalized = normalizeStatus(previousStatus);
+      const newStatusNormalized = normalizeStatus(status);
+      
       // Update only status fields
       await pool.query(
         `UPDATE routers SET 
@@ -242,6 +260,45 @@ router.post('/status/:routerId', async (req, res) => {
         WHERE router_id = $3`,
         [status, lastSeen, routerId]
       );
+      
+      // Check if status changed between online and offline
+      if (prevStatusNormalized && newStatusNormalized && prevStatusNormalized !== newStatusNormalized) {
+        // Status changed - add comment to ClickUp task
+        const clickupTaskId = previousResult.rows[0]?.clickup_task_id;
+        if (clickupTaskId) {
+          try {
+            const clickupClient = require('../services/clickupClient');
+            const statusEmoji = newStatusNormalized === 'online' ? '🟢' : '🔴';
+            const statusText = newStatusNormalized === 'online' ? 'Online' : 'Offline';
+            const previousStatusText = prevStatusNormalized === 'online' ? 'Online' : 'Offline';
+            
+            const commentText = `${statusEmoji} **System:** Router status changed\n\n` +
+              `**Previous:** ${previousStatusText}\n` +
+              `**Current:** ${statusText}\n\n` +
+              `🕐 Changed at: ${new Date().toLocaleString()}`;
+            
+            await clickupClient.createTaskComment(
+              clickupTaskId,
+              commentText,
+              { notifyAll: false },
+              'default'
+            );
+            
+            logger.info('Added status change comment to router task', {
+              routerId,
+              clickupTaskId,
+              previousStatus: prevStatusNormalized,
+              newStatus: newStatusNormalized
+            });
+          } catch (commentError) {
+            logger.warn('Failed to add status change comment (status still updated)', {
+              routerId,
+              error: commentError.message
+            });
+            // Don't fail the status update if comment fails
+          }
+        }
+      }
       
       logger.info(`Router ${routerId} status updated: ${status}`);
       
