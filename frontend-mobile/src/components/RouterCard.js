@@ -110,6 +110,7 @@ function RouterCard({ router }) {
               if (router.last_seen instanceof Date) {
                 date = router.last_seen;
               } else if (typeof router.last_seen === 'string') {
+                // PostgreSQL TIMESTAMP strings are in ISO format, parse directly
                 date = new Date(router.last_seen);
               } else if (typeof router.last_seen === 'number') {
                 // Handle Unix timestamp (seconds or milliseconds)
@@ -120,7 +121,7 @@ function RouterCard({ router }) {
               
               // Validate the date
               if (isNaN(date.getTime())) {
-                console.warn('Invalid last_seen date:', router.last_seen);
+                console.warn('Invalid last_seen date:', router.last_seen, 'for router:', router.router_id);
                 return 'Invalid date';
               }
               
@@ -129,12 +130,26 @@ function RouterCard({ router }) {
               
               // Handle negative differences (future dates) or very large differences
               if (diffMs < 0) {
+                // Future date - log for debugging
+                console.warn('Future date detected for router:', router.router_id, 'date:', date, 'now:', now);
                 return 'Just now'; // Future date, treat as just now
               }
               
               const diffMins = Math.floor(diffMs / 60000);
               const diffHours = Math.floor(diffMs / 3600000);
               const diffDays = Math.floor(diffMs / 86400000);
+              
+              // Debug: Log if all routers show same time (first router only to avoid spam)
+              if (router.router_id && router.router_id.toString().endsWith('1')) {
+                console.debug('Last seen calculation:', {
+                  router_id: router.router_id,
+                  last_seen_raw: router.last_seen,
+                  last_seen_parsed: date.toISOString(),
+                  now: now.toISOString(),
+                  diffMs,
+                  diffMins
+                });
+              }
               
               // Show relative time if recent
               if (diffMins < 1) return 'Just now';
@@ -151,7 +166,7 @@ function RouterCard({ router }) {
                 minute: '2-digit'
               });
             } catch (error) {
-              console.error('Error formatting last_seen:', error, router.last_seen);
+              console.error('Error formatting last_seen:', error, router.last_seen, 'for router:', router.router_id);
               return 'Unknown';
             }
           })()}
