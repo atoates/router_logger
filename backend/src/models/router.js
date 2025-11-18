@@ -154,7 +154,7 @@ async function getAllRouters() {
         router_id,
         timestamp as last_online_time
       FROM router_logs
-      WHERE LOWER(TRIM(status)) IN ('online', '1') OR status::text = 'true'
+      WHERE LOWER(TRIM(status)) IN ('online', '1', 'true')
       ORDER BY router_id, timestamp DESC
     ),
     latest_imei AS (
