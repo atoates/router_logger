@@ -402,11 +402,34 @@ async function assignRouterToUsers(assignment) {
       usernames: assigneeUsernames
     });
 
+    // Fetch updated task to get full assignee details
+    const updatedTask = await clickupClient.getTask(clickupTaskId);
+    const updatedAssignees = updatedTask.assignees || [];
+
+    // Update database with assignee information immediately
+    try {
+      await pool.query(
+        'UPDATE routers SET clickup_assignees = $1 WHERE router_id = $2',
+        [JSON.stringify(updatedAssignees), routerId]
+      );
+      
+      logger.info('Database updated with assignee information', {
+        routerId,
+        assigneeCount: updatedAssignees.length
+      });
+    } catch (dbError) {
+      logger.error('Failed to update database with assignee information', {
+        routerId,
+        error: dbError.message
+      });
+      // Don't throw - ClickUp update succeeded, database will sync later
+    }
+
     // Add comment to router task about assignment
     try {
       const assigneeNames = assigneeUsernames.length > 0 
         ? assigneeUsernames.join(', ')
-        : userIds.map(id => `User ${id}`).join(', ');
+        : updatedAssignees.map(a => a.username || a.email || `User ${a.id}`).join(', ');
       
       const commentText = `👤 **System:** Router assigned to: **${assigneeNames}**\n\n` +
         `🕐 Assigned at: ${new Date().toLocaleString()}`;
@@ -435,7 +458,8 @@ async function assignRouterToUsers(assignment) {
       success: true,
       routerId,
       clickupTaskId,
-      assignedTo: assigneeUsernames
+      assignedTo: assigneeUsernames,
+      assignees: updatedAssignees
     };
 
   } catch (error) {

@@ -21,6 +21,18 @@ function RouterDetailPage() {
     fetchRouter();
   }, [routerId]);
 
+  // Refresh router data when component becomes visible (e.g., after navigation)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (routerId) {
+        fetchRouter();
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [routerId]);
+
   const fetchRouter = async () => {
     try {
       setLoading(true);

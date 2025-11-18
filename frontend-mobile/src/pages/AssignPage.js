@@ -155,9 +155,11 @@ function AssignPage() {
 
       setSuccess(`Router #${selectedRouter.router_id} assigned to ${selectedMember.user.username || selectedMember.user.email || 'selected person'}`);
       
-      // Navigate back to router detail page after a short delay
+      // Force refresh routers cache and navigate back to router detail page
+      // The router detail page will fetch fresh data
       setTimeout(() => {
-        navigate(`/router/${selectedRouter.router_id}`);
+        // Clear router cache to force fresh fetch
+        navigate(`/router/${selectedRouter.router_id}?refresh=${Date.now()}`);
       }, 1500);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to assign router');
