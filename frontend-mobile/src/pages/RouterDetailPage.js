@@ -209,7 +209,12 @@ function RouterDetailPage() {
         >
           ← Back
         </button>
-        <h1>Router #{router.router_id}</h1>
+        <div className="page-header-content">
+          <h1>{router.name || `Router #${router.router_id}`}</h1>
+          {router.name && (
+            <p className="page-subtitle">#{router.router_id}</p>
+          )}
+        </div>
       </div>
 
       {error && (
