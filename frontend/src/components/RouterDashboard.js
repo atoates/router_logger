@@ -296,7 +296,11 @@ export default function RouterDashboard({ router }) {
           <h2 className="router-title">{router?.name || routerId}</h2>
           <div className="rd-sub">
             <StatusPill status={router?.current_status} />
-            {latest?.timestamp && <span className="muted">Last seen {new Date(latest.timestamp).toLocaleString()}</span>}
+            {(router?.last_seen || latest?.timestamp) && (
+              <span className="muted">
+                Last seen {new Date(router?.last_seen || latest.timestamp).toLocaleString()}
+              </span>
+            )}
             {latest?.wan_ip && <span className="muted">WAN {latest.wan_ip}</span>}
           </div>
         </div>
