@@ -606,6 +606,8 @@ async function getTopRoutersByUsage(days = 7, limit = 5) {
         LEFT JOIN base b ON b.router_id = d.router_id
       )
       SELECT r.router_id, r.name,
+             r.clickup_location_task_id,
+             r.clickup_location_task_name,
              totals.tx_bytes,
              totals.rx_bytes,
              (totals.tx_bytes + totals.rx_bytes) AS total_bytes
