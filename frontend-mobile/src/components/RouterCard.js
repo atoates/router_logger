@@ -107,21 +107,37 @@ function RouterCard({ router }) {
             try {
               // Parse the date - handle both string and Date objects
               let date;
-              if (router.last_seen instanceof Date) {
-                date = router.last_seen;
-              } else if (typeof router.last_seen === 'string') {
-                // PostgreSQL TIMESTAMP strings are in ISO format, parse directly
-                date = new Date(router.last_seen);
-              } else if (typeof router.last_seen === 'number') {
+              const rawValue = router.last_seen;
+              
+              if (rawValue instanceof Date) {
+                date = rawValue;
+              } else if (typeof rawValue === 'string') {
+                // PostgreSQL TIMESTAMP strings - handle various formats
+                // Try parsing as-is first
+                date = new Date(rawValue);
+                
+                // If that fails or gives invalid date, try other formats
+                if (isNaN(date.getTime())) {
+                  // Try removing timezone info and parsing as UTC
+                  const cleaned = rawValue.replace(/[+-]\d{2}:\d{2}$/, '').replace('Z', '');
+                  date = new Date(cleaned + 'Z'); // Add Z to force UTC
+                }
+              } else if (typeof rawValue === 'number') {
                 // Handle Unix timestamp (seconds or milliseconds)
-                date = new Date(router.last_seen > 1000000000000 ? router.last_seen : router.last_seen * 1000);
+                date = new Date(rawValue > 1000000000000 ? rawValue : rawValue * 1000);
               } else {
+                console.warn('Unexpected last_seen type:', typeof rawValue, rawValue, 'for router:', router.router_id);
                 return 'Unknown';
               }
               
               // Validate the date
               if (isNaN(date.getTime())) {
-                console.warn('Invalid last_seen date:', router.last_seen, 'for router:', router.router_id);
+                console.error('Invalid last_seen date after parsing:', {
+                  router_id: router.router_id,
+                  raw: rawValue,
+                  type: typeof rawValue,
+                  parsed: date
+                });
                 return 'Invalid date';
               }
               
@@ -131,7 +147,12 @@ function RouterCard({ router }) {
               // Handle negative differences (future dates) or very large differences
               if (diffMs < 0) {
                 // Future date - log for debugging
-                console.warn('Future date detected for router:', router.router_id, 'date:', date, 'now:', now);
+                console.warn('Future date detected:', {
+                  router_id: router.router_id,
+                  date: date.toISOString(),
+                  now: now.toISOString(),
+                  diffMs
+                });
                 return 'Just now'; // Future date, treat as just now
               }
               
@@ -139,15 +160,19 @@ function RouterCard({ router }) {
               const diffHours = Math.floor(diffMs / 3600000);
               const diffDays = Math.floor(diffMs / 86400000);
               
-              // Debug: Log if all routers show same time (first router only to avoid spam)
-              if (router.router_id && router.router_id.toString().endsWith('1')) {
-                console.debug('Last seen calculation:', {
-                  router_id: router.router_id,
-                  last_seen_raw: router.last_seen,
+              // Debug: Log for first few routers to diagnose
+              if (router.router_id && (router.router_id.toString().endsWith('1') || router.router_id.toString().endsWith('2') || router.router_id.toString().endsWith('3'))) {
+                console.log(`[RouterCard] Router ${router.router_id}:`, {
+                  last_seen_raw: rawValue,
+                  last_seen_type: typeof rawValue,
                   last_seen_parsed: date.toISOString(),
+                  last_seen_local: date.toLocaleString(),
                   now: now.toISOString(),
+                  now_local: now.toLocaleString(),
                   diffMs,
-                  diffMins
+                  diffMins,
+                  diffHours,
+                  diffDays
                 });
               }
               
@@ -166,7 +191,12 @@ function RouterCard({ router }) {
                 minute: '2-digit'
               });
             } catch (error) {
-              console.error('Error formatting last_seen:', error, router.last_seen, 'for router:', router.router_id);
+              console.error('Error formatting last_seen:', {
+                error: error.message,
+                router_id: router.router_id,
+                last_seen: router.last_seen,
+                type: typeof router.last_seen
+              });
               return 'Unknown';
             }
           })()}
