@@ -135,7 +135,7 @@ function AppContent() {
                 display: 'flex', 
                 alignItems: 'center', 
                 gap: '12px',
-                color: '#e2e8f0',
+                color: 'var(--text-primary)',
                 fontSize: '14px'
               }}>
                 <span>
@@ -153,8 +153,8 @@ function AppContent() {
                     fontSize: '14px',
                     transition: 'all 0.2s'
                   }}
-                  onMouseOver={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.2)'}
-                  onMouseOut={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.1)'}
+                  onMouseOver={(e) => e.target.style.background = 'var(--accent-primary)'}
+                  onMouseOut={(e) => e.target.style.background = 'var(--bg-secondary)'}
                 >
                   Logout
                 </button>

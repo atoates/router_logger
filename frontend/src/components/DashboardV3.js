@@ -5,6 +5,7 @@ import { AreaChart, Area, BarChart, Bar, CartesianGrid, Legend, Pie, PieChart, R
 import ClickUpAuthButton from './ClickUpAuthButton';
 import StoredWithRouters from './OutOfServiceRouters';
 import InstalledRouters from './InstalledRouters';
+import SystemStatusPage from '../pages/SystemStatus';
 import '../DashboardV3.css';
 
 function formatBytes(bytes) {
@@ -135,7 +136,7 @@ function DeltaBadge({ current, previous }) {
   return <span className={`delta ${cls}`}>{sym} {Math.abs(rounded)}%</span>;
 }
 
-export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, page = 'network' }) {
+export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page = 'network' }) {
   const [mode, setMode] = useState('rolling');
   const [value, setValue] = useState(24);
   const [dark, setDark] = useState(defaultDarkMode);
@@ -564,6 +565,16 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = false, pag
       {/* System Status Page */}
       {page === 'status' && (
         <div className="v3-full-width-content">
+          <SystemStatusPage
+            routers={routers}
+            storage={storage}
+            dbSize={dbSize}
+            inspections={inspections}
+            formatBytes={formatBytes}
+            fmtNum={fmtNum}
+            Metric={Metric}
+          />
+          
           {/* Storage Card */}
           <div className="v3-card">
             <div className="v3-card-title">💾 Storage</div>
