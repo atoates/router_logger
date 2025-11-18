@@ -1,11 +1,11 @@
 .router-card {
-  background: white;
+  background: var(--bg-card);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 12px;
-  box-shadow: 0 2px 4px rgba(35, 37, 35, 0.1);
-  border-left: 4px solid #747975; /* Grey */
-  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 4px var(--shadow);
+  border-left: 4px solid var(--border-color);
+  transition: transform 0.2s, box-shadow 0.2s, background-color 0.3s ease;
 }
 
 .router-card:active {
@@ -13,7 +13,7 @@
 }
 
 .router-card-online {
-  border-left-color: #5b7f5c; /* Green */
+  border-left-color: var(--accent-primary);
 }
 
 .router-card-offline {
@@ -30,7 +30,7 @@
 .router-card-name {
   font-size: 18px;
   font-weight: 700;
-  color: #232523; /* Eerie Black */
+  color: var(--text-primary);
 }
 
 .router-card-status {
@@ -41,8 +41,8 @@
 }
 
 .status-online {
-  color: #5b7f5c; /* Green */
-  background: #C7DFB9; /* Tea Green */
+  color: var(--accent-primary);
+  background: var(--accent-tea);
 }
 
 .status-offline {
@@ -52,14 +52,14 @@
 
 .router-card-id {
   font-size: 14px;
-  color: #747975; /* Grey */
+  color: var(--text-secondary);
   margin-bottom: 8px;
   font-weight: 400;
 }
 
 .router-card-location {
   font-size: 14px;
-  color: #6dced1; /* Blue */
+  color: var(--accent-secondary);
   font-weight: 500;
   margin-bottom: 8px;
   display: flex;
@@ -68,7 +68,7 @@
 }
 
 .router-card-location-link {
-  color: #6dced1; /* Blue */
+  color: var(--accent-secondary);
   text-decoration: none;
   display: flex;
   align-items: center;
@@ -87,20 +87,20 @@
 
 .router-card-assignees {
   font-size: 14px;
-  color: #747975; /* Grey */
+  color: var(--text-secondary);
   margin-bottom: 4px;
 }
 
 .router-card-last-seen {
   font-size: 12px;
-  color: #747975; /* Grey */
+  color: var(--text-secondary);
   margin-bottom: 12px;
 }
 
 .router-card-button {
   width: 100%;
   padding: 10px;
-  background: #5b7f5c; /* Green */
+  background: var(--accent-primary);
   color: white;
   border: none;
   border-radius: 8px;

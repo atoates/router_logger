@@ -4,14 +4,29 @@
   box-sizing: border-box;
 }
 
+:root {
+  /* Dark mode (default) - using brand colors */
+  --bg-primary: #232523; /* Eerie Black */
+  --bg-secondary: #2d302d; /* Slightly lighter black */
+  --bg-card: #2d302d; /* Card background */
+  --text-primary: #F6F7F8; /* Seasalt */
+  --text-secondary: #C7DFB9; /* Tea Green for secondary text */
+  --text-muted: #747975; /* Grey */
+  --accent-primary: #5b7f5c; /* Green */
+  --accent-secondary: #6dced1; /* Blue */
+  --accent-tea: #C7DFB9; /* Tea Green */
+  --border-color: #3d403d; /* Dark grey border */
+  --shadow: rgba(0, 0, 0, 0.3);
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #F6F7F8; /* Seasalt */
-  color: #232523; /* Eerie Black */
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   /* Prevent text selection on mobile for better UX */
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;

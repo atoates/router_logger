@@ -135,6 +135,24 @@ function StatsPage() {
                 <div className="stats-router-id">#{router.router_id}</div>
               </div>
               
+              {router.clickup_location_task_name && (
+                <div className="stats-router-location">
+                  {router.clickup_location_task_id ? (
+                    <a
+                      href={`https://app.clickup.com/list/${router.clickup_location_task_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="stats-router-location-link"
+                    >
+                      📍 {router.clickup_location_task_name}
+                    </a>
+                  ) : (
+                    <span>📍 {router.clickup_location_task_name}</span>
+                  )}
+                </div>
+              )}
+              
               <div className="stats-router-usage">
                 <div className="stats-usage-item">
                   <span className="stats-usage-label">Total Usage:</span>

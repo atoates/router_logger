@@ -1,10 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import './SettingsPage.css';
 
 function SettingsPage() {
   const { currentUser, logout } = useAuth();
+  const { isDarkMode, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -59,6 +61,23 @@ function SettingsPage() {
               {process.env.NODE_ENV === 'production' ? 'Production' : 'Development'}
             </span>
           </div>
+        </div>
+      </div>
+
+      {/* Appearance */}
+      <div className="settings-section">
+        <h2>Appearance</h2>
+        <div className="info-row">
+          <span className="info-label">Dark Mode:</span>
+          <label className="theme-toggle">
+            <input
+              type="checkbox"
+              checked={isDarkMode}
+              onChange={toggleTheme}
+              className="theme-toggle-input"
+            />
+            <span className="theme-toggle-slider"></span>
+          </label>
         </div>
       </div>
 
