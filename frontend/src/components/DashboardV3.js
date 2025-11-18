@@ -239,8 +239,8 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
 
   return (
     <div className={className}>
-      {/* Time Controls - Show for network and status pages */}
-      {(page === 'network' || page === 'status') && (
+      {/* Time Controls - Show for network page only */}
+      {page === 'network' && (
         <div className="v3-controls-bar">
           <TimeControls mode={mode} value={value} onChange={updateTime} />
           <div className="toggle" onClick={()=>setDark(!dark)} title="Toggle dark mode">{dark ? '🌙' : '🌞'}</div>
