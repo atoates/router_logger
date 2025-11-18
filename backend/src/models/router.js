@@ -149,6 +149,14 @@ async function getAllRouters() {
       FROM router_logs
       ORDER BY router_id, timestamp DESC
     ),
+    last_online AS (
+      SELECT DISTINCT ON (router_id)
+        router_id,
+        timestamp as last_online_time
+      FROM router_logs
+      WHERE LOWER(TRIM(status)) IN ('online', '1') OR status::text = 'true'
+      ORDER BY router_id, timestamp DESC
+    ),
     latest_imei AS (
       SELECT DISTINCT ON (router_id)
         router_id,
@@ -174,7 +182,9 @@ async function getAllRouters() {
     )
     SELECT 
       r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id, 
-      r.created_at, r.last_seen, r.rms_created_at, r.notes,
+      r.created_at, 
+      COALESCE(lo.last_online_time, r.last_seen) as last_seen,
+      r.rms_created_at, r.notes,
       r.clickup_task_id, r.clickup_task_url, r.clickup_list_id, 
       r.clickup_location_task_id, r.clickup_location_task_name, 
       r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
@@ -185,10 +195,11 @@ async function getAllRouters() {
       COALESCE(lf.firmware_version, r.firmware_version) as firmware_version
     FROM routers r
     LEFT JOIN latest_logs ll ON ll.router_id = r.router_id
+    LEFT JOIN last_online lo ON lo.router_id = r.router_id
     LEFT JOIN latest_imei li ON li.router_id = r.router_id
     LEFT JOIN latest_firmware lf ON lf.router_id = r.router_id
     LEFT JOIN log_counts lc ON lc.router_id = r.router_id
-    ORDER BY r.last_seen DESC NULLS LAST;
+    ORDER BY COALESCE(lo.last_online_time, r.last_seen) DESC NULLS LAST;
   `;
   
   try {
@@ -920,16 +931,25 @@ async function getTopRoutersByUsageRolling(hours = 24, limit = 5) {
                (GREATEST(d.first_rx - COALESCE(b.base_rx, d.first_rx), 0) + COALESCE(d.sum_rx_deltas, 0))::bigint AS rx_bytes
         FROM deltas d
         LEFT JOIN base b ON b.router_id = d.router_id
+      ),
+      last_online AS (
+        SELECT DISTINCT ON (router_id)
+          router_id,
+          timestamp as last_online_time
+        FROM router_logs
+        WHERE LOWER(TRIM(status)) IN ('online', '1') OR status::text = 'true'
+        ORDER BY router_id, timestamp DESC
       )
       SELECT r.router_id, r.name,
              r.clickup_location_task_id,
              r.clickup_location_task_name,
-             r.last_seen,
+             COALESCE(lo.last_online_time, r.last_seen) as last_seen,
              totals.tx_bytes,
              totals.rx_bytes,
              (totals.tx_bytes + totals.rx_bytes) AS total_bytes
       FROM totals
       JOIN routers r ON r.router_id = totals.router_id
+      LEFT JOIN last_online lo ON lo.router_id = r.router_id
       ORDER BY total_bytes DESC
       LIMIT $2;
     `;
