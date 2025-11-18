@@ -535,6 +535,48 @@ async function getStorageStats(sampleSize = 1000) {
     const projected30DaysBytes_30dAvg = Math.round(avgDaily30 * 30 * avgBytes);
     const projected90DaysBytes_30dAvg = Math.round(avgDaily30 * 90 * avgBytes);
 
+    // Get storage breakdown by router
+    const routerStorageRes = await pool.query(`
+      SELECT 
+        r.router_id,
+        r.name,
+        COUNT(l.router_id) AS log_count,
+        COUNT(l.router_id) * $1::bigint AS estimated_size_bytes
+      FROM routers r
+      LEFT JOIN router_logs l ON l.router_id = r.router_id
+      GROUP BY r.router_id, r.name
+      HAVING COUNT(l.router_id) > 0
+      ORDER BY estimated_size_bytes DESC
+      LIMIT 50;
+    `, [avgBytes > 0 ? avgBytes : 1000]);
+    
+    const by_router = routerStorageRes.rows.map(r => ({
+      router_id: r.router_id,
+      name: r.name || `Router ${r.router_id}`,
+      log_count: Number(r.log_count || 0),
+      total_size: Number(r.estimated_size_bytes || 0)
+    }));
+
+    // Calculate growth metrics
+    // Get record counts for last 7 days and previous 7 days for comparison
+    const growth7Res = await pool.query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE timestamp >= CURRENT_DATE - INTERVAL '7 days') AS last_7_days,
+        COUNT(*) FILTER (WHERE timestamp >= CURRENT_DATE - INTERVAL '14 days' AND timestamp < CURRENT_DATE - INTERVAL '7 days') AS prev_7_days
+      FROM router_logs;
+    `);
+    const growth7 = growth7Res.rows[0] || { last_7_days: 0, prev_7_days: 0 };
+    const recordsLast7Days = Number(growth7.last_7_days || 0);
+    const recordsPrev7Days = Number(growth7.prev_7_days || 0);
+    const recordsPerDay = recordsLast7Days / 7;
+    const recordsGrowthRate = recordsPrev7Days > 0 
+      ? ((recordsLast7Days - recordsPrev7Days) / recordsPrev7Days) * 100 
+      : (recordsLast7Days > 0 ? 100 : 0);
+    
+    // Estimate size growth
+    const sizePerDay = recordsPerDay * avgBytes;
+    const sizeGrowthRate = recordsGrowthRate; // Same as records growth rate
+
     return {
       totalRouters: Number(totals.total_routers || 0),
       totalLogs: Number(totals.total_logs || 0),
@@ -542,6 +584,16 @@ async function getStorageStats(sampleSize = 1000) {
       logsPerDay30,
       avgLogJsonSizeBytes: Number.isFinite(avgBytes) ? Number(avgBytes) : 0,
       estimatedCurrentJsonBytes,
+      total_size: estimatedCurrentJsonBytes,
+      by_router,
+      growth: {
+        recordsPerDay: Math.round(recordsPerDay),
+        recordsLast7Days,
+        recordsPrev7Days,
+        recordsGrowthRate: Math.round(recordsGrowthRate * 100) / 100,
+        sizePerDay: Math.round(sizePerDay),
+        sizeGrowthRate: Math.round(sizeGrowthRate * 100) / 100
+      },
       projections: {
         using7DayAvg: {
           projected30DaysBytes: projected30DaysBytes_7dAvg,
@@ -608,6 +660,7 @@ async function getTopRoutersByUsage(days = 7, limit = 5) {
       SELECT r.router_id, r.name,
              r.clickup_location_task_id,
              r.clickup_location_task_name,
+             r.last_seen,
              totals.tx_bytes,
              totals.rx_bytes,
              (totals.tx_bytes + totals.rx_bytes) AS total_bytes
@@ -871,6 +924,7 @@ async function getTopRoutersByUsageRolling(hours = 24, limit = 5) {
       SELECT r.router_id, r.name,
              r.clickup_location_task_id,
              r.clickup_location_task_name,
+             r.last_seen,
              totals.tx_bytes,
              totals.rx_bytes,
              (totals.tx_bytes + totals.rx_bytes) AS total_bytes
