@@ -667,16 +667,25 @@ async function getTopRoutersByUsage(days = 7, limit = 5) {
                (GREATEST(d.first_rx - COALESCE(b.base_rx, d.first_rx), 0) + COALESCE(d.sum_rx_deltas, 0))::bigint AS rx_bytes
         FROM deltas d
         LEFT JOIN base b ON b.router_id = d.router_id
+      ),
+      last_online AS (
+        SELECT DISTINCT ON (router_id)
+          router_id,
+          timestamp as last_online_time
+        FROM router_logs
+        WHERE LOWER(TRIM(status)) IN ('online', '1') OR status::text = 'true'
+        ORDER BY router_id, timestamp DESC
       )
       SELECT r.router_id, r.name,
              r.clickup_location_task_id,
              r.clickup_location_task_name,
-             r.last_seen,
+             COALESCE(lo.last_online_time, r.last_seen) as last_seen,
              totals.tx_bytes,
              totals.rx_bytes,
              (totals.tx_bytes + totals.rx_bytes) AS total_bytes
       FROM totals
       JOIN routers r ON r.router_id = totals.router_id
+      LEFT JOIN last_online lo ON lo.router_id = r.router_id
       ORDER BY total_bytes DESC
       LIMIT $2;
     `;
