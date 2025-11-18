@@ -20,7 +20,7 @@
 
 .error-retry-button {
   padding: 12px 24px;
-  background: #2563eb;
+  background: var(--accent-primary);
   color: white;
   border: none;
   border-radius: 8px;
@@ -32,11 +32,11 @@
 }
 
 .error-retry-button:hover {
-  background: #1d4ed8;
+  background: #4a6b4b;
 }
 
 .error-retry-button:active {
-  background: #1e40af;
+  background: #3d5a3e;
 }
 
 
