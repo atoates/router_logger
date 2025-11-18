@@ -251,12 +251,6 @@ function RouterDetailPage() {
           <span className="detail-label">Router ID:</span>
           <span className="detail-value">#{router.router_id}</span>
         </div>
-        {router.name && (
-          <div className="detail-row">
-            <span className="detail-label">Name:</span>
-            <span className="detail-value">{router.name}</span>
-          </div>
-        )}
         {router.firmware_version && (
           <div className="detail-row">
             <span className="detail-label">Firmware:</span>
