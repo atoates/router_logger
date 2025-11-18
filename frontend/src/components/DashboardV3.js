@@ -7,6 +7,7 @@ import StoredWithRouters from './OutOfServiceRouters';
 import InstalledRouters from './InstalledRouters';
 import SystemStatusPage from '../pages/SystemStatus';
 import '../DashboardV3.css';
+import '../pages/SystemStatus.css';
 
 function formatBytes(bytes) {
   const n = Number(bytes) || 0;
