@@ -12,6 +12,14 @@ const StoredWithRouters = () => {
 
   useEffect(() => {
     fetchRoutersByAssignees();
+    
+    // Auto-refresh every 30 minutes
+    const refreshInterval = setInterval(() => {
+      fetchRoutersByAssignees();
+    }, 30 * 60 * 1000); // 30 minutes in milliseconds
+    
+    // Cleanup interval on unmount
+    return () => clearInterval(refreshInterval);
   }, []);
 
   const fetchRoutersByAssignees = async () => {
