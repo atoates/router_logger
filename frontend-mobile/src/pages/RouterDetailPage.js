@@ -89,12 +89,12 @@ function RouterDetailPage() {
   };
 
   const handleAssign = () => {
-    // Navigate to location page where assignment can be handled
-    navigate(`/location?routerId=${router.router_id}`);
+    // Navigate to assign page for assigning router to a person
+    navigate(`/assign?routerId=${router.router_id}`);
   };
 
   const handleInstall = () => {
-    // Navigate to location page where installation can be handled
+    // Navigate to location page for linking router to a location
     navigate(`/location?routerId=${router.router_id}`);
   };
 

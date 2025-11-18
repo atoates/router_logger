@@ -104,6 +104,8 @@ export const getClickUpSpaceLists = (spaceId) => api.get(`/clickup/debug/space-l
 export const getClickUpLists = (workspaceId) => api.get(`/clickup/lists/${workspaceId}`);
 export const getClickUpTasks = (listId, search = '') => 
   api.get(`/clickup/tasks/${listId}`, { params: { search } });
+export const getClickUpWorkspaceMembers = (workspaceId) => 
+  api.get(`/clickup/workspaces/${workspaceId}/members`);
 
 // Statistics (for mobile stats view)
 export const getUsageStats = (params) => api.get('/stats/usage', { params });

@@ -7,6 +7,7 @@ import MobileLayout from './components/MobileLayout';
 import LoginPage from './pages/LoginPage';
 import SearchPage from './pages/SearchPage';
 import LocationPage from './pages/LocationPage';
+import AssignPage from './pages/AssignPage';
 import StatsPage from './pages/StatsPage';
 import SettingsPage from './pages/SettingsPage';
 import RouterDetailPage from './pages/RouterDetailPage';
@@ -37,6 +38,17 @@ function App() {
               <ProtectedRoute>
                 <MobileLayout>
                   <LocationPage />
+                </MobileLayout>
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/assign"
+            element={
+              <ProtectedRoute>
+                <MobileLayout>
+                  <AssignPage />
                 </MobileLayout>
               </ProtectedRoute>
             }
