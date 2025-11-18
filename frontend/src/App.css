@@ -5,7 +5,7 @@
   align-items: center;
   padding: 20px 0;
   gap: 24px;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--border-color);
   margin-bottom: 20px;
 }
 
@@ -20,20 +20,20 @@
 }
 
 .app-logo-link:hover .app-title {
-  color: #6366f1;
+  color: var(--accent-primary);
 }
 
 .app-title {
   font-size: 28px;
   font-weight: 700;
   margin: 0;
-  color: #0f172a;
+  color: var(--text-primary);
   transition: color 0.2s ease;
 }
 
 .app-subtitle {
   font-size: 14px;
-  color: #64748b;
+  color: var(--text-secondary);
   margin: 4px 0 0 0;
 }
 
@@ -48,10 +48,10 @@
   display: flex;
   gap: 8px;
   margin-bottom: 24px;
-  background: #f8fafc;
+  background: var(--bg-card);
   padding: 8px;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-color);
 }
 
 .app-nav-link {
@@ -61,7 +61,7 @@
   padding: 12px 20px;
   border-radius: 8px;
   text-decoration: none;
-  color: #64748b;
+  color: var(--text-secondary);
   font-weight: 600;
   font-size: 14px;
   transition: all 0.2s ease;
@@ -70,15 +70,15 @@
 }
 
 .app-nav-link:hover {
-  background: #fff;
-  color: #6366f1;
-  border-color: #e5e7eb;
+  background: var(--bg-secondary);
+  color: var(--accent-primary);
+  border-color: var(--border-color);
 }
 
 .app-nav-link.active {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: var(--accent-primary);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 2px 8px rgba(91, 127, 92, 0.3);
 }
 
 .app-nav-icon {
@@ -89,36 +89,36 @@
   font-size: 14px;
 }
 
-/* Dark Mode Overrides */
+/* Dark Mode Overrides (already using CSS variables, but keep for compatibility) */
 .dark-mode .app-title {
-  color: #f1f5f9;
+  color: var(--text-primary);
 }
 
 .dark-mode .app-subtitle {
-  color: #94a3b8;
+  color: var(--text-secondary);
 }
 
 .dark-mode .app-header {
-  border-bottom-color: #334155;
+  border-bottom-color: var(--border-color);
 }
 
 .dark-mode .app-nav {
-  background: #1e293b;
-  border-color: #334155;
+  background: var(--bg-card);
+  border-color: var(--border-color);
 }
 
 .dark-mode .app-nav-link {
-  color: #94a3b8;
+  color: var(--text-secondary);
 }
 
 .dark-mode .app-nav-link:hover {
-  background: #334155;
-  color: #e2e8f0;
-  border-color: #475569;
+  background: var(--bg-secondary);
+  color: var(--accent-primary);
+  border-color: var(--border-color);
 }
 
 .dark-mode .app-nav-link.active {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: var(--accent-primary);
   color: #fff;
 }
 
