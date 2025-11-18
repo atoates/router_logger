@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getRouters, getNetworkUsageRolling, getNetworkUsage, getTopRoutersRolling, getTopRouters, getOperators, getStorageStats, getInspectionStatus, getRMSUsage, getClickUpUsage, getRouterStatusSummary } from '../services/api';
+import { getRouters, getNetworkUsageRolling, getNetworkUsage, getTopRoutersRolling, getTopRouters, getOperators, getInspectionStatus, getRouterStatusSummary } from '../services/api';
 import api from '../services/api';
 import { AreaChart, Area, BarChart, Bar, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
 import ClickUpAuthButton from './ClickUpAuthButton';
@@ -147,16 +147,8 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
   const [usagePrev, setUsagePrev] = useState([]);
   const [top, setTop] = useState([]);
   const [operators, setOperators] = useState([]);
-  const [storage, setStorage] = useState(null);
-  const [dbSize, setDbSize] = useState(null);
   const [inspections, setInspections] = useState([]);
-  const [rmsUsage, setRMSUsage] = useState(null);
-  const [rmsSyncStatus, setRMSSyncStatus] = useState(null);
-  const [clickupUsage, setClickUpUsage] = useState(null);
   const [statusSummary, setStatusSummary] = useState(null);
-  const [smartSyncEnabled, setSmartSyncEnabled] = useState(true);
-  const [smartSyncLoading, setSmartSyncLoading] = useState(false);
-  const [manualSyncLoading, setManualSyncLoading] = useState(false);
   const [, setLoading] = useState(true);
 
   const updateTime = (m, v) => { setMode(m); setValue(v); };
@@ -171,53 +163,28 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
 
         const promises = [
           getRouters(),
-          getStorageStats({ sample_size: 800 }),
           mode==='rolling' ? getNetworkUsageRolling({ hours: hrs, bucket: 'hour' }) : getNetworkUsage({ days }),
           mode==='rolling' ? getTopRoutersRolling({ hours: hrs, limit: 5 }) : getTopRouters({ days, limit: 5 }),
           getOperators({ days: effectiveDaysForOps })
         ];
-        // Also fetch DB size (non-blocking for critical metrics)
-        const dbSizePromise = api.get('/stats/db-size').catch((err)=>{
-          console.error('DB size fetch error:', err);
-          return { data: null };
-        });
-        // Also fetch inspection status
+        // Also fetch inspection status (for assignments page)
         const inspectionPromise = getInspectionStatus().catch((err)=>{
           console.error('Inspection fetch error:', err);
           return { data: [] };
         });
-        // Also fetch RMS usage monitoring
-        const rmsUsagePromise = getRMSUsage().catch((err)=>{
-          console.error('RMS usage fetch error:', err);
-          return { data: null };
-        });
-        // Also fetch ClickUp usage monitoring
-        const clickupUsagePromise = getClickUpUsage().catch((err)=>{
-          console.error('ClickUp usage fetch error:', err);
-          return { data: null };
-        });
-        // Also fetch router status summary
+        // Also fetch router status summary (for network page)
         const statusSummaryPromise = getRouterStatusSummary().catch((err)=>{
           console.error('Status summary fetch error:', err);
           return { data: null };
         });
-        const [rRes, sRes, uRes, tRes, oRes] = await Promise.all(promises);
-        const dbRes = await dbSizePromise;
+        const [rRes, uRes, tRes, oRes] = await Promise.all(promises);
         const inspRes = await inspectionPromise;
-        const rmsRes = await rmsUsagePromise;
-        const clickupRes = await clickupUsagePromise;
         const statusRes = await statusSummaryPromise;
-        console.log('DB size response:', dbRes);
         setRouters(rRes.data || []);
-        setStorage(sRes.data || null);
         setUsage(uRes.data || []);
-  setTop((tRes.data || []).map(r=>({ router_id: r.router_id, name: r.name || r.router_id, tx_bytes: Number(r.tx_bytes)||0, rx_bytes: Number(r.rx_bytes)||0, total_bytes: Number(r.total_bytes)||0 })));
+        setTop((tRes.data || []).map(r=>({ router_id: r.router_id, name: r.name || r.router_id, tx_bytes: Number(r.tx_bytes)||0, rx_bytes: Number(r.rx_bytes)||0, total_bytes: Number(r.total_bytes)||0 })));
         setOperators((oRes.data || []).map((x,i)=>({ name: x.operator || 'Unknown', value: Number(x.total_bytes)||0, fill: COLORS[i%COLORS.length] })));
-  setDbSize(dbRes?.data || null);
-        console.log('DB size state set to:', dbRes?.data);
         setInspections(inspRes?.data || []);
-        setRMSUsage(rmsRes?.data || null);
-        setClickUpUsage(clickupRes?.data || null);
         setStatusSummary(statusRes?.data || null);
 
         // Previous period for network-level delta
@@ -248,69 +215,6 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
     load();
   }, [mode, value]);
 
-  // Fetch smart sync setting and RMS sync status when on status page
-  useEffect(() => {
-    if (page === 'status') {
-      const fetchSmartSync = async () => {
-        try {
-          const response = await api.get('/clickup/settings/smart-sync');
-          setSmartSyncEnabled(response.data.enabled);
-        } catch (error) {
-          console.error('Failed to fetch smart sync setting:', error);
-        }
-      };
-      
-      const fetchRMSSyncStatus = async () => {
-        try {
-          const response = await api.get('/rms/status');
-          setRMSSyncStatus(response.data);
-        } catch (error) {
-          console.error('Failed to fetch RMS sync status:', error);
-        }
-      };
-      
-      fetchSmartSync();
-      fetchRMSSyncStatus();
-    }
-  }, [page]);
-
-  // Handle smart sync toggle
-  const handleSmartSyncToggle = async () => {
-    setSmartSyncLoading(true);
-    try {
-      const newValue = !smartSyncEnabled;
-      const response = await api.put('/clickup/settings/smart-sync', { enabled: newValue });
-      setSmartSyncEnabled(response.data.enabled);
-    } catch (error) {
-      console.error('Failed to update smart sync setting:', error);
-      alert('Failed to update smart sync setting. Please try again.');
-    } finally {
-      setSmartSyncLoading(false);
-    }
-  };
-
-  // Handle manual sync trigger
-  const handleManualSync = async () => {
-    if (!window.confirm('Trigger a manual ClickUp sync for all routers? This will update all router data in ClickUp immediately.')) {
-      return;
-    }
-    
-    setManualSyncLoading(true);
-    try {
-      const response = await api.post('/clickup/sync');
-      const result = response.data;
-      alert(`Sync completed!\n\nUpdated: ${result.updated || 0} routers\nErrors: ${result.errors || 0}\nSkipped: ${result.skipped || 0}\nDuration: ${((result.duration || 0) / 1000).toFixed(1)}s`);
-      
-      // Refresh ClickUp usage stats
-      const clickupRes = await api.get('/monitoring/clickup');
-      setClickUpUsage(clickupRes.data || null);
-    } catch (error) {
-      console.error('Failed to trigger manual sync:', error);
-      alert(`Failed to trigger sync: ${error.response?.data?.error || error.message}`);
-    } finally {
-      setManualSyncLoading(false);
-    }
-  };
 
   const online = routers.filter(r => r.current_status === 'online' || r.current_status === 1 || r.current_status === '1').length;
   const total = routers.length;
