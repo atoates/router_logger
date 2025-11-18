@@ -25,7 +25,7 @@ function RouterDetailPage() {
   useEffect(() => {
     const handleFocus = () => {
       if (routerId) {
-        fetchRouter();
+        fetchRouter(true); // Force refresh to get latest assignee info
       }
     };
     
@@ -33,11 +33,11 @@ function RouterDetailPage() {
     return () => window.removeEventListener('focus', handleFocus);
   }, [routerId]);
 
-  const fetchRouter = async () => {
+  const fetchRouter = async (forceRefresh = false) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await getRouters();
+      const response = await getRouters(forceRefresh);
       const routers = Array.isArray(response.data) ? response.data : [];
       const found = routers.find(r => r.router_id.toString() === routerId);
       
