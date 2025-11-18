@@ -119,8 +119,13 @@ function AppContent() {
         <div className="app-header">
           <div className="app-header-left">
             <Link to="/" className="app-logo-link">
-              <h1 className="app-title">VacatAd Router Logger</h1>
-              <p className="app-subtitle">Monitor router network and property assignments</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <img src="/Logo.png" alt="Router Logger" style={{ width: '40px', height: 'auto' }} />
+                <div>
+                  <h1 className="app-title">Router Logger</h1>
+                  <p className="app-subtitle">Monitor router network and property assignments</p>
+                </div>
+              </div>
             </Link>
           </div>
           <div className="app-header-right">
@@ -134,15 +139,15 @@ function AppContent() {
                 fontSize: '14px'
               }}>
                 <span>
-                  {currentUser.username} <span style={{ color: '#a0aec0' }}>({currentUser.role})</span>
+                  {currentUser.username} <span style={{ color: 'var(--text-muted)' }}>({currentUser.role})</span>
                 </span>
                 <button
                   onClick={handleLogout}
                   style={{
                     padding: '8px 16px',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     fontSize: '14px',
