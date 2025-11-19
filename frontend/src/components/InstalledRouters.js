@@ -8,7 +8,7 @@ const InstalledRouters = () => {
   const [installedRouters, setInstalledRouters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showOfflineOnly, setShowOfflineOnly] = useState(false);
+  const [showOfflineOnly, setShowOfflineOnly] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -135,7 +135,11 @@ const InstalledRouters = () => {
       <div className="installed-routers-header">
         <h3 className="installed-routers-title">
           Installed Routers
-          <span className="installed-routers-count">{installedRouters.length}</span>
+          <span className="installed-routers-count">
+            {showOfflineOnly 
+              ? installedRouters.filter(r => !isRouterOnline(r.current_state)).length 
+              : installedRouters.length}
+          </span>
         </h3>
         
         <div className="ir-filter-controls">
