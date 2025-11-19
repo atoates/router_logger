@@ -705,6 +705,7 @@ function UsersManagement() {
                   <tbody>
                     {loginHistory.map((entry, index) => {
                       // Handle timestamp formatting - could be Unix timestamp (milliseconds) or ISO string
+                      // Backend returns 'login_at' field
                       const formatTimestamp = (timestamp) => {
                         if (!timestamp) return '-';
                         
@@ -740,7 +741,7 @@ function UsersManagement() {
                       
                       return (
                         <tr key={index}>
-                          <td>{formatTimestamp(entry.login_timestamp)}</td>
+                          <td>{formatTimestamp(entry.login_at)}</td>
                           <td>{entry.ip_address || '-'}</td>
                           <td className="user-agent-cell">{entry.user_agent || '-'}</td>
                           <td>
