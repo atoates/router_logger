@@ -674,10 +674,9 @@ async function syncAssigneesFromClickUp() {
 
     // Invalidate the assignee cache so users see fresh data immediately
     try {
-      const routerRoutes = require('../routes/router');
-      if (routerRoutes.invalidateAssigneeCache) {
-        routerRoutes.invalidateAssigneeCache();
-      }
+      const cacheManager = require('./cacheManager');
+      cacheManager.invalidateCache('assignees');
+      logger.info('Invalidated assignee cache after sync');
     } catch (err) {
       logger.warn('Could not invalidate assignee cache:', err.message);
     }
