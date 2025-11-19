@@ -2,7 +2,7 @@
 .rd-header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
 .rd-header h2{margin:0;font-size:24px;font-weight:700;color:#f1f5f9}
 .rd-header h2.router-title{color:#f1f5f9;text-shadow:0 1px 2px rgba(0,0,0,0.5)}
-.rd-sub{display:flex;gap:12px;align-items:center;color:#64748b;margin-top:8px;flex-wrap:wrap}
+.rd-sub{display:flex;gap:12px;align-items:center;color:#cbd5e1;margin-top:8px;flex-wrap:wrap}
 .rd-range{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
 .rd-range .seg{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .rd-range .seg button{padding:8px 14px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s ease}
