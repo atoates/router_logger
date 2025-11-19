@@ -84,7 +84,8 @@
   gap: 8px;
 }
 
-.form-group label {
+/* Increase specificity so this overrides global .form-group label color */
+.login-card .form-group label {
   color: var(--text-secondary);
   font-size: 14px;
   font-weight: 600;
