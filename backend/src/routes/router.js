@@ -480,6 +480,366 @@ router.post('/routers/:routerId/remove-assignees', requireAdmin, async (req, res
 // STATUS ENDPOINTS - Could be moved to statusController.js
 // ============================================================================
 
+// GET decommissioned routers
+router.get('/routers/decommissioned', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id,
+        r.created_at, r.last_seen, r.rms_created_at, r.notes,
+        r.clickup_task_id, r.clickup_task_url, r.clickup_list_id,
+        r.clickup_location_task_id, r.clickup_location_task_name,
+        r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
+        r.clickup_assignees, r.clickup_task_status, r.mac_address,
+        COALESCE(
+          (SELECT imei FROM router_logs WHERE router_id = r.router_id AND imei IS NOT NULL ORDER BY timestamp DESC LIMIT 1),
+          r.imei
+        ) as imei,
+        COALESCE(
+          (SELECT firmware_version FROM router_logs WHERE router_id = r.router_id AND firmware_version IS NOT NULL ORDER BY timestamp DESC LIMIT 1),
+          r.firmware_version
+        ) as firmware_version,
+        (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status,
+        (SELECT timestamp FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as last_log_time
+       FROM routers r
+       WHERE LOWER(r.clickup_task_status) = 'decommissioned'
+       ORDER BY r.last_seen DESC NULLS LAST, r.created_at DESC`
+    );
+
+    logger.info(`Retrieved ${result.rows.length} decommissioned routers`);
+    res.json({ success: true, routers: result.rows });
+
+  } catch (error) {
+    logger.error('Error fetching decommissioned routers:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch decommissioned routers' });
+  }
+});
+
+// GET routers being returned
+router.get('/routers/being-returned', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id,
+        r.created_at, r.last_seen, r.rms_created_at, r.notes,
+        r.clickup_task_id, r.clickup_task_url, r.clickup_list_id,
+        r.clickup_location_task_id, r.clickup_location_task_name,
+        r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
+        r.clickup_assignees, r.clickup_task_status, r.mac_address,
+        COALESCE(
+          (SELECT imei FROM router_logs WHERE router_id = r.router_id AND imei IS NOT NULL ORDER BY timestamp DESC LIMIT 1),
+          r.imei
+        ) as imei,
+        COALESCE(
+          (SELECT firmware_version FROM router_logs WHERE router_id = r.router_id AND firmware_version IS NOT NULL ORDER BY timestamp DESC LIMIT 1),
+          r.firmware_version
+        ) as firmware_version,
+        (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status,
+        (SELECT timestamp FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as last_log_time
+       FROM routers r
+       WHERE LOWER(r.clickup_task_status) = 'being returned'
+       ORDER BY r.last_seen DESC NULLS LAST, r.created_at DESC`
+    );
+
+    logger.info(`Retrieved ${result.rows.length} routers being returned`);
+    res.json({ success: true, routers: result.rows });
+  } catch (error) {
+    logger.error('Error fetching routers being returned:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch routers being returned' });
+  }
+});
+
+// GET routers that need attention
+router.get('/routers/needs-attention', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        r.*,
+        (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as current_status,
+        (SELECT timestamp FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as last_log_time,
+        CASE 
+          WHEN r.clickup_location_task_id IS NOT NULL 
+            AND (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) NOT IN ('online', 'Online', '1')
+            AND (SELECT timestamp FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) < NOW() - INTERVAL '1 hour'
+          THEN 'offline_at_location'
+          WHEN r.clickup_location_task_id IS NULL AND r.clickup_assignees IS NULL
+          THEN 'no_location_or_assignee'
+          WHEN LOWER(r.clickup_task_status) = 'needs attention'
+          THEN 'manually_flagged'
+          ELSE NULL
+        END as attention_reason
+       FROM routers r
+       WHERE 
+         LOWER(r.clickup_task_status) != 'decommissioned'
+         AND LOWER(r.clickup_task_status) != 'being returned'
+         AND (
+           -- Router has location but is offline for more than 1 hour
+           (r.clickup_location_task_id IS NOT NULL 
+            AND (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) NOT IN ('online', 'Online', '1')
+            AND (SELECT timestamp FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) < NOW() - INTERVAL '1 hour')
+           -- Router has no location or assignee
+           OR (r.clickup_location_task_id IS NULL AND r.clickup_assignees IS NULL)
+           -- Manually marked as needs attention
+           OR LOWER(r.clickup_task_status) = 'needs attention'
+         )
+       ORDER BY 
+         CASE 
+           WHEN LOWER(r.clickup_task_status) = 'needs attention' THEN 1
+           WHEN r.clickup_location_task_id IS NOT NULL THEN 2
+           ELSE 3
+         END,
+         r.last_seen DESC NULLS LAST`
+    );
+
+    logger.info(`Retrieved ${result.rows.length} routers needing attention`);
+    res.json({
+      success: true,
+      count: result.rows.length,
+      routers: result.rows
+    });
+
+  } catch (error) {
+    logger.error('Error fetching routers needing attention:', error);
+    res.status(500).json({ error: 'Failed to fetch routers needing attention' });
+  }
+});
+
+// PATCH update router ClickUp task status (decommissioned, being returned, etc)
+router.patch('/routers/:router_id/status', requireAdmin, async (req, res) => {
+  try {
+    const { router_id } = req.params;
+    const { status, notes } = req.body;
+
+    logger.info(`Status update request for router ${router_id}: status="${status}", notes="${notes}"`);
+
+    if (!status) {
+      return res.status(400).json({ error: 'Status is required' });
+    }
+
+    // Validate status values
+    const validStatuses = ['decommissioned', 'being returned', 'installed', 'ready', 'needs attention'];
+    const normalizedStatus = status.toLowerCase();
+    
+    if (!validStatuses.includes(normalizedStatus)) {
+      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+    }
+
+    // Update the router's clickup_task_status and notes in the database
+    logger.info(`Updating database for router ${router_id} with status="${normalizedStatus}", notes="${notes || 'none'}"`);
+    
+    // Try to update with notes, fallback to without notes if column doesn't exist
+    let result;
+    try {
+      result = await pool.query(
+        `UPDATE routers 
+         SET clickup_task_status = $1,
+             notes = COALESCE($2::text, notes)
+         WHERE router_id = $3
+         RETURNING *`,
+        [normalizedStatus, notes, router_id]
+      );
+    } catch (notesError) {
+      // If notes column doesn't exist yet, update without it
+      if (notesError.message && notesError.message.includes('column "notes" does not exist')) {
+        logger.warn('Notes column does not exist yet, updating without notes');
+        result = await pool.query(
+          `UPDATE routers 
+           SET clickup_task_status = $1
+           WHERE router_id = $2
+           RETURNING *`,
+          [normalizedStatus, router_id]
+        );
+      } else {
+        throw notesError;
+      }
+    }
+
+    if (result.rows.length === 0) {
+      logger.warn(`Router ${router_id} not found in database`);
+      return res.status(404).json({ error: 'Router not found' });
+    }
+
+    const router = result.rows[0];
+    logger.info(`Database updated successfully for router ${router_id}`);
+
+    // If decommissioning or being returned, unlink from location and remove assignees
+    if ((normalizedStatus === 'decommissioned' || normalizedStatus === 'being returned') && router.clickup_task_id) {
+      try {
+        // Unlink from location
+        if (router.clickup_location_task_id) {
+          await pool.query(
+            `UPDATE routers 
+             SET clickup_location_task_id = NULL, 
+                 clickup_location_task_name = NULL,
+                 clickup_location_task_url = NULL
+             WHERE router_id = $1`,
+            [router_id]
+          );
+          logger.info(`Unlinked router ${router_id} from location (status: ${normalizedStatus})`);
+        }
+
+        // Remove assignees in ClickUp
+        const assignees = router.clickup_assignees ? JSON.parse(router.clickup_assignees) : [];
+        if (assignees.length > 0) {
+          await clickupClient.updateTaskAssignees(
+            router.clickup_task_id,
+            { add: [], rem: assignees.map(a => a.id) },
+            'default'
+          );
+          
+          // Update database
+          await pool.query(
+            `UPDATE routers SET clickup_assignees = '[]' WHERE router_id = $1`,
+            [router_id]
+          );
+          logger.info(`Removed all assignees from router ${router_id} (status: ${normalizedStatus})`);
+        }
+      } catch (unlinkError) {
+        logger.error(`Error unlinking/unassigning router (status: ${normalizedStatus}):`, unlinkError);
+        // Don't fail the request - status update was successful
+      }
+    }
+
+    // If there's a ClickUp task linked, update the status there too
+    if (router.clickup_task_id) {
+      try {
+        logger.info(`Attempting to update ClickUp task ${router.clickup_task_id} status to "${normalizedStatus}"`);
+        
+        await clickupClient.updateTask(
+          router.clickup_task_id, 
+          { status: normalizedStatus },
+          'default'
+        );
+        logger.info(`Successfully updated ClickUp task ${router.clickup_task_id} status to "${normalizedStatus}"`);
+        
+        // Add comment to ClickUp task for significant status changes
+        try {
+          let commentText = '';
+          if (normalizedStatus === 'decommissioned') {
+            commentText = `🗑️ **Router Decommissioned**\n\nThis router has been permanently decommissioned and removed from service.`;
+            if (notes) {
+              commentText += `\n\n**Notes:** ${notes}`;
+            }
+          } else if (normalizedStatus === 'being returned') {
+            commentText = `📦 **Router Being Returned**\n\nThis router is being returned and is no longer in use.`;
+            if (notes) {
+              commentText += `\n\n**Notes:** ${notes}`;
+            }
+          }
+          
+          if (commentText) {
+            await clickupClient.createTaskComment(
+              router.clickup_task_id,
+              commentText,
+              {},
+              'default'
+            );
+            logger.info(`Added comment to ClickUp task ${router.clickup_task_id} for status change to ${normalizedStatus}`);
+          }
+        } catch (commentError) {
+          logger.warn(`Failed to add comment to ClickUp task:`, commentError.message);
+          // Don't fail the request
+        }
+      } catch (clickupError) {
+        logger.error(`Failed to update ClickUp task status to "${normalizedStatus}":`, {
+          error: clickupError.message,
+          status: clickupError.response?.status,
+          data: clickupError.response?.data,
+          stack: clickupError.stack
+        });
+        // Continue anyway - database was updated
+      }
+    } else {
+      logger.info(`No ClickUp task linked for router ${router_id}, skipping ClickUp sync`);
+    }
+
+    logger.info(`Sending success response for router ${router_id} status update`);
+    res.json({ 
+      success: true, 
+      router: result.rows[0],
+      message: `Router status updated to "${normalizedStatus}"`
+    });
+
+  } catch (error) {
+    logger.error('CRITICAL ERROR updating router status:', {
+      error: error.message,
+      stack: error.stack,
+      router_id: req.params.router_id,
+      body: req.body
+    });
+    res.status(500).json({ error: 'Failed to update router status', details: error.message });
+  }
+});
+
+// PATCH update router notes
+router.patch('/routers/:router_id/notes', requireAdmin, async (req, res) => {
+  try {
+    const { router_id } = req.params;
+    const { notes } = req.body;
+
+    const result = await pool.query(
+      `UPDATE routers 
+       SET notes = $1
+       WHERE router_id = $2
+       RETURNING *`,
+      [notes, router_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Router not found' });
+    }
+
+    logger.info(`Updated notes for router ${router_id}`);
+    res.json({ 
+      success: true, 
+      router: result.rows[0]
+    });
+
+  } catch (error) {
+    logger.error('Error updating router notes:', error);
+    res.status(500).json({ error: 'Failed to update router notes' });
+  }
+});
+
+// POST log inspection for a router
+router.post('/inspections/:routerId', requireAdmin, async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const { inspected_by, notes } = req.body;
+    const inspection = await logInspection(routerId, inspected_by, notes);
+    res.json({ success: true, inspection });
+  } catch (error) {
+    logger.error('Error logging inspection:', error);
+    res.status(500).json({ error: 'Failed to log inspection' });
+  }
+});
+
+// GET inspection history for a router
+router.get('/inspections/:routerId', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const history = await getInspectionHistory(routerId);
+    res.json(history);
+  } catch (error) {
+    logger.error('Error fetching inspection history:', error);
+    res.status(500).json({ error: 'Failed to fetch inspection history' });
+  }
+});
+
+// POST clear all ClickUp task associations
+router.post('/clear-clickup-tasks', requireAdmin, async (req, res) => {
+  try {
+    await pool.query(
+      'UPDATE routers SET clickup_task_id = NULL, clickup_task_url = NULL, clickup_list_id = NULL'
+    );
+    logger.info('Cleared all ClickUp task associations');
+    res.json({ success: true, message: 'Cleared all ClickUp task associations' });
+  } catch (error) {
+    logger.error('Error clearing task associations:', error);
+    res.status(500).json({ error: 'Failed to clear task associations' });
+  }
+});
+
 router.get('/routers/status-summary', async (req, res) => {
   try {
     const currentResult = await pool.query(`
