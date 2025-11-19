@@ -97,4 +97,21 @@ export const removeRouterAssignees = (routerId) => api.post(`/routers/${routerId
 // Router Status Updates
 export const updateRouterStatus = (routerId, status, notes) => api.patch(`/routers/${routerId}/status`, { status, notes });
 
+// Admin - Cache Management
+export const clearRouterCache = () => {
+  // Clear frontend cache immediately
+  _routersCache = { data: null, expiresAt: 0 };
+  // Clear backend cache
+  return api.post('/admin/clear-cache');
+};
+
+// Admin - Deduplication Report
+export const getDeduplicationReport = () => api.get('/admin/deduplication-report');
+
+// Force refresh routers (bypass cache)
+export const forceRefreshRouters = async () => {
+  _routersCache = { data: null, expiresAt: 0 };
+  return api.get('/routers');
+};
+
 export default api;

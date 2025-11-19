@@ -11,6 +11,7 @@ import DecommissionedPage from './components/DecommissionedPage';
 import LoginPage from './components/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import UsersManagement from './components/UsersManagement';
+import AdminDebugTools from './components/AdminDebugTools';
 import GuestDashboard from './components/GuestDashboard';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer, toast } from 'react-toastify';
@@ -105,6 +106,7 @@ function AppContent() {
   // Admin-only navigation items
   const adminNavItems = [
     { path: '/users', label: 'Users', icon: '👥', title: 'User Management' },
+    { path: '/admin/debug', label: 'Debug', icon: '🔧', title: 'Admin Debug Tools' },
   ];
 
   // If login page, render standalone without header/nav
@@ -238,6 +240,11 @@ function AppContent() {
             <Route path="/users" element={
               <ProtectedRoute requireAdmin>
                 <UsersManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/debug" element={
+              <ProtectedRoute requireAdmin>
+                <AdminDebugTools />
               </ProtectedRoute>
             } />
           </Routes>

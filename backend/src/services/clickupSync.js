@@ -211,13 +211,19 @@ async function syncRouterToClickUp(router, dataUsageMap = {}) {
     // - No location and no assignee = 'needs attention'
     // IMPORTANT: Don't override manual statuses like 'being returned' or 'decommissioned'
     try {
-      // Check if router has a manual status that should be preserved
-      const currentDbStatus = router.clickup_task_status?.toLowerCase();
+      // CRITICAL: Re-check current status from database to avoid race conditions
+      // The router object may have stale data if status was changed after sync batch was loaded
+      const freshStatusResult = await pool.query(
+        'SELECT clickup_task_status FROM routers WHERE router_id = $1',
+        [router.router_id]
+      );
+      
+      const currentDbStatus = freshStatusResult.rows[0]?.clickup_task_status?.toLowerCase();
       const manualStatuses = ['being returned', 'decommissioned'];
       const hasManualStatus = manualStatuses.includes(currentDbStatus);
       
       if (hasManualStatus) {
-        logger.info(`Router ${router.router_id} has manual status "${currentDbStatus}" - skipping automatic status sync`);
+        logger.info(`Router ${router.router_id} has manual status "${currentDbStatus}" - skipping automatic status sync (race condition prevented)`);
       } else {
         // Calculate desired status based on router state
         let desiredStatus;
