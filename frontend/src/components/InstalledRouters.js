@@ -144,7 +144,7 @@ const InstalledRouters = () => {
             onClick={() => setShowOfflineOnly(!showOfflineOnly)}
             title={showOfflineOnly ? 'Show all routers' : 'Show offline only'}
           >
-            {showOfflineOnly ? '🔴 Offline Only' : 'Show All'}
+            {showOfflineOnly ? '🔴 Offline Only' : '🔔'}
           </button>
         </div>
       </div>
