@@ -85,7 +85,7 @@
 }
 
 .form-group label {
-  color: #2d3748;
+  color: var(--text-secondary);
   font-size: 14px;
   font-weight: 600;
 }
