@@ -7,7 +7,7 @@ const rateLimit = require('express-rate-limit');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const { logger } = require('./config/database');
-const { initializeDatabase } = require('./database/migrate');
+const { initializeDatabase, runMigrations } = require('./database/migrate');
 const { initMQTT, closeMQTT } = require('./services/mqttService');
 const { startRMSSync } = require('./services/rmsSync');
 const { startClickUpSync } = require('./services/clickupSync');
@@ -20,6 +20,9 @@ const sessionRoutes = require('./routes/session');
 const userRoutes = require('./routes/users');
 const ironwifiWebhookRoutes = require('./routes/ironwifiWebhook');
 const { router: monitoringRoutes } = require('./routes/monitoring');
+
+// Async error handler utility available at: ./utils/asyncHandler.js
+// Usage: router.get('/path', asyncHandler(async (req, res) => { ... }));
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -165,59 +168,8 @@ async function startServer() {
     await initializeDatabase();
     logger.info('Database initialized successfully');
     
-    // Get pool for migrations and seeding
-    const fs = require('fs');
-    const path = require('path');
-    const { pool } = require('./config/database');
-    
-    // Run migrations on startup
-    try {
-      logger.info('Running database migrations...');
-      
-      // Run migration 007 (IronWifi tables)
-      const migration007Path = path.join(__dirname, '../database/migrations/007_add_ironwifi_tables.sql');
-      if (fs.existsSync(migration007Path)) {
-        const sql = fs.readFileSync(migration007Path, 'utf8');
-        await pool.query(sql);
-        logger.info('✅ Migration 007_add_ironwifi_tables.sql completed successfully');
-      }
-      
-      // Run migration 008 (User authentication)
-      const migration008Path = path.join(__dirname, '../database/migrations/008_add_user_authentication.sql');
-      if (fs.existsSync(migration008Path)) {
-        const sql = fs.readFileSync(migration008Path, 'utf8');
-        await pool.query(sql);
-        logger.info('✅ Migration 008_add_user_authentication.sql completed successfully');
-      }
-      
-      // Run migration 014 (Database optimizations)
-      const migration014Path = path.join(__dirname, 'database/migrations/014_database_optimizations.sql');
-      if (fs.existsSync(migration014Path)) {
-        const sql = fs.readFileSync(migration014Path, 'utf8');
-        await pool.query(sql);
-        logger.info('✅ Migration 014_database_optimizations.sql completed successfully');
-      }
-    } catch (migrationError) {
-      // Check if error is because columns/tables/triggers/indexes/constraints already exist (safe to ignore)
-      // 42701 = duplicate column
-      // 42P07 = duplicate table
-      // 42P16 = invalid table definition
-      // 42710 = duplicate object (triggers, functions, indexes, constraints, etc)
-      // 42P17 = invalid table definition (constraint already exists)
-      const safeErrorCodes = ['42701', '42P07', '42P16', '42710', '42P17'];
-      
-      if (safeErrorCodes.includes(migrationError.code)) {
-        logger.info('Migration already applied (duplicate object exists), skipping');
-      } else {
-        logger.error('Migration failed:', {
-          message: migrationError.message,
-          code: migrationError.code,
-          detail: migrationError.detail,
-          stack: migrationError.stack
-        });
-        // Don't exit - allow server to start anyway
-      }
-    }
+    // Run all pending migrations automatically
+    await runMigrations();
     
     // Admin users are now managed through the Users Management page
     // Migration 008 creates initial admin users via seed_admins.js
@@ -260,14 +212,14 @@ async function startServer() {
     
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
-      console.log(`🚀 Server is running on http://localhost:${PORT}`);
+      logger.info(`🚀 Server is running on http://localhost:${PORT}`);
       // Mark server as ready for health checks
       isServerReady = true;
-      console.log(`📊 Ready to receive RUT200 telemetry via:`);
-      console.log(`   - MQTT (if configured)`);
-      console.log(`   - HTTPS POST to /api/log`);
-      console.log(`   - RMS API Sync (if configured)`);
-      console.log(`   - IronWifi Session Sync (if configured)`);
+      logger.info(`📊 Ready to receive RUT200 telemetry via:`);
+      logger.info(`   - MQTT (if configured)`);
+      logger.info(`   - HTTPS POST to /api/log`);
+      logger.info(`   - RMS API Sync (if configured)`);
+      logger.info(`   - IronWifi Session Sync (if configured)`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
