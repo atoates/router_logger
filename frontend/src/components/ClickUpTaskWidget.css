@@ -195,11 +195,18 @@
   text-overflow: ellipsis;
 }
 
-body.dark-mode .router-details .detail-label {
-  color: #94a3b8;
+/* Dark mode - Use light background for better visibility */
+body.dark-mode .router-details {
+  background: #f8fafc;
+  border-color: #e2e8f0;
 }
+
+body.dark-mode .router-details .detail-label {
+  color: #475569;
+}
+
 body.dark-mode .router-details .detail-value {
-  color: #f1f5f9;
+  color: #1e293b;
 }
 
 .task-meta {
