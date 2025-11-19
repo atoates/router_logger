@@ -37,10 +37,12 @@
 .kv div{display:flex;justify-content:space-between;gap:12px;padding:8px;background:#f1f5f9;border-radius:6px;border:1px solid #e2e8f0}
 .kv span{color:#64748b;font-size:12px;font-weight:500}
 .kv strong{color:#0f172a;font-size:13px}
-.table-wrap{overflow:auto;border-radius:8px}
+.table-wrap{overflow:auto;border-radius:8px;background:#fff}
 .table-wrap table{width:100%;border-collapse:collapse}
 .table-wrap th,.table-wrap td{border-bottom:1px solid #e5e7eb;padding:10px 12px;text-align:left;font-size:12px}
 .table-wrap th{background:#f8fafc;font-weight:600;color:#475569;position:sticky;top:0}
+.table-wrap td{color:#0f172a;background:#fff}
+.table-wrap tbody tr{background:#fff}
 .table-wrap tbody tr:hover{background:#fafbfc}
 .rd-pill{padding:4px 10px;border-radius:9999px;font-size:11px;font-weight:600}
 .rd-pill.ok{background:#d1fae5;color:#065f46}
