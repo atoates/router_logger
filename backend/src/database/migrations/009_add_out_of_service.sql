@@ -18,14 +18,29 @@ CREATE INDEX IF NOT EXISTS idx_routers_stored_with
   WHERE service_status = 'out-of-service';
 
 -- Check constraint for valid service status
-ALTER TABLE routers 
-  ADD CONSTRAINT IF NOT EXISTS check_service_status 
-  CHECK (service_status IN ('in-service', 'out-of-service'));
+-- Note: IF NOT EXISTS not supported for constraints, will fail gracefully if already exists
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'check_service_status'
+  ) THEN
+    ALTER TABLE routers 
+      ADD CONSTRAINT check_service_status 
+      CHECK (service_status IN ('in-service', 'out-of-service'));
+  END IF;
+END $$;
 
 -- Check constraint for valid stored_with person
-ALTER TABLE routers 
-  ADD CONSTRAINT IF NOT EXISTS check_stored_with 
-  CHECK (stored_with IS NULL OR stored_with IN ('Jordan', 'Ali', 'Karl'));
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'check_stored_with'
+  ) THEN
+    ALTER TABLE routers 
+      ADD CONSTRAINT check_stored_with 
+      CHECK (stored_with IS NULL OR stored_with IN ('Jordan', 'Ali', 'Karl'));
+  END IF;
+END $$;
 
 -- Comments for documentation
 COMMENT ON COLUMN routers.service_status IS 'Current service status: in-service or out-of-service';
