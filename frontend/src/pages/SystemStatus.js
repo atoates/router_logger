@@ -50,7 +50,7 @@ function StatusBadge({ status, label }) {
   const isHealthy = status === 'healthy' || status === 'OK' || status === 'connected' || status === 'enabled';
   return (
     <div className={`status-badge ${isHealthy ? 'status-healthy' : 'status-warning'}`}>
-      <span className="status-indicator">{isHealthy ? '●' : '○'}</span>
+      <span className="status-indicator">{isHealthy ? '🟢' : '🔴'}</span>
       <span className="status-label">{label}</span>
     </div>
   );
@@ -69,9 +69,27 @@ function MetricCard({ label, value, sub, icon, color }) {
   );
 }
 
+function CollapsibleSection({ title, children, defaultOpen = false }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  
+  return (
+    <div className="collapsible-section">
+      <button 
+        className="collapsible-header"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <h2>{title}</h2>
+        <span className="collapsible-icon">{isOpen ? '▼' : '▶'}</span>
+      </button>
+      {isOpen && <div className="collapsible-content">{children}</div>}
+    </div>
+  );
+}
+
 export default function SystemStatusPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
   
   // System Health
   const [apiHealth, setApiHealth] = useState(null);
@@ -144,6 +162,8 @@ export default function SystemStatusPage() {
       if (dbHealthRes.status === 'fulfilled') setDbHealth(dbHealthRes.value.data || null);
       if (apiHealthRes.status === 'fulfilled') setApiHealth(apiHealthRes.value.data || null);
       
+      setLastUpdated(new Date());
+      
     } catch (err) {
       console.error('Error fetching system status:', err);
       setError(err.message || 'Failed to load system status');
@@ -155,7 +175,10 @@ export default function SystemStatusPage() {
   if (loading && !routers.length) {
     return (
       <div className="system-status-page">
-        <div className="status-loading">Loading system status...</div>
+        <div className="status-loading">
+          <div className="loading-spinner"></div>
+          <p>Loading system status...</p>
+        </div>
       </div>
     );
   }
@@ -163,8 +186,11 @@ export default function SystemStatusPage() {
   if (error) {
     return (
       <div className="system-status-page">
-        <div className="status-error">Error: {error}</div>
-        <button onClick={fetchAllData} className="retry-button">Retry</button>
+        <div className="status-error">
+          <span className="error-icon">⚠️</span>
+          <p>Error: {error}</p>
+          <button onClick={fetchAllData} className="retry-button">Retry</button>
+        </div>
       </div>
     );
   }
@@ -179,13 +205,37 @@ export default function SystemStatusPage() {
     r.clickup_task_status?.toLowerCase() === 'installed'
   ).length;
 
+  // Calculate total logs from db health (more accurate)
+  const totalLogs = dbHealth?.database?.totalLogs || storage?.total_logs || 0;
+
+  // Overall system health
+  const allHealthy = 
+    (apiHealth?.status === 'healthy' || apiHealth?.status === 'OK') &&
+    (dbHealth?.status === 'healthy' || dbHealth?.status === 'OK') &&
+    (!rmsStatus || rmsStatus.enabled) &&
+    (clickupStatus?.connected);
+
   return (
     <div className="system-status-page">
       <div className="status-header">
-        <h1>System Status</h1>
+        <div>
+          <h1>System Status</h1>
+          {lastUpdated && (
+            <p className="last-updated">Last updated: {formatTimeAgo(lastUpdated)}</p>
+          )}
+        </div>
         <button onClick={fetchAllData} className="refresh-button" disabled={loading}>
           {loading ? '🔄 Refreshing...' : '🔄 Refresh'}
         </button>
+      </div>
+
+      {/* Overall Health Alert */}
+      <div className={`health-alert ${allHealthy ? 'healthy' : 'warning'}`}>
+        <span className="alert-icon">{allHealthy ? '✅' : '⚠️'}</span>
+        <div className="alert-content">
+          <h3>{allHealthy ? 'All Systems Operational' : 'System Issues Detected'}</h3>
+          <p>{allHealthy ? 'Everything is running smoothly' : 'Some services may need attention'}</p>
+        </div>
       </div>
 
       {/* System Health Overview */}
@@ -220,162 +270,167 @@ export default function SystemStatusPage() {
             value={routers.length}
             sub={`${onlineRouters} online, ${offlineRouters} offline`}
             icon="📡"
-            color="var(--accent-primary)"
+            color="#5a7c5b"
           />
           <MetricCard
             label="Installed Routers"
             value={installedRouters}
-            sub={statusSummary ? `${statusSummary.current?.online || 0} online` : ''}
+            sub={statusSummary ? `${statusSummary.current?.online || 0} online now` : ''}
             icon="🏠"
-            color="var(--accent-secondary)"
+            color="#7c9a5a"
           />
-          {storage && (
-            <MetricCard
-              label="Total Logs"
-              value={storage.total_logs?.toLocaleString() || '0'}
-              sub={formatBytes(storage.total_size || 0)}
-              icon="📊"
-              color="var(--accent-tea)"
-            />
-          )}
-          {dbSize && (
-            <MetricCard
-              label="Database Size"
-              value={formatBytes(dbSize.db_bytes || 0)}
-              sub={`${dbSize.tables?.length || 0} tables`}
-              icon="💾"
-              color="var(--accent-primary)"
-            />
-          )}
+          <MetricCard
+            label="Total Logs"
+            value={totalLogs.toLocaleString()}
+            sub={storage ? formatBytes(storage.total_size || 0) : 'Loading...'}
+            icon="📊"
+            color="#9a7c5a"
+          />
+          <MetricCard
+            label="Database Size"
+            value={dbSize ? formatBytes(dbSize.db_bytes || 0) : 'Loading...'}
+            sub={dbSize ? `${dbSize.tables?.length || 0} tables` : ''}
+            icon="💾"
+            color="#7c5a9a"
+          />
         </div>
       </div>
 
-      {/* RMS Integration Status */}
-      {rmsStatus && (
+      {/* Database Health Checks */}
+      {inspections && inspections.length > 0 && (
         <div className="status-section">
-          <h2>RMS Integration</h2>
-          <div className="integration-card">
-            <div className="integration-header">
-              <StatusBadge 
-                status={rmsStatus.enabled ? 'enabled' : 'disabled'} 
-                label={rmsStatus.enabled ? 'Enabled' : 'Disabled'} 
-              />
-              <span className="integration-type">{rmsStatus.tokenType || 'none'}</span>
-            </div>
-            {rmsStatus.enabled && rmsStatus.syncStats && (
-              <div className="integration-details">
-                <div className="detail-row">
-                  <span className="detail-label">Last Sync:</span>
-                  <span className="detail-value">
-                    {formatTimeAgo(rmsStatus.syncStats.lastSyncTime)}
-                  </span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">Sync Interval:</span>
-                  <span className="detail-value">{rmsStatus.syncInterval || 5} minutes</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">Last Sync:</span>
-                  <span className="detail-value">
-                    {rmsStatus.syncStats.lastSyncSuccess || 0} of {rmsStatus.syncStats.lastSyncTotal || 0} routers
-                  </span>
-                </div>
-                {rmsStatus.syncStats.lastSyncErrors > 0 && (
-                  <div className="detail-row error">
-                    <span className="detail-label">Errors:</span>
-                    <span className="detail-value">{rmsStatus.syncStats.lastSyncErrors}</span>
-                  </div>
-                )}
-                {rmsStatus.syncStats.lastSyncDuration && (
-                  <div className="detail-row">
-                    <span className="detail-label">Duration:</span>
-                    <span className="detail-value">{rmsStatus.syncStats.lastSyncDuration}ms</span>
-                  </div>
-                )}
-                <div className="detail-row">
-                  <span className="detail-label">24h Syncs:</span>
-                  <span className="detail-value">{rmsStatus.syncStats.totalSyncs24h || 0}</span>
+          <h2>Health Checks</h2>
+          <div className="health-checks-grid">
+            {inspections.map((inspection, i) => (
+              <div key={i} className={`health-check ${inspection.status === 'healthy' ? 'healthy' : 'warning'}`}>
+                <span className="check-icon">{inspection.status === 'healthy' ? '✓' : '⚠'}</span>
+                <div className="check-content">
+                  <div className="check-name">{inspection.check_name}</div>
+                  {inspection.description && (
+                    <div className="check-description">{inspection.description}</div>
+                  )}
                 </div>
               </div>
-            )}
+            ))}
           </div>
         </div>
       )}
 
-      {/* ClickUp Integration Status */}
-      {clickupStatus && (
-        <div className="status-section">
-          <h2>ClickUp Integration</h2>
-          <div className="integration-card">
-            <div className="integration-header">
-              <StatusBadge 
-                status={clickupStatus.connected ? 'connected' : 'disconnected'} 
-                label={clickupStatus.connected ? 'Connected' : 'Disconnected'} 
-              />
-            </div>
-            {clickupUsage && clickupUsage.syncStats && (
-              <div className="integration-details">
-                <div className="detail-row">
-                  <span className="detail-label">Last Sync:</span>
-                  <span className="detail-value">
-                    {formatTimeAgo(clickupUsage.syncStats.lastSyncTime)}
-                  </span>
+      {/* Integrations - Collapsible */}
+      <CollapsibleSection title="Integration Status" defaultOpen={true}>
+        <div className="integrations-grid">
+          {/* RMS Integration */}
+          {rmsStatus && (
+            <div className="integration-card">
+              <div className="integration-header">
+                <div className="integration-title">
+                  <span className="integration-icon">🔌</span>
+                  <h3>RMS Integration</h3>
                 </div>
-                <div className="detail-row">
-                  <span className="detail-label">Total Syncs:</span>
-                  <span className="detail-value">{clickupUsage.syncStats.totalSyncs || 0}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">Last Updated:</span>
-                  <span className="detail-value">{clickupUsage.syncStats.lastSyncUpdated || 0} routers</span>
-                </div>
-                {clickupUsage.syncStats.lastSyncErrors > 0 && (
-                  <div className="detail-row error">
-                    <span className="detail-label">Errors:</span>
-                    <span className="detail-value">{clickupUsage.syncStats.lastSyncErrors}</span>
-                  </div>
-                )}
-                {clickupUsage.syncStats.lastSyncDuration && (
-                  <div className="detail-row">
-                    <span className="detail-label">Duration:</span>
-                    <span className="detail-value">{clickupUsage.syncStats.lastSyncDuration}ms</span>
-                  </div>
-                )}
+                <StatusBadge 
+                  status={rmsStatus.enabled ? 'enabled' : 'disabled'} 
+                  label={rmsStatus.enabled ? 'Enabled' : 'Disabled'} 
+                />
               </div>
-            )}
-          </div>
+              {rmsStatus.enabled && rmsStatus.syncStats && (
+                <div className="integration-details">
+                  <div className="detail-row">
+                    <span className="detail-label">Last Sync</span>
+                    <span className="detail-value">
+                      {formatTimeAgo(rmsStatus.syncStats.lastSyncTime)}
+                    </span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">Sync Interval</span>
+                    <span className="detail-value">{rmsStatus.syncInterval || 5} minutes</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">Success Rate</span>
+                    <span className="detail-value">
+                      {rmsStatus.syncStats.lastSyncSuccess || 0}/{rmsStatus.syncStats.lastSyncTotal || 0} routers
+                    </span>
+                  </div>
+                  {rmsStatus.syncStats.lastSyncErrors > 0 && (
+                    <div className="detail-row error">
+                      <span className="detail-label">Errors</span>
+                      <span className="detail-value">{rmsStatus.syncStats.lastSyncErrors}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* ClickUp Integration */}
+          {clickupStatus && (
+            <div className="integration-card">
+              <div className="integration-header">
+                <div className="integration-title">
+                  <span className="integration-icon">✓</span>
+                  <h3>ClickUp Integration</h3>
+                </div>
+                <StatusBadge 
+                  status={clickupStatus.connected ? 'connected' : 'disconnected'} 
+                  label={clickupStatus.connected ? 'Connected' : 'Disconnected'} 
+                />
+              </div>
+              {clickupUsage && clickupUsage.syncStats && (
+                <div className="integration-details">
+                  <div className="detail-row">
+                    <span className="detail-label">Last Sync</span>
+                    <span className="detail-value">
+                      {formatTimeAgo(clickupUsage.syncStats.lastSyncTime)}
+                    </span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">Total Syncs</span>
+                    <span className="detail-value">{clickupUsage.syncStats.totalSyncs || 0}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">Updated</span>
+                    <span className="detail-value">{clickupUsage.syncStats.lastSyncUpdated || 0} routers</span>
+                  </div>
+                  {clickupUsage.syncStats.lastSyncErrors > 0 && (
+                    <div className="detail-row error">
+                      <span className="detail-label">Errors</span>
+                      <span className="detail-value">{clickupUsage.syncStats.lastSyncErrors}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
+      </CollapsibleSection>
 
-      {/* API Usage Monitoring */}
-      <div className="status-section">
-        <h2>API Usage</h2>
+      {/* API Usage - Collapsible */}
+      <CollapsibleSection title="API Usage Monitoring" defaultOpen={false}>
         <div className="usage-grid">
           {rmsUsage && rmsUsage.apiUsage && (
             <div className="usage-card">
               <h3>RMS API</h3>
               <div className="usage-details">
                 <div className="usage-metric">
-                  <span className="usage-label">Total Calls:</span>
+                  <span className="usage-label">Total Calls</span>
                   <span className="usage-value">{rmsUsage.apiUsage.total?.toLocaleString() || 0}</span>
                 </div>
                 {rmsUsage.apiUsage.estimates && (
                   <>
                     <div className="usage-metric">
-                      <span className="usage-label">Daily Estimate:</span>
+                      <span className="usage-label">Daily Estimate</span>
                       <span className="usage-value">{rmsUsage.apiUsage.estimates.dailyRate?.toLocaleString() || 0}</span>
                     </div>
                     <div className="usage-metric">
-                      <span className="usage-label">Monthly Estimate:</span>
+                      <span className="usage-label">Monthly Estimate</span>
                       <span className="usage-value">{rmsUsage.apiUsage.estimates.monthlyRate?.toLocaleString() || 0}</span>
                     </div>
                     <div className="usage-metric">
-                      <span className="usage-label">Quota Usage:</span>
+                      <span className="usage-label">Quota Usage</span>
                       <span className="usage-value">{rmsUsage.apiUsage.estimates.percentOfQuota || '0%'}</span>
                     </div>
                     {rmsUsage.apiUsage.rateLimitHits > 0 && (
                       <div className="usage-metric error">
-                        <span className="usage-label">Rate Limit Hits:</span>
+                        <span className="usage-label">Rate Limit Hits</span>
                         <span className="usage-value">{rmsUsage.apiUsage.rateLimitHits}</span>
                       </div>
                     )}
@@ -390,29 +445,23 @@ export default function SystemStatusPage() {
               <h3>ClickUp API</h3>
               <div className="usage-details">
                 <div className="usage-metric">
-                  <span className="usage-label">Total Calls:</span>
+                  <span className="usage-label">Total Calls</span>
                   <span className="usage-value">{clickupUsage.apiUsage.total?.toLocaleString() || 0}</span>
                 </div>
                 {clickupUsage.apiUsage.estimates && (
                   <>
                     <div className="usage-metric">
-                      <span className="usage-label">Rate per Minute:</span>
+                      <span className="usage-label">Rate per Minute</span>
                       <span className="usage-value">{clickupUsage.apiUsage.estimates.currentRatePerMinute || '0'}</span>
                     </div>
                     <div className="usage-metric">
-                      <span className="usage-label">Daily Estimate:</span>
+                      <span className="usage-label">Daily Estimate</span>
                       <span className="usage-value">{clickupUsage.apiUsage.estimates.dailyRate?.toLocaleString() || 0}</span>
                     </div>
                     {clickupUsage.apiUsage.rateLimitHits > 0 && (
                       <div className="usage-metric error">
-                        <span className="usage-label">Rate Limit Hits:</span>
+                        <span className="usage-label">Rate Limit Hits</span>
                         <span className="usage-value">{clickupUsage.apiUsage.rateLimitHits}</span>
-                      </div>
-                    )}
-                    {clickupUsage.apiUsage.retries > 0 && (
-                      <div className="usage-metric">
-                        <span className="usage-label">Retries:</span>
-                        <span className="usage-value">{clickupUsage.apiUsage.retries}</span>
                       </div>
                     )}
                   </>
@@ -421,66 +470,15 @@ export default function SystemStatusPage() {
             </div>
           )}
         </div>
-      </div>
+      </CollapsibleSection>
 
-      {/* Database Health */}
-      {dbHealth && (
-        <div className="status-section">
-          <h2>Database Health</h2>
-          <div className="health-card">
-            <div className="health-metrics">
-              <div className="health-metric">
-                <span className="health-label">Routers:</span>
-                <span className="health-value">{dbHealth.database?.routers || 0}</span>
-              </div>
-              <div className="health-metric">
-                <span className="health-label">Total Logs:</span>
-                <span className="health-value">{dbHealth.database?.totalLogs?.toLocaleString() || 0}</span>
-              </div>
-              <div className="health-metric">
-                <span className="health-label">Logs (24h):</span>
-                <span className="health-value">{dbHealth.database?.logsLast24h?.toLocaleString() || 0}</span>
-              </div>
-              <div className="health-metric">
-                <span className="health-label">Latest Data:</span>
-                <span className="health-value">{dbHealth.database?.dataAge || 'Unknown'}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Database Inspections */}
-      {inspections && inspections.length > 0 && (
-        <div className="status-section">
-          <h2>Database Health Checks</h2>
-          <div className="inspections-list">
-            {inspections.map((inspection, i) => (
-              <div key={i} className={`inspection-item ${inspection.status === 'healthy' ? 'healthy' : 'warning'}`}>
-                <div className="inspection-header">
-                  <span className="inspection-name">{inspection.check_name}</span>
-                  <StatusBadge 
-                    status={inspection.status} 
-                    label={inspection.status === 'healthy' ? '✓ Healthy' : '⚠ Warning'} 
-                  />
-                </div>
-                {inspection.description && (
-                  <div className="inspection-description">{inspection.description}</div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Database Storage Breakdown */}
+      {/* Database Storage - Collapsible */}
       {dbSize && dbSize.tables && (
-        <div className="status-section">
-          <h2>Database Storage</h2>
+        <CollapsibleSection title="Database Storage Details" defaultOpen={false}>
           <div className="storage-card">
             <div className="storage-summary">
               <div className="storage-total">
-                <span className="storage-label">Total Size:</span>
+                <span className="storage-label">Total Size</span>
                 <span className="storage-value">{formatBytes(dbSize.db_bytes || 0)}</span>
               </div>
             </div>
@@ -524,7 +522,7 @@ export default function SystemStatusPage() {
               })}
             </div>
           </div>
-        </div>
+        </CollapsibleSection>
       )}
 
       {/* Router Status Summary */}
@@ -534,22 +532,20 @@ export default function SystemStatusPage() {
           <div className="status-summary-card">
             <div className="summary-metrics">
               <div className="summary-metric">
-                <span className="summary-label">Currently Online:</span>
+                <span className="summary-label">Currently Online</span>
                 <span className="summary-value online">{statusSummary.current?.online || 0}</span>
               </div>
               <div className="summary-metric">
-                <span className="summary-label">Currently Offline:</span>
+                <span className="summary-label">Currently Offline</span>
                 <span className="summary-value offline">{statusSummary.current?.offline || 0}</span>
               </div>
               {statusSummary.change && (
-                <>
-                  <div className="summary-metric">
-                    <span className="summary-label">Change (48h):</span>
-                    <span className={`summary-value ${statusSummary.change.online >= 0 ? 'positive' : 'negative'}`}>
-                      {statusSummary.change.online >= 0 ? '+' : ''}{statusSummary.change.online}
-                    </span>
-                  </div>
-                </>
+                <div className="summary-metric">
+                  <span className="summary-label">Change (48h)</span>
+                  <span className={`summary-value ${statusSummary.change.online >= 0 ? 'positive' : 'negative'}`}>
+                    {statusSummary.change.online >= 0 ? '+' : ''}{statusSummary.change.online}
+                  </span>
+                </div>
               )}
             </div>
           </div>
