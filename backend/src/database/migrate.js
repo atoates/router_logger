@@ -149,7 +149,8 @@ async function runMigrations() {
             code: error.code,
             detail: error.detail
           });
-          throw error;
+          // Don't throw - log error but continue server startup
+          // This matches the old behavior where server continues even if migrations fail
         }
       }
     }
@@ -162,7 +163,9 @@ async function runMigrations() {
     
   } catch (error) {
     logger.error('Migration system failed:', error);
-    throw error;
+    // Don't throw - log error but allow server to start
+    // This matches the old behavior where failures don't crash the server
+    logger.warn('⚠️  Server will continue despite migration errors');
   }
 }
 
