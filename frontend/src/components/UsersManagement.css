@@ -260,7 +260,7 @@ body.dark-mode .users-table tbody tr {
 }
 
 body.dark-mode .users-table tbody tr:hover {
-  background-color: #111827; /* slightly lighter than bg */
+  background-color: #1e293b; /* More visible hover effect */
 }
 
 body.dark-mode .users-table td {
@@ -596,11 +596,42 @@ body.dark-mode .router-serial { color: #94a3b8; }
   border-bottom: 2px solid #e2e8f0;
 }
 
+.history-table tbody tr {
+  transition: background-color 0.2s;
+}
+
+.history-table tbody tr:hover {
+  background-color: #f7fafc;
+}
+
 .history-table td {
   padding: 12px;
   font-size: 13px;
   color: #4a5568;
   border-bottom: 1px solid #e2e8f0;
+}
+
+/* Dark mode history table hover */
+body.dark-mode .history-table-container {
+  border-color: #334155;
+}
+
+body.dark-mode .history-table thead {
+  background: #1e293b;
+}
+
+body.dark-mode .history-table th {
+  color: #e2e8f0;
+  border-bottom-color: #334155;
+}
+
+body.dark-mode .history-table tbody tr:hover {
+  background-color: #1e293b;
+}
+
+body.dark-mode .history-table td {
+  color: #cbd5e1;
+  border-bottom-color: #334155;
 }
 
 .user-agent-cell {

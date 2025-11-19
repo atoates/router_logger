@@ -703,18 +703,54 @@ function UsersManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {loginHistory.map((entry, index) => (
-                      <tr key={index}>
-                        <td>{new Date(entry.login_timestamp).toLocaleString()}</td>
-                        <td>{entry.ip_address || '-'}</td>
-                        <td className="user-agent-cell">{entry.user_agent || '-'}</td>
-                        <td>
-                          <span className={`status-badge ${entry.success ? 'success' : 'failed'}`}>
-                            {entry.success ? 'Success' : 'Failed'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {loginHistory.map((entry, index) => {
+                      // Handle timestamp formatting - could be Unix timestamp (milliseconds) or ISO string
+                      const formatTimestamp = (timestamp) => {
+                        if (!timestamp) return '-';
+                        
+                        try {
+                          // Try parsing as is first
+                          let date = new Date(timestamp);
+                          
+                          // If invalid, try as Unix timestamp (milliseconds)
+                          if (isNaN(date.getTime())) {
+                            date = new Date(Number(timestamp));
+                          }
+                          
+                          // Check if still invalid
+                          if (isNaN(date.getTime())) {
+                            return 'Invalid Date';
+                          }
+                          
+                          // Format as readable date/time
+                          return date.toLocaleString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                          });
+                        } catch (e) {
+                          console.error('Date parsing error:', e);
+                          return 'Invalid Date';
+                        }
+                      };
+                      
+                      return (
+                        <tr key={index}>
+                          <td>{formatTimestamp(entry.login_timestamp)}</td>
+                          <td>{entry.ip_address || '-'}</td>
+                          <td className="user-agent-cell">{entry.user_agent || '-'}</td>
+                          <td>
+                            <span className={`status-badge ${entry.success ? 'success' : 'failed'}`}>
+                              {entry.success ? 'Success' : 'Failed'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
