@@ -41,7 +41,7 @@ function LoginPage() {
         <div className="login-header">
           <img src="/Logo.png" alt="Router Logger" className="login-logo" />
           <h1>Router Logger</h1>
-          <p>Field Installer App</p>
+          <p>Sign in to continue</p>
         </div>
         
         <form onSubmit={handleSubmit} className="login-form">
