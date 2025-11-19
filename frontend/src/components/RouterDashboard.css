@@ -1,7 +1,7 @@
 .router-dash{display:flex;flex-direction:column;gap:20px;padding:0}
 .rd-header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
-.rd-header h2{margin:0;font-size:24px;font-weight:700;color:#fff}
-.rd-header h2.router-title{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.3)}
+.rd-header h2{margin:0;font-size:24px;font-weight:700;color:#111827}
+.rd-header h2.router-title{color:#111827;text-shadow:none}
 .rd-sub{display:flex;gap:12px;align-items:center;color:#64748b;margin-top:8px;flex-wrap:wrap}
 .rd-range{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
 .rd-range .seg{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -31,8 +31,8 @@
 .rd-grid{display:grid;grid-template-columns:1.2fr 0.8fr;gap:16px}
 .rd-grid .col{display:flex;flex-direction:column;gap:16px}
 .card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
-.card-title{font-weight:700;font-size:15px;margin-bottom:12px;color:#fff;display:flex;align-items:center;gap:8px;text-shadow:0 1px 1px rgba(0,0,0,0.2)}
-.card-title.latest-title,.card-title.uptime-title{color:#fff;text-shadow:0 1px 1px rgba(0,0,0,0.2)}
+.card-title{font-weight:700;font-size:15px;margin-bottom:12px;color:#111827;display:flex;align-items:center;gap:8px;text-shadow:none}
+.card-title.latest-title,.card-title.uptime-title{color:#111827;text-shadow:none}
 .kv{display:grid;grid-template-columns:1fr;gap:10px}
 .kv div{display:flex;justify-content:space-between;gap:12px;padding:8px;background:#f1f5f9;border-radius:6px;border:1px solid #e2e8f0}
 .kv span{color:#64748b;font-size:12px;font-weight:500}
@@ -83,8 +83,10 @@ body.dark-mode .card-title.latest-title,body.dark-mode .card-title.uptime-title{
 body.dark-mode .kv div{background:#0f172a;border-color:#1e293b}
 body.dark-mode .kv span{color:#94a3b8}
 body.dark-mode .kv strong{color:#e2e8f0}
-body.dark-mode .table-wrap th{background:#0f172a;color:#cbd5e1}
-body.dark-mode .table-wrap td{color:#e2e8f0;border-bottom-color:#334155}
+body.dark-mode .table-wrap{background:#0f172a}
+body.dark-mode .table-wrap th{background:#1e293b;color:#cbd5e1}
+body.dark-mode .table-wrap td{color:#e2e8f0;border-bottom-color:#334155;background:#0f172a}
+body.dark-mode .table-wrap tbody tr{background:#0f172a}
 body.dark-mode .table-wrap tbody tr:hover{background:#334155}
 body.dark-mode .inspections-list::-webkit-scrollbar-track{background:#0f172a}
 body.dark-mode .inspections-list::-webkit-scrollbar-thumb{background:#475569}
