@@ -512,17 +512,19 @@ body.dark-mode .error-message {
   color: #fca5a5;
 }
 
-body.dark-mode .router-details {
-  background: #334155;
-  border-color: #475569;
+.dark-mode .router-details {
+  /* Use a light neutral grey so the bar doesn't look like a solid black strip
+     against the status card background */
+  background: #e5e7eb;
+  border-color: #cbd5e1;
 }
 
-body.dark-mode .detail-label {
-  color: #94a3b8;
+.dark-mode .detail-label {
+  color: #4b5563;
 }
 
-body.dark-mode .detail-value {
-  color: #f1f5f9;
+.dark-mode .detail-value {
+  color: #111827;
 }
 
 /* Enhanced Return Modal Styles */
