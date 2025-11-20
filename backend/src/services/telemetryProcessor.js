@@ -114,9 +114,11 @@ async function processRouterTelemetry(data) {
     // Insert log entry
     const log = await insertLog(logData);
     
-    // Update router's last_seen to use the log's timestamp (not database server time)
-    // This ensures last_seen reflects when the router actually sent the data
-    await updateRouterLastSeen(data.device_id, logData.timestamp);
+    // Update router's last_seen to use the log's timestamp only if status is online
+    // This ensures last_seen reflects when the router was actually functioning/online
+    if (newStatusNormalized === 'online') {
+      await updateRouterLastSeen(data.device_id, logData.timestamp);
+    }
     
     // Check if status changed between online and offline
     if (prevStatusNormalized && newStatusNormalized && prevStatusNormalized !== newStatusNormalized) {
