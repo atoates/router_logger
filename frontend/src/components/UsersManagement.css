@@ -22,7 +22,7 @@
 .users-header h2 {
   margin: 0;
   font-size: 28px;
-  color: #1a202c;
+  color: var(--text-primary);
 }
 
 .btn-create {
@@ -234,83 +234,83 @@
 }
 
 /* ---- Dark mode overrides ---- */
-body.dark-mode .users-header h2 {
-  color: #e2e8f0;
+.dark-mode .users-header h2 {
+  color: var(--text-primary);
 }
 
-body.dark-mode .search-input {
-  background: #0f172a;
-  border-color: #334155;
-  color: #e2e8f0;
+.dark-mode .search-input {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-primary);
 }
 
-body.dark-mode .filter-select {
-  background: #0f172a;
-  border-color: #334155;
-  color: #e2e8f0;
+.dark-mode .filter-select {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-primary);
 }
 
-body.dark-mode .users-table-container {
-  background: #0f172a;
+.dark-mode .users-table-container {
+  background: var(--bg-card);
   box-shadow: none;
 }
 
-body.dark-mode .users-table tbody tr {
-  border-bottom: 1px solid #334155;
+.dark-mode .users-table tbody tr {
+  border-bottom: 1px solid var(--border-color);
 }
 
-body.dark-mode .users-table tbody tr:hover {
-  background-color: #1e293b; /* More visible hover effect */
+.dark-mode .users-table tbody tr:hover {
+  background-color: var(--bg-secondary);
 }
 
-body.dark-mode .users-table td {
-  color: #e2e8f0;
+.dark-mode .users-table td {
+  color: var(--text-primary);
 }
 
-body.dark-mode .username-cell {
-  color: #f1f5f9;
+.dark-mode .username-cell {
+  color: var(--text-primary);
 }
 
-body.dark-mode .btn-action {
-  background: #1e293b;
-  color: #e2e8f0;
+.dark-mode .btn-action {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
-body.dark-mode .no-users { color: #94a3b8; }
+.dark-mode .no-users { color: var(--text-muted); }
 
 /* Modals */
-body.dark-mode .modal-content {
-  background: #1e293b;
+.dark-mode .modal-content {
+  background: var(--bg-card);
 }
-body.dark-mode .modal-content h3,
-body.dark-mode .modal-content h4 {
-  color: #f1f5f9;
+.dark-mode .modal-content h3,
+.dark-mode .modal-content h4 {
+  color: var(--text-primary);
 }
-body.dark-mode .form-group label { color: #e2e8f0; }
-body.dark-mode .form-group input,
-body.dark-mode .form-group select {
-  background: #0f172a;
-  border-color: #334155;
-  color: #e2e8f0;
+.dark-mode .form-group label { color: var(--text-primary); }
+.dark-mode .form-group input,
+.dark-mode .form-group select {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-primary);
 }
-body.dark-mode .modal-actions { border-top-color: #334155; }
-body.dark-mode .btn-cancel {
-  background: #334155;
-  color: #e2e8f0;
+.dark-mode .modal-actions { border-top-color: var(--border-color); }
+.dark-mode .btn-cancel {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 /* Router assignment lists */
-body.dark-mode .assigned-routers,
-body.dark-mode .available-routers {
-  background: #0f172a;
+.dark-mode .assigned-routers,
+.dark-mode .available-routers {
+  background: var(--bg-secondary);
 }
-body.dark-mode .router-card,
-body.dark-mode .router-card-available {
-  background: #1e293b;
-  border-color: #334155;
+.dark-mode .router-card,
+.dark-mode .router-card-available {
+  background: var(--bg-card);
+  border-color: var(--border-color);
 }
-body.dark-mode .router-name { color: #f1f5f9; }
-body.dark-mode .router-serial { color: #94a3b8; }
+.dark-mode .router-name { color: var(--text-primary); }
+.dark-mode .router-serial { color: var(--text-secondary); }
 
 /* Modals */
 .modal-overlay {
@@ -612,26 +612,26 @@ body.dark-mode .router-serial { color: #94a3b8; }
 }
 
 /* Dark mode history table hover */
-body.dark-mode .history-table-container {
-  border-color: #334155;
+.dark-mode .history-table-container {
+  border-color: var(--border-color);
 }
 
-body.dark-mode .history-table thead {
-  background: #1e293b;
+.dark-mode .history-table thead {
+  background: var(--bg-secondary);
 }
 
-body.dark-mode .history-table th {
-  color: #e2e8f0;
-  border-bottom-color: #334155;
+.dark-mode .history-table th {
+  color: var(--text-primary);
+  border-bottom-color: var(--border-color);
 }
 
-body.dark-mode .history-table tbody tr:hover {
-  background-color: #1e293b;
+.dark-mode .history-table tbody tr:hover {
+  background-color: var(--bg-secondary);
 }
 
-body.dark-mode .history-table td {
-  color: #cbd5e1;
-  border-bottom-color: #334155;
+.dark-mode .history-table td {
+  color: var(--text-secondary);
+  border-bottom-color: var(--border-color);
 }
 
 .user-agent-cell {
