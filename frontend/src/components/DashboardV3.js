@@ -5,9 +5,9 @@ import { AreaChart, Area, BarChart, Bar, CartesianGrid, Legend, Pie, PieChart, R
 import ClickUpAuthButton from './ClickUpAuthButton';
 import StoredWithRouters from './OutOfServiceRouters';
 import InstalledRouters from './InstalledRouters';
-import SystemStatusPage from '../pages/SystemStatus';
+import SystemStatusPage from '../pages/SystemStatusV2';
 import '../DashboardV3.css';
-import '../pages/SystemStatus.css';
+import '../pages/SystemStatusV2.css';
 
 function formatBytes(bytes) {
   const n = Number(bytes) || 0;
