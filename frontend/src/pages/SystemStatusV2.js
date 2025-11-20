@@ -163,11 +163,6 @@ export default function SystemStatusV2() {
     if (!data.rmsStatus?.enabled) { score -= 10; issues++; }
     if (!data.clickupStatus?.connected) { score -= 10; issues++; }
     
-    // Inspection failures
-    const failedInspections = data.inspections.filter(i => i.status !== 'healthy').length;
-    score -= (failedInspections * 5);
-    issues += failedInspections;
-
     return { score: Math.max(0, score), issues };
   }, [data]);
 
@@ -413,13 +408,6 @@ export default function SystemStatusV2() {
             <div className="health-indicator"></div>
             <span className="health-label">ClickUp Integration</span>
           </div>
-
-          {data.inspections.map((inspection, i) => (
-            <div key={i} className={`health-item ${inspection.status === 'healthy' ? 'healthy' : 'warning'}`}>
-              <div className="health-indicator"></div>
-              <span className="health-label" title={inspection.description}>{inspection.check_name}</span>
-            </div>
-          ))}
         </div>
       </div>
     </div>
