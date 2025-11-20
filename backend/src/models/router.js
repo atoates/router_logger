@@ -7,7 +7,7 @@ async function upsertRouter(routerData) {
       router_id, device_serial, imei, name, location, 
       site_id, firmware_version, rms_created_at, mac_address, last_seen
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL)
     ON CONFLICT (router_id) 
     DO UPDATE SET 
       device_serial = COALESCE($2, routers.device_serial),

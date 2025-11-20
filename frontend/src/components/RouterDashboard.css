@@ -82,7 +82,7 @@ body.dark-mode .metric .sub{color:#64748b}
 body.dark-mode .card{background:#1e293b;border-color:#334155}
 body.dark-mode .card-title{color:#f1f5f9}
 body.dark-mode .card-title.latest-title,body.dark-mode .card-title.uptime-title{color:#f1f5f9;text-shadow:0 1px 1px rgba(0,0,0,0.6)}
-body.dark-mode .kv div{background:#0f172a;border-color:#1e293b}
+body.dark-mode .kv div{background:#334155;border-color:#475569}
 body.dark-mode .kv span{color:#94a3b8}
 body.dark-mode .kv strong{color:#e2e8f0}
 body.dark-mode .table-wrap{background:#0f172a}
