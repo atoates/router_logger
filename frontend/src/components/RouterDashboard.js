@@ -86,11 +86,6 @@ export default function RouterDashboard({ router }) {
         setLogs(Array.isArray(logsRes.data) ? logsRes.data : []);
         // Handle nested data structure: statsRes.data.data[0]
         const extractedStats = statsRes.data?.data?.[0] || statsRes.data?.[0] || statsRes.data || null;
-        console.log('Stats response:', statsRes);
-        console.log('Extracted stats:', extractedStats);
-        console.log('total_data_usage:', extractedStats?.total_data_usage);
-        console.log('period_tx_bytes:', extractedStats?.period_tx_bytes);
-        console.log('period_rx_bytes:', extractedStats?.period_rx_bytes);
         setStats(extractedStats);
         setUptime(Array.isArray(upRes.data) ? upRes.data : []);
         setInspections(Array.isArray(inspRes.data) ? inspRes.data : []);
@@ -176,13 +171,10 @@ export default function RouterDashboard({ router }) {
 
   const totalBytes = useMemo(() => {
     // Use stats if available (includes baseline jump), otherwise sum from logs
-    console.log('Calculating totalBytes with stats:', stats);
     if (stats?.total_data_usage != null) {
-      console.log('Using stats.total_data_usage:', stats.total_data_usage);
       return Number(stats.total_data_usage) || 0;
     }
     const summed = (series.txrx || []).reduce((s,d)=> s + (Number(d.total_bytes)||0), 0);
-    console.log('Using summed from logs:', summed);
     return summed;
   }, [series, stats]);
   const onlinePct = useMemo(() => {
@@ -192,13 +184,7 @@ export default function RouterDashboard({ router }) {
     }
     const on = uptime.filter(u => (u.status === 'online' || u.status === 1 || u.status === '1' || u.status === true)).length;
     const pct = Math.round(on / uptime.length * 100);
-    console.log('RouterDashboard - Uptime calculation:', { 
-      total: uptime.length, 
-      online: on, 
-      percentage: pct,
-      sampleStatuses: uptime.slice(0, 5).map(u => u.status)
-    });
-    return pct;
+    return pct;;
   }, [uptime]);
 
   const yMax = useMemo(() => {
@@ -218,7 +204,6 @@ export default function RouterDashboard({ router }) {
     }
     
     if (!inspectionDate) {
-      console.log('RouterDashboard - No inspection date for router:', router?.router_id, 'Router object:', router);
       return null;
     }
     const createdDate = new Date(inspectionDate);
@@ -228,17 +213,6 @@ export default function RouterDashboard({ router }) {
     const msRemaining = inspectionDue - now;
     const daysRemaining = Math.floor(msRemaining / (1000 * 60 * 60 * 24));
     const overdue = daysRemaining < 0;
-    console.log('RouterDashboard - Inspection calc for', router.router_id, {
-      hasInspections: inspections?.length > 0,
-      lastInspection: inspections?.[0]?.inspected_at,
-      rms_created_at: router.rms_created_at,
-      created_at: router.created_at,
-      inspectionDate: inspectionDate,
-      createdDate: createdDate.toISOString(),
-      inspectionDue: inspectionDue.toISOString(),
-      daysRemaining,
-      overdue
-    });
     return {
       createdDate,
       inspectionDue,

@@ -215,9 +215,7 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
         try {
           const res = await api.get(`/clickup/workspaces/${workspaceId}/members`);
           const data = res.data;
-          console.log('Workspace members response:', data);
           if (data.members) {
-            console.log('Setting available users:', data.members);
             setAvailableUsers(data.members);
           } else {
             console.warn('No members in response:', data);
@@ -248,9 +246,6 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
 
     setLoading(true);
     try {
-      console.log('Assigning router to users');
-      console.log('Selected assignees:', selectedAssignees);
-      
       // Get usernames for the selected user IDs
       const usernames = selectedAssignees.map(assigneeId => {
         const user = availableUsers.find(u => {
@@ -261,8 +256,6 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
                user?.user?.email || user?.email || 'Unknown';
       });
 
-      console.log('Assigning to:', { userIds: selectedAssignees, usernames });
-
       // Call backend to update ClickUp assignees
       const res = await api.post(`/routers/${routerId}/assign`, {
         assignee_user_ids: selectedAssignees.map(String),
@@ -270,7 +263,6 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
       });
 
       const data = res.data;
-      console.log('Assignment response:', data);
 
       if (data) {
         toast.success(`Router assigned to ${usernames.join(', ')}`);
@@ -282,7 +274,6 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
           onAssigned(data);
         }
       } else {
-        console.error('Assignment failed:', data);
         toast.error(data.error || 'Failed to assign router');
       }
     } catch (error) {
