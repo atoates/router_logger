@@ -278,10 +278,8 @@ const InstalledRouters = () => {
                     <tr key={router.router_id}>
                       <td>
                         <div className="ir-router-info">
-                          <div className="ir-router-id">#{router.router_id}</div>
-                          {router.name && (
-                            <div className="ir-router-name">{router.name}</div>
-                          )}
+                          <div className="ir-router-id">{router.name || `Router #${router.router_id}`}</div>
+                          <div className="ir-router-name">#{router.router_id}</div>
                         </div>
                       </td>
                       <td>
