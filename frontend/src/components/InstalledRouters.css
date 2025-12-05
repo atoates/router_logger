@@ -111,6 +111,25 @@
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  user-select: none;
+  position: relative;
+}
+
+.installed-routers-table th:hover {
+  background: #f3f4f6;
+}
+
+.sort-icon {
+  margin-left: 6px;
+  font-size: 12px;
+  color: #9ca3af;
+  display: inline-block;
+  transition: color 0.2s;
+}
+
+.sort-icon.active {
+  color: #6366f1;
+  font-weight: bold;
 }
 
 .installed-routers-table tbody tr {
@@ -229,4 +248,63 @@
 .ir-date-overdue {
   color: #dc2626;
   font-weight: 600;
+}
+
+/* Dark mode styles */
+.dark-mode .installed-routers-card {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+.dark-mode .installed-routers-title {
+  color: #f3f4f6;
+}
+
+.dark-mode .installed-routers-table thead {
+  background: #374151;
+  border-bottom-color: #4b5563;
+}
+
+.dark-mode .installed-routers-table th {
+  color: #d1d5db;
+}
+
+.dark-mode .installed-routers-table th:hover {
+  background: #4b5563;
+}
+
+.dark-mode .installed-routers-table tbody tr {
+  border-bottom-color: #374151;
+}
+
+.dark-mode .installed-routers-table tbody tr:hover {
+  background: #374151;
+}
+
+.dark-mode .installed-routers-table td {
+  color: #d1d5db;
+}
+
+.dark-mode .ir-router-id {
+  color: #f3f4f6;
+}
+
+.dark-mode .ir-router-name {
+  color: #9ca3af;
+}
+
+.dark-mode .ir-property-name {
+  color: #e5e7eb;
+}
+
+.dark-mode .installed-routers-table-wrap {
+  border-color: #4b5563;
+}
+
+.dark-mode .sort-icon {
+  color: #6b7280;
+}
+
+.dark-mode .sort-icon.active {
+  color: #8b5cf6;
 }

@@ -9,6 +9,7 @@ const InstalledRouters = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showOfflineOnly, setShowOfflineOnly] = useState(true);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -112,6 +113,70 @@ const InstalledRouters = () => {
     navigate(`/router/${routerId}`);
   };
 
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortedRouters = (routers) => {
+    if (!sortConfig.key) return routers;
+
+    const sorted = [...routers].sort((a, b) => {
+      let aVal, bVal;
+
+      switch (sortConfig.key) {
+        case 'router':
+          aVal = a.router_id || '';
+          bVal = b.router_id || '';
+          break;
+        case 'location':
+          aVal = (a.clickup_location_task_name || '').toLowerCase();
+          bVal = (b.clickup_location_task_name || '').toLowerCase();
+          break;
+        case 'status':
+          aVal = isRouterOnline(a.current_state) ? 1 : 0;
+          bVal = isRouterOnline(b.current_state) ? 1 : 0;
+          break;
+        case 'install_date':
+          aVal = a.date_installed || a.location_linked_at || 0;
+          bVal = b.date_installed || b.location_linked_at || 0;
+          // Convert to number if string
+          aVal = typeof aVal === 'string' ? parseInt(aVal, 10) : aVal;
+          bVal = typeof bVal === 'string' ? parseInt(bVal, 10) : bVal;
+          break;
+        case 'uninstall_date':
+          const aInstall = a.date_installed || a.location_linked_at || 0;
+          const bInstall = b.date_installed || b.location_linked_at || 0;
+          aVal = typeof aInstall === 'string' ? parseInt(aInstall, 10) : aInstall;
+          bVal = typeof bInstall === 'string' ? parseInt(bInstall, 10) : bInstall;
+          // Add 92 days in milliseconds
+          aVal = aVal ? aVal + (92 * 24 * 60 * 60 * 1000) : 0;
+          bVal = bVal ? bVal + (92 * 24 * 60 * 60 * 1000) : 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  };
+
+  const getSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) {
+      return <span className="sort-icon">⇅</span>;
+    }
+    return sortConfig.direction === 'asc' 
+      ? <span className="sort-icon active">↑</span> 
+      : <span className="sort-icon active">↓</span>;
+  };
+
   if (loading) {
     return (
       <div className="installed-routers-card">
@@ -160,6 +225,8 @@ const InstalledRouters = () => {
           return !online;
         });
 
+        const sortedRouters = getSortedRouters(filteredRouters);
+
         if (installedRouters.length === 0) {
           return (
             <div className="installed-routers-empty">
@@ -181,16 +248,26 @@ const InstalledRouters = () => {
             <table className="installed-routers-table">
               <thead>
                 <tr>
-                  <th>Router</th>
-                  <th>Location</th>
-                  <th>Status</th>
-                  <th>Install Date</th>
-                  <th>Uninstall Date</th>
+                  <th onClick={() => handleSort('router')} style={{ cursor: 'pointer' }}>
+                    Router {getSortIcon('router')}
+                  </th>
+                  <th onClick={() => handleSort('location')} style={{ cursor: 'pointer' }}>
+                    Location {getSortIcon('location')}
+                  </th>
+                  <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>
+                    Status {getSortIcon('status')}
+                  </th>
+                  <th onClick={() => handleSort('install_date')} style={{ cursor: 'pointer' }}>
+                    Install Date {getSortIcon('install_date')}
+                  </th>
+                  <th onClick={() => handleSort('uninstall_date')} style={{ cursor: 'pointer' }}>
+                    Uninstall Date {getSortIcon('uninstall_date')}
+                  </th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredRouters.map((router) => {
+                {sortedRouters.map((router) => {
                   // Use date_installed if available, fallback to location_linked_at
                   const installDate = router.date_installed || router.location_linked_at;
                   const uninstallDate = getUninstallDate(installDate);
