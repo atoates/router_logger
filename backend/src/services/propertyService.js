@@ -8,6 +8,7 @@
 
 const { pool, logger } = require('../config/database');
 const clickupClient = require('./clickupClient');
+const { CLICKUP_FIELD_IDS } = require('../config/constants');
 
 /**
  * Link router to a ClickUp location task
@@ -60,7 +61,7 @@ async function linkRouterToLocation(linkage) {
     );
 
     // Fetch and sync date_installed from ClickUp
-    const DATE_INSTALLED_FIELD_ID = '9f31c21a-630d-49f2-8a79-354de03e24d1';
+    const DATE_INSTALLED_FIELD_ID = CLICKUP_FIELD_IDS.DATE_INSTALLED;
     try {
       const rawDate = await clickupClient.getListCustomFieldValue(
         locationTaskId,
@@ -335,11 +336,51 @@ async function getCurrentLocation(routerId) {
       return null;
     }
 
+    let dateInstalled = router.date_installed;
+
+    // Fallback: if date_installed is missing, try to backfill it once from ClickUp
+    if (!dateInstalled) {
+      const DATE_INSTALLED_FIELD_ID = CLICKUP_FIELD_IDS.DATE_INSTALLED;
+      try {
+        const rawDate = await clickupClient.getListCustomFieldValue(
+          router.clickup_location_task_id,
+          DATE_INSTALLED_FIELD_ID,
+          'default'
+        );
+        const fetchedDate = rawDate ? Number(rawDate) : null;
+
+        if (fetchedDate) {
+          dateInstalled = fetchedDate;
+          await pool.query(
+            `UPDATE routers SET date_installed = $1 WHERE router_id = $2`,
+            [dateInstalled, routerId]
+          );
+
+          logger.info('Backfilled date_installed from ClickUp in getCurrentLocation', {
+            routerId,
+            locationTaskId: router.clickup_location_task_id,
+            dateInstalled: new Date(dateInstalled).toISOString()
+          });
+        } else {
+          logger.warn('No Date Installed value found in ClickUp for location', {
+            routerId,
+            locationTaskId: router.clickup_location_task_id
+          });
+        }
+      } catch (dateError) {
+        logger.warn('Failed to backfill date_installed from ClickUp (location still returned)', {
+          routerId,
+          locationTaskId: router.clickup_location_task_id,
+          error: dateError.message
+        });
+      }
+    }
+
     return {
       location_task_id: router.clickup_location_task_id,
       location_task_name: router.clickup_location_task_name,
       linked_at: router.location_linked_at,
-      date_installed: router.date_installed
+      date_installed: dateInstalled
     };
   } catch (error) {
     logger.error('Error getting current location:', error);

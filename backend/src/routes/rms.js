@@ -163,7 +163,25 @@ router.post('/refresh/:routerId', async (req, res) => {
     // Get monitoring data if available
     const monitoring = deviceData.monitoring || {};
     const cellular = monitoring.cellular || monitoring.mobile || {};
-    
+
+    // Normalize status so we can decide whether this counts as "online"
+    const rawStatus = deviceData.status?.toLowerCase() || 'offline';
+    const isOnline = ['online', '1', 'true'].includes(String(rawStatus).toLowerCase());
+
+    // RMS exposes last_connection as "last time device was actually connected"
+    const rmsLastConnection = deviceData.last_connection
+      ? new Date(deviceData.last_connection)
+      : null;
+
+    const existingRouter = routerResult.rows[0];
+
+    // Only move last_seen forward when RMS says the device is online and we have a concrete timestamp.
+    // Otherwise preserve whatever we already had (last time we truly saw it online).
+    const lastSeenForUpdate =
+      isOnline && rmsLastConnection
+        ? rmsLastConnection
+        : existingRouter.last_seen;
+
     // Update router with fresh data
     const updateQuery = `
       UPDATE routers SET
@@ -182,8 +200,8 @@ router.post('/refresh/:routerId', async (req, res) => {
       deviceData.name || routerId,
       deviceData.serial || deviceData.serial_number || routerId,
       deviceData.imei || cellular.imei,
-      deviceData.status?.toLowerCase() || 'offline',
-      deviceData.last_connection ? new Date(deviceData.last_connection) : new Date(),
+      rawStatus,
+      lastSeenForUpdate,
       cellular.operator || cellular.network_name,
       monitoring.network?.wan_ip || monitoring.network?.ip,
       routerId
@@ -252,14 +270,23 @@ router.post('/status/:routerId', async (req, res) => {
       const prevStatusNormalized = normalizeStatus(previousStatus);
       const newStatusNormalized = normalizeStatus(status);
       
-      // Update only status fields
-      await pool.query(
-        `UPDATE routers SET 
-          current_status = $1,
-          last_seen = $2
-        WHERE router_id = $3`,
-        [status, lastSeen, routerId]
-      );
+      // Update status and only move last_seen when RMS reports the router as online
+      if (newStatusNormalized === 'online' && lastSeen) {
+        await pool.query(
+          `UPDATE routers SET 
+            current_status = $1,
+            last_seen = $2
+          WHERE router_id = $3`,
+          [status, lastSeen, routerId]
+        );
+      } else {
+        await pool.query(
+          `UPDATE routers SET 
+            current_status = $1
+          WHERE router_id = $2`,
+          [status, routerId]
+        );
+      }
       
       // Check if status changed between online and offline
       if (prevStatusNormalized && newStatusNormalized && prevStatusNormalized !== newStatusNormalized) {
