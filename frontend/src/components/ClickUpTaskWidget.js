@@ -278,7 +278,10 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
   if (loading && !linkedTask) {
     return (
       <div className="clickup-task-widget">
-        <div className="loading-spinner">Loading ClickUp task...</div>
+        <div className="loading-container">
+          <div className="loading-spinner-icon"></div>
+          <div className="loading-text">Loading ClickUp task...</div>
+        </div>
       </div>
     );
   }
@@ -464,7 +467,10 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
                   />
                   
                   {loading ? (
-                    <div className="loading-spinner">Loading tasks...</div>
+                    <div className="loading-container">
+                      <div className="loading-spinner-icon"></div>
+                      <div className="loading-text">Loading tasks...</div>
+                    </div>
                   ) : filteredTasks.length > 0 ? (
                     <div className="task-list">
                       {filteredTasks.map(task => (
