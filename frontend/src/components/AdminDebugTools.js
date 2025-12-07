@@ -93,7 +93,21 @@ function AdminDebugTools() {
         setClickupMessage(`✅ All routers synced successfully: ${updated}/${total} updated`);
       }
     } catch (error) {
-      setClickupMessage(`❌ Sync failed: ${error.response?.data?.error || error.message}`);
+      console.error('ClickUp sync error:', error);
+      let errorMsg = '❌ Sync failed: ';
+      
+      if (error.response) {
+        // Server responded with error
+        errorMsg += error.response.data?.error || error.response.data?.message || `HTTP ${error.response.status}`;
+      } else if (error.request) {
+        // Request made but no response
+        errorMsg += 'No response from server. Check if backend is running and you are logged in as admin.';
+      } else {
+        // Error setting up request
+        errorMsg += error.message;
+      }
+      
+      setClickupMessage(errorMsg);
     } finally {
       setClickupSyncing(false);
     }
@@ -116,7 +130,18 @@ function AdminDebugTools() {
         setClickupMessage(`📊 Last sync: ${timeAgo} (${lastSyncUpdated} updated, ${lastSyncErrors} errors)${isRunning ? ' - Scheduler is running' : ' - Scheduler is stopped'}`);
       }
     } catch (error) {
-      setClickupMessage(`❌ Error: ${error.response?.data?.error || error.message}`);
+      console.error('Sync stats error:', error);
+      let errorMsg = '❌ Error: ';
+      
+      if (error.response) {
+        errorMsg += error.response.data?.error || error.response.data?.message || `HTTP ${error.response.status}`;
+      } else if (error.request) {
+        errorMsg += 'No response from server. Check if backend is running and you are logged in as admin.';
+      } else {
+        errorMsg += error.message;
+      }
+      
+      setClickupMessage(errorMsg);
     } finally {
       setClickupSyncing(false);
     }
