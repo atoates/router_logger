@@ -1097,8 +1097,8 @@ router.get('/sync/stats', (req, res) => {
  */
 router.post('/sync', async (req, res) => {
   try {
-    logger.info('Manual ClickUp sync triggered');
-    const result = await syncAllRoutersToClickUp();
+    logger.info('Manual ClickUp sync triggered (FORCE MODE)');
+    const result = await syncAllRoutersToClickUp(true); // Pass true to force sync
     res.json({
       success: true,
       ...result

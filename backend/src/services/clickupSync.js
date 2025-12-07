@@ -107,7 +107,7 @@ async function discoverMacAddressField() {
 /**
  * Sync a single router's data to its ClickUp task
  */
-async function syncRouterToClickUp(router, dataUsageMap = {}) {
+async function syncRouterToClickUp(router, dataUsageMap = {}, force = false) {
   try {
     if (!router.clickup_task_id) {
       return { success: false, error: 'No ClickUp task linked' };
@@ -120,18 +120,22 @@ async function syncRouterToClickUp(router, dataUsageMap = {}) {
         firmware: router.firmware_version,
         last_seen: router.last_seen,
         imei: router.imei,
-        router_id: router.router_id
+        router_id: router.router_id,
+        mac_address: router.mac_address
       }))
       .digest('hex');
     
     // Skip sync if data hasn't changed (smart sync) - only if smart sync is enabled
+    // Force flag bypasses this check
     const smartSyncEnabled = await isSmartSyncEnabled();
-    if (smartSyncEnabled && router.last_clickup_sync_hash && router.last_clickup_sync_hash === currentDataHash) {
+    if (!force && smartSyncEnabled && router.last_clickup_sync_hash && router.last_clickup_sync_hash === currentDataHash) {
       logger.debug(`Router ${router.router_id}: No changes detected, skipping sync (smart sync enabled)`);
       return { success: true, skipped: true };
     }
 
-    if (!smartSyncEnabled) {
+    if (force) {
+      logger.info(`Router ${router.router_id}: Forcing sync (smart sync bypassed)`);
+    } else if (!smartSyncEnabled) {
       logger.debug(`Router ${router.router_id}: Smart sync disabled, forcing update`);
     }
 
@@ -438,9 +442,9 @@ async function calculateAllRouterDataUsage() {
 /**
  * Sync all routers with linked ClickUp tasks
  */
-async function syncAllRoutersToClickUp() {
+async function syncAllRoutersToClickUp(force = false) {
   const startTime = Date.now();
-  logger.info('Starting ClickUp sync for all routers...');
+  logger.info(`Starting ClickUp sync for all routers...${force ? ' (FORCE MODE)' : ''}`);
 
   try {
     // Get all routers with ClickUp tasks
@@ -495,7 +499,7 @@ async function syncAllRoutersToClickUp() {
       const router = routers[i];
       
       try {
-        const result = await syncRouterToClickUp(router, dataUsageMap);
+        const result = await syncRouterToClickUp(router, dataUsageMap, force);
         
         if (result.success) {
           if (result.skipped) {
