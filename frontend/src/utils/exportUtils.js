@@ -142,14 +142,14 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
 
     doc.autoTable({
       startY: currentY - 5, // Align with top of metadata
-      margin: { left: 130 }, // Position on the right
+      margin: { left: 145 }, // Position on the right
       head: [['Cell Info', 'Value']],
       body: cellInfoData,
       theme: 'grid',
       headStyles: { fillColor: [91, 127, 92], halign: 'left' },
-      styles: { fontSize: 9, cellPadding: 1.5 },
-      columnStyles: { 0: { fontStyle: 'bold', width: 35 }, 1: { width: 25 } },
-      tableWidth: 60
+      styles: { fontSize: 8, cellPadding: 1 },
+      columnStyles: { 0: { fontStyle: 'bold', width: 28 }, 1: { width: 22 } },
+      tableWidth: 50
     });
   }
 
