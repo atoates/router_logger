@@ -228,3 +228,43 @@
   font-size: 1.1rem;
 }
 
+.sync-stats {
+  margin-top: 1.5rem;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.sync-stats h4 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #4a9eff;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.stat-item {
+  background: #252525;
+  padding: 1rem;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stat-label {
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.stat-value {
+  color: #4a9eff;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+

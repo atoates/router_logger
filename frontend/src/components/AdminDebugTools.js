@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { clearRouterCache, getDeduplicationReport, forceRefreshRouters } from '../services/api';
+import { clearRouterCache, getDeduplicationReport, forceRefreshRouters, forceClickUpSync, getClickUpSyncStats } from '../services/api';
 import './AdminDebugTools.css';
 
 function AdminDebugTools() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [report, setReport] = useState(null);
+  const [clickupSyncing, setClickupSyncing] = useState(false);
+  const [clickupMessage, setClickupMessage] = useState('');
+  const [syncStats, setSyncStats] = useState(null);
 
   const handleClearCache = async () => {
     if (!window.confirm('Clear all router caches? This will force a fresh data load.')) {
@@ -67,6 +70,58 @@ function AdminDebugTools() {
     }
   };
 
+  const handleForceClickUpSync = async () => {
+    if (!window.confirm('Force sync all routers to ClickUp? This will update all custom fields (firmware, status, last seen, etc.).')) {
+      return;
+    }
+
+    setClickupSyncing(true);
+    setClickupMessage('⏳ Starting ClickUp sync...');
+    setSyncStats(null);
+    
+    try {
+      const response = await forceClickUpSync();
+      const { updated, skipped, errors, total } = response.data;
+      
+      setSyncStats(response.data);
+      
+      if (errors > 0) {
+        setClickupMessage(`⚠️ Sync completed with errors: ${updated} updated, ${skipped || 0} skipped, ${errors} errors out of ${total} routers`);
+      } else if (skipped > 0) {
+        setClickupMessage(`✅ Sync completed: ${updated} updated, ${skipped} unchanged (smart sync), ${total} routers processed`);
+      } else {
+        setClickupMessage(`✅ All routers synced successfully: ${updated}/${total} updated`);
+      }
+    } catch (error) {
+      setClickupMessage(`❌ Sync failed: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setClickupSyncing(false);
+    }
+  };
+
+  const handleGetSyncStats = async () => {
+    setClickupSyncing(true);
+    setClickupMessage('');
+    
+    try {
+      const response = await getClickUpSyncStats();
+      setSyncStats(response.data);
+      
+      const { lastSyncTime, lastSyncUpdated, lastSyncErrors, isRunning } = response.data;
+      
+      if (!lastSyncTime) {
+        setClickupMessage('ℹ️ No sync has run yet');
+      } else {
+        const timeAgo = new Date(lastSyncTime).toLocaleString();
+        setClickupMessage(`📊 Last sync: ${timeAgo} (${lastSyncUpdated} updated, ${lastSyncErrors} errors)${isRunning ? ' - Scheduler is running' : ' - Scheduler is stopped'}`);
+      }
+    } catch (error) {
+      setClickupMessage(`❌ Error: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setClickupSyncing(false);
+    }
+  };
+
   return (
     <div className="admin-debug-tools">
       <h2>🔧 Admin Debug Tools</h2>
@@ -109,6 +164,90 @@ function AdminDebugTools() {
         >
           {loading ? '⏳ Generating...' : '📊 Show Deduplication Report'}
         </button>
+      </div>
+
+      <div className="debug-section">
+        <h3>ClickUp Sync</h3>
+        <p className="debug-description">
+          Force sync all router data to ClickUp (firmware, status, last seen, IMEI, MAC address, etc.). 
+          This will update all custom fields in ClickUp tasks. Smart sync will skip routers that haven't changed.
+        </p>
+        
+        <div className="debug-buttons">
+          <button 
+            onClick={handleForceClickUpSync}
+            disabled={clickupSyncing}
+            className="btn btn-primary"
+          >
+            {clickupSyncing ? '⏳ Syncing...' : '🔄 Force ClickUp Sync'}
+          </button>
+          
+          <button 
+            onClick={handleGetSyncStats}
+            disabled={clickupSyncing}
+            className="btn btn-secondary"
+          >
+            {clickupSyncing ? '⏳ Loading...' : '📊 View Sync Stats'}
+          </button>
+        </div>
+
+        {clickupMessage && (
+          <div className={`debug-message ${clickupMessage.startsWith('❌') ? 'error' : clickupMessage.startsWith('⚠️') ? 'warning' : 'success'}`}>
+            {clickupMessage}
+          </div>
+        )}
+
+        {syncStats && (
+          <div className="sync-stats">
+            <h4>Sync Statistics</h4>
+            <div className="stats-grid">
+              {syncStats.lastSyncTime && (
+                <>
+                  <div className="stat-item">
+                    <span className="stat-label">Last Sync:</span>
+                    <span className="stat-value">{new Date(syncStats.lastSyncTime).toLocaleString()}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Duration:</span>
+                    <span className="stat-value">{(syncStats.lastSyncDuration / 1000).toFixed(2)}s</span>
+                  </div>
+                </>
+              )}
+              {syncStats.updated !== undefined && (
+                <>
+                  <div className="stat-item">
+                    <span className="stat-label">Updated:</span>
+                    <span className="stat-value">{syncStats.updated}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Skipped:</span>
+                    <span className="stat-value">{syncStats.skipped || 0}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Errors:</span>
+                    <span className="stat-value">{syncStats.errors || 0}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Total:</span>
+                    <span className="stat-value">{syncStats.total}</span>
+                  </div>
+                </>
+              )}
+              {syncStats.totalSyncs !== undefined && (
+                <div className="stat-item">
+                  <span className="stat-label">Total Syncs:</span>
+                  <span className="stat-value">{syncStats.totalSyncs}</span>
+                </div>
+              )}
+              {syncStats.isRunning !== undefined && (
+                <div className="stat-item">
+                  <span className="stat-label">Scheduler:</span>
+                  <span className="stat-value">{syncStats.isRunning ? '✅ Running' : '❌ Stopped'}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {message && (

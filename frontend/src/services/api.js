@@ -114,4 +114,9 @@ export const forceRefreshRouters = async () => {
   return api.get('/routers');
 };
 
+// Admin - ClickUp Sync
+export const forceClickUpSync = () => api.post('/clickup/sync');
+export const getClickUpSyncStats = () => api.get('/clickup/sync/stats');
+export const syncSingleRouterToClickUp = (routerId) => api.post(`/clickup/sync/${routerId}`);
+
 export default api;
