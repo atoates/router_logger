@@ -120,7 +120,8 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
   let currentY = y + 30; // Start lower to clear logo
   
   // Cell Info Box (Right side) - Render first so it doesn't overlap if metadata is long
-  if (router?.cell_id || router?.tac || router?.mcc || router?.mnc) {
+  // Always show the box if we have a router object, as requested
+  if (router) {
     const cellInfoData = [
       ['Cell ID', router.cell_id || '-'],
       ['TAC', router.tac || '-'],
