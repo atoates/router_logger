@@ -192,14 +192,10 @@ async function syncRouterToClickUp(router, dataUsageMap = {}, force = false) {
     }
 
     // MAC Address (text) - auto-discover field ID on first use
+    let macFieldId = null;
     if (router.mac_address) {
-      const macFieldId = await discoverMacAddressField();
-      if (macFieldId) {
-        customFields.push({
-          id: macFieldId,
-          value: router.mac_address
-        });
-      }
+      macFieldId = await discoverMacAddressField();
+      // Note: MAC Address is updated separately below to ensure reliability
     }
 
     // Last Online (date timestamp in milliseconds)
@@ -332,6 +328,25 @@ async function syncRouterToClickUp(router, dataUsageMap = {}, force = false) {
     } catch (urlError) {
       logger.error(`Failed to update Router Dashboard URL for router ${router.router_id}:`, urlError.message);
       // Don't fail the whole sync if just the URL field fails
+    }
+
+    // Update MAC Address separately using the individual field API
+    // This is more reliable than the bulk update for some field types
+    if (router.mac_address && macFieldId) {
+      try {
+        logger.info(`Router ${router.router_id}: Updating MAC Address field (${macFieldId}) to "${router.mac_address}"`);
+        
+        await clickupClient.updateCustomField(
+          router.clickup_task_id,
+          macFieldId,
+          router.mac_address,
+          'default'
+        );
+        logger.info(`✓ Successfully updated MAC Address for router ${router.router_id}`);
+      } catch (macError) {
+        logger.error(`Failed to update MAC Address for router ${router.router_id}:`, macError.message);
+        // Don't fail the whole sync if just the MAC field fails
+      }
     }
 
     // Update Data Usage separately using the individual field API
