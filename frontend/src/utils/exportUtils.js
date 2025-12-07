@@ -82,26 +82,41 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
   const { logoDataUrl, router, stats } = options;
   const doc = new jsPDF();
 
-  // Optional logo
+  // Optional logo - Increased size
   let y = 14;
   if (logoDataUrl) {
     try {
-      doc.addImage(logoDataUrl, 'PNG', 14, y, 20, 20);
-      y += 4; // slight shift for title
+      // Increased from 20x20 to 30x30
+      doc.addImage(logoDataUrl, 'PNG', 14, y, 30, 30);
+      y += 10; // Shift title down to accommodate larger logo
     } catch (e) {
       // If image fails, continue without blocking
     }
   }
 
-  // Title - include router number/name if available
+  // Title - "Router #XX: Uptime & Coverage Report"
   doc.setFontSize(18);
-  const routerName = router?.name || `#${routerId}`;
-  doc.text(`Router ${routerName} Uptime Report`, 40, y + 8);
+  // Clean up router name if it already contains "Router"
+  let displayName = router?.name || `#${routerId}`;
+  if (displayName.toLowerCase().startsWith('router')) {
+    // If name is "Router 7", keep it. If "Router #7", keep it.
+    // Just ensure we don't double up "Router Router 7"
+  } else {
+    // If name is just "7" or "#7", prepend "Router "
+    displayName = `Router ${displayName}`;
+  }
+  
+  doc.text(`${displayName}: Uptime & Coverage Report`, 50, y + 8);
 
   // Metadata
   doc.setFontSize(11);
-  let currentY = y + 24;
+  let currentY = y + 30; // Start lower to clear logo
   doc.text(`Router ID: ${routerId}`, 14, currentY);
+
+  if (router?.clickup_location_task_name) {
+    currentY += 6;
+    doc.text(`Assigned Location: ${router.clickup_location_task_name}`, 14, currentY);
+  }
 
   if (router?.imei) {
     currentY += 6;
@@ -224,7 +239,7 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
     head: [['Metric', 'Value']],
     body: summaryData,
     theme: 'grid',
-    headStyles: { fillColor: [102, 126, 234] },
+    headStyles: { fillColor: [91, 127, 92] }, // Brand Green #5b7f5c
   });
 
   // Data Usage section (if stats available)
@@ -248,7 +263,7 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
       head: [['Metric', 'Value']],
       body: dataUsageData,
       theme: 'grid',
-      headStyles: { fillColor: [102, 126, 234] },
+      headStyles: { fillColor: [91, 127, 92] }, // Brand Green #5b7f5c
     });
   }
 
@@ -262,7 +277,7 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
     head: [['Date', 'Samples', 'Online', 'Uptime %']],
     body: dailyBody,
     theme: 'striped',
-    headStyles: { fillColor: [102, 126, 234] },
+    headStyles: { fillColor: [91, 127, 92] }, // Brand Green #5b7f5c
     styles: { cellPadding: 2 }
   });
 
