@@ -290,7 +290,7 @@ router.post('/status/:routerId', async (req, res) => {
       
       // Check if status changed between online and offline
       if (prevStatusNormalized && newStatusNormalized && prevStatusNormalized !== newStatusNormalized) {
-        // Status changed - add comment to ClickUp task
+        // Status changed - add comment to ClickUp task AND update Operational Status field immediately
         const clickupTaskId = previousResult.rows[0]?.clickup_task_id;
         if (clickupTaskId) {
           try {
@@ -304,6 +304,7 @@ router.post('/status/:routerId', async (req, res) => {
               `**Current:** ${statusText}\n\n` +
               `🕐 Changed at: ${new Date().toLocaleString()}`;
             
+            // Post comment to ClickUp
             await clickupClient.createTaskComment(
               clickupTaskId,
               commentText,
@@ -317,6 +318,38 @@ router.post('/status/:routerId', async (req, res) => {
               previousStatus: prevStatusNormalized,
               newStatus: newStatusNormalized
             });
+            
+            // IMMEDIATELY update Operational Status custom field in ClickUp
+            // Don't wait for the scheduled sync - status changes should be reflected in real-time
+            try {
+              const { CLICKUP_FIELD_IDS } = require('../config/constants');
+              const STATUS_OPTIONS = {
+                ONLINE: 0,
+                OFFLINE: 1
+              };
+              
+              const statusValue = newStatusNormalized === 'online' ? STATUS_OPTIONS.ONLINE : STATUS_OPTIONS.OFFLINE;
+              
+              await clickupClient.updateCustomField(
+                clickupTaskId,
+                CLICKUP_FIELD_IDS.OPERATIONAL_STATUS,
+                statusValue,
+                'default'
+              );
+              
+              logger.info('Immediately updated Operational Status field in ClickUp', {
+                routerId,
+                clickupTaskId,
+                newStatus: statusText,
+                fieldValue: statusValue
+              });
+            } catch (fieldError) {
+              logger.warn('Failed to update Operational Status field (comment still posted)', {
+                routerId,
+                error: fieldError.message
+              });
+              // Don't fail if just the custom field update fails
+            }
           } catch (commentError) {
             logger.warn('Failed to add status change comment (status still updated)', {
               routerId,
