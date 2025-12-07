@@ -108,11 +108,20 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
   
   doc.text(`${displayName}: Uptime & Coverage Report`, 50, y + 8);
 
+  // Assigned Location (Subtitle)
+  let dateY = y + 15;
+  if (router?.clickup_location_task_name) {
+    doc.setFontSize(9);
+    doc.setTextColor(60);
+    doc.text(router.clickup_location_task_name, 50, dateY);
+    dateY += 5;
+  }
+
   // Subtitle with full date range
   doc.setFontSize(11);
   doc.setTextColor(80); // Dark grey
   const dateRange = `${format(new Date(startDate), 'MMMM do, yyyy')} - ${format(new Date(endDate), 'MMMM do, yyyy')}`;
-  doc.text(dateRange, 50, y + 15);
+  doc.text(dateRange, 50, dateY);
   doc.setTextColor(0); // Reset to black
 
   // Metadata
@@ -145,11 +154,6 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
   }
 
   doc.text(`Router ID: ${routerId}`, 14, currentY);
-
-  if (router?.clickup_location_task_name) {
-    currentY += 6;
-    doc.text(`Assigned Location: ${router.clickup_location_task_name}`, 14, currentY);
-  }
 
   if (router?.imei) {
     currentY += 6;
