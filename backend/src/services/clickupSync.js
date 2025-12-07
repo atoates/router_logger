@@ -84,15 +84,34 @@ async function discoverMacAddressField() {
     const task = await clickupClient.getTask(taskId, 'default');
 
     if (task && task.custom_fields) {
-      // Look for a field named "MAC Address" or similar
-      const macField = task.custom_fields.find(field => 
+      // Find all potential MAC fields
+      const candidates = task.custom_fields.filter(field => 
         field.name && field.name.toLowerCase().includes('mac')
       );
 
-      if (macField) {
-        CUSTOM_FIELDS.MAC_ADDRESS = macField.id;
-        logger.info(`✓ Auto-discovered MAC Address field ID: ${macField.id} (name: "${macField.name}")`);
-        return macField.id;
+      if (candidates.length > 0) {
+        logger.info(`Found ${candidates.length} candidate fields for MAC Address:`, 
+          candidates.map(c => `${c.name} (${c.id}, type=${c.type})`).join(', ')
+        );
+
+        // 1. Look for exact match "MAC Address" (case insensitive)
+        let macField = candidates.find(f => f.name.toLowerCase() === 'mac address');
+        
+        // 2. Look for exact match "Mac Address"
+        if (!macField) {
+          macField = candidates.find(f => f.name === 'Mac Address');
+        }
+
+        // 3. Fallback to first candidate
+        if (!macField) {
+          macField = candidates[0];
+        }
+
+        if (macField) {
+          CUSTOM_FIELDS.MAC_ADDRESS = macField.id;
+          logger.info(`✓ Selected MAC Address field ID: ${macField.id} (name: "${macField.name}", type: ${macField.type})`);
+          return macField.id;
+        }
       }
     }
 
