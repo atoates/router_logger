@@ -65,7 +65,7 @@ async function insertLog(logData) {
   const query = `
     INSERT INTO router_logs (
       router_id, imei, timestamp, wan_ip, operator, mcc, mnc, network_type,
-      lac, tac, cell_id, rsrp, rsrq, rssi, sinr,
+      lac, tac, cell_id, rsrp, rsrq, rssi, sinr, earfcn, pc_id,
       latitude, longitude, location_accuracy,
       total_tx_bytes, total_rx_bytes,
       uptime_seconds, firmware_version, cpu_usage, memory_free, status,
@@ -75,7 +75,7 @@ async function insertLog(logData) {
     )
     VALUES (
       $1, $2, $3, $4, $5, $6, $7, $8,
-      $9, $10, $11, $12, $13, $14, $15,
+      $9, $10, $11, $12, $13, $14, $15, $40, $41,
       $16, $17, $18,
       $19, $20,
       $21, $22, $23, $24, $25,
@@ -125,7 +125,9 @@ async function insertLog(logData) {
     logData.wan_ipv6,
     logData.vpn_status,
     logData.vpn_name,
-    logData.eth_link_up
+    logData.eth_link_up,
+    logData.earfcn,
+    logData.pc_id
   ];
   
   try {
@@ -149,7 +151,13 @@ async function getAllRouters() {
         wan_ip,
         operator,
         latitude,
-        longitude
+        longitude,
+        cell_id,
+        tac,
+        mcc,
+        mnc,
+        earfcn,
+        pc_id
       FROM router_logs
       ORDER BY router_id, timestamp DESC
     ),
@@ -199,6 +207,12 @@ async function getAllRouters() {
       ll.operator,
       ll.latitude,
       ll.longitude,
+      ll.cell_id,
+      ll.tac,
+      ll.mcc,
+      ll.mnc,
+      ll.earfcn,
+      ll.pc_id,
       COALESCE(li.imei, r.imei) as imei,
       COALESCE(lf.firmware_version, r.firmware_version) as firmware_version
     FROM routers r

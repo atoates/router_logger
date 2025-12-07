@@ -60,6 +60,8 @@ async function processRouterTelemetry(data) {
       rsrq: data.cell?.rsrq,
       rssi: data.cell?.rssi,
       sinr: data.cell?.sinr,
+      earfcn: data.cell?.earfcn,
+      pc_id: data.cell?.pc_id || data.cell?.pci || data.cell?.phys_cell_id,
       
       // Location (enriched)
       latitude: geoData?.latitude,
