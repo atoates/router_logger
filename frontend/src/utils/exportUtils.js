@@ -231,8 +231,7 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
     ['Total Records', totalRecords],
     ['Online Records', onlineRecords],
     ['Overall Uptime', `${uptimePercent.toFixed(2)}%`],
-    ['Total Uptime', fmtHMS(totalUptimeSec)],
-    ['Longest Offline Streak', fmtHMS(longestOfflineSec)]
+    ['Total Uptime', fmtHMS(totalUptimeSec)]
   ];
   doc.autoTable({
     startY: summaryStartY + 4,
