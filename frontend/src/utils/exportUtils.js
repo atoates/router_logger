@@ -253,7 +253,14 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
 
   const fmtHMS = (sec) => {
     const s = Math.max(0, Math.floor(sec));
-    const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), ss = s%60;
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const ss = s % 60;
+    
+    if (d > 0) {
+      return `${d}d ${h}h ${m}m ${ss}s`;
+    }
     return `${h}h ${m}m ${ss}s`;
   };
 
