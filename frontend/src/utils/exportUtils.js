@@ -108,6 +108,13 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
   
   doc.text(`${displayName}: Uptime & Coverage Report`, 50, y + 8);
 
+  // Subtitle with full date range
+  doc.setFontSize(11);
+  doc.setTextColor(80); // Dark grey
+  const dateRange = `${format(new Date(startDate), 'MMMM do, yyyy')} - ${format(new Date(endDate), 'MMMM do, yyyy')}`;
+  doc.text(dateRange, 50, y + 15);
+  doc.setTextColor(0); // Reset to black
+
   // Metadata
   doc.setFontSize(11);
   let currentY = y + 30; // Start lower to clear logo
@@ -157,9 +164,6 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
     doc.text(`Location: ${locationText}`, 14, currentY);
   }
 
-  currentY += 6;
-  doc.text(`Period: ${format(new Date(startDate), 'yyyy-MM-dd HH:mm')} to ${format(new Date(endDate), 'yyyy-MM-dd HH:mm')}`, 14, currentY);
-  
   currentY += 6;
   doc.text(`Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`, 14, currentY);
   
