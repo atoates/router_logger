@@ -106,7 +106,9 @@ function transformRMSDeviceToTelemetry(device, monitoring) {
       rsrp: cellular.rsrp,
       rsrq: cellular.rsrq,
       rssi: cellular.rssi,
-      sinr: cellular.sinr
+      sinr: cellular.sinr,
+      earfcn: cellular.earfcn,
+      pc_id: cellular.pc_id || cellular.pci || cellular.phys_cell_id
     },
     
     // Data Counters
