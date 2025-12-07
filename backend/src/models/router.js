@@ -145,7 +145,11 @@ async function getAllRouters() {
       SELECT DISTINCT ON (router_id)
         router_id,
         status as current_status,
-        timestamp
+        timestamp,
+        wan_ip,
+        operator,
+        latitude,
+        longitude
       FROM router_logs
       ORDER BY router_id, timestamp DESC
     ),
@@ -191,6 +195,10 @@ async function getAllRouters() {
       r.clickup_assignees, r.clickup_task_status, r.mac_address,
       COALESCE(lc.log_count, 0) as log_count,
       ll.current_status,
+      ll.wan_ip,
+      ll.operator,
+      ll.latitude,
+      ll.longitude,
       COALESCE(li.imei, r.imei) as imei,
       COALESCE(lf.firmware_version, r.firmware_version) as firmware_version
     FROM routers r

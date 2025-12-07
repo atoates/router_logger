@@ -99,16 +99,37 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
 
   // Metadata
   doc.setFontSize(11);
-  doc.text(`Router ID: ${routerId}`, 14, y + 24);
+  let currentY = y + 24;
+  doc.text(`Router ID: ${routerId}`, 14, currentY);
+
   if (router?.imei) {
-    doc.text(`IMEI: ${router.imei}`, 14, y + 30);
-    doc.text(`Period: ${format(new Date(startDate), 'yyyy-MM-dd HH:mm')} to ${format(new Date(endDate), 'yyyy-MM-dd HH:mm')}`, 14, y + 36);
-    doc.text(`Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`, 14, y + 42);
-    y += 6; // Adjust for extra line
-  } else {
-    doc.text(`Period: ${format(new Date(startDate), 'yyyy-MM-dd HH:mm')} to ${format(new Date(endDate), 'yyyy-MM-dd HH:mm')}`, 14, y + 30);
-    doc.text(`Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`, 14, y + 36);
+    currentY += 6;
+    doc.text(`IMEI: ${router.imei}`, 14, currentY);
   }
+
+  if (router?.operator) {
+    currentY += 6;
+    doc.text(`Network Provider: ${router.operator}`, 14, currentY);
+  }
+
+  if (router?.wan_ip) {
+    currentY += 6;
+    doc.text(`IP Address: ${router.wan_ip}`, 14, currentY);
+  }
+
+  if (router?.latitude && router?.longitude) {
+    currentY += 6;
+    doc.text(`Location: ${router.latitude}, ${router.longitude}`, 14, currentY);
+  }
+
+  currentY += 6;
+  doc.text(`Period: ${format(new Date(startDate), 'yyyy-MM-dd HH:mm')} to ${format(new Date(endDate), 'yyyy-MM-dd HH:mm')}`, 14, currentY);
+  
+  currentY += 6;
+  doc.text(`Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`, 14, currentY);
+  
+  // Update y for subsequent sections
+  y = currentY;
 
   // Sort uptime records ascending by timestamp for analysis
   const sorted = (uptimeData || []).slice().sort((a,b)=> new Date(a.timestamp) - new Date(b.timestamp));
@@ -162,7 +183,7 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
 
   // Summary table
   doc.setFontSize(14);
-  const summaryStartY = y + 46;
+  const summaryStartY = y + 10;
   doc.text('Uptime Summary', 14, summaryStartY);
   const summaryData = [
     ['Total Records', totalRecords],
