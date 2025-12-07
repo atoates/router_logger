@@ -96,7 +96,43 @@ async function getCellLocationUnwired(cellInfo) {
   }
 }
 
+/**
+ * Get approximate location from IP address
+ * @param {string} ip - IP address
+ * @returns {Object} - Location data {latitude, longitude, city, region, country, org}
+ */
+async function getIpLocation(ip) {
+  if (!ip || ip === '127.0.0.1' || ip === 'localhost') {
+    return null;
+  }
+
+  try {
+    // Using ip-api.com (free for non-commercial, no key required for basic)
+    // Note: Free endpoint is HTTP only, but we are in backend so it's fine.
+    // Rate limit: 45 requests per minute
+    const url = `http://ip-api.com/json/${ip}`;
+    const response = await axios.get(url, { timeout: 5000 });
+    
+    if (response.data && response.data.status === 'success') {
+      return {
+        latitude: response.data.lat,
+        longitude: response.data.lon,
+        city: response.data.city,
+        region: response.data.regionName,
+        country: response.data.country,
+        org: response.data.isp || response.data.org
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    logger.warn(`Error fetching IP location for ${ip}:`, error.message);
+    return null;
+  }
+}
+
 module.exports = {
   getCellLocation,
-  getCellLocationUnwired
+  getCellLocationUnwired,
+  getIpLocation
 };

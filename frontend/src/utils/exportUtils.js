@@ -2,6 +2,7 @@ import Papa from 'papaparse';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { format } from 'date-fns';
+import { getRouterGeo } from '../services/api';
 
 /**
  * Export logs to CSV
@@ -117,9 +118,28 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
     doc.text(`IP Address: ${router.wan_ip}`, 14, currentY);
   }
 
+  // Location: Prefer lat/long, fallback to IP geolocation
+  let locationText = null;
   if (router?.latitude && router?.longitude) {
+    locationText = `${router.latitude}, ${router.longitude} (Cell Tower)`;
+  } else if (router?.wan_ip) {
+    try {
+      const geoRes = await getRouterGeo(router.wan_ip);
+      if (geoRes.data) {
+        const { city, region, country, org } = geoRes.data;
+        const parts = [city, region, country].filter(Boolean);
+        if (parts.length > 0) {
+          locationText = `${parts.join(', ')} (IP: ${org || 'Unknown ISP'})`;
+        }
+      }
+    } catch (e) {
+      // Ignore geo lookup errors
+    }
+  }
+
+  if (locationText) {
     currentY += 6;
-    doc.text(`Location: ${router.latitude}, ${router.longitude}`, 14, currentY);
+    doc.text(`Location: ${locationText}`, 14, currentY);
   }
 
   currentY += 6;
@@ -175,6 +195,13 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
     if (run > longestOfflineSec) longestOfflineSec = run;
   }
 
+  // Calculate Total Uptime (Total Duration - Total Offline)
+  let totalDurationSec = 0;
+  if (sorted.length > 1) {
+    totalDurationSec = (new Date(sorted[sorted.length-1].timestamp) - new Date(sorted[0].timestamp)) / 1000;
+  }
+  const totalUptimeSec = Math.max(0, totalDurationSec - totalOfflineSec);
+
   const fmtHMS = (sec) => {
     const s = Math.max(0, Math.floor(sec));
     const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), ss = s%60;
@@ -189,7 +216,7 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
     ['Total Records', totalRecords],
     ['Online Records', onlineRecords],
     ['Overall Uptime', `${uptimePercent.toFixed(2)}%`],
-    ['Total Offline', fmtHMS(totalOfflineSec)],
+    ['Total Uptime', fmtHMS(totalUptimeSec)],
     ['Longest Offline Streak', fmtHMS(longestOfflineSec)]
   ];
   doc.autoTable({

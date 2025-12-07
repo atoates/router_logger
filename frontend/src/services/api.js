@@ -69,6 +69,7 @@ export const getInspectionHistory = (routerId) => api.get(`/inspections/${router
 
 // Router Status
 export const getRouterStatusSummary = () => api.get('/routers/status-summary');
+export const getRouterGeo = (ip) => api.get('/routers/geo', { params: { ip } });
 
 // Monitoring
 export const getRMSUsage = () => api.get('/monitoring/rms-usage');

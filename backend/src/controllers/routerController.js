@@ -8,6 +8,7 @@ const { logger } = require('../config/database');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const cacheManager = require('../services/cacheManager');
 const { getAllRouters } = require('../models/router');
+const { getIpLocation } = require('../services/geoService');
 
 /**
  * POST /log
@@ -87,6 +88,31 @@ async function getRouters(req, res) {
 }
 
 /**
+ * GET /routers/:id/geo
+ * Get geolocation for a router (from cell or IP)
+ */
+async function getRouterGeo(req, res) {
+  try {
+    const { ip } = req.query;
+    
+    if (!ip) {
+      return res.status(400).json({ error: 'IP address is required' });
+    }
+    
+    const location = await getIpLocation(ip);
+    
+    if (!location) {
+      return res.status(404).json({ error: 'Location not found for this IP' });
+    }
+    
+    res.json(location);
+  } catch (error) {
+    logger.error('Error fetching router geo:', error);
+    res.status(500).json({ error: 'Failed to fetch geolocation' });
+  }
+}
+
+/**
  * Deduplicate routers by name
  * Prefers: serial-like IDs > more logs > more recent last_seen
  */
@@ -130,7 +156,8 @@ function deduplicateRoutersByName(routers) {
 
 module.exports = {
   logTelemetry,
-  getRouters
+  getRouters,
+  getRouterGeo
 };
 
 

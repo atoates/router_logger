@@ -89,6 +89,11 @@ router.post('/log', routerController.logTelemetry);
  */
 router.get('/routers', routerController.getRouters);
 
+/**
+ * GET /routers/geo - Get geolocation from IP
+ */
+router.get('/routers/geo', routerController.getRouterGeo);
+
 // ============================================================================
 // STATS ENDPOINTS - Still need refactoring (TODO: statsController.js)
 // ============================================================================
