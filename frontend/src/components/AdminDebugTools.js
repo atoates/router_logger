@@ -195,6 +195,7 @@ function AdminDebugTools() {
         <h3>ClickUp Sync</h3>
         <p className="debug-description">
           Force sync all router data to ClickUp (firmware, status, last seen, IMEI, MAC address, etc.). 
+          Also pulls latest assignees from ClickUp to local database.
           This will update all custom fields in ClickUp tasks. Smart sync will skip routers that haven't changed.
         </p>
         

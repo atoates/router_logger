@@ -528,6 +528,18 @@ async function syncAllRoutersToClickUp(force = false) {
       }
     }
 
+    // If force is true, also sync assignees from ClickUp to ensure database matches
+    // This fixes issues where manual assignee changes in ClickUp aren't reflected in the app
+    if (force) {
+      logger.info('Force sync enabled: Pulling latest assignees from ClickUp...');
+      try {
+        await syncAssigneesFromClickUp();
+      } catch (assigneeError) {
+        logger.error('Error syncing assignees during force sync:', assigneeError);
+        // Don't fail the whole sync
+      }
+    }
+
     const duration = Date.now() - startTime;
     lastSyncTime = new Date();
     syncStats.totalSyncs++;
