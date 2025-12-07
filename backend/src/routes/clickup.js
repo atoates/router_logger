@@ -1098,13 +1098,19 @@ router.get('/sync/stats', (req, res) => {
 router.post('/sync', async (req, res) => {
   try {
     logger.info('Manual ClickUp sync triggered (FORCE MODE)');
-    const result = await syncAllRoutersToClickUp(true); // Pass true to force sync
+    
+    // Run in background
+    syncAllRoutersToClickUp(true).catch(err => {
+      logger.error('Error during background ClickUp sync:', sanitizeError(err));
+    });
+
     res.json({
       success: true,
-      ...result
+      message: 'Sync started in background',
+      status: 'running'
     });
   } catch (error) {
-    logger.error('Error during manual ClickUp sync:', sanitizeError(error));
+    logger.error('Error triggering ClickUp sync:', sanitizeError(error));
     res.status(500).json({ error: error.message });
   }
 });

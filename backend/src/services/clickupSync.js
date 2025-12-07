@@ -30,6 +30,7 @@ const STATUS_OPTIONS = {
 
 let syncIntervalId = null;
 let lastSyncTime = null;
+let isSyncing = false;
 let syncStats = {
   totalSyncs: 0,
   lastSyncUpdated: 0,
@@ -462,6 +463,12 @@ async function calculateAllRouterDataUsage() {
  * Sync all routers with linked ClickUp tasks
  */
 async function syncAllRoutersToClickUp(force = false) {
+  if (isSyncing) {
+    logger.warn('ClickUp sync already in progress, skipping');
+    return { skipped: true, reason: 'already_running' };
+  }
+
+  isSyncing = true;
   const startTime = Date.now();
   logger.info(`Starting ClickUp sync for all routers...${force ? ' (FORCE MODE)' : ''}`);
 
@@ -580,6 +587,8 @@ async function syncAllRoutersToClickUp(force = false) {
   } catch (error) {
     logger.error('Error during ClickUp sync:', error);
     throw error;
+  } finally {
+    isSyncing = false;
   }
 }
 
@@ -779,7 +788,8 @@ function getSyncStats() {
   return {
     ...syncStats,
     lastSyncTime,
-    isRunning: !!syncIntervalId
+    isRunning: !!syncIntervalId,
+    isSyncing
   };
 }
 

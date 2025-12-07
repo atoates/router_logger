@@ -81,6 +81,54 @@ function AdminDebugTools() {
     
     try {
       const response = await forceClickUpSync();
+      
+      // Handle background sync (new behavior)
+      if (response.data.status === 'running') {
+        setClickupMessage('⏳ Sync started in background. Waiting for completion...');
+        
+        // Poll for status
+        const pollInterval = setInterval(async () => {
+          try {
+            const statsResponse = await getClickUpSyncStats();
+            const stats = statsResponse.data;
+            
+            if (!stats.isSyncing) {
+              clearInterval(pollInterval);
+              setSyncStats(stats);
+              
+              const { lastSyncUpdated, lastSyncSkipped, lastSyncErrors } = stats;
+              
+              if (lastSyncErrors > 0) {
+                setClickupMessage(`⚠️ Sync completed with errors: ${lastSyncUpdated} updated, ${lastSyncSkipped || 0} skipped, ${lastSyncErrors} errors`);
+              } else {
+                setClickupMessage(`✅ Sync completed successfully: ${lastSyncUpdated} updated, ${lastSyncSkipped || 0} skipped`);
+              }
+              setClickupSyncing(false);
+            } else {
+               setClickupMessage('⏳ Syncing in progress...');
+            }
+          } catch (err) {
+            console.error('Error polling sync stats:', err);
+          }
+        }, 2000);
+        
+        // Stop polling after 5 minutes (safety)
+        setTimeout(() => {
+          clearInterval(pollInterval);
+          // Only update state if still syncing (might have finished)
+          setClickupSyncing(prev => {
+            if (prev) {
+              setClickupMessage('⚠️ Sync timed out or is taking longer than expected. Check stats later.');
+              return false;
+            }
+            return prev;
+          });
+        }, 5 * 60 * 1000);
+        
+        return;
+      }
+
+      // Handle synchronous response (old behavior)
       const { updated, skipped, errors, total } = response.data;
       
       setSyncStats(response.data);
@@ -92,6 +140,7 @@ function AdminDebugTools() {
       } else {
         setClickupMessage(`✅ All routers synced successfully: ${updated}/${total} updated`);
       }
+      setClickupSyncing(false);
     } catch (error) {
       console.error('ClickUp sync error:', error);
       let errorMsg = '❌ Sync failed: ';
@@ -108,7 +157,6 @@ function AdminDebugTools() {
       }
       
       setClickupMessage(errorMsg);
-    } finally {
       setClickupSyncing(false);
     }
   };

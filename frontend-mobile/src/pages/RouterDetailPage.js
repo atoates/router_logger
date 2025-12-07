@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { getRouters, unlinkRouterFromLocation, removeRouterAssignees } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -9,6 +9,7 @@ import './RouterDetailPage.css';
 function RouterDetailPage() {
   const { routerId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [router, setRouter] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -18,8 +19,10 @@ function RouterDetailPage() {
   const { isAdmin } = useAuth();
 
   useEffect(() => {
-    fetchRouter();
-  }, [routerId]);
+    const searchParams = new URLSearchParams(location.search);
+    const shouldRefresh = searchParams.get('refresh');
+    fetchRouter(!!shouldRefresh);
+  }, [routerId, location.search]);
 
   // Refresh router data when component becomes visible (e.g., after navigation)
   useEffect(() => {
