@@ -37,6 +37,13 @@ let syncStats = {
   lastSyncErrors: 0,
   lastSyncDuration: 0
 };
+let syncProgress = {
+  total: 0,
+  processed: 0,
+  updated: 0,
+  skipped: 0,
+  errors: 0
+};
 
 /**
  * Check if smart sync is enabled in settings
@@ -506,6 +513,15 @@ async function syncAllRoutersToClickUp(force = false) {
       return { updated: 0, errors: 0, total: 0 };
     }
 
+    // Reset progress
+    syncProgress = {
+      total: routers.length,
+      processed: 0,
+      updated: 0,
+      skipped: 0,
+      errors: 0
+    };
+
     // Calculate 30-day data usage for ALL routers at once (much faster!)
     logger.info('Calculating 30-day data usage for all routers...');
     const dataUsageMap = await calculateAllRouterDataUsage();
@@ -530,17 +546,23 @@ async function syncAllRoutersToClickUp(force = false) {
         if (result.success) {
           if (result.skipped) {
             skipped++;
+            syncProgress.skipped++;
           } else {
             updated++;
+            syncProgress.updated++;
           }
         } else {
           errors++;
+          syncProgress.errors++;
           logger.warn(`Failed to sync router ${router.router_id}: ${result.error}`);
         }
       } catch (error) {
         errors++;
+        syncProgress.errors++;
         logger.warn(`Failed to sync router ${router.router_id}: ${error.message}`);
       }
+
+      syncProgress.processed++;
 
       // Delay between routers to avoid rate limiting (except after last router)
       // Skip delay for skipped routers to speed up sync
@@ -789,7 +811,8 @@ function getSyncStats() {
     ...syncStats,
     lastSyncTime,
     isRunning: !!syncIntervalId,
-    isSyncing
+    isSyncing,
+    progress: isSyncing ? syncProgress : null
   };
 }
 

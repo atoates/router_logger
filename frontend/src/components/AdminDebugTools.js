@@ -105,7 +105,13 @@ function AdminDebugTools() {
               }
               setClickupSyncing(false);
             } else {
-               setClickupMessage('⏳ Syncing in progress...');
+               if (stats.progress && stats.progress.total > 0) {
+                 const { processed, total, updated, errors } = stats.progress;
+                 const percent = Math.round((processed / total) * 100);
+                 setClickupMessage(`⏳ Syncing in progress... ${percent}% (${processed}/${total}) - ${updated} updated, ${errors} errors`);
+               } else {
+                 setClickupMessage('⏳ Syncing in progress...');
+               }
             }
           } catch (err) {
             console.error('Error polling sync stats:', err);
