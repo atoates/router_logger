@@ -13,6 +13,20 @@ const express = require('express');
 const router = express.Router();
 const { requireAuth, requireAdmin, requireRouterAccess } = require('./session');
 
+// Some endpoints are router-scoped (guests can access assigned routers), others are global (admin-only).
+function requireAdminOrRouterAccess(req, res, next) {
+  const routerId =
+    req.params.routerId ||
+    req.body?.router_id ||
+    req.query?.router_id ||
+    req.query?.routerId;
+
+  if (routerId) {
+    return requireRouterAccess(req, res, next);
+  }
+  return requireAdmin(req, res, next);
+}
+
 // Controllers (NEW - proper separation of concerns)
 const adminController = require('../controllers/adminController');
 const routerController = require('../controllers/routerController');
@@ -87,18 +101,18 @@ router.post('/log', routerController.logTelemetry);
  * BEFORE: 60 lines of caching, ETag, deduplication logic in route
  * AFTER: Controller handles it
  */
-router.get('/routers', routerController.getRouters);
+router.get('/routers', requireAuth, routerController.getRouters);
 
 /**
  * GET /routers/geo - Get geolocation from IP
  */
-router.get('/routers/geo', routerController.getRouterGeo);
+router.get('/routers/geo', requireAuth, routerController.getRouterGeo);
 
 // ============================================================================
 // STATS ENDPOINTS - Still need refactoring (TODO: statsController.js)
 // ============================================================================
 
-router.get('/logs', async (req, res) => {
+router.get('/logs', requireAdminOrRouterAccess, async (req, res) => {
   try {
     const filters = {
       router_id: req.query.router_id,
@@ -115,7 +129,7 @@ router.get('/logs', async (req, res) => {
   }
 });
 
-router.get('/stats/usage', async (req, res) => {
+router.get('/stats/usage', requireRouterAccess, async (req, res) => {
   try {
     const { router_id, start_date, end_date } = req.query;
     
@@ -133,7 +147,7 @@ router.get('/stats/usage', async (req, res) => {
   }
 });
 
-router.get('/stats/uptime', async (req, res) => {
+router.get('/stats/uptime', requireRouterAccess, async (req, res) => {
   try {
     const { router_id, start_date, end_date } = req.query;
     
@@ -151,7 +165,7 @@ router.get('/stats/uptime', async (req, res) => {
   }
 });
 
-router.get('/stats/storage', async (req, res) => {
+router.get('/stats/storage', requireAdmin, async (req, res) => {
   try {
     const sampleSize = req.query.sample_size ? Number(req.query.sample_size) : 1000;
     const stats = await getStorageStats(sampleSize);
@@ -162,7 +176,7 @@ router.get('/stats/storage', async (req, res) => {
   }
 });
 
-router.get('/stats/top-routers', async (req, res) => {
+router.get('/stats/top-routers', requireAdmin, async (req, res) => {
   try {
     const days = req.query.days ? Number(req.query.days) : 7;
     const limit = req.query.limit ? Number(req.query.limit) : 5;
@@ -174,7 +188,7 @@ router.get('/stats/top-routers', async (req, res) => {
   }
 });
 
-router.get('/stats/network-usage', async (req, res) => {
+router.get('/stats/network-usage', requireAdmin, async (req, res) => {
   try {
     const days = req.query.days ? Number(req.query.days) : 7;
     const data = await getNetworkUsageByDay(days);
@@ -185,7 +199,7 @@ router.get('/stats/network-usage', async (req, res) => {
   }
 });
 
-router.get('/stats/operators', async (req, res) => {
+router.get('/stats/operators', requireAdmin, async (req, res) => {
   try {
     const days = req.query.days ? Number(req.query.days) : 7;
     const data = await getOperatorDistribution(days);
@@ -196,7 +210,7 @@ router.get('/stats/operators', async (req, res) => {
   }
 });
 
-router.get('/stats/operators-rolling', async (req, res) => {
+router.get('/stats/operators-rolling', requireAdmin, async (req, res) => {
   try {
     const hours = req.query.hours ? Number(req.query.hours) : 24;
     const data = await getOperatorDistributionRolling(hours);
@@ -207,7 +221,7 @@ router.get('/stats/operators-rolling', async (req, res) => {
   }
 });
 
-router.get('/stats/network-usage-rolling', async (req, res) => {
+router.get('/stats/network-usage-rolling', requireAdmin, async (req, res) => {
   try {
     const hours = req.query.hours ? Number(req.query.hours) : 24;
     const bucket = (req.query.bucket || 'hour').toString();
@@ -219,7 +233,7 @@ router.get('/stats/network-usage-rolling', async (req, res) => {
   }
 });
 
-router.get('/stats/top-routers-rolling', async (req, res) => {
+router.get('/stats/top-routers-rolling', requireAdmin, async (req, res) => {
   try {
     const hours = req.query.hours ? Number(req.query.hours) : 24;
     const limit = req.query.limit ? Number(req.query.limit) : 5;
@@ -231,7 +245,7 @@ router.get('/stats/top-routers-rolling', async (req, res) => {
   }
 });
 
-router.get('/stats/db-size', async (req, res) => {
+router.get('/stats/db-size', requireAdmin, async (req, res) => {
   try {
     const data = await getDatabaseSizeStats();
     res.json(data);
@@ -241,7 +255,7 @@ router.get('/stats/db-size', async (req, res) => {
   }
 });
 
-router.get('/stats/inspections', async (req, res) => {
+router.get('/stats/inspections', requireAdmin, async (req, res) => {
   try {
     const data = await getInspectionStatus();
     res.json(data);
@@ -255,7 +269,7 @@ router.get('/stats/inspections', async (req, res) => {
 // PROPERTY/LOCATION ENDPOINTS - Using service layer (good pattern)
 // ============================================================================
 
-router.get('/routers/:routerId/current-location', async (req, res) => {
+router.get('/routers/:routerId/current-location', requireRouterAccess, async (req, res) => {
   try {
     const { routerId } = req.params;
     const location = await getCurrentLocation(routerId);
@@ -266,7 +280,7 @@ router.get('/routers/:routerId/current-location', async (req, res) => {
   }
 });
 
-router.get('/routers/with-locations', async (req, res) => {
+router.get('/routers/with-locations', requireAdmin, async (req, res) => {
   try {
     // Check cache
     const cached = cacheManager.getRoutersWithLocationsCache();
@@ -302,7 +316,7 @@ router.get('/routers/with-locations', async (req, res) => {
   }
 });
 
-router.get('/routers/by-assignees', async (req, res) => {
+router.get('/routers/by-assignees', requireAdmin, async (req, res) => {
   try {
     // Check cache
     const cached = cacheManager.getAssigneesCache();
@@ -486,7 +500,7 @@ router.post('/routers/:routerId/remove-assignees', requireAdmin, async (req, res
 // ============================================================================
 
 // GET decommissioned routers
-router.get('/routers/decommissioned', async (req, res) => {
+router.get('/routers/decommissioned', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT 
@@ -521,7 +535,7 @@ router.get('/routers/decommissioned', async (req, res) => {
 });
 
 // GET routers being returned
-router.get('/routers/being-returned', async (req, res) => {
+router.get('/routers/being-returned', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT 
@@ -555,7 +569,7 @@ router.get('/routers/being-returned', async (req, res) => {
 });
 
 // GET routers that need attention
-router.get('/routers/needs-attention', async (req, res) => {
+router.get('/routers/needs-attention', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT 
@@ -820,7 +834,7 @@ router.post('/inspections/:routerId', requireAdmin, async (req, res) => {
 });
 
 // GET inspection history for a router
-router.get('/inspections/:routerId', async (req, res) => {
+router.get('/inspections/:routerId', requireRouterAccess, async (req, res) => {
   try {
     const { routerId } = req.params;
     const history = await getInspectionHistory(routerId);
@@ -845,7 +859,7 @@ router.post('/clear-clickup-tasks', requireAdmin, async (req, res) => {
   }
 });
 
-router.get('/routers/status-summary', async (req, res) => {
+router.get('/routers/status-summary', requireAdmin, async (req, res) => {
   try {
     const currentResult = await pool.query(`
       SELECT 

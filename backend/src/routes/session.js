@@ -9,14 +9,54 @@ const crypto = require('crypto');
 const { logger, pool } = require('../config/database');
 const authService = require('../services/authService');
 
-// Simple in-memory session store (use Redis in production)
-const sessions = new Map();
-
 // Session expiry: 7 days
 const SESSION_EXPIRY = 7 * 24 * 60 * 60 * 1000;
 
 // Feature flag for authentication (set via environment)
 const AUTH_ENABLED = process.env.ENABLE_AUTH === 'true';
+
+function hashSessionToken(sessionToken) {
+  return crypto.createHash('sha256').update(String(sessionToken)).digest('hex');
+}
+
+async function getSessionFromRequest(req) {
+  const sessionToken = req.headers.authorization?.replace('Bearer ', '');
+  if (!sessionToken) return null;
+
+  const tokenHash = hashSessionToken(sessionToken);
+  const result = await pool.query(
+    `SELECT user_id, username, role, expires_at
+     FROM user_sessions
+     WHERE session_token_hash = $1
+     LIMIT 1`,
+    [tokenHash]
+  );
+
+  if (result.rows.length === 0) return null;
+
+  const row = result.rows[0];
+  const expiresAt = new Date(row.expires_at);
+
+  if (expiresAt.getTime() < Date.now()) {
+    // Expired - cleanup
+    await pool.query('DELETE FROM user_sessions WHERE session_token_hash = $1', [tokenHash]);
+    return null;
+  }
+
+  // Update last_seen asynchronously (best-effort)
+  pool.query(
+    'UPDATE user_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE session_token_hash = $1',
+    [tokenHash]
+  ).catch(() => {});
+
+  return {
+    tokenHash,
+    userId: row.user_id,
+    username: row.username,
+    role: row.role,
+    expiresAt
+  };
+}
 
 /**
  * POST /api/session/login
@@ -44,15 +84,15 @@ router.post('/login', async (req, res) => {
     // Generate session token
     const sessionToken = crypto.randomBytes(32).toString('hex');
     const expiresAt = Date.now() + SESSION_EXPIRY;
+    const tokenHash = hashSessionToken(sessionToken);
 
-    // Store session with user info
-    sessions.set(sessionToken, {
-      createdAt: Date.now(),
-      expiresAt,
-      userId: user.id,
-      username: user.username,
-      role: user.role
-    });
+    // Store session in database (deploy/scale safe)
+    await pool.query(
+      `INSERT INTO user_sessions (session_token_hash, user_id, username, role, expires_at)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (session_token_hash) DO NOTHING`,
+      [tokenHash, user.id, user.username, user.role, new Date(expiresAt)]
+    );
 
     logger.info(`User logged in: ${user.username} (${user.role})`);
 
@@ -81,169 +121,149 @@ router.post('/login', async (req, res) => {
  */
 router.post('/logout', (req, res) => {
   const { sessionToken } = req.body;
-  
-  if (sessionToken) {
-    sessions.delete(sessionToken);
+
+  if (!sessionToken) {
+    return res.json({ success: true });
   }
 
-  res.json({ success: true });
+  const tokenHash = hashSessionToken(sessionToken);
+  pool.query('DELETE FROM user_sessions WHERE session_token_hash = $1', [tokenHash])
+    .catch((err) => logger.warn('Failed to delete session during logout', { error: err.message }));
+
+  return res.json({ success: true });
 });
 
 /**
  * GET /api/session/verify
  * Verify session token is valid
  */
-router.get('/verify', (req, res) => {
-  const sessionToken = req.headers.authorization?.replace('Bearer ', '');
-  
-  if (!sessionToken) {
-    return res.status(401).json({ valid: false, error: 'No session token' });
-  }
+router.get('/verify', async (req, res) => {
+  try {
+    const session = await getSessionFromRequest(req);
 
-  const session = sessions.get(sessionToken);
-  
-  if (!session) {
-    return res.status(401).json({ valid: false, error: 'Invalid session' });
-  }
+    if (!session) {
+      return res.status(401).json({ valid: false, error: 'Invalid or expired session' });
+    }
 
-  if (session.expiresAt < Date.now()) {
-    sessions.delete(sessionToken);
-    return res.status(401).json({ valid: false, error: 'Session expired' });
+    return res.json({
+      valid: true,
+      expiresAt: session.expiresAt.toISOString()
+    });
+  } catch (error) {
+    logger.error('Session verify error:', error);
+    return res.status(500).json({ valid: false, error: 'Failed to verify session' });
   }
-
-  res.json({
-    valid: true,
-    expiresAt: new Date(session.expiresAt).toISOString()
-  });
 });
 
 /**
  * Middleware to validate session (any authenticated user)
  */
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   // If auth is disabled, allow all requests
   if (!AUTH_ENABLED) {
     req.user = { id: 1, username: 'admin', role: 'admin' }; // Mock admin user
     return next();
   }
 
-  const sessionToken = req.headers.authorization?.replace('Bearer ', '');
-  
-  if (!sessionToken) {
-    return res.status(401).json({ error: 'Authentication required' });
+  try {
+    const session = await getSessionFromRequest(req);
+
+    if (!session) {
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+
+    req.user = {
+      id: session.userId,
+      username: session.username,
+      role: session.role
+    };
+
+    return next();
+  } catch (error) {
+    logger.error('Authentication error:', error);
+    return res.status(500).json({ error: 'Failed to authenticate' });
   }
-
-  const session = sessions.get(sessionToken);
-  
-  if (!session || session.expiresAt < Date.now()) {
-    if (session) sessions.delete(sessionToken);
-    return res.status(401).json({ error: 'Invalid or expired session' });
-  }
-
-  // Attach user info to request
-  req.user = {
-    id: session.userId,
-    username: session.username,
-    role: session.role
-  };
-
-  next();
 }
 
 /**
  * Middleware to require admin role
  */
-function requireAdmin(req, res, next) {
+async function requireAdmin(req, res, next) {
   // If auth is disabled, allow all requests
   if (!AUTH_ENABLED) {
     req.user = { id: 1, username: 'admin', role: 'admin' };
     return next();
   }
 
-  const sessionToken = req.headers.authorization?.replace('Bearer ', '');
-  
-  if (!sessionToken) {
-    return res.status(401).json({ error: 'Authentication required' });
+  try {
+    const session = await getSessionFromRequest(req);
+
+    if (!session) {
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    req.user = {
+      id: session.userId,
+      username: session.username,
+      role: session.role
+    };
+
+    return next();
+  } catch (error) {
+    logger.error('Admin auth error:', error);
+    return res.status(500).json({ error: 'Failed to authenticate' });
   }
-
-  const session = sessions.get(sessionToken);
-  
-  if (!session || session.expiresAt < Date.now()) {
-    if (session) sessions.delete(sessionToken);
-    return res.status(401).json({ error: 'Invalid or expired session' });
-  }
-
-  // Check if user is admin
-  if (session.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
-  }
-
-  // Attach user info to request
-  req.user = {
-    id: session.userId,
-    username: session.username,
-    role: session.role
-  };
-
-  next();
 }
 
 /**
  * Middleware to check router access for current user
  * Use this on routes that access specific routers
  */
-function requireRouterAccess(req, res, next) {
+async function requireRouterAccess(req, res, next) {
   // If auth is disabled, allow all requests
   if (!AUTH_ENABLED) {
     req.user = { id: 1, username: 'admin', role: 'admin' };
     return next();
   }
 
-  const sessionToken = req.headers.authorization?.replace('Bearer ', '');
-  
-  if (!sessionToken) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
+  try {
+    const session = await getSessionFromRequest(req);
 
-  const session = sessions.get(sessionToken);
-  
-  if (!session || session.expiresAt < Date.now()) {
-    if (session) sessions.delete(sessionToken);
-    return res.status(401).json({ error: 'Invalid or expired session' });
-  }
+    if (!session) {
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
 
-  // Attach user info to request
-  req.user = {
-    id: session.userId,
-    username: session.username,
-    role: session.role
-  };
+    req.user = {
+      id: session.userId,
+      username: session.username,
+      role: session.role
+    };
 
-  // Admins have access to all routers
-  if (session.role === 'admin') {
+    // Admins have access to all routers
+    if (session.role === 'admin') {
+      return next();
+    }
+
+    // For guests, check router assignment
+    const routerId = req.params.routerId || req.body.router_id || req.query.router_id;
+    if (!routerId) {
+      return res.status(400).json({ error: 'Router ID required' });
+    }
+
+    const hasAccess = await authService.hasRouterAccess(session.userId, routerId);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Access denied to this router' });
+    }
+
     return next();
+  } catch (error) {
+    logger.error('Error checking router access:', error);
+    return res.status(500).json({ error: 'Failed to verify access' });
   }
-
-  // For guests, check router assignment
-  // Extract router_id from params or body
-  const routerId = req.params.routerId || req.body.router_id || req.query.router_id;
-
-  if (!routerId) {
-    return res.status(400).json({ error: 'Router ID required' });
-  }
-
-  // Check access asynchronously
-  authService.hasRouterAccess(session.userId, routerId)
-    .then(hasAccess => {
-      if (!hasAccess) {
-        return res.status(403).json({ error: 'Access denied to this router' });
-      }
-      next();
-    })
-    .catch(error => {
-      logger.error('Error checking router access:', error);
-      res.status(500).json({ error: 'Failed to verify access' });
-    });
 }
 
 // Backwards compatibility alias
@@ -251,14 +271,10 @@ function requireSession(req, res, next) {
   return requireAuth(req, res, next);
 }
 
-// Cleanup expired sessions every hour
+// Cleanup expired sessions every hour (DB)
 setInterval(() => {
-  const now = Date.now();
-  for (const [token, session] of sessions.entries()) {
-    if (session.expiresAt < now) {
-      sessions.delete(token);
-    }
-  }
+  pool.query('DELETE FROM user_sessions WHERE expires_at < NOW()')
+    .catch((err) => logger.warn('Failed to cleanup expired sessions', { error: err.message }));
 }, 60 * 60 * 1000);
 
 module.exports = router;

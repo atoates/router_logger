@@ -7,6 +7,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool, logger } = require('../config/database');
+const { validateIronwifiWebhookPayload } = require('../utils/validation');
 
 /**
  * POST /api/ironwifi/webhook
@@ -23,14 +24,19 @@ router.post('/webhook', async (req, res) => {
     const webhookData = req.body;
     
     logger.info('IronWifi webhook received', {
-      headers: req.headers,
       bodyType: typeof webhookData,
       contentType: req.headers['content-type']
     });
 
-    // IronWifi might send different report types
-    // Log the full payload for debugging
-    logger.info('IronWifi webhook payload:', JSON.stringify(webhookData, null, 2));
+    // Validate basic shape; we always ACK 200 to avoid aggressive retries,
+    // but we will skip processing invalid payloads to protect the DB.
+    const validation = validateIronwifiWebhookPayload(webhookData);
+    if (!validation.ok) {
+      logger.warn('IronWifi webhook payload failed validation (skipping processing)', {
+        errors: validation.errors,
+        bodyType: typeof webhookData
+      });
+    }
 
     // Acknowledge receipt immediately
     res.status(200).json({
@@ -40,9 +46,11 @@ router.post('/webhook', async (req, res) => {
     });
 
     // Process webhook data asynchronously
-    processWebhookData(webhookData).catch(error => {
-      logger.error('Error processing IronWifi webhook:', error);
-    });
+    if (validation.ok) {
+      processWebhookData(webhookData).catch(error => {
+        logger.error('Error processing IronWifi webhook:', error);
+      });
+    }
 
   } catch (error) {
     logger.error('Error handling IronWifi webhook:', error);

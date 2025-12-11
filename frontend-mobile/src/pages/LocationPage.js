@@ -112,8 +112,9 @@ function LocationPage() {
       
       // Extract all lists from folderless and folders
       let lists = [];
-      if (data.folderless && data.folderless.length > 0) {
-        lists = lists.concat(data.folderless.map(list => ({
+      const folderlessLists = data.folderless || data.folderlessLists || [];
+      if (folderlessLists.length > 0) {
+        lists = lists.concat(folderlessLists.map(list => ({
           ...list,
           folderName: null
         })));

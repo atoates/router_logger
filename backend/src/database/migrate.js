@@ -2,6 +2,54 @@ const { pool, logger } = require('../config/database');
 const fs = require('fs');
 const path = require('path');
 
+async function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Stable advisory lock key for migrations (two int32 keys)
+const MIGRATIONS_LOCK_KEY1 = 214021; // arbitrary constant
+const MIGRATIONS_LOCK_KEY2 = 9001;   // arbitrary constant
+
+async function acquireMigrationsLock({ timeoutSeconds = 120 } = {}) {
+  const client = await pool.connect();
+  const deadline = Date.now() + timeoutSeconds * 1000;
+
+  try {
+    while (true) {
+      const res = await client.query(
+        'SELECT pg_try_advisory_lock($1, $2) AS locked',
+        [MIGRATIONS_LOCK_KEY1, MIGRATIONS_LOCK_KEY2]
+      );
+      const locked = !!res.rows?.[0]?.locked;
+      if (locked) {
+        return client;
+      }
+      if (Date.now() > deadline) {
+        logger.warn(`⚠️  Could not acquire migrations advisory lock within ${timeoutSeconds}s; skipping migrations on this instance.`);
+        client.release();
+        return null;
+      }
+      logger.info('Another instance is running migrations; waiting for advisory lock...');
+      await sleep(2000);
+    }
+  } catch (error) {
+    logger.error('Failed to acquire migrations advisory lock:', { message: error.message });
+    client.release();
+    return null;
+  }
+}
+
+async function releaseMigrationsLock(client) {
+  if (!client) return;
+  try {
+    await client.query('SELECT pg_advisory_unlock($1, $2)', [MIGRATIONS_LOCK_KEY1, MIGRATIONS_LOCK_KEY2]);
+  } catch (error) {
+    logger.warn('Failed to release migrations advisory lock:', { message: error.message });
+  } finally {
+    client.release();
+  }
+}
+
 // Initialize database tables from schema file
 async function initializeDatabase() {
   const client = await pool.connect();
@@ -102,6 +150,10 @@ async function runJSMigration(filePath, filename) {
  * Run all pending migrations in order
  */
 async function runMigrations() {
+  const timeoutSeconds = parseInt(process.env.MIGRATIONS_LOCK_TIMEOUT_SECONDS || '120', 10);
+  const lockClient = await acquireMigrationsLock({ timeoutSeconds });
+  if (!lockClient) return;
+
   try {
     // Ensure migrations table exists
     await createMigrationsTable();
@@ -166,6 +218,8 @@ async function runMigrations() {
     // Don't throw - log error but allow server to start
     // This matches the old behavior where failures don't crash the server
     logger.warn('⚠️  Server will continue despite migration errors');
+  } finally {
+    await releaseMigrationsLock(lockClient);
   }
 }
 

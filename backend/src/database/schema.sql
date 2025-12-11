@@ -133,12 +133,37 @@ CREATE TABLE IF NOT EXISTS clickup_oauth_tokens (
   UNIQUE(user_id)
 );
 
+-- ---------------------------------------------------------------------------
+-- Persisted session store (deploy/scale safe)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_sessions (
+  session_token_hash TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  username VARCHAR(255) NOT NULL,
+  role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'guest')),
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  last_seen_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+-- Short-lived OAuth state + PKCE verifier store (deploy/scale safe)
+CREATE TABLE IF NOT EXISTS oauth_state_store (
+  id SERIAL PRIMARY KEY,
+  provider VARCHAR(50) NOT NULL,
+  state VARCHAR(255) NOT NULL,
+  data JSONB,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMPTZ NOT NULL,
+  UNIQUE(provider, state)
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_router_logs_router_id ON router_logs(router_id);
 CREATE INDEX IF NOT EXISTS idx_router_logs_timestamp ON router_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_router_logs_router_timestamp ON router_logs(router_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_router_logs_router_ts ON router_logs (router_id, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_router_logs_ts ON router_logs (timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_router_logs_timestamp_brin ON router_logs USING brin (timestamp);
 
 CREATE INDEX IF NOT EXISTS idx_inspection_logs_router_id ON inspection_logs(router_id);
 CREATE INDEX IF NOT EXISTS idx_inspection_logs_inspected_at ON inspection_logs(inspected_at DESC);
@@ -149,6 +174,12 @@ CREATE INDEX IF NOT EXISTS idx_oauth_tokens_expires_at ON oauth_tokens(expires_a
 
 CREATE INDEX IF NOT EXISTS idx_routers_clickup_task ON routers(clickup_task_id);
 CREATE INDEX IF NOT EXISTS idx_clickup_tokens_user ON clickup_oauth_tokens(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
+
+CREATE INDEX IF NOT EXISTS idx_oauth_state_store_provider_state ON oauth_state_store(provider, state);
+CREATE INDEX IF NOT EXISTS idx_oauth_state_store_expires_at ON oauth_state_store(expires_at);
 
 CREATE INDEX IF NOT EXISTS idx_routers_location_task ON routers(clickup_location_task_id) WHERE clickup_location_task_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_routers_date_installed ON routers(date_installed) WHERE date_installed IS NOT NULL;
@@ -168,3 +199,8 @@ CREATE TRIGGER oauth_tokens_updated_at
 BEFORE UPDATE ON oauth_tokens
 FOR EACH ROW
 EXECUTE FUNCTION update_oauth_tokens_updated_at();
+
+-- Optional: archive table for long-term retention of router logs
+CREATE TABLE IF NOT EXISTS router_logs_archive (LIKE router_logs INCLUDING ALL);
+CREATE INDEX IF NOT EXISTS idx_router_logs_archive_router_ts ON router_logs_archive (router_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_router_logs_archive_timestamp_brin ON router_logs_archive USING brin (timestamp);

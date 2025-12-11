@@ -13,24 +13,13 @@ router.use(requireAdmin);
 const { startRMSSync, isRMSSyncRunning } = require('../services/rmsSync');
 const { logger } = require('../config/database');
 
-// Server-side state storage for OAuth (fixes mobile cookie issues)
-const oauthStates = new Map();
-
-// Clean up expired states every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [state, data] of oauthStates.entries()) {
-    if (data.expiresAt <= now) {
-      oauthStates.delete(state);
-    }
-  }
-}, 5 * 60 * 1000);
+// NOTE: OAuth state + PKCE verifier are persisted in Postgres by oauthService (deploy/scale safe).
 
 /**
  * GET /api/auth/rms/login
  * Redirect user to RMS OAuth authorization page
  */
-router.get('/rms/login', (req, res) => {
+router.get('/rms/login', async (req, res) => {
   try {
     if (!oauthService.isConfigured()) {
       return res.status(500).json({
@@ -39,13 +28,7 @@ router.get('/rms/login', (req, res) => {
       });
     }
 
-    const { authUrl, state } = oauthService.getAuthorizationUrl();
-    
-    // Store state server-side for CSRF protection (mobile-friendly)
-    oauthStates.set(state, {
-      createdAt: Date.now(),
-      expiresAt: Date.now() + (10 * 60 * 1000) // 10 minutes
-    });
+    const { authUrl, state } = await oauthService.getAuthorizationUrl();
     
     // Also set cookie as backup for desktop
     res.cookie('oauth_state', state, {
@@ -95,19 +78,14 @@ router.get('/rms/callback', async (req, res) => {
     }
 
     // Verify state matches (CSRF protection)
-    // Check server-side store first (mobile-friendly), then cookie (desktop fallback)
-    const serverState = oauthStates.get(state);
     const cookieState = req.cookies.oauth_state;
-    
-    const isValidState = (serverState && serverState.expiresAt > Date.now()) || (cookieState === state);
-    
-    if (!isValidState) {
+
+    // If cookie exists (desktop), it must match. If cookie is missing (mobile), allow.
+    if (cookieState && cookieState !== state) {
       logger.error('State mismatch - possible CSRF attack', {
         received: state,
-        hasServerState: !!serverState,
-        serverStateExpired: serverState ? serverState.expiresAt <= Date.now() : null,
         hasCookieState: !!cookieState,
-        cookieMatches: cookieState === state
+        cookieMatches: false
       });
       return res.status(400).json({
         success: false,
@@ -115,8 +93,17 @@ router.get('/rms/callback', async (req, res) => {
       });
     }
 
-    // Clear state from both stores
-    oauthStates.delete(state);
+    // Require that PKCE verifier exists for this state (mobile-friendly, deploy/scale safe)
+    const hasPkce = await oauthService.hasValidPKCEVerifier(state);
+    if (!hasPkce) {
+      logger.error('State not found/expired in PKCE store', { state });
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid or expired state parameter'
+      });
+    }
+
+    // Clear cookie (PKCE verifier is consumed inside exchangeCodeForToken)
     res.clearCookie('oauth_state');
 
     // Exchange code for token

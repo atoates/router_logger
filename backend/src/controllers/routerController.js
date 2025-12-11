@@ -7,8 +7,9 @@ const crypto = require('crypto');
 const { logger } = require('../config/database');
 const { processRouterTelemetry } = require('../services/telemetryProcessor');
 const cacheManager = require('../services/cacheManager');
-const { getAllRouters } = require('../models/router');
+const { getAllRouters, getRoutersForUser } = require('../models/router');
 const { getIpLocation } = require('../services/geoService');
+const { validateTelemetryPayload } = require('../utils/validation');
 
 /**
  * POST /log
@@ -17,6 +18,15 @@ const { getIpLocation } = require('../services/geoService');
 async function logTelemetry(req, res) {
   try {
     const telemetryData = req.body;
+
+    // Lightweight schema validation to prevent dirty rows / unexpected shapes
+    const validation = validateTelemetryPayload(telemetryData);
+    if (!validation.ok) {
+      return res.status(400).json({
+        error: 'Invalid telemetry payload',
+        details: validation.errors
+      });
+    }
     
     // Validate required fields
     if (!telemetryData.device_id) {
@@ -40,6 +50,12 @@ async function logTelemetry(req, res) {
  */
 async function getRouters(req, res) {
   try {
+    // Guests: only return assigned routers (no shared cache / ETag to avoid cross-user leaks)
+    if (req.user?.role === 'guest') {
+      const routers = await getRoutersForUser(req.user.id);
+      return res.json(routers);
+    }
+
     const ROUTERS_CACHE_TTL_SECONDS = parseInt(
       process.env.ROUTERS_CACHE_TTL_SECONDS || '60', 
       10

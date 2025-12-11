@@ -11,6 +11,7 @@ const { initializeDatabase, runMigrations } = require('./database/migrate');
 const { initMQTT, closeMQTT } = require('./services/mqttService');
 const { startRMSSync } = require('./services/rmsSync');
 const { startClickUpSync } = require('./services/clickupSync');
+const distributedLockService = require('./services/distributedLockService');
 const oauthService = require('./services/oauthService');
 const routerRoutes = require('./routes/router');
 const rmsRoutes = require('./routes/rms');
@@ -194,16 +195,16 @@ async function startServer() {
       }
     }
     if (canSync) {
-      startRMSSync(parseInt(rmsSyncInterval));
-      logger.info('RMS sync scheduler started');
+      await startRMSSync(parseInt(rmsSyncInterval));
+      logger.info('RMS sync scheduler startup attempted');
     }
     
     // Start ClickUp sync (every 30 minutes by default)
     // Don't run on startup - all data is persistent in database
     // This avoids delaying deployments by 3+ minutes
     const clickupSyncInterval = process.env.CLICKUP_SYNC_INTERVAL_MINUTES || 30;
-    startClickUpSync(parseInt(clickupSyncInterval), false); // false = skip initial sync
-    logger.info(`ClickUp sync scheduler started (every ${clickupSyncInterval} minutes, no startup sync)`);
+    startClickUpSync(parseInt(clickupSyncInterval), false); // lock-gated
+    logger.info(`ClickUp sync scheduler startup attempted (every ${clickupSyncInterval} minutes, no startup sync)`);
     
     // IronWifi: Webhook-only integration (no API polling)
     // Configure webhook in IronWifi Console → Reports → Report Scheduler
@@ -231,12 +232,14 @@ async function startServer() {
 process.on('SIGTERM', () => {
   logger.info('SIGTERM signal received: closing HTTP server');
   closeMQTT();
+  distributedLockService.releaseAll().catch(() => {});
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
   logger.info('SIGINT signal received: closing HTTP server');
   closeMQTT();
+  distributedLockService.releaseAll().catch(() => {});
   process.exit(0);
 });
 

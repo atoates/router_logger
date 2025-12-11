@@ -100,7 +100,16 @@ export const getCurrentLocation = (routerId) =>
 // ClickUp integration (for location search)
 export const getClickUpSpaces = () => api.get('/clickup/workspaces');
 export const getClickUpSpacesForWorkspace = (workspaceId) => api.get(`/clickup/spaces/${workspaceId}`);
-export const getClickUpSpaceLists = (spaceId) => api.get(`/clickup/debug/space-lists/${spaceId}`);
+// Lists in a space (mobile installer flow).
+// Prefer non-debug endpoint; keep debug path as a fallback for older deployments.
+export const getClickUpSpaceLists = async (spaceId) => {
+  try {
+    return await api.get(`/clickup/space-lists/${spaceId}`);
+  } catch (err) {
+    // Fallback (may be gated behind ENABLE_DEBUG_ENDPOINTS)
+    return await api.get(`/clickup/debug/space-lists/${spaceId}`);
+  }
+};
 export const getClickUpLists = (workspaceId) => api.get(`/clickup/lists/${workspaceId}`);
 export const getClickUpTasks = (listId, search = '') => 
   api.get(`/clickup/tasks/${listId}`, { params: { search } });

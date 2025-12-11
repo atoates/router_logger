@@ -6,6 +6,7 @@
 const { pool, logger } = require('../config/database');
 const clickupClient = require('./clickupClient');
 const crypto = require('crypto');
+const distributedLockService = require('./distributedLockService');
 
 // Custom field IDs from ClickUp
 const CUSTOM_FIELDS = {
@@ -785,26 +786,41 @@ function startClickUpSync(intervalMinutes = 30, runImmediately = false) {
     return;
   }
 
-  logger.info(`Starting ClickUp sync scheduler (every ${intervalMinutes} minutes)`);
+  // Distributed singleton: only one instance should run ClickUp sync
+  distributedLockService.tryAcquire('scheduler:clickup_sync')
+    .then((acquired) => {
+      if (!acquired) {
+        logger.info('ClickUp sync scheduler not started on this instance (lock held by another instance)');
+        return;
+      }
 
-  // Optionally run immediately on start (disabled by default to avoid delaying deployments)
-  if (runImmediately) {
-    logger.info('Running initial ClickUp sync...');
-    syncAllRoutersToClickUp().catch(error => {
-      logger.error('Initial ClickUp sync failed:', error.message);
+      logger.info(`Starting ClickUp sync scheduler (every ${intervalMinutes} minutes)`);
+
+      // Optionally run immediately on start (disabled by default to avoid delaying deployments)
+      if (runImmediately) {
+        logger.info('Running initial ClickUp sync...');
+        syncAllRoutersToClickUp().catch(error => {
+          logger.error('Initial ClickUp sync failed:', error.message);
+        });
+      } else {
+        logger.info('Skipping initial sync - will run on schedule. All data is persistent in database.');
+      }
+
+      // Run on schedule
+      syncIntervalId = setInterval(() => {
+        syncAllRoutersToClickUp().catch(error => {
+          logger.error('Scheduled ClickUp sync failed:', error.message);
+        });
+      }, intervalMinutes * 60 * 1000);
+
+      logger.info(`ClickUp sync will run every ${intervalMinutes} minutes`);
+    })
+    .catch((err) => {
+      logger.warn('Failed to acquire ClickUp sync distributed lock', { error: err.message });
     });
-  } else {
-    logger.info('Skipping initial sync - will run on schedule. All data is persistent in database.');
-  }
 
-  // Run on schedule
-  syncIntervalId = setInterval(() => {
-    syncAllRoutersToClickUp().catch(error => {
-      logger.error('Scheduled ClickUp sync failed:', error.message);
-    });
-  }, intervalMinutes * 60 * 1000);
+  return;
 
-  logger.info(`ClickUp sync will run every ${intervalMinutes} minutes`);
 }
 
 /**

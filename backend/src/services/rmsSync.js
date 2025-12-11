@@ -3,6 +3,7 @@ const { processRouterTelemetry } = require('./telemetryProcessor');
 const { getLatestLog } = require('../models/router');
 const { logger } = require('../config/database');
 const { isApproachingQuota, getQuotaStatus } = require('../routes/monitoring');
+const distributedLockService = require('./distributedLockService');
 
 // Throttle RMS API requests to avoid rate limiting
 // Delay between processing devices (configurable via env)
@@ -362,10 +363,17 @@ let syncIntervalId = null;
 /**
  * Start scheduled RMS sync (idempotent)
  */
-function startRMSSync(intervalMinutes = 15) {
+async function startRMSSync(intervalMinutes = 15) {
   if (syncIntervalId) {
     logger.info('RMS sync scheduler already running');
     return syncIntervalId;
+  }
+
+  // Distributed singleton: only one instance should run RMS sync
+  const acquired = await distributedLockService.tryAcquire('scheduler:rms_sync');
+  if (!acquired) {
+    logger.info('RMS sync scheduler not started on this instance (lock held by another instance)');
+    return null;
   }
 
   const intervalMs = intervalMinutes * 60 * 1000;

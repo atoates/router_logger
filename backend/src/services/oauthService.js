@@ -29,8 +29,8 @@ class RMSOAuthService {
   this.tokenUrl = 'https://rms.teltonika-networks.com/account/token';
   this.revokeUrl = 'https://rms.teltonika-networks.com/account/revoke';
     
-    // In-memory PKCE storage (in production, use Redis or DB)
-    this.pkceStore = new Map();
+    // PKCE storage is persisted in Postgres via oauth_state_store (deploy/scale safe)
+    this.pkceProvider = 'rms_pkce';
   }
 
   /**
@@ -65,7 +65,7 @@ class RMSOAuthService {
    * @param {string} state - CSRF protection state
    * @returns {Object} { authUrl, state, codeVerifier }
    */
-  getAuthorizationUrl(state = null) {
+  async getAuthorizationUrl(state = null) {
     if (!this.clientId || !this.redirectUri) {
       throw new Error('RMS OAuth not configured. Set RMS_OAUTH_CLIENT_ID and RMS_OAUTH_REDIRECT_URI');
     }
@@ -73,15 +73,10 @@ class RMSOAuthService {
     const generatedState = state || this.generateState();
     const { codeVerifier, codeChallenge } = this.generatePKCE();
     
-    // Store PKCE verifier for later use in token exchange
-    this.pkceStore.set(generatedState, {
-      codeVerifier,
-      createdAt: Date.now(),
-      expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes
-    });
-
-    // Clean up expired PKCE entries
-    this.cleanupExpiredPKCE();
+    // Store PKCE verifier for later use in token exchange (DB)
+    await this.storePKCEVerifier(generatedState, codeVerifier, new Date(Date.now() + 10 * 60 * 1000));
+    // Best-effort cleanup of old entries
+    this.cleanupExpiredPKCE().catch(() => {});
 
     const params = new URLSearchParams({
       client_id: this.clientId,
@@ -115,19 +110,8 @@ class RMSOAuthService {
       throw new Error('RMS OAuth not configured');
     }
 
-    // Retrieve and validate PKCE verifier
-    const pkceData = this.pkceStore.get(state);
-    if (!pkceData) {
-      throw new Error('Invalid or expired state parameter');
-    }
-
-    if (Date.now() > pkceData.expiresAt) {
-      this.pkceStore.delete(state);
-      throw new Error('PKCE verifier expired');
-    }
-
-    const { codeVerifier } = pkceData;
-    this.pkceStore.delete(state); // Use once only
+    // Retrieve and validate PKCE verifier (DB, use-once)
+    const codeVerifier = await this.consumePKCEVerifier(state);
 
     try {
       // RMS expects application/x-www-form-urlencoded body
@@ -383,12 +367,78 @@ class RMSOAuthService {
    * Clean up expired PKCE entries from memory
    */
   cleanupExpiredPKCE() {
-    const now = Date.now();
-    for (const [state, data] of this.pkceStore.entries()) {
-      if (now > data.expiresAt) {
-        this.pkceStore.delete(state);
-      }
+    return pool.query(
+      'DELETE FROM oauth_state_store WHERE provider = $1 AND expires_at < NOW()',
+      [this.pkceProvider]
+    );
+  }
+
+  /**
+   * Store PKCE verifier for a given state (DB).
+   */
+  async storePKCEVerifier(state, codeVerifier, expiresAt) {
+    await pool.query(
+      `INSERT INTO oauth_state_store (provider, state, data, expires_at)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (provider, state)
+       DO UPDATE SET data = EXCLUDED.data, expires_at = EXCLUDED.expires_at`,
+      [this.pkceProvider, state, { code_verifier: codeVerifier }, expiresAt]
+    );
+  }
+
+  /**
+   * Check whether a PKCE verifier exists and is unexpired for a given state.
+   * Used to validate state on callback (mobile-friendly).
+   */
+  async hasValidPKCEVerifier(state) {
+    const result = await pool.query(
+      `SELECT 1
+       FROM oauth_state_store
+       WHERE provider = $1 AND state = $2 AND expires_at > NOW()
+       LIMIT 1`,
+      [this.pkceProvider, state]
+    );
+    return result.rows.length > 0;
+  }
+
+  /**
+   * Consume PKCE verifier (use-once) for a given state.
+   */
+  async consumePKCEVerifier(state) {
+    const result = await pool.query(
+      `SELECT data, expires_at
+       FROM oauth_state_store
+       WHERE provider = $1 AND state = $2
+       LIMIT 1`,
+      [this.pkceProvider, state]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error('Invalid or expired state parameter');
     }
+
+    const row = result.rows[0];
+    const expiresAt = new Date(row.expires_at);
+    if (expiresAt.getTime() < Date.now()) {
+      await pool.query(
+        'DELETE FROM oauth_state_store WHERE provider = $1 AND state = $2',
+        [this.pkceProvider, state]
+      );
+      throw new Error('PKCE verifier expired');
+    }
+
+    // Use once
+    await pool.query(
+      'DELETE FROM oauth_state_store WHERE provider = $1 AND state = $2',
+      [this.pkceProvider, state]
+    );
+
+    const codeVerifier = row.data?.code_verifier;
+    if (!codeVerifier) {
+      throw new Error('Missing PKCE verifier');
+    }
+
+    return codeVerifier;
   }
 
   /**
