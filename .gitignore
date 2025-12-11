@@ -7,6 +7,10 @@ coverage/
 dist/
 build/
 
+# Local one-off debug scripts
+backend/check-*.js
+backend/debug-*.js
+
 # Railway
 .railway
 
