@@ -344,8 +344,8 @@ curl http://localhost:3001/api/routers/6001747099
 
 ## 📚 Additional Documentation
 
-- **Architecture**: `LOCATION-TRACKING-ARCHITECTURE.md`
-- **Property Search**: `PROPERTY-SEARCH-GUIDE.md`
+- **Architecture**: `docs/architecture/LOCATION-TRACKING-ARCHITECTURE.md`
+- **Property Search**: `docs/guides/PROPERTY-SEARCH-GUIDE.md`
 - **Environment Variables**: `docs/ENVIRONMENT-VARIABLES.md`
 - **MQTT Setup**: `docs/MQTT-SETUP-GUIDE.md`
 - **RMS Configuration**: `docs/RMS-CONFIGURATION-GUIDE.md`

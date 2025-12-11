@@ -37,7 +37,7 @@ A **secure, mobile-first** app for field installers with:
 
 ## 📋 Next Steps
 
-See `../MOBILE-APP-FRESH-START.md` for the complete implementation plan.
+See `../docs/mobile/MOBILE-APP-FRESH-START.md` for the complete implementation plan.
 
 ---
 

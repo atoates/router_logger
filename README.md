@@ -2,6 +2,10 @@
 
 A comprehensive logging and monitoring system for Teltonika RUT200 routers with centralized data collection, visualization, and reporting capabilities.
 
+## 📚 Documentation
+
+See `docs/README.md` for the documentation index.
+
 ## 🎯 Features
 
 - **Real-time Telemetry Collection**: MQTT and HTTPS endpoints for RUT200 data ingestion
