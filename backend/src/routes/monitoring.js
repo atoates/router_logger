@@ -260,4 +260,126 @@ router.get('/api/monitoring/db-health', async (req, res) => {
   }
 });
 
+// DB activity snapshot (useful for investigating CPU/memory spikes)
+router.get('/api/monitoring/db-activity', async (req, res) => {
+  try {
+    const [activity, connections, vacuumProgress, indexProgress] = await Promise.all([
+      pool.query(`
+        SELECT
+          pid,
+          usename,
+          application_name,
+          client_addr,
+          state,
+          wait_event_type,
+          wait_event,
+          query_start,
+          NOW() - query_start AS runtime,
+          LEFT(REGEXP_REPLACE(query, '\\s+', ' ', 'g'), 500) AS query
+        FROM pg_stat_activity
+        WHERE datname = current_database()
+          AND pid <> pg_backend_pid()
+          AND state <> 'idle'
+        ORDER BY query_start ASC;
+      `),
+      pool.query(`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE state <> 'idle')::int AS active,
+          COUNT(*) FILTER (WHERE wait_event_type IS NOT NULL)::int AS waiting
+        FROM pg_stat_activity
+        WHERE datname = current_database();
+      `),
+      pool.query(`
+        SELECT
+          pid,
+          relid::regclass AS relation,
+          phase,
+          heap_blks_total,
+          heap_blks_scanned,
+          heap_blks_vacuumed,
+          index_vacuum_count,
+          max_dead_tuples
+        FROM pg_stat_progress_vacuum
+        ORDER BY pid;
+      `),
+      pool.query(`
+        SELECT
+          pid,
+          command,
+          phase,
+          lockers_total,
+          lockers_done,
+          current_locker_pid,
+          blocks_total,
+          blocks_done
+        FROM pg_stat_progress_create_index
+        ORDER BY pid;
+      `)
+    ]);
+
+    res.json({
+      connections: connections.rows[0] || { total: 0, active: 0, waiting: 0 },
+      activeQueries: activity.rows,
+      vacuumProgress: vacuumProgress.rows,
+      createIndexProgress: indexProgress.rows,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error fetching DB activity:', error);
+    res.status(500).json({ error: 'Failed to fetch DB activity' });
+  }
+});
+
+// Key DB settings for memory + maintenance behavior
+router.get('/api/monitoring/db-settings', async (req, res) => {
+  try {
+    const settings = await pool.query(`
+      SELECT name, setting, unit, context
+      FROM pg_settings
+      WHERE name IN (
+        'shared_buffers',
+        'work_mem',
+        'maintenance_work_mem',
+        'autovacuum_work_mem',
+        'temp_buffers',
+        'effective_cache_size',
+        'max_connections',
+        'max_parallel_workers_per_gather',
+        'max_parallel_workers',
+        'max_worker_processes'
+      )
+      ORDER BY name;
+    `);
+
+    const stats = await pool.query(`
+      SELECT
+        numbackends,
+        xact_commit,
+        xact_rollback,
+        blks_read,
+        blks_hit,
+        tup_returned,
+        tup_fetched,
+        tup_inserted,
+        tup_updated,
+        tup_deleted,
+        deadlocks,
+        temp_files,
+        temp_bytes
+      FROM pg_stat_database
+      WHERE datname = current_database();
+    `);
+
+    res.json({
+      settings: settings.rows,
+      databaseStats: stats.rows[0] || null,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error fetching DB settings:', error);
+    res.status(500).json({ error: 'Failed to fetch DB settings' });
+  }
+});
+
 module.exports = { router, trackRMSCall, trackClickUpCall, apiMetrics, clickupMetrics, isApproachingQuota, getQuotaStatus };
