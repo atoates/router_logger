@@ -35,7 +35,17 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('sessionToken');
       localStorage.removeItem('sessionExpiry');
-      window.location.reload();
+      // Redirect to login immediately. Avoid relying on reload timing,
+      // which can leave the UI showing "Invalid or expired session".
+      if (!window.__RL_AUTH_REDIRECTING__) {
+        window.__RL_AUTH_REDIRECTING__ = true;
+        const currentPath = window.location.pathname + window.location.search + window.location.hash;
+        if (!currentPath.startsWith('/login')) {
+          window.location.assign('/login');
+        } else {
+          window.location.reload();
+        }
+      }
     }
     return Promise.reject(error);
   }
