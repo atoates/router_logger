@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { getRouters, unlinkRouterFromLocation, removeRouterAssignees } from '../services/api';
+import { getRouters, unlinkRouterFromLocation, removeRouterAssignees, getUsageStats } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
@@ -16,6 +16,9 @@ function RouterDetailPage() {
   const [uninstalling, setUninstalling] = useState(false);
   const [unassigning, setUnassigning] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [usageStats, setUsageStats] = useState(null);
+  const [usageLoading, setUsageLoading] = useState(false);
+  const [usageError, setUsageError] = useState(null);
   const { isAdmin } = useAuth();
 
   useEffect(() => {
@@ -57,6 +60,38 @@ function RouterDetailPage() {
     }
   };
 
+  const formatBytes = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+  };
+
+  const fetchUsageStats = async (routerIdValue) => {
+    try {
+      setUsageLoading(true);
+      setUsageError(null);
+
+      const end = new Date();
+      const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+
+      const res = await getUsageStats({
+        router_id: routerIdValue,
+        start_date: start.toISOString(),
+        end_date: end.toISOString(),
+      });
+
+      const stats = res?.data?.data?.[0] || null;
+      setUsageStats(stats);
+    } catch (err) {
+      setUsageStats(null);
+      setUsageError(err.response?.data?.error || 'Failed to load usage stats');
+    } finally {
+      setUsageLoading(false);
+    }
+  };
+
   const handleUninstall = async () => {
     if (!window.confirm(`Are you sure you want to uninstall router #${router.router_id}? This will unlink it from its current location.`)) {
       return;
@@ -71,7 +106,7 @@ function RouterDetailPage() {
       });
 
       // Refresh router data
-      await fetchRouter();
+      await fetchRouter(true);
       
       alert('Router uninstalled successfully');
     } catch (err) {
@@ -92,8 +127,11 @@ function RouterDetailPage() {
 
       await removeRouterAssignees(router.router_id);
 
+      // Optimistic UI: clear assignees immediately
+      setRouter(prev => (prev ? { ...prev, clickup_assignees: null } : prev));
+
       // Refresh router data
-      await fetchRouter();
+      await fetchRouter(true);
       
       alert('Router unassigned successfully');
     } catch (err) {
@@ -173,6 +211,13 @@ function RouterDetailPage() {
       return 'Invalid date';
     }
   };
+
+  // Fetch 24h usage + network stats once router is loaded
+  useEffect(() => {
+    if (!router?.router_id) return;
+    fetchUsageStats(router.router_id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router?.router_id]);
 
   if (loading) {
     return (
@@ -278,6 +323,62 @@ function RouterDetailPage() {
         </div>
       </div>
 
+      {/* Data Usage + Network Stats (24h) */}
+      <div className="detail-section">
+        <h2>Data Usage & Network (24h)</h2>
+
+        {usageError && (
+          <div className="alert alert-error">{usageError}</div>
+        )}
+
+        {usageLoading ? (
+          <LoadingSpinner text="Loading usage stats..." />
+        ) : (
+          <>
+            <div className="detail-row">
+              <span className="detail-label">Total Usage:</span>
+              <span className="detail-value">{formatBytes(usageStats?.total_data_usage || 0)}</span>
+            </div>
+            <div className="detail-row">
+              <span className="detail-label">Sent:</span>
+              <span className="detail-value">↑ {formatBytes(usageStats?.period_tx_bytes || 0)}</span>
+            </div>
+            <div className="detail-row">
+              <span className="detail-label">Received:</span>
+              <span className="detail-value">↓ {formatBytes(usageStats?.period_rx_bytes || 0)}</span>
+            </div>
+            <div className="detail-row">
+              <span className="detail-label">Operator:</span>
+              <span className="detail-value">{router.operator || 'N/A'}</span>
+            </div>
+            <div className="detail-row">
+              <span className="detail-label">WAN IP:</span>
+              <span className="detail-value">{router.wan_ip || 'N/A'}</span>
+            </div>
+            <div className="detail-row">
+              <span className="detail-label">Cell:</span>
+              <span className="detail-value">
+                {router.cell_id || router.tac || router.mcc || router.mnc || router.earfcn || router.pc_id
+                  ? `CID ${router.cell_id ?? 'N/A'} · TAC ${router.tac ?? 'N/A'} · MCC ${router.mcc ?? 'N/A'} · MNC ${router.mnc ?? 'N/A'} · EARFCN ${router.earfcn ?? 'N/A'} · PCI ${router.pc_id ?? 'N/A'}`
+                  : 'N/A'}
+              </span>
+            </div>
+            <div className="detail-row">
+              <span className="detail-label">Avg Signal:</span>
+              <span className="detail-value">
+                {(usageStats?.avg_rsrp ?? null) !== null || (usageStats?.avg_rsrq ?? null) !== null || (usageStats?.avg_rssi ?? null) !== null || (usageStats?.avg_sinr ?? null) !== null
+                  ? `RSRP ${usageStats?.avg_rsrp?.toFixed?.(1) ?? 'N/A'} · RSRQ ${usageStats?.avg_rsrq?.toFixed?.(1) ?? 'N/A'} · RSSI ${usageStats?.avg_rssi?.toFixed?.(1) ?? 'N/A'} · SINR ${usageStats?.avg_sinr?.toFixed?.(1) ?? 'N/A'}`
+                  : 'N/A'}
+              </span>
+            </div>
+            <div className="detail-row">
+              <span className="detail-label">Avg Clients:</span>
+              <span className="detail-value">{(usageStats?.avg_clients ?? null) === null ? 'N/A' : Number(usageStats.avg_clients).toFixed(1)}</span>
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Location Info */}
       {hasLocation && (
         <div className="detail-section">
@@ -287,9 +388,7 @@ function RouterDetailPage() {
             <span className="detail-value">
               {router.clickup_location_task_id ? (
                 <a
-                  href={`https://app.clickup.com/list/${router.clickup_location_task_id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={`https://app.clickup.com/t/${router.clickup_location_task_id}`}
                   className="detail-value-link"
                 >
                   {router.clickup_location_task_name || 'Unknown'}

@@ -46,6 +46,10 @@ let _routersCache = { data: null, expiresAt: 0 };
 let _routersInflight = null;
 const ROUTERS_TTL_MS = 30 * 1000; // 30 seconds (mobile refreshes more often)
 
+const invalidateRoutersCache = () => {
+  _routersCache = { data: null, expiresAt: 0 };
+};
+
 // Routers - core mobile functionality
 export const getRouters = async (forceRefresh = false) => {
   const now = Date.now();
@@ -72,26 +76,43 @@ export const getRouters = async (forceRefresh = false) => {
 };
 
 // Router Assignment (mobile installer workflow)
-export const assignRouter = (routerId, data) => api.post(`/routers/${routerId}/assign`, data);
-export const removeRouterAssignees = (routerId) => api.post(`/routers/${routerId}/remove-assignees`);
+export const assignRouter = async (routerId, data) => {
+  const res = await api.post(`/routers/${routerId}/assign`, data);
+  invalidateRoutersCache();
+  return res;
+};
+export const removeRouterAssignees = async (routerId) => {
+  const res = await api.post(`/routers/${routerId}/remove-assignees`);
+  invalidateRoutersCache();
+  return res;
+};
 
 // Router Status Updates
-export const updateRouterStatus = (routerId, status, notes) => 
-  api.patch(`/routers/${routerId}/status`, { status, notes });
+export const updateRouterStatus = async (routerId, status, notes) => {
+  const res = await api.patch(`/routers/${routerId}/status`, { status, notes });
+  invalidateRoutersCache();
+  return res;
+};
 
 // Location linking (mobile installer workflow)
-export const linkRouterToLocation = (routerId, data) => 
-  api.post(`/routers/${routerId}/link-location`, {
+export const linkRouterToLocation = async (routerId, data) => {
+  const res = await api.post(`/routers/${routerId}/link-location`, {
     location_task_id: data.location_task_id || data.taskId,
     location_task_name: data.location_task_name || data.taskName || data.name,
     notes: data.notes || 'Assigned via mobile app'
   });
+  invalidateRoutersCache();
+  return res;
+};
 
 // Unlink location (uninstall)
-export const unlinkRouterFromLocation = (routerId, data) =>
-  api.post(`/routers/${routerId}/unlink-location`, {
+export const unlinkRouterFromLocation = async (routerId, data) => {
+  const res = await api.post(`/routers/${routerId}/unlink-location`, {
     notes: data?.notes || 'Uninstalled via mobile app'
   });
+  invalidateRoutersCache();
+  return res;
+};
 
 // Get current location for router
 export const getCurrentLocation = (routerId) => 
