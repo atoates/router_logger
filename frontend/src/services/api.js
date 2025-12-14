@@ -23,6 +23,24 @@ api.interceptors.request.use(
   }
 );
 
+// Handle 401 responses - redirect to login
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Clear stored credentials
+      localStorage.removeItem('sessionToken');
+      localStorage.removeItem('user');
+      
+      // Only redirect if not already on login page
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Simple in-module cache for routers with TTL and in-flight dedupe
 let _routersCache = { data: null, expiresAt: 0 };
 let _routersInflight = null;

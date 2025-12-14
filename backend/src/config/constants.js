@@ -30,6 +30,27 @@ const ROUTER_STATUS = {
   VALID_TASK_STATUSES: ['decommissioned', 'being returned', 'installed', 'ready', 'needs attention']
 };
 
+// ClickUp task status constants (normalized lowercase)
+const TASK_STATUS = {
+  DECOMMISSIONED: 'decommissioned',
+  BEING_RETURNED: 'being returned',
+  INSTALLED: 'installed',
+  READY: 'ready',
+  NEEDS_ATTENTION: 'needs attention'
+};
+
+// User roles
+const USER_ROLES = {
+  ADMIN: 'admin',
+  GUEST: 'guest'
+};
+
+// Cleanup intervals (in milliseconds)
+const CLEANUP_INTERVALS = {
+  OAUTH_STATE: 60 * 60 * 1000,  // 1 hour
+  EXPIRED_SESSIONS: 60 * 60 * 1000  // 1 hour
+};
+
 // Rate limiting
 const RATE_LIMITS = {
   CLICKUP_API_DELAY_MS: 200, // Delay between ClickUp API calls
@@ -52,9 +73,12 @@ module.exports = {
   CLICKUP_FIELD_IDS,
   CACHE_TTL,
   ROUTER_STATUS,
+  TASK_STATUS,
+  USER_ROLES,
   RATE_LIMITS,
   INSPECTION,
-  TIME_INTERVALS
+  TIME_INTERVALS,
+  CLEANUP_INTERVALS
 };
 
 

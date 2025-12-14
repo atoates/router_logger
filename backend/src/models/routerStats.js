@@ -1,610 +1,16 @@
 /**
- * Router Model
- * Core CRUD operations for routers and logs
- * 
- * For statistics queries, see: ./routerStats.js
- * For maintenance utilities, see: ./routerMaintenance.js
+ * Router Statistics Model
+ * Contains all statistics and reporting queries for router data
  */
 
 const { pool, logger } = require('../config/database');
 
-// Re-export from split modules for backwards compatibility
-const routerStats = require('./routerStats');
-const routerMaintenance = require('./routerMaintenance');
-
-// Insert or update router information
-async function upsertRouter(routerData) {
-  const query = `
-    INSERT INTO routers (
-      router_id, device_serial, imei, name, location, 
-      site_id, firmware_version, rms_created_at, mac_address, last_seen
-    )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL)
-    ON CONFLICT (router_id) 
-    DO UPDATE SET 
-      device_serial = COALESCE($2, routers.device_serial),
-      imei = COALESCE($3, routers.imei),
-      name = COALESCE($4, routers.name),
-      location = COALESCE($5, routers.location),
-      site_id = COALESCE($6, routers.site_id),
-      firmware_version = COALESCE($7, routers.firmware_version),
-      rms_created_at = COALESCE($8, routers.rms_created_at),
-      mac_address = COALESCE($9, routers.mac_address)
-      -- Note: last_seen is NOT updated here - it's updated separately using updateRouterLastSeen
-      -- with the actual log timestamp
-    RETURNING *;
-  `;
-  
-  try {
-    const result = await pool.query(query, [
-      routerData.router_id,
-      routerData.device_serial,
-      routerData.imei,
-      routerData.name,
-      routerData.location,
-      routerData.site_id,
-      routerData.firmware_version,
-      routerData.rms_created_at || null,
-      routerData.mac_address || null
-    ]);
-    return result.rows[0];
-  } catch (error) {
-    logger.error('Error upserting router:', error);
-    throw error;
-  }
-}
-
-// Update router's last_seen timestamp
-async function updateRouterLastSeen(routerId, timestamp) {
-  const query = `
-    UPDATE routers 
-    SET last_seen = $1
-    WHERE router_id = $2
-    RETURNING *;
-  `;
-  
-  try {
-    const result = await pool.query(query, [timestamp, routerId]);
-    return result.rows[0];
-  } catch (error) {
-    logger.error('Error updating router last_seen:', error);
-    throw error;
-  }
-}
-
-// Insert router log entry (RUT200 format)
-async function insertLog(logData) {
-  const query = `
-    INSERT INTO router_logs (
-      router_id, imei, timestamp, wan_ip, operator, mcc, mnc, network_type,
-      lac, tac, cell_id, rsrp, rsrq, rssi, sinr, earfcn, pc_id,
-      latitude, longitude, location_accuracy,
-      total_tx_bytes, total_rx_bytes,
-      uptime_seconds, firmware_version, cpu_usage, memory_free, status,
-      wifi_clients, wifi_client_count, raw_data,
-      iccid, imsi, cpu_temp_c, board_temp_c, input_voltage_mv, conn_uptime_seconds,
-      wan_type, wan_ipv6, vpn_status, vpn_name, eth_link_up
-    )
-    VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8,
-      $9, $10, $11, $12, $13, $14, $15, $40, $41,
-      $16, $17, $18,
-      $19, $20,
-      $21, $22, $23, $24, $25,
-      $26, $27, $28,
-      $29, $30, $31, $32, $33, $34,
-      $35, $36, $37, $38, $39
-    )
-    RETURNING *;
-  `;
-  
-  const values = [
-    logData.router_id,
-    logData.imei,
-    logData.timestamp || new Date(),
-    logData.wan_ip,
-    logData.operator,
-    logData.mcc,
-    logData.mnc,
-    logData.network_type,
-    logData.lac,
-    logData.tac,
-    logData.cell_id,
-    logData.rsrp,
-    logData.rsrq,
-    logData.rssi,
-    logData.sinr,
-    logData.latitude,
-    logData.longitude,
-    logData.location_accuracy,
-    logData.total_tx_bytes || 0,
-    logData.total_rx_bytes || 0,
-    logData.uptime_seconds || 0,
-    logData.firmware_version,
-    logData.cpu_usage,
-    logData.memory_free,
-    logData.status || 'online',
-    logData.wifi_clients,
-    logData.wifi_client_count || 0,
-    logData.raw_data,
-    logData.iccid,
-    logData.imsi,
-    logData.cpu_temp_c,
-    logData.board_temp_c,
-    logData.input_voltage_mv,
-    logData.conn_uptime_seconds,
-    logData.wan_type,
-    logData.wan_ipv6,
-    logData.vpn_status,
-    logData.vpn_name,
-    logData.eth_link_up,
-    logData.earfcn,
-    logData.pc_id
-  ];
-  
-  try {
-    const result = await pool.query(query, values);
-    return result.rows[0];
-  } catch (error) {
-    logger.error('Error inserting log:', error);
-    throw error;
-  }
-}
-
-// Get all routers
-// Optimized to avoid N+1 query problem by using CTEs and aggregations instead of correlated subqueries
-async function getAllRouters() {
-  const query = `
-    WITH latest_logs AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        status as current_status,
-        timestamp,
-        wan_ip,
-        operator,
-        latitude,
-        longitude,
-        cell_id,
-        tac,
-        mcc,
-        mnc,
-        earfcn,
-        pc_id
-      FROM router_logs
-      ORDER BY router_id, timestamp DESC
-    ),
-    last_online AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        timestamp as last_online_time
-      FROM router_logs
-      WHERE LOWER(TRIM(status)) IN ('online', '1', 'true')
-      ORDER BY router_id, timestamp DESC
-    ),
-    latest_imei AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        imei
-      FROM router_logs
-      WHERE imei IS NOT NULL
-      ORDER BY router_id, timestamp DESC
-    ),
-    latest_firmware AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        firmware_version
-      FROM router_logs
-      WHERE firmware_version IS NOT NULL
-      ORDER BY router_id, timestamp DESC
-    ),
-    log_counts AS (
-      SELECT 
-        router_id,
-        COUNT(*) as log_count
-      FROM router_logs
-      GROUP BY router_id
-    )
-    SELECT 
-      r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id, 
-      r.created_at, 
-      COALESCE(lo.last_online_time, r.last_seen) as last_seen,
-      r.rms_created_at, r.notes,
-      r.clickup_task_id, r.clickup_task_url, r.clickup_list_id, 
-      r.clickup_location_task_id, r.clickup_location_task_name, 
-      r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
-      r.clickup_assignees, r.clickup_task_status, r.mac_address,
-      COALESCE(lc.log_count, 0) as log_count,
-      ll.current_status,
-      ll.wan_ip,
-      ll.operator,
-      ll.latitude,
-      ll.longitude,
-      ll.cell_id,
-      ll.tac,
-      ll.mcc,
-      ll.mnc,
-      ll.earfcn,
-      ll.pc_id,
-      COALESCE(li.imei, r.imei) as imei,
-      COALESCE(lf.firmware_version, r.firmware_version) as firmware_version
-    FROM routers r
-    LEFT JOIN latest_logs ll ON ll.router_id = r.router_id
-    LEFT JOIN last_online lo ON lo.router_id = r.router_id
-    LEFT JOIN latest_imei li ON li.router_id = r.router_id
-    LEFT JOIN latest_firmware lf ON lf.router_id = r.router_id
-    LEFT JOIN log_counts lc ON lc.router_id = r.router_id
-    ORDER BY COALESCE(lo.last_online_time, r.last_seen) DESC NULLS LAST;
-  `;
-  
-  try {
-    const result = await pool.query(query);
-    return result.rows;
-  } catch (error) {
-    logger.error('Error fetching routers:', error);
-    throw error;
-  }
-}
-
-// Get routers visible to a given user (guests only see assigned routers; admins should use getAllRouters)
-async function getRoutersForUser(userId) {
-  const query = `
-    WITH latest_logs AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        status as current_status,
-        timestamp,
-        wan_ip,
-        operator,
-        latitude,
-        longitude,
-        cell_id,
-        tac,
-        mcc,
-        mnc,
-        earfcn,
-        pc_id
-      FROM router_logs
-      ORDER BY router_id, timestamp DESC
-    ),
-    last_online AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        timestamp as last_online_time
-      FROM router_logs
-      WHERE LOWER(TRIM(status)) IN ('online', '1', 'true')
-      ORDER BY router_id, timestamp DESC
-    ),
-    latest_imei AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        imei
-      FROM router_logs
-      WHERE imei IS NOT NULL
-      ORDER BY router_id, timestamp DESC
-    ),
-    latest_firmware AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        firmware_version
-      FROM router_logs
-      WHERE firmware_version IS NOT NULL
-      ORDER BY router_id, timestamp DESC
-    ),
-    log_counts AS (
-      SELECT 
-        router_id,
-        COUNT(*) as log_count
-      FROM router_logs
-      GROUP BY router_id
-    )
-    SELECT 
-      r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id, 
-      r.created_at, 
-      COALESCE(lo.last_online_time, r.last_seen) as last_seen,
-      r.rms_created_at, r.notes,
-      r.clickup_task_id, r.clickup_task_url, r.clickup_list_id, 
-      r.clickup_location_task_id, r.clickup_location_task_name, 
-      r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
-      r.clickup_assignees, r.clickup_task_status, r.mac_address,
-      COALESCE(lc.log_count, 0) as log_count,
-      ll.current_status,
-      ll.wan_ip,
-      ll.operator,
-      ll.latitude,
-      ll.longitude,
-      ll.cell_id,
-      ll.tac,
-      ll.mcc,
-      ll.mnc,
-      ll.earfcn,
-      ll.pc_id,
-      COALESCE(li.imei, r.imei) as imei,
-      COALESCE(lf.firmware_version, r.firmware_version) as firmware_version,
-      ura.assigned_at,
-      ura.notes as assignment_notes
-    FROM user_router_assignments ura
-    JOIN routers r ON r.router_id = ura.router_id
-    LEFT JOIN latest_logs ll ON ll.router_id = r.router_id
-    LEFT JOIN last_online lo ON lo.router_id = r.router_id
-    LEFT JOIN latest_imei li ON li.router_id = r.router_id
-    LEFT JOIN latest_firmware lf ON lf.router_id = r.router_id
-    LEFT JOIN log_counts lc ON lc.router_id = r.router_id
-    WHERE ura.user_id = $1
-    ORDER BY COALESCE(lo.last_online_time, r.last_seen) DESC NULLS LAST;
-  `;
-
-  try {
-    const result = await pool.query(query, [userId]);
-    return result.rows;
-  } catch (error) {
-    logger.error('Error fetching routers for user:', error);
-    throw error;
-  }
-}
-
-// Get logs with filters (excluding certain fields from response)
-async function getLogs(filters = {}) {
-  let query = `SELECT 
-      router_id,
-      imei,
-      timestamp,
-      wan_ip,
-      operator,
-      mcc,
-      mnc,
-      -- network_type excluded by request
-      lac,
-      tac,
-      cell_id,
-      rsrp,
-      rsrq,
-      rssi,
-      sinr,
-      latitude,
-      longitude,
-      location_accuracy,
-      total_tx_bytes,
-      total_rx_bytes,
-      uptime_seconds,
-      firmware_version,
-      cpu_usage,
-      memory_free,
-      status,
-      wifi_clients,
-      wifi_client_count,
-      raw_data,
-      -- excluded: iccid, imsi, cpu_temp_c, board_temp_c, input_voltage_mv, wan_type, wan_ipv6, vpn_status, vpn_name
-      conn_uptime_seconds,
-      eth_link_up
-    FROM router_logs WHERE 1=1`;
-  const values = [];
-  let paramCount = 1;
-  
-  if (filters.router_id) {
-    query += ` AND router_id = $${paramCount}`;
-    values.push(filters.router_id);
-    paramCount++;
-  }
-  
-  if (filters.start_date) {
-    query += ` AND timestamp >= $${paramCount}`;
-    values.push(filters.start_date);
-    paramCount++;
-  }
-  
-  if (filters.end_date) {
-    query += ` AND timestamp <= $${paramCount}`;
-    values.push(filters.end_date);
-    paramCount++;
-  }
-  
-  query += ` ORDER BY timestamp DESC`;
-  
-  if (filters.limit) {
-    query += ` LIMIT $${paramCount}`;
-    values.push(filters.limit);
-  }
-  
-  try {
-    const result = await pool.query(query, values);
-    return result.rows;
-  } catch (error) {
-    logger.error('Error fetching logs:', error);
-    throw error;
-  }
-}
-
-// Get usage statistics with data deltas
-async function getUsageStats(routerId, startDate, endDate) {
-  const query = `
-    WITH params AS (
-      SELECT $2::timestamp AS start_ts, $3::timestamp AS end_ts
-    ), base AS (
-      SELECT l.total_tx_bytes AS base_tx, l.total_rx_bytes AS base_rx
-      FROM router_logs l, params
-      WHERE l.router_id = $1
-        AND l.timestamp < (SELECT start_ts FROM params)
-      ORDER BY l.timestamp DESC
-      LIMIT 1
-    ), ordered_logs AS (
-      SELECT 
-        timestamp,
-        total_tx_bytes,
-        total_rx_bytes,
-        LAG(total_tx_bytes) OVER (ORDER BY timestamp) as prev_tx,
-        LAG(total_rx_bytes) OVER (ORDER BY timestamp) as prev_rx,
-        FIRST_VALUE(total_tx_bytes) OVER (ORDER BY timestamp) as first_tx,
-        FIRST_VALUE(total_rx_bytes) OVER (ORDER BY timestamp) as first_rx
-      FROM router_logs, params
-      WHERE router_id = $1
-        AND timestamp >= (SELECT start_ts FROM params)
-        AND timestamp <= (SELECT end_ts FROM params)
-      ORDER BY timestamp
-    ),
-    deltas AS (
-      SELECT
-        SUM(CASE WHEN prev_tx IS NULL THEN 0 ELSE GREATEST(total_tx_bytes - prev_tx, 0) END) as sum_tx_deltas,
-        SUM(CASE WHEN prev_rx IS NULL THEN 0 ELSE GREATEST(total_rx_bytes - prev_rx, 0) END) as sum_rx_deltas,
-        MAX(first_tx) as first_tx,
-        MAX(first_rx) as first_rx
-      FROM ordered_logs
-    ),
-    totals AS (
-      SELECT
-        (GREATEST(d.first_tx - COALESCE(b.base_tx, d.first_tx), 0) + COALESCE(d.sum_tx_deltas, 0))::bigint as period_tx_bytes,
-        (GREATEST(d.first_rx - COALESCE(b.base_rx, d.first_rx), 0) + COALESCE(d.sum_rx_deltas, 0))::bigint as period_rx_bytes
-      FROM deltas d
-      LEFT JOIN base b ON true
-    )
-    SELECT 
-      $1 as router_id,
-      COUNT(*) as total_logs,
-      t.period_tx_bytes,
-      t.period_rx_bytes,
-      (t.period_tx_bytes + t.period_rx_bytes) as total_data_usage,
-      AVG(rsrp) as avg_rsrp,
-      AVG(rsrq) as avg_rsrq,
-      AVG(rssi) as avg_rssi,
-      AVG(sinr) as avg_sinr,
-      AVG(uptime_seconds) as avg_uptime,
-      AVG(wifi_client_count) as avg_clients,
-      MIN(timestamp) as first_log,
-      MAX(timestamp) as last_log
-    FROM router_logs, params, totals t
-    WHERE router_id = $1
-      AND timestamp >= (SELECT start_ts FROM params)
-      AND timestamp <= (SELECT end_ts FROM params)
-    GROUP BY t.period_tx_bytes, t.period_rx_bytes;
-  `;
-  
-  try {
-    const result = await pool.query(query, [routerId, startDate, endDate]);
-    return result.rows[0] || null;
-  } catch (error) {
-    logger.error('Error fetching usage stats:', error);
-    throw error;
-  }
-}
-
-// Get uptime data
-async function getUptimeData(routerId, startDate, endDate) {
-  const query = `
-    SELECT 
-      timestamp,
-      uptime_seconds,
-      status
-    FROM router_logs
-    WHERE router_id = $1
-      AND timestamp >= $2
-      AND timestamp <= $3
-    ORDER BY timestamp ASC;
-  `;
-  
-  try {
-    const result = await pool.query(query, [routerId, startDate, endDate]);
-    return result.rows;
-  } catch (error) {
-    logger.error('Error fetching uptime data:', error);
-    throw error;
-  }
-}
-
-// Get the latest log for a router
-async function getLatestLog(routerId) {
-  const query = `
-    SELECT * FROM router_logs
-    WHERE router_id = $1
-    ORDER BY timestamp DESC
-    LIMIT 1;
-  `;
-  try {
-    const result = await pool.query(query, [routerId]);
-    return result.rows[0] || null;
-  } catch (error) {
-    logger.error('Error fetching latest log:', error);
-    throw error;
-  }
-}
-
-module.exports = {
-  upsertRouter,
-  updateRouterLastSeen,
-  insertLog,
-  getAllRouters,
-  getRoutersForUser,
-  getLogs,
-  getUsageStats,
-  getUptimeData,
-  getLatestLog
-};
-
-// --- Admin/maintenance helpers ---
-/**
- * Merge duplicate routers that share the same name; prefer serial-like IDs (>=9 digits).
- * Moves all logs to the preferred router_id and deletes the others from routers table.
- * Returns a summary of changes.
- */
-async function mergeDuplicateRouters() {
-  const summary = { groupsChecked: 0, routersMerged: 0, logsMoved: 0, details: [] };
-  try {
-    const routers = await getAllRouters();
-    const groups = new Map();
-    for (const r of routers) {
-      const key = (r.name || '').toLowerCase();
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(r);
-    }
-    const isSerialLike = (id) => /^(\d){9,}$/.test(String(id || ''));
-
-    for (const [nameKey, list] of groups.entries()) {
-      if (list.length < 2) continue;
-      summary.groupsChecked++;
-      // Choose preferred: highest log_count; tie-break with serial-like; then most recent last_seen
-      const preferred = list.slice().sort((a, b) => {
-        const aLogs = Number(a.log_count || 0);
-        const bLogs = Number(b.log_count || 0);
-        if (aLogs !== bLogs) return bLogs - aLogs;
-        const aSerial = isSerialLike(a.router_id) ? 1 : 0;
-        const bSerial = isSerialLike(b.router_id) ? 1 : 0;
-        if (aSerial !== bSerial) return bSerial - aSerial;
-        const aSeen = a.last_seen ? new Date(a.last_seen).getTime() : 0;
-        const bSeen = b.last_seen ? new Date(b.last_seen).getTime() : 0;
-        return bSeen - aSeen;
-      })[0];
-      const others = list.filter(r => String(r.router_id) !== String(preferred.router_id));
-      if (others.length === 0) continue;
-
-      for (const o of others) {
-        // Move logs
-        const moveRes = await pool.query(
-          'UPDATE router_logs SET router_id = $1 WHERE router_id = $2',
-          [preferred.router_id, o.router_id]
-        );
-        summary.logsMoved += moveRes.rowCount || 0;
-        // Delete other router row
-        await pool.query('DELETE FROM routers WHERE router_id = $1', [o.router_id]);
-        summary.routersMerged += 1;
-        summary.details.push({ name: preferred.name || nameKey, kept: preferred.router_id, removed: o.router_id, movedLogs: moveRes.rowCount || 0 });
-      }
-    }
-    return summary;
-  } catch (error) {
-    logger.error('Error merging duplicate routers:', error);
-    throw error;
-  }
-}
-
-module.exports.mergeDuplicateRouters = mergeDuplicateRouters;
-
 /**
  * Compute storage-related stats:
- * - totalRouters
- * - totalLogs
- * - logsPerDay7 (last 7 days inclusive)
- * - logsPerDay30 (last 30 days inclusive)
- * - avgLogJsonSizeBytes (approx, sampled from latest N rows via row_to_json)
- * - estimatedCurrentJsonBytes (totalLogs * avg size)
- * - projections (30/90 day) based on avg daily logs over last 7 and 30 days
+ * - totalRouters, totalLogs
+ * - logsPerDay7, logsPerDay30
+ * - avgLogJsonSizeBytes, estimatedCurrentJsonBytes
+ * - projections (30/90 day)
  */
 async function getStorageStats(sampleSize = 1000) {
   try {
@@ -701,7 +107,6 @@ async function getStorageStats(sampleSize = 1000) {
     }));
 
     // Calculate growth metrics
-    // Get record counts for last 7 days and previous 7 days for comparison
     const growth7Res = await pool.query(`
       SELECT 
         COUNT(*) FILTER (WHERE timestamp >= CURRENT_DATE - INTERVAL '7 days') AS last_7_days,
@@ -716,9 +121,8 @@ async function getStorageStats(sampleSize = 1000) {
       ? ((recordsLast7Days - recordsPrev7Days) / recordsPrev7Days) * 100 
       : (recordsLast7Days > 0 ? 100 : 0);
     
-    // Estimate size growth
     const sizePerDay = recordsPerDay * avgBytes;
-    const sizeGrowthRate = recordsGrowthRate; // Same as records growth rate
+    const sizeGrowthRate = recordsGrowthRate;
 
     return {
       totalRouters: Number(totals.total_routers || 0),
@@ -754,11 +158,8 @@ async function getStorageStats(sampleSize = 1000) {
   }
 }
 
-module.exports.getStorageStats = getStorageStats;
-
 /**
  * Top routers by data usage over the last N days.
- * Returns router_id, name, tx_bytes, rx_bytes, total_bytes.
  */
 async function getTopRoutersByUsage(days = 7, limit = 5) {
   try {
@@ -829,11 +230,8 @@ async function getTopRoutersByUsage(days = 7, limit = 5) {
   }
 }
 
-module.exports.getTopRoutersByUsage = getTopRoutersByUsage;
-
 /**
  * Aggregate network-wide usage by day for the last N days.
- * Returns [{ date, tx_bytes, rx_bytes, total_bytes }].
  */
 async function getNetworkUsageByDay(days = 7) {
   try {
@@ -892,11 +290,8 @@ async function getNetworkUsageByDay(days = 7) {
   }
 }
 
-module.exports.getNetworkUsageByDay = getNetworkUsageByDay;
-
 /**
  * Operator distribution and usage for last N days.
- * Returns counts by operator and total usage assigned to the router's latest operator.
  */
 async function getOperatorDistribution(days = 7) {
   try {
@@ -946,7 +341,6 @@ async function getOperatorDistribution(days = 7) {
     `;
     const usageRes = await pool.query(usageQuery, [daysInt]);
 
-    // merge counts and usage by operator
     const usageMap = new Map((usageRes.rows || []).map(r => [r.operator || 'Unknown', r]));
     const out = (countsRes.rows || []).map(r => {
       const u = usageMap.get(r.operator || 'Unknown') || { tx_bytes: 0, rx_bytes: 0, total_bytes: 0 };
@@ -965,14 +359,13 @@ async function getOperatorDistribution(days = 7) {
   }
 }
 
-module.exports.getOperatorDistribution = getOperatorDistribution;
-
 /**
  * Rolling window network usage, grouped by bucket (hour or day).
  */
 async function getNetworkUsageRolling(hours = 24, bucket = 'hour') {
   try {
     const hrs = Math.max(1, Math.min(24 * 30, Number(hours) || 24));
+    // Validate bucket to prevent SQL injection - only allow 'day' or 'hour'
     const buck = bucket === 'day' ? 'day' : 'hour';
     const query = `
       WITH params AS (
@@ -1027,8 +420,6 @@ async function getNetworkUsageRolling(hours = 24, bucket = 'hour') {
     throw error;
   }
 }
-
-module.exports.getNetworkUsageRolling = getNetworkUsageRolling;
 
 /**
  * Rolling window top routers by usage in last N hours.
@@ -1102,11 +493,8 @@ async function getTopRoutersByUsageRolling(hours = 24, limit = 5) {
   }
 }
 
-module.exports.getTopRoutersByUsageRolling = getTopRoutersByUsageRolling;
-
 /**
  * True rolling window operator distribution for last N hours.
- * Attributes byte deltas to the operator present at each log within the window.
  */
 async function getOperatorDistributionRolling(hours = 24) {
   try {
@@ -1163,15 +551,11 @@ async function getOperatorDistributionRolling(hours = 24) {
   }
 }
 
-module.exports.getOperatorDistributionRolling = getOperatorDistributionRolling;
-
 /**
  * Database size statistics for key relations.
- * Returns per-table sizes (table/index/total/toast) and row counts, plus database total size.
  */
 async function getDatabaseSizeStats() {
   try {
-    // Get all user tables, not just specific ones
     const sizesQuery = `
       SELECT
         c.relname AS name,
@@ -1185,7 +569,6 @@ async function getDatabaseSizeStats() {
       ORDER BY total_bytes DESC;`;
     const sizesRes = await pool.query(sizesQuery);
 
-    // Get row counts for all tables dynamically
     const tableNames = (sizesRes.rows || []).map(r => r.name);
     const countQueries = tableNames.map(name => 
       `SELECT '${name}' AS name, COUNT(*)::bigint AS row_count FROM ${name}`
@@ -1197,7 +580,6 @@ async function getDatabaseSizeStats() {
 
     const dbSizeRes = await pool.query(`SELECT pg_database_size(current_database()) AS db_bytes;`);
 
-    // Merge counts into sizes map
     const countMap = new Map((countsRes.rows || []).map(r => [r.name, Number(r.row_count) || 0]));
     const tables = (sizesRes.rows || []).map(r => ({
       name: r.name,
@@ -1220,7 +602,6 @@ async function getDatabaseSizeStats() {
 
 /**
  * Get inspection status for all routers
- * Returns routers with days_remaining until reinspection (365 days from last inspection or created_at)
  */
 async function getInspectionStatus() {
   try {
@@ -1314,22 +695,17 @@ async function getInspectionHistory(routerId) {
   }
 }
 
-// Re-export stats functions from routerStats module
-module.exports.getStorageStats = routerStats.getStorageStats;
-module.exports.getTopRoutersByUsage = routerStats.getTopRoutersByUsage;
-module.exports.getNetworkUsageByDay = routerStats.getNetworkUsageByDay;
-module.exports.getOperatorDistribution = routerStats.getOperatorDistribution;
-module.exports.getNetworkUsageRolling = routerStats.getNetworkUsageRolling;
-module.exports.getTopRoutersByUsageRolling = routerStats.getTopRoutersByUsageRolling;
-module.exports.getOperatorDistributionRolling = routerStats.getOperatorDistributionRolling;
-module.exports.getDatabaseSizeStats = routerStats.getDatabaseSizeStats;
-module.exports.getInspectionStatus = routerStats.getInspectionStatus;
-module.exports.logInspection = routerStats.logInspection;
-module.exports.getInspectionHistory = routerStats.getInspectionHistory;
+module.exports = {
+  getStorageStats,
+  getTopRoutersByUsage,
+  getNetworkUsageByDay,
+  getOperatorDistribution,
+  getNetworkUsageRolling,
+  getTopRoutersByUsageRolling,
+  getOperatorDistributionRolling,
+  getDatabaseSizeStats,
+  getInspectionStatus,
+  logInspection,
+  getInspectionHistory
+};
 
-// Re-export maintenance functions from routerMaintenance module
-module.exports.mergeDuplicateRouters = routerMaintenance.mergeDuplicateRouters;
-module.exports.getDeduplicationReport = routerMaintenance.getDeduplicationReport;
-module.exports.archiveOldLogs = routerMaintenance.archiveOldLogs;
-module.exports.purgeArchivedLogs = routerMaintenance.purgeArchivedLogs;
-module.exports.cleanupOrphanedLogs = routerMaintenance.cleanupOrphanedLogs;

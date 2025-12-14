@@ -211,6 +211,20 @@ async function startServer() {
     // Webhook URL: /api/ironwifi/webhook
     logger.info('IronWifi webhook endpoint ready at /api/ironwifi/webhook');
     
+    // Cleanup expired OAuth states every hour
+    setInterval(async () => {
+      try {
+        const result = await require('./config/database').pool.query(
+          'DELETE FROM oauth_state_store WHERE expires_at < NOW()'
+        );
+        if (result.rowCount > 0) {
+          logger.info(`Cleaned up ${result.rowCount} expired OAuth states`);
+        }
+      } catch (error) {
+        logger.warn('Failed to cleanup expired OAuth states:', { error: error.message });
+      }
+    }, 60 * 60 * 1000); // 1 hour
+    
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
       logger.info(`🚀 Server is running on http://localhost:${PORT}`);
