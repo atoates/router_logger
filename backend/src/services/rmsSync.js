@@ -9,8 +9,9 @@ const distributedLockService = require('./distributedLockService');
 // Delay between processing devices (configurable via env)
 const DELAY_BETWEEN_DEVICES_MS = parseInt(process.env.RMS_SYNC_DELAY_MS || '500', 10);
 const INITIAL_SYNC_DELAY_MS = parseInt(process.env.RMS_INITIAL_SYNC_DELAY_MS || '2000', 10); // Longer delay for initial sync
-// Enable fetching full monitoring data for cell info (uses more API quota)
-const FETCH_CELL_INFO = process.env.RMS_FETCH_CELL_INFO === 'true';
+// NOTE: RMS /monitoring endpoint does not exist (returns 404)
+// Cell info must come from device list or direct telemetry from routers
+const FETCH_CELL_INFO = false; // Disabled - endpoint doesn't exist
 
 // RMS Sync Statistics Tracking
 let rmsSyncStats = {
@@ -44,10 +45,25 @@ function transformRMSDeviceToTelemetry(device, monitoring) {
   const vpn = monitoring?.vpn || {};
   const eth = monitoring?.ethernet || {};
   
+  // Debug: Log device keys to understand what data RMS returns
+  const deviceKeys = Object.keys(device || {});
+  const monitoringKeys = Object.keys(monitoring || {});
+  const cellularKeys = Object.keys(cellular || {});
+  
+  // Log once per sync (first device) to avoid spam
+  if (!transformRMSDeviceToTelemetry._logged) {
+    transformRMSDeviceToTelemetry._logged = true;
+    logger.info(`RMS device fields: ${deviceKeys.join(', ')}`);
+    logger.info(`RMS monitoring fields: ${monitoringKeys.join(', ')}`);
+    logger.info(`RMS cellular fields: ${cellularKeys.join(', ')}`);
+    // Log sample device to see structure
+    logger.debug(`Sample RMS device data: ${JSON.stringify(device).substring(0, 1000)}`);
+  }
+  
   // Debug: Log if cell info is found
   const hasCellInfo = !!(cellular.cell_id || cellular.cid || cellular.tac || cellular.mcc);
   if (hasCellInfo) {
-    logger.debug(`Cell info found for ${device.serial_number || device.id}: mcc=${cellular.mcc}, mnc=${cellular.mnc}, tac=${cellular.tac}, cid=${cellular.cell_id || cellular.cid}`);
+    logger.info(`Cell info found for ${device.serial_number || device.id}: mcc=${cellular.mcc}, mnc=${cellular.mnc}, tac=${cellular.tac}, cid=${cellular.cell_id || cellular.cid}`);
   }
 
   // Helper to coerce to finite number
@@ -160,6 +176,9 @@ async function syncFromRMS() {
 
   try {
     logger.info('Starting RMS sync...');
+    
+    // Reset debug logging flag for this sync
+    transformRMSDeviceToTelemetry._logged = false;
     
     // Check if we're approaching quota limit before starting sync
     if (isApproachingQuota()) {
