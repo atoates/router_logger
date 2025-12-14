@@ -172,10 +172,20 @@ class RMSClient {
   }
 
   /**
-   * NOTE: getDeviceMonitoring() has been removed to save API quota.
-   * Monitoring data is now extracted from the device list response.
-   * See getAllDevicesWithMonitoring() for details.
+   * Get device monitoring/real-time data (includes cell tower info)
+   * Use sparingly to conserve API quota
    */
+  async getDeviceMonitoring(deviceId) {
+    try {
+      const response = await this.requestWithFallback('get', [
+        `/api/devices/${deviceId}/monitoring`
+      ]);
+      return response.data;
+    } catch (error) {
+      logger.warn(`Monitoring fetch failed for ${deviceId}:`, error.message);
+      return null;
+    }
+  }
 
   /**
    * Get device statistics (data usage, etc.)
@@ -277,15 +287,38 @@ class RMSClient {
       // The monitoring endpoint provides real-time data, but we're logging every hour anyway
       // So we can use the device list data directly to save 50-100 API calls per sync
       const devicesWithMonitoring = devices.map((device) => {
+        // Extract cellular/mobile data from various possible locations in device response
+        const cellular = device.cellular || device.mobile || device.modem || {};
+        const network = device.network || {};
+        
         return {
           ...device,
           // Use status from device list instead of separate monitoring call
           monitoring: {
             status: device.status || device.state || device.connection_state,
             last_seen: device.last_seen || device.last_activity || device.updated_at,
-            // These fields may or may not be in the device list, but they're not critical
             uptime: device.uptime,
             signal_strength: device.signal_strength || device.rssi,
+            // Include cellular/cell tower info if available in device list
+            cellular: {
+              operator: cellular.operator || device.operator,
+              mcc: cellular.mcc || device.mcc,
+              mnc: cellular.mnc || device.mnc,
+              lac: cellular.lac || device.lac,
+              tac: cellular.tac || device.tac,
+              cell_id: cellular.cell_id || cellular.cid || device.cell_id,
+              rsrp: cellular.rsrp || device.rsrp,
+              rsrq: cellular.rsrq || device.rsrq,
+              rssi: cellular.rssi || device.rssi || device.signal_strength,
+              sinr: cellular.sinr || device.sinr,
+              earfcn: cellular.earfcn || device.earfcn,
+              pc_id: cellular.pc_id || cellular.pci || device.pci || device.phys_cell_id,
+              network_type: cellular.network_type || cellular.connection_type || device.network_type,
+              imei: cellular.imei || device.imei
+            },
+            network: {
+              wan_ip: network.wan_ip || network.ip || device.wan_ip || device.ip,
+            }
           }
         };
       });

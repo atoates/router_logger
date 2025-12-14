@@ -9,6 +9,8 @@ const distributedLockService = require('./distributedLockService');
 // Delay between processing devices (configurable via env)
 const DELAY_BETWEEN_DEVICES_MS = parseInt(process.env.RMS_SYNC_DELAY_MS || '500', 10);
 const INITIAL_SYNC_DELAY_MS = parseInt(process.env.RMS_INITIAL_SYNC_DELAY_MS || '2000', 10); // Longer delay for initial sync
+// Enable fetching full monitoring data for cell info (uses more API quota)
+const FETCH_CELL_INFO = process.env.RMS_FETCH_CELL_INFO === 'true';
 
 // RMS Sync Statistics Tracking
 let rmsSyncStats = {
@@ -33,13 +35,20 @@ function sleep(ms) {
  * Transform RMS device data to our telemetry format
  */
 function transformRMSDeviceToTelemetry(device, monitoring) {
-  const cellular = monitoring?.cellular || monitoring?.mobile || {};
-  const network = monitoring?.network || {};
+  // Look for cellular data in multiple places (monitoring, device root, modem)
+  const cellular = monitoring?.cellular || monitoring?.mobile || device?.cellular || device?.modem || {};
+  const network = monitoring?.network || device?.network || {};
   const system = monitoring?.system || {};
   const wifi = monitoring?.wifi || {};
   const hw = monitoring?.hardware || monitoring?.device || {};
   const vpn = monitoring?.vpn || {};
   const eth = monitoring?.ethernet || {};
+  
+  // Debug: Log if cell info is found
+  const hasCellInfo = !!(cellular.cell_id || cellular.cid || cellular.tac || cellular.mcc);
+  if (hasCellInfo) {
+    logger.debug(`Cell info found for ${device.serial_number || device.id}: mcc=${cellular.mcc}, mnc=${cellular.mnc}, tac=${cellular.tac}, cid=${cellular.cell_id || cellular.cid}`);
+  }
 
   // Helper to coerce to finite number
   const num = (v) => {
@@ -95,21 +104,21 @@ function transformRMSDeviceToTelemetry(device, monitoring) {
     // WAN & Network
   wan_ip: network.wan_ip || network.ip || device.wan_ip,
   operator: cellular.operator || cellular.network_name || device.operator,
-    mcc: cellular.mcc,
-    mnc: cellular.mnc,
-    network_type: cellular.network_type || cellular.connection_type,
+    mcc: cellular.mcc || device.mcc,
+    mnc: cellular.mnc || device.mnc,
+    network_type: cellular.network_type || cellular.connection_type || device.network_type,
     
-    // Cell Tower Info
+    // Cell Tower Info (check both cellular object and device root)
     cell: {
-      lac: cellular.lac,
-      tac: cellular.tac,
-      cid: cellular.cell_id || cellular.cid,
-      rsrp: cellular.rsrp,
-      rsrq: cellular.rsrq,
-      rssi: cellular.rssi,
-      sinr: cellular.sinr,
-      earfcn: cellular.earfcn,
-      pc_id: cellular.pc_id || cellular.pci || cellular.phys_cell_id
+      lac: cellular.lac || device.lac,
+      tac: cellular.tac || device.tac,
+      cid: cellular.cell_id || cellular.cid || device.cell_id,
+      rsrp: cellular.rsrp || device.rsrp,
+      rsrq: cellular.rsrq || device.rsrq,
+      rssi: cellular.rssi || device.rssi || device.signal_strength,
+      sinr: cellular.sinr || device.sinr,
+      earfcn: cellular.earfcn || device.earfcn,
+      pc_id: cellular.pc_id || cellular.pci || cellular.phys_cell_id || device.pci
     },
     
     // Data Counters
@@ -188,7 +197,17 @@ async function syncFromRMS() {
           await sleep(delay);
         }
         
-        const telemetry = transformRMSDeviceToTelemetry(device, device.monitoring);
+        // Optionally fetch full monitoring data for cell info (uses API quota)
+        let monitoringData = device.monitoring;
+        if (FETCH_CELL_INFO) {
+          const deviceId = device.id || device.device_id || device.serial_number;
+          const fullMonitoring = await rmsClient.getDeviceMonitoring(deviceId);
+          if (fullMonitoring) {
+            monitoringData = fullMonitoring;
+          }
+        }
+        
+        const telemetry = transformRMSDeviceToTelemetry(device, monitoringData);
 
         // If monitoring did not provide cumulative counters, try to derive from statistics API
         // BUT: Only do this if we have no previous data to avoid wasting API quota
