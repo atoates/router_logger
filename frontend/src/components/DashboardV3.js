@@ -292,7 +292,17 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
                     tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} 
                   />
                   <YAxis domain={[0, Math.ceil(yMax * 1.1)]} tickFormatter={(v)=> formatBytes(v)} tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} />
-                  <Tooltip formatter={(v)=>formatBytes(v)} labelFormatter={(t)=> new Date(t).toLocaleString()} />
+                  <Tooltip
+                    formatter={(v) => formatBytes(v)}
+                    labelFormatter={(t) => new Date(t).toLocaleString()}
+                    contentStyle={{
+                      backgroundColor: dark ? '#1f2937' : '#ffffff',
+                      border: '1px solid ' + (dark ? '#374151' : '#e5e7eb'),
+                      color: dark ? '#e5e7eb' : '#111827',
+                    }}
+                    labelStyle={{ color: dark ? '#e5e7eb' : '#111827' }}
+                    itemStyle={{ color: dark ? '#e5e7eb' : '#111827' }}
+                  />
                   <Legend />
                   <Area type="monotone" dataKey="tx_bytes" stroke="#6366f1" fill="url(#gTx)" name="TX" />
                   <Area type="monotone" dataKey="rx_bytes" stroke="#10b981" fill="url(#gRx)" name="RX" />

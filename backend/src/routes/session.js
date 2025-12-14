@@ -24,38 +24,49 @@ async function getSessionFromRequest(req) {
   if (!sessionToken) return null;
 
   const tokenHash = hashSessionToken(sessionToken);
-  const result = await pool.query(
-    `SELECT user_id, username, role, expires_at
-     FROM user_sessions
-     WHERE session_token_hash = $1
-     LIMIT 1`,
-    [tokenHash]
-  );
+  
+  try {
+    const result = await pool.query(
+      `SELECT user_id, username, role, expires_at
+       FROM user_sessions
+       WHERE session_token_hash = $1
+       LIMIT 1`,
+      [tokenHash]
+    );
 
-  if (result.rows.length === 0) return null;
+    if (result.rows.length === 0) return null;
 
-  const row = result.rows[0];
-  const expiresAt = new Date(row.expires_at);
+    const row = result.rows[0];
+    const expiresAt = new Date(row.expires_at);
 
-  if (expiresAt.getTime() < Date.now()) {
-    // Expired - cleanup
-    await pool.query('DELETE FROM user_sessions WHERE session_token_hash = $1', [tokenHash]);
+    if (expiresAt.getTime() < Date.now()) {
+      // Expired - cleanup
+      await pool.query('DELETE FROM user_sessions WHERE session_token_hash = $1', [tokenHash]);
+      return null;
+    }
+
+    // Update last_seen asynchronously (best-effort)
+    pool.query(
+      'UPDATE user_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE session_token_hash = $1',
+      [tokenHash]
+    ).catch(() => {});
+
+    return {
+      tokenHash,
+      userId: row.user_id,
+      username: row.username,
+      role: row.role,
+      expiresAt
+    };
+  } catch (error) {
+    // Table may not exist yet (migration not run) - log and return null
+    if (error.code === '42P01') { // undefined_table
+      logger.warn('user_sessions table does not exist - run migrations. Falling back to no session.');
+    } else {
+      logger.error('Session lookup error:', { message: error.message, code: error.code });
+    }
     return null;
   }
-
-  // Update last_seen asynchronously (best-effort)
-  pool.query(
-    'UPDATE user_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE session_token_hash = $1',
-    [tokenHash]
-  ).catch(() => {});
-
-  return {
-    tokenHash,
-    userId: row.user_id,
-    username: row.username,
-    role: row.role,
-    expiresAt
-  };
 }
 
 /**
@@ -87,12 +98,42 @@ router.post('/login', async (req, res) => {
     const tokenHash = hashSessionToken(sessionToken);
 
     // Store session in database (deploy/scale safe)
-    await pool.query(
-      `INSERT INTO user_sessions (session_token_hash, user_id, username, role, expires_at)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (session_token_hash) DO NOTHING`,
-      [tokenHash, user.id, user.username, user.role, new Date(expiresAt)]
-    );
+    try {
+      await pool.query(
+        `INSERT INTO user_sessions (session_token_hash, user_id, username, role, expires_at)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (session_token_hash) DO NOTHING`,
+        [tokenHash, user.id, user.username, user.role, new Date(expiresAt)]
+      );
+    } catch (dbError) {
+      if (dbError.code === '42P01') { // undefined_table
+        // Table doesn't exist - try to create it on the fly
+        logger.warn('user_sessions table missing - creating it now...');
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS user_sessions (
+            session_token_hash TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            username VARCHAR(255) NOT NULL,
+            role VARCHAR(20) NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            last_seen_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMPTZ NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+          CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
+        `);
+        // Retry insert
+        await pool.query(
+          `INSERT INTO user_sessions (session_token_hash, user_id, username, role, expires_at)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (session_token_hash) DO NOTHING`,
+          [tokenHash, user.id, user.username, user.role, new Date(expiresAt)]
+        );
+        logger.info('user_sessions table created and session stored.');
+      } else {
+        throw dbError;
+      }
+    }
 
     logger.info(`User logged in: ${user.username} (${user.role})`);
 
