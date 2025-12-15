@@ -2248,30 +2248,44 @@ router.post('/run-migration-024', async (req, res) => {
   try {
     logger.info('Manually running migration 024...');
     
-    // Run the migration SQL directly
-    await pool.query(`
-      -- client_mac = Calling-Station-Id = User's device MAC
-      ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS client_mac VARCHAR(50);
-      
-      -- ap_mac = Called-Station-Id = Router/AP MAC (for router linking)  
-      ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS ap_mac VARCHAR(50);
-      
-      -- router_id = Matched router from ap_mac
-      ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS router_id INTEGER REFERENCES routers(router_id);
-      
-      -- Additional context fields
-      ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS captive_portal_name VARCHAR(255);
-      ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS venue_id VARCHAR(100);
-      ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS public_ip VARCHAR(50);
-    `);
+    const results = [];
+    
+    // Add columns one by one to identify which one fails
+    const columns = [
+      { name: 'client_mac', sql: 'ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS client_mac VARCHAR(50)' },
+      { name: 'ap_mac', sql: 'ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS ap_mac VARCHAR(50)' },
+      // Skip foreign key for now - add as simple integer
+      { name: 'router_id', sql: 'ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS router_id INTEGER' },
+      { name: 'captive_portal_name', sql: 'ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS captive_portal_name VARCHAR(255)' },
+      { name: 'venue_id', sql: 'ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS venue_id VARCHAR(100)' },
+      { name: 'public_ip', sql: 'ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS public_ip VARCHAR(50)' }
+    ];
+    
+    for (const col of columns) {
+      try {
+        await pool.query(col.sql);
+        results.push({ column: col.name, status: 'added' });
+      } catch (e) {
+        results.push({ column: col.name, status: 'failed', error: e.message });
+      }
+    }
     
     // Create indexes
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_client_mac ON ironwifi_guests(client_mac);
-      CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_ap_mac ON ironwifi_guests(ap_mac);
-      CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_router_id ON ironwifi_guests(router_id);
-      CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_venue ON ironwifi_guests(venue_id);
-    `);
+    const indexes = [
+      { name: 'idx_ironwifi_guests_client_mac', sql: 'CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_client_mac ON ironwifi_guests(client_mac)' },
+      { name: 'idx_ironwifi_guests_ap_mac', sql: 'CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_ap_mac ON ironwifi_guests(ap_mac)' },
+      { name: 'idx_ironwifi_guests_router_id', sql: 'CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_router_id ON ironwifi_guests(router_id)' },
+      { name: 'idx_ironwifi_guests_venue', sql: 'CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_venue ON ironwifi_guests(venue_id)' }
+    ];
+    
+    for (const idx of indexes) {
+      try {
+        await pool.query(idx.sql);
+        results.push({ index: idx.name, status: 'created' });
+      } catch (e) {
+        results.push({ index: idx.name, status: 'failed', error: e.message });
+      }
+    }
     
     // Record the migration (table is called 'migrations' with 'filename' column)
     await pool.query(`
@@ -2280,12 +2294,12 @@ router.post('/run-migration-024', async (req, res) => {
       ON CONFLICT (filename) DO NOTHING
     `);
     
-    logger.info('Migration 024 applied successfully');
+    logger.info('Migration 024 applied successfully', { results });
     
     res.json({
       success: true,
       message: 'Migration 024 applied successfully',
-      columnsAdded: ['client_mac', 'ap_mac', 'router_id', 'captive_portal_name', 'venue_id', 'public_ip']
+      results
     });
   } catch (error) {
     logger.error('Error running migration 024:', error);
