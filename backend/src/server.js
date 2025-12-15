@@ -135,13 +135,16 @@ app.get('/', (req, res) => {
   });
 });
 
-app.use('/api', routerRoutes);
+// IronWifi routes FIRST - webhook must be public for IronWifi to POST data
+app.use('/api/ironwifi', ironwifiWebhookRoutes);
+
+// Other API routes
 app.use('/api/rms', rmsRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/clickup', clickupRoutes);
 app.use('/api/session', sessionRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/ironwifi', ironwifiWebhookRoutes); // Webhook-only (no API polling)
+app.use('/api', routerRoutes); // General API routes - last because it's the most general
 app.use(monitoringRoutes);
 
 // Error handling middleware
