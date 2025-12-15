@@ -173,7 +173,7 @@ export default function LocationMap({ routerId }) {
       <div 
         id="router-location-map" 
         style={{ 
-          height: '300px', 
+          height: '400px', 
           width: '100%', 
           borderRadius: '8px',
           overflow: 'hidden'

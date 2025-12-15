@@ -43,7 +43,7 @@ export default function RouterDashboard({ router }) {
   const [inspections, setInspections] = useState([]);
   const [showRawData, setShowRawData] = useState(false); // Toggle for chart scale (false = normalized)
   const [useRollingAverage, setUseRollingAverage] = useState(true); // Toggle for rolling average (true = smoothed by default)
-  const [expandedSection, setExpandedSection] = useState('latest'); // Accordion state: 'latest', 'uptime', or 'inspections'
+  const [expandedSection, setExpandedSection] = useState('location'); // Accordion state: 'location', 'latest', 'uptime', or 'inspections'
   const propertyWidgetRef = useRef(null);
 
   const routerId = router?.router_id;
@@ -397,6 +397,22 @@ export default function RouterDashboard({ router }) {
 
       {/* Accordion Sections */}
       <div className="rd-accordion">
+        {/* Location Section - First and expanded by default */}
+        <div className={`accordion-item ${expandedSection === 'location' ? 'expanded' : ''}`}>
+          <div 
+            className="accordion-header" 
+            onClick={() => setExpandedSection(expandedSection === 'location' ? null : 'location')}
+          >
+            <span className="accordion-title">📍 Location</span>
+            <span className="accordion-icon">{expandedSection === 'location' ? '▼' : '▶'}</span>
+          </div>
+          {expandedSection === 'location' && (
+            <div className="accordion-content">
+              <LocationMap routerId={routerId} />
+            </div>
+          )}
+        </div>
+
         {/* Uptime Samples Section */}
         <div className={`accordion-item ${expandedSection === 'uptime' ? 'expanded' : ''}`}>
           <div 
@@ -551,21 +567,6 @@ export default function RouterDashboard({ router }) {
           )}
         </div>
 
-        {/* Location Section */}
-        <div className={`accordion-item ${expandedSection === 'location' ? 'expanded' : ''}`}>
-          <div 
-            className="accordion-header" 
-            onClick={() => setExpandedSection(expandedSection === 'location' ? null : 'location')}
-          >
-            <span className="accordion-title">📍 Location</span>
-            <span className="accordion-icon">{expandedSection === 'location' ? '▼' : '▶'}</span>
-          </div>
-          {expandedSection === 'location' && (
-            <div className="accordion-content">
-              <LocationMap routerId={routerId} />
-            </div>
-          )}
-        </div>
       </div>
 
       {/* TX/RX Chart - Full Width */}
