@@ -681,4 +681,145 @@ router.get('/api/monitoring/location-api', async (req, res) => {
   }
 });
 
+// Current configuration and tuning recommendations
+router.get('/api/monitoring/config', async (req, res) => {
+  try {
+    const memUsage = process.memoryUsage();
+    const heapStats = v8.getHeapStatistics();
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    
+    // Current sync intervals
+    const rmsSyncInterval = parseInt(process.env.RMS_SYNC_INTERVAL_MINUTES || '5', 10);
+    const clickupSyncInterval = parseInt(process.env.CLICKUP_SYNC_INTERVAL_MINUTES || '30', 10);
+    const ironwifiSyncInterval = parseInt(process.env.IRONWIFI_SYNC_INTERVAL_MINUTES || '15', 10);
+    
+    // Database pool settings
+    const dbPoolMax = parseInt(process.env.DB_POOL_MAX || '20', 10);
+    const dbPoolMin = parseInt(process.env.DB_POOL_MIN || '2', 10);
+    
+    // Current utilization
+    const memoryUtilization = (memUsage.heapUsed / heapStats.heap_size_limit) * 100;
+    const systemMemUtilization = ((totalMem - freeMem) / totalMem) * 100;
+    
+    // Pool stats
+    const poolStats = {
+      totalCount: pool.totalCount,
+      idleCount: pool.idleCount,
+      waitingCount: pool.waitingCount
+    };
+    
+    const poolUtilization = poolStats.totalCount > 0 
+      ? ((poolStats.totalCount - poolStats.idleCount) / dbPoolMax) * 100 
+      : 0;
+    
+    // Generate recommendations
+    const recommendations = [];
+    
+    // Memory-based recommendations
+    if (memoryUtilization < 30 && systemMemUtilization < 50) {
+      recommendations.push({
+        area: 'memory',
+        current: `${memoryUtilization.toFixed(0)}% heap used`,
+        recommendation: 'You have headroom! Consider increasing Node memory with NODE_OPTIONS="--max-old-space-size=512" or higher',
+        priority: 'low'
+      });
+    }
+    
+    // Database pool recommendations
+    if (poolUtilization > 80) {
+      recommendations.push({
+        area: 'database',
+        current: `${poolUtilization.toFixed(0)}% pool used`,
+        recommendation: `Increase DB_POOL_MAX from ${dbPoolMax} to ${Math.min(50, dbPoolMax + 10)}`,
+        priority: 'high'
+      });
+    } else if (poolUtilization < 20 && memoryUtilization < 50) {
+      recommendations.push({
+        area: 'database',
+        current: `Only ${poolUtilization.toFixed(0)}% pool used`,
+        recommendation: 'Pool is underutilized. Could handle more concurrent operations.',
+        priority: 'info'
+      });
+    }
+    
+    // Sync interval recommendations
+    if (rmsSyncInterval > 2 && systemMemUtilization < 60) {
+      recommendations.push({
+        area: 'rms_sync',
+        current: `Every ${rmsSyncInterval} minutes`,
+        recommendation: `Could reduce RMS_SYNC_INTERVAL_MINUTES to ${Math.max(1, rmsSyncInterval - 2)} for fresher data`,
+        priority: 'medium'
+      });
+    }
+    
+    if (clickupSyncInterval > 15 && systemMemUtilization < 60) {
+      recommendations.push({
+        area: 'clickup_sync',
+        current: `Every ${clickupSyncInterval} minutes`,
+        recommendation: `Could reduce CLICKUP_SYNC_INTERVAL_MINUTES to ${Math.max(10, clickupSyncInterval - 10)} for faster updates`,
+        priority: 'low'
+      });
+    }
+    
+    // CPU recommendations
+    const loadAvg = os.loadavg();
+    const cpuCount = os.cpus().length;
+    const loadPercent = (loadAvg[0] / cpuCount) * 100;
+    
+    if (loadPercent < 30) {
+      recommendations.push({
+        area: 'cpu',
+        current: `${loadPercent.toFixed(0)}% load average`,
+        recommendation: 'CPU is underutilized. Could handle more frequent syncs or parallel operations.',
+        priority: 'info'
+      });
+    }
+    
+    res.json({
+      current: {
+        syncIntervals: {
+          rms: `${rmsSyncInterval} minutes`,
+          clickup: `${clickupSyncInterval} minutes`,
+          ironwifi: `${ironwifiSyncInterval} minutes`
+        },
+        database: {
+          poolMax: dbPoolMax,
+          poolMin: dbPoolMin,
+          currentConnections: poolStats.totalCount,
+          activeConnections: poolStats.totalCount - poolStats.idleCount,
+          waitingQueries: poolStats.waitingCount
+        },
+        resources: {
+          heapUsed: `${(memUsage.heapUsed / 1024 / 1024).toFixed(0)} MB`,
+          heapLimit: `${(heapStats.heap_size_limit / 1024 / 1024).toFixed(0)} MB`,
+          systemMemUsed: `${((totalMem - freeMem) / 1024 / 1024 / 1024).toFixed(1)} GB`,
+          systemMemTotal: `${(totalMem / 1024 / 1024 / 1024).toFixed(1)} GB`,
+          cpuCores: cpuCount,
+          loadAverage: loadAvg.map(l => l.toFixed(2))
+        }
+      },
+      utilization: {
+        memory: `${memoryUtilization.toFixed(1)}%`,
+        systemMemory: `${systemMemUtilization.toFixed(1)}%`,
+        dbPool: `${poolUtilization.toFixed(1)}%`,
+        cpu: `${loadPercent.toFixed(1)}%`
+      },
+      canPushHarder: memoryUtilization < 60 && systemMemUtilization < 70 && poolUtilization < 70 && loadPercent < 60,
+      recommendations,
+      suggestedEnvVars: recommendations.length > 0 ? {
+        // Only suggest if we can push harder
+        ...(memoryUtilization < 50 && { 'NODE_OPTIONS': '--max-old-space-size=512' }),
+        ...(rmsSyncInterval > 2 && systemMemUtilization < 60 && { 'RMS_SYNC_INTERVAL_MINUTES': Math.max(1, rmsSyncInterval - 2).toString() }),
+        ...(poolUtilization > 60 && { 'DB_POOL_MAX': Math.min(50, dbPoolMax + 10).toString() }),
+        ...(clickupSyncInterval > 15 && { 'CLICKUP_SYNC_INTERVAL_MINUTES': Math.max(10, clickupSyncInterval - 10).toString() })
+      } : {},
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error fetching config:', error);
+    res.status(500).json({ error: 'Failed to fetch configuration' });
+  }
+});
+
 module.exports = { router, trackRMSCall, trackClickUpCall, apiMetrics, clickupMetrics, isApproachingQuota, getQuotaStatus };

@@ -114,6 +114,7 @@ export default function SystemStatusPage() {
   
   // VM Performance
   const [vmPerformance, setVmPerformance] = useState(null);
+  const [vmConfig, setVmConfig] = useState(null);
 
   useEffect(() => {
     fetchAllData();
@@ -142,7 +143,8 @@ export default function SystemStatusPage() {
         dbHealthRes,
         apiHealthRes,
         ironwifiStatusRes,
-        vmPerformanceRes
+        vmPerformanceRes,
+        vmConfigRes
       ] = await Promise.allSettled([
         getRouters(),
         getStorageStats({ sample_size: 800 }),
@@ -156,7 +158,8 @@ export default function SystemStatusPage() {
         api.get('/monitoring/db-health'),
         api.get('/health'),
         getIronwifiStatus(),
-        api.get('/monitoring/performance')
+        api.get('/monitoring/performance'),
+        api.get('/monitoring/config')
       ]);
       
       if (routersRes.status === 'fulfilled') setRouters(routersRes.value.data || []);
@@ -172,6 +175,7 @@ export default function SystemStatusPage() {
       if (apiHealthRes.status === 'fulfilled') setApiHealth(apiHealthRes.value.data || null);
       if (ironwifiStatusRes.status === 'fulfilled') setIronwifiStatus(ironwifiStatusRes.value.data || null);
       if (vmPerformanceRes.status === 'fulfilled') setVmPerformance(vmPerformanceRes.value.data || null);
+      if (vmConfigRes.status === 'fulfilled') setVmConfig(vmConfigRes.value.data || null);
       
       setLastUpdated(new Date());
       
@@ -430,6 +434,170 @@ export default function SystemStatusPage() {
                     <span className="rec-message">{rec.message}</span>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* Can Push Harder? */}
+      {vmConfig && (
+        <CollapsibleSection title="🚀 Resource Optimization" defaultOpen={true}>
+          <div className="optimization-section">
+            {/* Can Push Harder Banner */}
+            <div className={`push-harder-banner ${vmConfig.canPushHarder ? 'yes' : 'no'}`}>
+              <div className="push-harder-icon">
+                {vmConfig.canPushHarder ? '🚀' : '⚠️'}
+              </div>
+              <div className="push-harder-content">
+                <h3>{vmConfig.canPushHarder ? 'Yes! You Can Push Harder' : 'Currently at Capacity'}</h3>
+                <p>
+                  {vmConfig.canPushHarder 
+                    ? 'Your VM has unused capacity. Consider the optimizations below.'
+                    : 'Resources are well-utilized. Consider upgrading if you need more performance.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Utilization Meters */}
+            <div className="utilization-grid">
+              <div className="utilization-item">
+                <div className="util-header">
+                  <span className="util-label">Process Memory</span>
+                  <span className="util-value">{vmConfig.utilization?.memory || 'N/A'}</span>
+                </div>
+                <div className="util-bar-container">
+                  <div 
+                    className={`util-bar ${parseFloat(vmConfig.utilization?.memory) > 80 ? 'high' : parseFloat(vmConfig.utilization?.memory) > 50 ? 'medium' : 'low'}`}
+                    style={{ width: vmConfig.utilization?.memory || '0%' }}
+                  />
+                </div>
+              </div>
+              <div className="utilization-item">
+                <div className="util-header">
+                  <span className="util-label">System Memory</span>
+                  <span className="util-value">{vmConfig.utilization?.systemMemory || 'N/A'}</span>
+                </div>
+                <div className="util-bar-container">
+                  <div 
+                    className={`util-bar ${parseFloat(vmConfig.utilization?.systemMemory) > 80 ? 'high' : parseFloat(vmConfig.utilization?.systemMemory) > 50 ? 'medium' : 'low'}`}
+                    style={{ width: vmConfig.utilization?.systemMemory || '0%' }}
+                  />
+                </div>
+              </div>
+              <div className="utilization-item">
+                <div className="util-header">
+                  <span className="util-label">Database Pool</span>
+                  <span className="util-value">{vmConfig.utilization?.dbPool || 'N/A'}</span>
+                </div>
+                <div className="util-bar-container">
+                  <div 
+                    className={`util-bar ${parseFloat(vmConfig.utilization?.dbPool) > 80 ? 'high' : parseFloat(vmConfig.utilization?.dbPool) > 50 ? 'medium' : 'low'}`}
+                    style={{ width: vmConfig.utilization?.dbPool || '0%' }}
+                  />
+                </div>
+              </div>
+              <div className="utilization-item">
+                <div className="util-header">
+                  <span className="util-label">CPU Load</span>
+                  <span className="util-value">{vmConfig.utilization?.cpu || 'N/A'}</span>
+                </div>
+                <div className="util-bar-container">
+                  <div 
+                    className={`util-bar ${parseFloat(vmConfig.utilization?.cpu) > 80 ? 'high' : parseFloat(vmConfig.utilization?.cpu) > 50 ? 'medium' : 'low'}`}
+                    style={{ width: vmConfig.utilization?.cpu || '0%' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Current Configuration */}
+            <div className="config-grid">
+              <div className="config-card">
+                <h4>⏱️ Sync Intervals</h4>
+                <div className="config-items">
+                  <div className="config-item">
+                    <span className="config-label">RMS Sync</span>
+                    <span className="config-value">{vmConfig.current?.syncIntervals?.rms || 'N/A'}</span>
+                  </div>
+                  <div className="config-item">
+                    <span className="config-label">ClickUp Sync</span>
+                    <span className="config-value">{vmConfig.current?.syncIntervals?.clickup || 'N/A'}</span>
+                  </div>
+                  <div className="config-item">
+                    <span className="config-label">IronWifi Sync</span>
+                    <span className="config-value">{vmConfig.current?.syncIntervals?.ironwifi || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="config-card">
+                <h4>🗄️ Database Pool</h4>
+                <div className="config-items">
+                  <div className="config-item">
+                    <span className="config-label">Max Connections</span>
+                    <span className="config-value">{vmConfig.current?.database?.poolMax || 'N/A'}</span>
+                  </div>
+                  <div className="config-item">
+                    <span className="config-label">Active</span>
+                    <span className="config-value">{vmConfig.current?.database?.activeConnections || 0}</span>
+                  </div>
+                  <div className="config-item">
+                    <span className="config-label">Waiting Queries</span>
+                    <span className={`config-value ${vmConfig.current?.database?.waitingQueries > 0 ? 'warning' : ''}`}>
+                      {vmConfig.current?.database?.waitingQueries || 0}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="config-card">
+                <h4>💻 Resources</h4>
+                <div className="config-items">
+                  <div className="config-item">
+                    <span className="config-label">Heap Used</span>
+                    <span className="config-value">{vmConfig.current?.resources?.heapUsed || 'N/A'}</span>
+                  </div>
+                  <div className="config-item">
+                    <span className="config-label">Heap Limit</span>
+                    <span className="config-value">{vmConfig.current?.resources?.heapLimit || 'N/A'}</span>
+                  </div>
+                  <div className="config-item">
+                    <span className="config-label">CPU Cores</span>
+                    <span className="config-value">{vmConfig.current?.resources?.cpuCores || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Optimization Recommendations */}
+            {vmConfig.recommendations && vmConfig.recommendations.length > 0 && (
+              <div className="optimization-recommendations">
+                <h4>🔧 Optimization Suggestions</h4>
+                {vmConfig.recommendations.map((rec, i) => (
+                  <div key={i} className={`opt-recommendation ${rec.priority}`}>
+                    <div className="opt-header">
+                      <span className={`opt-priority ${rec.priority}`}>
+                        {rec.priority === 'high' ? '🔴 HIGH' : rec.priority === 'medium' ? '🟠 MEDIUM' : rec.priority === 'low' ? '🟡 LOW' : 'ℹ️ INFO'}
+                      </span>
+                      <span className="opt-area">{rec.area?.replace('_', ' ').toUpperCase()}</span>
+                    </div>
+                    <div className="opt-current">Current: {rec.current}</div>
+                    <div className="opt-suggestion">{rec.recommendation}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Suggested Environment Variables */}
+            {vmConfig.suggestedEnvVars && Object.keys(vmConfig.suggestedEnvVars).length > 0 && (
+              <div className="suggested-env-vars">
+                <h4>📋 Copy to Railway Variables</h4>
+                <div className="env-vars-code">
+                  {Object.entries(vmConfig.suggestedEnvVars).map(([key, value]) => (
+                    <div key={key} className="env-var-line">
+                      <span className="env-key">{key}</span>=<span className="env-value">{value}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
