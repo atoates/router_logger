@@ -322,12 +322,13 @@ router.get('/routers/:routerId/geo-location', requireRouterAccess, async (req, r
 });
 
 // Get router's location history with start/end times (from router_locations table)
-// This shows distinct locations the router has been at, not individual samples
+// Falls back to router_logs if router_locations is empty
 router.get('/routers/:routerId/location-history', requireRouterAccess, async (req, res) => {
   try {
     const { routerId } = req.params;
     const { start_date, end_date, limit = 50 } = req.query;
     
+    // First try the router_locations table
     let query = `
       SELECT 
         id,
@@ -368,7 +369,53 @@ router.get('/routers/:routerId/location-history', requireRouterAccess, async (re
     query += ` ORDER BY started_at DESC LIMIT $${paramIndex}`;
     params.push(parseInt(limit, 10));
     
-    const result = await pool.query(query, params);
+    let result = await pool.query(query, params);
+    
+    // If router_locations is empty, fall back to router_logs
+    if (result.rows.length === 0) {
+      const fallbackResult = await pool.query(`
+        SELECT 
+          id,
+          latitude,
+          longitude,
+          location_accuracy as accuracy,
+          cell_id,
+          tac,
+          lac,
+          mcc,
+          mnc,
+          operator,
+          network_type,
+          timestamp as started_at,
+          NULL as ended_at,
+          1 as sample_count,
+          true as is_current
+        FROM router_logs
+        WHERE router_id = $1
+          AND latitude IS NOT NULL
+          AND longitude IS NOT NULL
+        ORDER BY timestamp DESC
+        LIMIT $2
+      `, [routerId, parseInt(limit, 10)]);
+      
+      if (fallbackResult.rows.length > 0) {
+        // Mark only the first one as current
+        const locations = fallbackResult.rows.map((loc, idx) => ({
+          ...loc,
+          is_current: idx === 0,
+          duration_ms: 0,
+          duration_readable: 'N/A (legacy data)'
+        }));
+        
+        return res.json({
+          routerId,
+          current: locations[0] || null,
+          locations,
+          count: locations.length,
+          source: 'router_logs' // Indicate fallback source
+        });
+      }
+    }
     
     // Calculate duration for each location
     const locations = result.rows.map(loc => {
@@ -390,7 +437,8 @@ router.get('/routers/:routerId/location-history', requireRouterAccess, async (re
       routerId,
       current,
       locations,
-      count: locations.length
+      count: locations.length,
+      source: 'router_locations'
     });
   } catch (error) {
     logger.error('Error fetching location history:', error);
