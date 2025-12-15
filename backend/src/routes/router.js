@@ -280,6 +280,47 @@ router.get('/routers/:routerId/current-location', requireRouterAccess, async (re
   }
 });
 
+// Get router's geolocation history (from cell tower lookups)
+router.get('/routers/:routerId/geo-location', requireRouterAccess, async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const { limit = 30 } = req.query;
+    
+    // Get location history (only entries with valid coordinates)
+    const result = await pool.query(`
+      SELECT 
+        latitude,
+        longitude,
+        location_accuracy as accuracy,
+        timestamp,
+        operator,
+        network_type,
+        cell_id,
+        rsrp,
+        rssi
+      FROM router_logs
+      WHERE router_id = $1
+        AND latitude IS NOT NULL
+        AND longitude IS NOT NULL
+      ORDER BY timestamp DESC
+      LIMIT $2
+    `, [routerId, parseInt(limit, 10)]);
+    
+    // Get the most recent location as "current"
+    const current = result.rows.length > 0 ? result.rows[0] : null;
+    
+    res.json({
+      routerId,
+      current,
+      history: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    logger.error('Error fetching geo location:', error);
+    res.status(500).json({ error: 'Failed to fetch geo location' });
+  }
+});
+
 router.get('/routers/with-locations', requireAdmin, async (req, res) => {
   try {
     // Check cache

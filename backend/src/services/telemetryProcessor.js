@@ -3,6 +3,48 @@ const { getCellLocation } = require('./geoService');
 const { logger, pool } = require('../config/database');
 const clickupClient = require('./clickupClient');
 
+// Track last geolocation lookup time per router (in-memory, 24h throttle)
+const lastGeoLookup = new Map();
+const GEO_LOOKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+/**
+ * Check if we should do a geolocation lookup for this router
+ * Returns true if 24h has passed since last lookup OR if we have no location data
+ */
+async function shouldDoGeoLookup(routerId) {
+  // Check in-memory cache first
+  const lastLookup = lastGeoLookup.get(routerId);
+  if (lastLookup && Date.now() - lastLookup < GEO_LOOKUP_INTERVAL_MS) {
+    return false; // Too recent
+  }
+  
+  // Check if we already have recent location data in DB
+  try {
+    const result = await pool.query(`
+      SELECT latitude, longitude, timestamp 
+      FROM router_logs 
+      WHERE router_id = $1 
+        AND latitude IS NOT NULL 
+        AND longitude IS NOT NULL
+      ORDER BY timestamp DESC 
+      LIMIT 1
+    `, [routerId]);
+    
+    if (result.rows.length > 0) {
+      const lastLocationTime = new Date(result.rows[0].timestamp).getTime();
+      if (Date.now() - lastLocationTime < GEO_LOOKUP_INTERVAL_MS) {
+        // Update in-memory cache
+        lastGeoLookup.set(routerId, lastLocationTime);
+        return false; // Have recent location
+      }
+    }
+  } catch (error) {
+    logger.warn('Error checking last location time:', { error: error.message });
+  }
+  
+  return true; // Do the lookup
+}
+
 /**
  * Process incoming RUT200 telemetry data
  * Expected format matches the RUT200 Data to Server JSON structure
@@ -27,21 +69,33 @@ async function processRouterTelemetry(data) {
       mac_address: data.mac_address || null
     });
 
-    // Enrich with geolocation if cell info is available
+    // Enrich with geolocation if cell info is available (throttled to once per 24h)
     let geoData = null;
     if (data.cell && data.mcc && data.mnc) {
-      geoData = await getCellLocation({
-        mcc: data.mcc,
-        mnc: data.mnc,
-        lac: data.cell.lac,
-        tac: data.cell.tac,
-        cell_id: data.cell.cid || data.cell.cell_id,
-        // Additional params for better accuracy
-        network_type: data.network_type,
-        rsrp: data.cell.rsrp,
-        pci: data.cell.pc_id || data.cell.pci || data.cell.phys_cell_id,
-        earfcn: data.cell.earfcn
-      });
+      const shouldLookup = await shouldDoGeoLookup(data.device_id);
+      
+      if (shouldLookup) {
+        geoData = await getCellLocation({
+          mcc: data.mcc,
+          mnc: data.mnc,
+          lac: data.cell.lac,
+          tac: data.cell.tac,
+          cell_id: data.cell.cid || data.cell.cell_id,
+          // Additional params for better accuracy
+          network_type: data.network_type,
+          rsrp: data.cell.rsrp,
+          pci: data.cell.pc_id || data.cell.pci || data.cell.phys_cell_id,
+          earfcn: data.cell.earfcn
+        });
+        
+        if (geoData) {
+          // Update in-memory cache
+          lastGeoLookup.set(data.device_id, Date.now());
+          logger.info(`Geolocation updated for ${data.device_id}: ${geoData.latitude}, ${geoData.longitude}`);
+        }
+      } else {
+        logger.debug(`Skipping geolocation for ${data.device_id} (within 24h throttle)`);
+      }
     }
 
     // Prepare log data

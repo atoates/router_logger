@@ -7,6 +7,7 @@ import { exportUptimeReportToPDF } from '../utils/exportUtils';
 import { toast } from 'react-toastify';
 import ClickUpTaskWidget from './ClickUpTaskWidget';
 import PropertySearchWidget from './PropertySearchWidget';
+import LocationMap from './LocationMap';
 import './RouterDashboard.css';
 
 function formatBytes(bytes) {
@@ -546,6 +547,22 @@ export default function RouterDashboard({ router }) {
                 <div><span>Firmware</span><strong>{latest?.firmware_version || router?.firmware_version || '—'}</strong></div>
                 <div><span>WAN IP</span><strong>{latest?.wan_ip || '—'}</strong></div>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Location Section */}
+        <div className={`accordion-item ${expandedSection === 'location' ? 'expanded' : ''}`}>
+          <div 
+            className="accordion-header" 
+            onClick={() => setExpandedSection(expandedSection === 'location' ? null : 'location')}
+          >
+            <span className="accordion-title">📍 Location</span>
+            <span className="accordion-icon">{expandedSection === 'location' ? '▼' : '▶'}</span>
+          </div>
+          {expandedSection === 'location' && (
+            <div className="accordion-content">
+              <LocationMap routerId={routerId} />
             </div>
           )}
         </div>
