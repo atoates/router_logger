@@ -2078,6 +2078,22 @@ router.get('/diagnose-pairing', async (req, res) => {
  */
 router.get('/pairing-status', async (req, res) => {
   try {
+    // Check if required columns exist (migration may not have run yet)
+    const columnCheck = await pool.query(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'ironwifi_guests' AND column_name IN ('router_id', 'ap_mac', 'client_mac')
+    `);
+    const hasRouterIdColumn = columnCheck.rows.some(r => r.column_name === 'router_id');
+    const hasApMacColumn = columnCheck.rows.some(r => r.column_name === 'ap_mac');
+    
+    if (!hasRouterIdColumn) {
+      return res.json({
+        status: 'migration_pending',
+        message: 'Database migration 024_add_guest_mac_fields.sql needs to be applied',
+        solution: 'Restart the backend service to trigger migration, or run: ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS router_id INTEGER REFERENCES routers(router_id);'
+      });
+    }
+    
     const [
       totalGuests,
       pairedGuests,
@@ -2093,7 +2109,7 @@ router.get('/pairing-status', async (req, res) => {
         JOIN routers r ON g.router_id = r.router_id
         ORDER BY g.auth_date DESC NULLS LAST
         LIMIT 5
-      `),
+      `).catch(() => ({ rows: [] })),
       pool.query('SELECT COUNT(*) FROM ironwifi_webhook_log').catch(() => ({ rows: [{ count: 0 }] })),
       pool.query('SELECT COUNT(*) FROM routers WHERE mac IS NOT NULL')
     ]);
