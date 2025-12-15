@@ -128,14 +128,12 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
   doc.setFontSize(11);
   let currentY = y + 30; // Start lower to clear logo
   
-  // Cell Info Box (Right side) - Render first so it doesn't overlap if metadata is long
+  // Cell Tower Location Box (Right side) - Render first so it doesn't overlap if metadata is long
   // Always show the box if we have a router object, as requested
   if (router) {
-    const cellInfoData = [
+    const cellTowerData = [
       ['Cell ID', router.cell_id || '-'],
       ['TAC', router.tac || '-'],
-      ['Physical cell ID', router.pc_id || router.pci || '-'],
-      ['EARFCN', router.earfcn || '-'],
       ['Mobile country code', router.mcc || '-'],
       ['Mobile network code', router.mnc || '-']
     ];
@@ -143,13 +141,13 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
     doc.autoTable({
       startY: currentY - 5, // Align with top of metadata
       margin: { left: 145 }, // Position on the right
-      head: [['Cell Info', 'Value']],
-      body: cellInfoData,
+      head: [['Cell Tower Location', 'Value']],
+      body: cellTowerData,
       theme: 'grid',
       headStyles: { fillColor: [91, 127, 92], halign: 'left' },
       styles: { fontSize: 8, cellPadding: 1 },
-      columnStyles: { 0: { fontStyle: 'bold', width: 28 }, 1: { width: 22 } },
-      tableWidth: 50
+      columnStyles: { 0: { fontStyle: 'bold', width: 32 }, 1: { width: 22 } },
+      tableWidth: 54
     });
   }
 
