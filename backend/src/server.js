@@ -213,7 +213,8 @@ async function startServer() {
     // IronWifi: Supports both Webhook and API polling
     // Webhook: Configure in IronWifi Console → Reports → Report Scheduler
     // API Polling: Set IRONWIFI_API_KEY environment variable
-    const ironwifiSyncInterval = parseInt(process.env.IRONWIFI_SYNC_INTERVAL_MINUTES || '15', 10);
+    // Default: Sync once per hour to avoid API rate limits
+    const ironwifiSyncInterval = parseInt(process.env.IRONWIFI_SYNC_INTERVAL_MINUTES || '60', 10);
     if (process.env.IRONWIFI_API_KEY) {
       startIronWifiSync(ironwifiSyncInterval);
       logger.info(`IronWifi sync scheduler started (every ${ironwifiSyncInterval} minutes)`);

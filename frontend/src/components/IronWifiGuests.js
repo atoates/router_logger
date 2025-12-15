@@ -27,7 +27,6 @@ function IronWifiGuests() {
   const [webhookHistory, setWebhookHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
   const [searchInput, setSearchInput] = useState('');
   const [activeTab, setActiveTab] = useState('guests');
@@ -106,64 +105,6 @@ function IronWifiGuests() {
     fetchData(debouncedSearch);
   }, [displayLimit]);
 
-  const handleSync = async () => {
-    try {
-      setSyncing(true);
-      const response = await fetch(`${API_URL}/api/ironwifi/sync/guests`, {
-        method: 'POST',
-        headers: {
-          ...getAuthHeaders(),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ pages: 10 })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        alert(`Sync complete! Fetched ${result.fetched} guests, ${result.inserted} new, ${result.updated} updated`);
-        fetchData();
-      } else {
-        const errorData = await response.json();
-        alert(`Sync failed: ${errorData.error || 'Unknown error'}`);
-      }
-    } catch (err) {
-      alert(`Sync error: ${err.message}`);
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const handleReset = async () => {
-    if (!window.confirm('This will DELETE all cached guest data and re-sync fresh from IronWifi. Continue?')) {
-      return;
-    }
-    
-    try {
-      setSyncing(true);
-      const response = await fetch(`${API_URL}/api/ironwifi/reset-guests`, {
-        method: 'POST',
-        headers: {
-          ...getAuthHeaders(),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ pages: 10, confirm: 'yes' })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        alert(`Reset complete! Deleted ${result.deleted}, inserted ${result.inserted} fresh records`);
-        fetchData();
-      } else {
-        const errorData = await response.json();
-        alert(`Reset failed: ${errorData.error || 'Unknown error'}`);
-      }
-    } catch (err) {
-      alert(`Reset error: ${err.message}`);
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
     const date = new Date(dateStr);
@@ -222,26 +163,15 @@ function IronWifiGuests() {
         </div>
         <div className="ironwifi-actions">
           <button 
-            className="ironwifi-sync-btn"
-            onClick={handleSync}
-            disabled={syncing}
-          >
-            {syncing ? '⏳ Syncing...' : '🔄 Sync Guests'}
-          </button>
-          <button 
-            className="ironwifi-reset-btn"
-            onClick={handleReset}
-            disabled={syncing}
-            title="Delete all and re-sync fresh"
-          >
-            🗑️ Reset & Re-sync
-          </button>
-          <button 
             className="ironwifi-refresh-btn"
-            onClick={fetchData}
+            onClick={() => fetchData(debouncedSearch)}
+            disabled={loading}
           >
-            ↻ Refresh
+            {loading ? '⏳ Loading...' : '↻ Refresh'}
           </button>
+          <span className="ironwifi-sync-info" title="Data syncs automatically every hour from IronWifi API">
+            ⏱️ Auto-sync hourly
+          </span>
         </div>
       </div>
 
@@ -351,7 +281,7 @@ function IronWifiGuests() {
 
           {guests.length === 0 ? (
             <div className="ironwifi-empty">
-              <p>No guests found. Click "Sync Guests" to fetch from IronWifi.</p>
+              <p>No guests found. Data syncs automatically every hour from IronWifi.</p>
             </div>
           ) : (
             <div className="ironwifi-table-container">
