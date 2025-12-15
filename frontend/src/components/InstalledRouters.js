@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
 import './InstalledRouters.css';
-
-const API_BASE = process.env.REACT_APP_API_URL || 'https://routerlogger-production.up.railway.app';
 
 const InstalledRouters = () => {
   const [installedRouters, setInstalledRouters] = useState([]);
@@ -19,17 +18,12 @@ const InstalledRouters = () => {
   const fetchInstalledRouters = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/api/routers/with-locations`);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to fetch installed routers (${response.status})`);
-      }
-      const data = await response.json();
-      setInstalledRouters(data);
+      const response = await api.get('/routers/with-locations');
+      setInstalledRouters(response.data);
       setError(null);
     } catch (err) {
       console.error('Error fetching installed routers:', err);
-      setError(err.message);
+      setError(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);
     }
