@@ -505,8 +505,14 @@ async function syncAllRoutersToClickUp(force = false) {
          r.clickup_location_task_id,
          r.clickup_location_task_name,
          r.clickup_task_status,
-         r.imei, 
-         r.firmware_version, 
+         COALESCE(
+           (SELECT imei FROM router_logs WHERE router_id = r.router_id AND imei IS NOT NULL ORDER BY timestamp DESC LIMIT 1),
+           r.imei
+         ) as imei,
+         COALESCE(
+           (SELECT firmware_version FROM router_logs WHERE router_id = r.router_id AND firmware_version IS NOT NULL ORDER BY timestamp DESC LIMIT 1),
+           r.firmware_version
+         ) as firmware_version, 
          r.last_seen, 
          r.name,
          r.mac_address,
