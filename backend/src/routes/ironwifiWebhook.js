@@ -811,9 +811,9 @@ router.post('/sync/guests', async (req, res) => {
             fullname = EXCLUDED.fullname,
             phone = EXCLUDED.phone,
             last_seen_at = CURRENT_TIMESTAMP,
-            -- Only increment auth_count if auth_date has changed (new authentication)
+            -- Only increment auth_count when we have a NEW non-null auth_date later than existing
             auth_count = CASE 
-              WHEN EXCLUDED.auth_date IS DISTINCT FROM ironwifi_guests.auth_date 
+              WHEN EXCLUDED.auth_date IS NOT NULL AND (ironwifi_guests.auth_date IS NULL OR EXCLUDED.auth_date > ironwifi_guests.auth_date) 
               THEN ironwifi_guests.auth_count + 1 
               ELSE ironwifi_guests.auth_count 
             END,
