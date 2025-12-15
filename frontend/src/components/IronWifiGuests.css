@@ -186,36 +186,128 @@
   font-size: 13px;
 }
 
-/* Search */
-.ironwifi-search {
-  display: flex;
-  gap: 12px;
+/* Search Container */
+.ironwifi-search-container {
   margin-bottom: 20px;
+}
+
+/* Search Box */
+.ironwifi-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.ironwifi-search:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(var(--accent-primary-rgb, 79, 70, 229), 0.15);
+}
+
+.ironwifi-search.has-value {
+  border-color: var(--accent-primary);
+}
+
+.ironwifi-search.is-searching {
+  border-color: #f59e0b;
+}
+
+.ironwifi-search .search-icon {
+  padding-left: 16px;
+  font-size: 16px;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.ironwifi-search:focus-within .search-icon {
+  opacity: 1;
 }
 
 .ironwifi-search input {
   flex: 1;
-  padding: 12px 16px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-size: 14px;
-}
-
-.ironwifi-search input:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-}
-
-.ironwifi-search button {
-  padding: 12px 20px;
-  background: var(--accent-primary);
-  color: white;
+  padding: 14px 12px;
+  background: transparent;
   border: none;
-  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 15px;
+  outline: none;
+  min-width: 0;
+}
+
+.ironwifi-search input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Search Spinner */
+.ironwifi-search .search-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  margin-right: 12px;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Clear Button */
+.ironwifi-search .search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 10px;
+  padding: 0;
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: 50%;
+  color: var(--text-muted);
   cursor: pointer;
-  font-size: 16px;
+  font-size: 12px;
+  font-weight: bold;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.ironwifi-search .search-clear:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  transform: scale(1.1);
+}
+
+/* Search Results Info */
+.search-results-info {
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-results-info strong {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.search-results-info .searching-text {
+  color: #f59e0b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-results-info .no-match-hint {
+  color: var(--text-muted);
+  opacity: 0.7;
 }
 
 /* Empty State */
@@ -275,6 +367,15 @@
 .ironwifi-email {
   font-weight: 500;
   color: var(--accent-primary);
+}
+
+/* Search Highlight */
+.search-highlight {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.4), rgba(245, 158, 11, 0.3));
+  color: inherit;
+  padding: 1px 2px;
+  border-radius: 3px;
+  font-weight: 600;
 }
 
 .ironwifi-secondary {

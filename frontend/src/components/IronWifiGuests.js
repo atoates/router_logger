@@ -1,30 +1,56 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import './IronWifiGuests.css';
+
+// Custom hook for debouncing
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 function IronWifiGuests() {
   const [guests, setGuests] = useState([]);
   const [guestsTotal, setGuestsTotal] = useState(0);
+  const [unfilteredTotal, setUnfilteredTotal] = useState(0);
   const [status, setStatus] = useState(null);
   const [webhookHistory, setWebhookHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
-  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [activeTab, setActiveTab] = useState('guests');
   const [displayLimit, setDisplayLimit] = useState(100);
+  const searchInputRef = useRef(null);
   const { getAuthHeaders, API_URL } = useAuth();
 
-  const fetchData = useCallback(async () => {
+  // Debounce search input - waits 300ms after user stops typing
+  const debouncedSearch = useDebounce(searchInput, 300);
+
+  // Fetch all data (status, guests, webhooks)
+  const fetchData = useCallback(async (searchTerm = '') => {
     try {
       setLoading(true);
       setError(null);
 
       // Fetch in parallel
-      const [statusRes, guestsRes, webhookRes] = await Promise.all([
+      const [statusRes, guestsRes, webhookRes, totalRes] = await Promise.all([
         fetch(`${API_URL}/api/ironwifi/status`, { headers: getAuthHeaders() }),
-        fetch(`${API_URL}/api/ironwifi/guests?limit=${displayLimit}&search=${encodeURIComponent(search)}`, { headers: getAuthHeaders() }),
-        fetch(`${API_URL}/api/ironwifi/webhook/history?limit=20`, { headers: getAuthHeaders() })
+        fetch(`${API_URL}/api/ironwifi/guests?limit=${displayLimit}&search=${encodeURIComponent(searchTerm)}`, { headers: getAuthHeaders() }),
+        fetch(`${API_URL}/api/ironwifi/webhook/history?limit=20`, { headers: getAuthHeaders() }),
+        // Also fetch unfiltered count for comparison
+        searchTerm ? fetch(`${API_URL}/api/ironwifi/guests?limit=1`, { headers: getAuthHeaders() }) : Promise.resolve(null)
       ]);
 
       if (statusRes.ok) {
@@ -36,6 +62,17 @@ function IronWifiGuests() {
         const guestsData = await guestsRes.json();
         setGuests(guestsData.guests || []);
         setGuestsTotal(guestsData.total || guestsData.guests?.length || 0);
+        
+        // Set unfiltered total
+        if (!searchTerm) {
+          setUnfilteredTotal(guestsData.total || guestsData.guests?.length || 0);
+        }
+      }
+
+      // Get unfiltered total if we have a search
+      if (totalRes && totalRes.ok) {
+        const totalData = await totalRes.json();
+        setUnfilteredTotal(totalData.total || 0);
       }
 
       if (webhookRes.ok) {
@@ -47,12 +84,27 @@ function IronWifiGuests() {
       setError(err.message);
     } finally {
       setLoading(false);
+      setSearching(false);
     }
-  }, [API_URL, getAuthHeaders, search, displayLimit]);
+  }, [API_URL, getAuthHeaders, displayLimit]);
 
+  // Initial load
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchData('');
+  }, []);
+
+  // Trigger search when debounced value changes
+  useEffect(() => {
+    if (debouncedSearch !== undefined) {
+      setSearching(true);
+      fetchData(debouncedSearch);
+    }
+  }, [debouncedSearch, fetchData]);
+
+  // Re-fetch when display limit changes
+  useEffect(() => {
+    fetchData(debouncedSearch);
+  }, [displayLimit]);
 
   const handleSync = async () => {
     try {
@@ -138,6 +190,19 @@ function IronWifiGuests() {
     if (diffHours < 24) return `${diffHours}h ago`;
     return `${diffDays}d ago`;
   };
+
+  // Highlight matching text in search results
+  const highlightText = useCallback((text, highlight) => {
+    if (!text || !highlight || highlight.length < 2) return text;
+    
+    const parts = text.toString().split(new RegExp(`(${highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+    
+    return parts.map((part, i) => 
+      part.toLowerCase() === highlight.toLowerCase() 
+        ? <mark key={i} className="search-highlight">{part}</mark>
+        : part
+    );
+  }, []);
 
   if (loading) {
     return (
@@ -240,15 +305,48 @@ function IronWifiGuests() {
       {/* Guests Tab */}
       {activeTab === 'guests' && (
         <div className="ironwifi-panel">
-          <div className="ironwifi-search">
-            <input
-              type="text"
-              placeholder="Search by email, name, or phone..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && fetchData()}
-            />
-            <button onClick={fetchData}>🔍</button>
+          <div className="ironwifi-search-container">
+            <div className={`ironwifi-search ${searchInput ? 'has-value' : ''} ${searching ? 'is-searching' : ''}`}>
+              <span className="search-icon">🔍</span>
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search by email, name, or phone..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setSearchInput('');
+                    searchInputRef.current?.blur();
+                  }
+                }}
+              />
+              {searching && <span className="search-spinner"></span>}
+              {searchInput && !searching && (
+                <button 
+                  className="search-clear" 
+                  onClick={() => setSearchInput('')}
+                  title="Clear search (Esc)"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            
+            {/* Search Results Info */}
+            {searchInput && (
+              <div className="search-results-info">
+                {searching ? (
+                  <span className="searching-text">Searching...</span>
+                ) : (
+                  <span>
+                    Found <strong>{guestsTotal.toLocaleString()}</strong> match{guestsTotal !== 1 ? 'es' : ''} 
+                    {unfilteredTotal > 0 && ` of ${unfilteredTotal.toLocaleString()} total`}
+                    {guestsTotal === 0 && <span className="no-match-hint"> — try a different search term</span>}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {guests.length === 0 ? (
@@ -272,13 +370,17 @@ function IronWifiGuests() {
                   {guests.map((guest) => (
                     <tr key={guest.id}>
                       <td>
-                        <div className="ironwifi-email">{guest.username || guest.email}</div>
+                        <div className="ironwifi-email">
+                          {highlightText(guest.username || guest.email, searchInput)}
+                        </div>
                         {guest.email && guest.email !== guest.username && (
-                          <div className="ironwifi-secondary">{guest.email}</div>
+                          <div className="ironwifi-secondary">
+                            {highlightText(guest.email, searchInput)}
+                          </div>
                         )}
                       </td>
-                      <td>{guest.fullname || '-'}</td>
-                      <td>{guest.phone || '-'}</td>
+                      <td>{highlightText(guest.fullname, searchInput) || '-'}</td>
+                      <td>{highlightText(guest.phone, searchInput) || '-'}</td>
                       <td>
                         <div className="ironwifi-time">{formatRelativeTime(guest.auth_date)}</div>
                         <div className="ironwifi-secondary">{formatDate(guest.auth_date)}</div>
