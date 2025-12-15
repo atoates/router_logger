@@ -94,11 +94,15 @@ function StatsPage() {
 
   // Helper functions
   const formatBytes = (bytes) => {
-    if (!bytes || bytes === 0) return '0 B';
+    // Handle null, undefined, NaN, or non-numeric values
+    const numBytes = Number(bytes);
+    if (!numBytes || isNaN(numBytes) || numBytes <= 0) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+    const i = Math.floor(Math.log(numBytes) / Math.log(k));
+    // Ensure i is within bounds
+    const safeIndex = Math.min(i, sizes.length - 1);
+    return `${(numBytes / Math.pow(k, safeIndex)).toFixed(1)} ${sizes[safeIndex]}`;
   };
 
   const formatDate = (dateStr) => {
@@ -110,10 +114,10 @@ function StatsPage() {
     navigate(`/router/${routerId}`);
   };
 
-  // Calculate summary stats
-  const totalData = routers.reduce((sum, r) => sum + (r.total_bytes || 0), 0);
-  const totalSent = routers.reduce((sum, r) => sum + (r.tx_bytes || 0), 0);
-  const totalReceived = routers.reduce((sum, r) => sum + (r.rx_bytes || 0), 0);
+  // Calculate summary stats - ensure values are converted to numbers (BigInt from PostgreSQL comes as strings)
+  const totalData = routers.reduce((sum, r) => sum + (Number(r.total_bytes) || 0), 0);
+  const totalSent = routers.reduce((sum, r) => sum + (Number(r.tx_bytes) || 0), 0);
+  const totalReceived = routers.reduce((sum, r) => sum + (Number(r.rx_bytes) || 0), 0);
   const onlineCount = allRouters.filter(r => {
     const status = r.current_status || r.current_state;
     return status === 'online' || status === 'Online' || status === 1 || status === '1';
