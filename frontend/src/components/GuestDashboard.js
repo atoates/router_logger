@@ -31,6 +31,10 @@ function GuestDashboard() {
       const data = await response.json();
       setRouters(data.routers || []);
     } catch (err) {
+      // Don't set error for 401 - the interceptor handles redirect to login
+      if (err.response?.status === 401) {
+        return;
+      }
       console.error('Error loading routers:', err);
       setError(err.message);
     } finally {

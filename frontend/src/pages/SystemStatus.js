@@ -165,6 +165,10 @@ export default function SystemStatusPage() {
       setLastUpdated(new Date());
       
     } catch (err) {
+      // Don't set error for 401 - the interceptor handles redirect to login
+      if (err.response?.status === 401) {
+        return;
+      }
       console.error('Error fetching system status:', err);
       setError(err.message || 'Failed to load system status');
     } finally {

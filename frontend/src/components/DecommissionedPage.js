@@ -24,6 +24,10 @@ function DecommissionedPage() {
       setRouters(data.routers || data);
       setError(null);
     } catch (err) {
+      // Don't set error for 401 - the interceptor handles redirect to login
+      if (err.response?.status === 401) {
+        return;
+      }
       console.error('Error fetching decommissioned routers:', err);
       setError(err.message);
     } finally {
