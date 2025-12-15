@@ -778,6 +778,54 @@ router.get('/guests', async (req, res) => {
 });
 
 /**
+ * GET /api/ironwifi/test-api-fields
+ * Test endpoint to see what fields the /guests API returns
+ * Use this to verify if ap_mac, client_mac etc are available
+ */
+router.get('/test-api-fields', async (req, res) => {
+  try {
+    const result = await ironwifiClient.getGuests({ page: 1, pageSize: 3 });
+    
+    if (result.items && result.items.length > 0) {
+      const sample = result.items[0];
+      const allFields = Object.keys(sample).sort();
+      
+      // Check for MAC-related fields
+      const macFields = ['client_mac', 'ap_mac', 'mac', 'mac_address', 'calling_station_id', 
+                        'called_station_id', 'venue_id', 'captive_portal_name', 'public_ip', 
+                        'mobilephone', 'phone'];
+      
+      const foundMacFields = {};
+      macFields.forEach(field => {
+        if (sample[field] !== undefined) {
+          foundMacFields[field] = sample[field];
+        }
+      });
+      
+      res.json({
+        success: true,
+        totalGuests: result.total_items,
+        sampleGuestFields: allFields,
+        sampleGuestData: sample,
+        macRelatedFields: foundMacFields,
+        message: Object.keys(foundMacFields).length > 0 
+          ? 'Found MAC-related fields in API response' 
+          : 'No MAC fields found - these may only be in webhook/report data'
+      });
+    } else {
+      res.json({
+        success: true,
+        message: 'No guests found in API',
+        rawResponse: result
+      });
+    }
+  } catch (error) {
+    logger.error('Error testing API fields:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/ironwifi/sync/guests
  * Sync guests from IronWifi API to local database
  * This caches guest data to reduce API calls
@@ -800,16 +848,43 @@ router.post('/sync/guests', async (req, res) => {
         const creationDate = guest.creationdate ? new Date(guest.creationdate) : null;
         const authDate = guest.authdate ? new Date(guest.authdate) : null;
         
+        // Normalize MAC addresses (ap_mac links to router)
+        const clientMac = guest.client_mac ? normalizeMac(guest.client_mac) : null;
+        const apMac = guest.ap_mac ? normalizeMac(guest.ap_mac) : null;
+        
+        // Try to match ap_mac to a router
+        let routerId = null;
+        if (apMac) {
+          const prefix = getMacPrefix(apMac);
+          if (prefix) {
+            const routerResult = await pool.query(
+              'SELECT router_id FROM routers WHERE LEFT(LOWER(REPLACE(mac_address, \':\', \'\')), 10) = LEFT(REPLACE($1, \':\', \'\'), 10)',
+              [apMac]
+            );
+            if (routerResult.rows.length > 0) {
+              routerId = routerResult.rows[0].router_id;
+            }
+          }
+        }
+        
         const result = await pool.query(`
           INSERT INTO ironwifi_guests (
             ironwifi_id, username, email, fullname, firstname, lastname,
-            phone, auth_date, creation_date, source, owner_id, first_seen_at, last_seen_at, auth_count
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP, 1)
+            phone, auth_date, creation_date, source, owner_id, 
+            client_mac, ap_mac, router_id, captive_portal_name, venue_id, public_ip,
+            first_seen_at, last_seen_at, auth_count
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, CURRENT_TIMESTAMP, 1)
           ON CONFLICT (ironwifi_id) DO UPDATE SET
             username = EXCLUDED.username,
             email = EXCLUDED.email,
             fullname = EXCLUDED.fullname,
             phone = EXCLUDED.phone,
+            client_mac = COALESCE(EXCLUDED.client_mac, ironwifi_guests.client_mac),
+            ap_mac = COALESCE(EXCLUDED.ap_mac, ironwifi_guests.ap_mac),
+            router_id = COALESCE(EXCLUDED.router_id, ironwifi_guests.router_id),
+            captive_portal_name = COALESCE(EXCLUDED.captive_portal_name, ironwifi_guests.captive_portal_name),
+            venue_id = COALESCE(EXCLUDED.venue_id, ironwifi_guests.venue_id),
+            public_ip = COALESCE(EXCLUDED.public_ip, ironwifi_guests.public_ip),
             last_seen_at = CURRENT_TIMESTAMP,
             -- Only increment auth_count if auth_date has changed (new authentication)
             auth_count = CASE 
@@ -832,6 +907,12 @@ router.post('/sync/guests', async (req, res) => {
           creationDate,
           guest.source,
           guest.owner_id,
+          clientMac,
+          apMac,
+          routerId,
+          guest.captive_portal_name || null,
+          guest.venue_id || null,
+          guest.public_ip || null,
           creationDate  // Use creation_date as first_seen_at
         ]);
         

@@ -471,6 +471,13 @@ CREATE TABLE IF NOT EXISTS ironwifi_guests (
   creation_date TIMESTAMP,
   source VARCHAR(255),
   owner_id VARCHAR(100),
+  -- New fields from Guest Registrations report
+  client_mac VARCHAR(50),           -- User's device MAC address
+  ap_mac VARCHAR(50),               -- Router/AP MAC address (for router linking)
+  router_id INTEGER REFERENCES routers(router_id),  -- Matched router
+  captive_portal_name VARCHAR(255), -- Portal name (e.g., "Vacatad - ACTIVE")
+  venue_id VARCHAR(100),            -- Venue identifier
+  public_ip VARCHAR(50),            -- User's public IP
   first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   auth_count INTEGER DEFAULT 1,
@@ -482,6 +489,10 @@ CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_username ON ironwifi_guests(usern
 CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_email ON ironwifi_guests(email);
 CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_auth_date ON ironwifi_guests(auth_date DESC);
 CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_last_seen ON ironwifi_guests(last_seen_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_client_mac ON ironwifi_guests(client_mac);
+CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_ap_mac ON ironwifi_guests(ap_mac);
+CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_router_id ON ironwifi_guests(router_id);
+CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_venue ON ironwifi_guests(venue_id);
 
 -- ============================================================================
 -- TRIGGERS
