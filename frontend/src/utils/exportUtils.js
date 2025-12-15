@@ -5,6 +5,137 @@ import { format } from 'date-fns';
 import { getRouterGeo, uploadReportToClickUp } from '../services/api';
 
 /**
+ * Generate a static map image as base64 using OpenStreetMap tiles
+ * Uses a canvas to combine tiles into a single image with a marker
+ * @param {number} lat - Latitude
+ * @param {number} lon - Longitude
+ * @param {number} zoom - Zoom level (lower = more zoomed out, 10-12 is good for wider area)
+ * @param {number} width - Image width in pixels
+ * @param {number} height - Image height in pixels
+ * @returns {Promise<string>} Base64 data URL of the map image
+ */
+async function generateStaticMapImage(lat, lon, zoom = 10, width = 400, height = 200) {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    
+    // Calculate tile coordinates
+    const n = Math.pow(2, zoom);
+    const xTile = Math.floor((lon + 180) / 360 * n);
+    const yTile = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
+    
+    // Calculate pixel offset within tile
+    const xOffset = ((lon + 180) / 360 * n - xTile) * 256;
+    const yOffset = ((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n - yTile) * 256;
+    
+    // Calculate how many tiles we need
+    const tilesX = Math.ceil(width / 256) + 1;
+    const tilesY = Math.ceil(height / 256) + 1;
+    const startTileX = xTile - Math.floor(tilesX / 2);
+    const startTileY = yTile - Math.floor(tilesY / 2);
+    
+    // Track loaded tiles
+    const totalTiles = tilesX * tilesY;
+    let loadedTiles = 0;
+    let hasError = false;
+    
+    // Center offset to place the coordinate in the middle
+    const centerOffsetX = width / 2 - (xTile - startTileX) * 256 - xOffset;
+    const centerOffsetY = height / 2 - (yTile - startTileY) * 256 - yOffset;
+    
+    // Fill with a light background color first
+    ctx.fillStyle = '#e8e8e8';
+    ctx.fillRect(0, 0, width, height);
+    
+    for (let dy = 0; dy < tilesY; dy++) {
+      for (let dx = 0; dx < tilesX; dx++) {
+        const tileX = startTileX + dx;
+        const tileY = startTileY + dy;
+        
+        // Skip invalid tiles
+        if (tileX < 0 || tileY < 0 || tileX >= n || tileY >= n) {
+          loadedTiles++;
+          continue;
+        }
+        
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        // Use OpenStreetMap tile server with random subdomain for load balancing
+        const subdomain = ['a', 'b', 'c'][Math.floor(Math.random() * 3)];
+        img.src = `https://${subdomain}.tile.openstreetmap.org/${zoom}/${tileX}/${tileY}.png`;
+        
+        const drawX = dx * 256 + centerOffsetX;
+        const drawY = dy * 256 + centerOffsetY;
+        
+        img.onload = () => {
+          if (hasError) return;
+          ctx.drawImage(img, drawX, drawY);
+          loadedTiles++;
+          
+          if (loadedTiles === totalTiles) {
+            // Draw marker at center
+            const markerX = width / 2;
+            const markerY = height / 2;
+            
+            // Draw marker shadow
+            ctx.beginPath();
+            ctx.ellipse(markerX, markerY + 15, 8, 4, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fill();
+            
+            // Draw marker pin
+            ctx.beginPath();
+            ctx.moveTo(markerX, markerY + 12);
+            ctx.bezierCurveTo(markerX - 12, markerY - 5, markerX - 12, markerY - 20, markerX, markerY - 20);
+            ctx.bezierCurveTo(markerX + 12, markerY - 20, markerX + 12, markerY - 5, markerX, markerY + 12);
+            ctx.fillStyle = '#dc2626';
+            ctx.fill();
+            ctx.strokeStyle = '#991b1b';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            // Draw inner circle
+            ctx.beginPath();
+            ctx.arc(markerX, markerY - 8, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            
+            // Add attribution (required by OSM)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.fillRect(width - 120, height - 14, 120, 14);
+            ctx.fillStyle = '#333';
+            ctx.font = '9px sans-serif';
+            ctx.fillText('© OpenStreetMap', width - 115, height - 4);
+            
+            resolve(canvas.toDataURL('image/png'));
+          }
+        };
+        
+        img.onerror = () => {
+          loadedTiles++;
+          // Continue even if some tiles fail
+          if (loadedTiles === totalTiles && !hasError) {
+            // Still return what we have
+            resolve(canvas.toDataURL('image/png'));
+          }
+        };
+      }
+    }
+    
+    // Timeout fallback
+    setTimeout(() => {
+      if (loadedTiles < totalTiles && !hasError) {
+        hasError = true;
+        reject(new Error('Map tile loading timeout'));
+      }
+    }, 10000);
+  });
+}
+
+/**
  * Export logs to CSV
  */
 export function exportLogsToCSV(logs, filename = 'router-logs.csv') {
@@ -319,6 +450,78 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
       theme: 'grid',
       headStyles: { fillColor: [91, 127, 92] }, // Brand Green #5b7f5c
     });
+  }
+
+  // Location Map section (if coordinates available)
+  if (router?.latitude && router?.longitude) {
+    const mapStartY = (doc.lastAutoTable?.finalY || (summaryStartY + 30)) + 10;
+    
+    // Check if we need a new page for the map
+    if (mapStartY + 70 > 280) {
+      doc.addPage();
+      doc.setFontSize(14);
+      doc.text('Router Location', 14, 20);
+      
+      try {
+        // Generate static map - zoom level 10 for wider area view
+        const mapDataUrl = await generateStaticMapImage(
+          parseFloat(router.latitude),
+          parseFloat(router.longitude),
+          10, // Zoomed out to show wider area
+          400,
+          180
+        );
+        
+        // Add map image to PDF (scaled to fit page width)
+        doc.addImage(mapDataUrl, 'PNG', 14, 24, 180, 81);
+        
+        // Add coordinates text below map
+        doc.setFontSize(9);
+        doc.setTextColor(80);
+        doc.text(`Coordinates: ${router.latitude}, ${router.longitude}`, 14, 110);
+        if (router.location_accuracy) {
+          doc.text(`Accuracy: ±${Math.round(router.location_accuracy)}m`, 100, 110);
+        }
+        doc.setTextColor(0);
+      } catch (mapError) {
+        console.error('Failed to generate map for PDF:', mapError);
+        doc.setFontSize(10);
+        doc.text(`Location: ${router.latitude}, ${router.longitude}`, 14, 28);
+      }
+    } else {
+      doc.setFontSize(14);
+      doc.text('Router Location', 14, mapStartY);
+      
+      try {
+        // Generate static map - zoom level 10 for wider area view
+        const mapDataUrl = await generateStaticMapImage(
+          parseFloat(router.latitude),
+          parseFloat(router.longitude),
+          10, // Zoomed out to show wider area
+          400,
+          180
+        );
+        
+        // Add map image to PDF (scaled to fit page width)
+        doc.addImage(mapDataUrl, 'PNG', 14, mapStartY + 4, 180, 81);
+        
+        // Add coordinates text below map
+        doc.setFontSize(9);
+        doc.setTextColor(80);
+        doc.text(`Coordinates: ${router.latitude}, ${router.longitude}`, 14, mapStartY + 90);
+        if (router.location_accuracy) {
+          doc.text(`Accuracy: ±${Math.round(router.location_accuracy)}m`, 100, mapStartY + 90);
+        }
+        doc.setTextColor(0);
+        
+        // Update the lastAutoTable position for following sections
+        doc.lastAutoTable = { finalY: mapStartY + 95 };
+      } catch (mapError) {
+        console.error('Failed to generate map for PDF:', mapError);
+        doc.setFontSize(10);
+        doc.text(`Location: ${router.latitude}, ${router.longitude}`, 14, mapStartY + 8);
+      }
+    }
   }
 
   // Daily breakdown table
