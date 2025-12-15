@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS routers (
   
   -- RMS integration
   rms_created_at TIMESTAMP,
+  current_status VARCHAR(50) DEFAULT 'unknown',
+  operator VARCHAR(100),
+  wan_ip VARCHAR(50),
   
   -- Status and notes
   notes TEXT,
