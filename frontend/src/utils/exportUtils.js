@@ -453,7 +453,16 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
   }
 
   // Location Map section (if coordinates available)
+  console.log('PDF Export - Router location data:', { 
+    hasLatitude: !!router?.latitude, 
+    hasLongitude: !!router?.longitude,
+    latitude: router?.latitude,
+    longitude: router?.longitude,
+    routerKeys: router ? Object.keys(router) : []
+  });
+  
   if (router?.latitude && router?.longitude) {
+    console.log('PDF Export - Generating map for coordinates:', router.latitude, router.longitude);
     const mapStartY = (doc.lastAutoTable?.finalY || (summaryStartY + 30)) + 10;
     
     // Check if we need a new page for the map
