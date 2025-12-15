@@ -1048,4 +1048,229 @@ router.post('/update-daily-stats', async (req, res) => {
   }
 });
 
+// ============================================================================
+// API EXPLORATION ENDPOINTS (for finding MAC address data)
+// ============================================================================
+
+/**
+ * GET /api/ironwifi/explore
+ * Explore all available IronWifi API endpoints
+ * Helps find where MAC address data is located
+ */
+router.get('/explore', async (req, res) => {
+  try {
+    logger.info('Exploring IronWifi API endpoints...');
+    const results = await ironwifiClient.exploreApi();
+    res.json(results);
+  } catch (error) {
+    logger.error('Error exploring API:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/ironwifi/guest/:guestId/details
+ * Get full details for a specific guest including attributes
+ */
+router.get('/guest/:guestId/details', async (req, res) => {
+  try {
+    const { guestId } = req.params;
+    
+    // Fetch guest details, attributes, and authentications in parallel
+    const [guest, attributes, authentications] = await Promise.all([
+      ironwifiClient.getGuestById(guestId).catch(e => ({ error: e.message })),
+      ironwifiClient.getUserAttributes(guestId).catch(e => null),
+      ironwifiClient.getUserAuthentications(guestId).catch(e => null)
+    ]);
+    
+    // Look for MAC-related fields in all data
+    const allFields = {};
+    const macFields = {};
+    
+    const extractFields = (obj, prefix = '') => {
+      if (!obj || typeof obj !== 'object') return;
+      for (const [key, value] of Object.entries(obj)) {
+        const fullKey = prefix ? `${prefix}.${key}` : key;
+        allFields[fullKey] = typeof value;
+        
+        if (key.toLowerCase().includes('mac') || 
+            key.toLowerCase().includes('station') ||
+            key.toLowerCase().includes('ap_') ||
+            key.toLowerCase().includes('client_')) {
+          macFields[fullKey] = value;
+        }
+      }
+    };
+    
+    extractFields(guest);
+    extractFields(attributes, 'attributes');
+    if (Array.isArray(authentications)) {
+      extractFields(authentications[0], 'authentications[0]');
+    }
+    
+    res.json({
+      guestId,
+      guest,
+      attributes,
+      authentications: authentications ? {
+        count: Array.isArray(authentications) ? authentications.length : 1,
+        sample: Array.isArray(authentications) ? authentications.slice(0, 3) : authentications
+      } : null,
+      analysis: {
+        allFields: Object.keys(allFields).sort(),
+        macRelatedFields: macFields,
+        hasMacData: Object.keys(macFields).length > 0
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching guest details:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/ironwifi/registrations
+ * Try to get guest registrations report with MAC data
+ */
+router.get('/registrations', async (req, res) => {
+  try {
+    const { earliest = '-7d', latest = 'now', page = 1 } = req.query;
+    
+    const result = await ironwifiClient.getGuestRegistrations({
+      earliest,
+      latest,
+      page: parseInt(page)
+    });
+    
+    res.json(result);
+  } catch (error) {
+    logger.error('Error fetching registrations:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/ironwifi/captive-portals
+ * Get captive portals list
+ */
+router.get('/captive-portals', async (req, res) => {
+  try {
+    const portals = await ironwifiClient.getCaptivePortals();
+    res.json({ success: true, portals });
+  } catch (error) {
+    logger.error('Error fetching captive portals:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/ironwifi/venues
+ * Get venues list
+ */
+router.get('/venues', async (req, res) => {
+  try {
+    const venues = await ironwifiClient.getVenues();
+    res.json({ success: true, venues });
+  } catch (error) {
+    logger.error('Error fetching venues:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/ironwifi/sample-guests-with-auth
+ * Get sample guests and fetch their authentication history
+ * This is the best way to find MAC data associated with guests
+ */
+router.get('/sample-guests-with-auth', async (req, res) => {
+  try {
+    const { limit = 5 } = req.query;
+    
+    // Get first few guests
+    const guestsResult = await ironwifiClient.getGuests({ page: 1, pageSize: parseInt(limit) });
+    const guests = guestsResult.items;
+    
+    if (!guests.length) {
+      return res.json({
+        success: true,
+        message: 'No guests found',
+        guests: []
+      });
+    }
+    
+    // For each guest, try to get their authentication history
+    const guestsWithAuth = await Promise.all(
+      guests.map(async (guest) => {
+        try {
+          const auths = await ironwifiClient.getUserAuthentications(guest.id);
+          return {
+            guest: {
+              id: guest.id,
+              username: guest.username,
+              email: guest.email,
+              authdate: guest.authdate,
+              creationdate: guest.creationdate,
+              allFields: Object.keys(guest).sort()
+            },
+            authentications: auths ? {
+              count: Array.isArray(auths) ? auths.length : 1,
+              sample: Array.isArray(auths) ? auths.slice(0, 2) : auths,
+              fields: Array.isArray(auths) && auths[0] ? Object.keys(auths[0]).sort() : []
+            } : null
+          };
+        } catch (error) {
+          return {
+            guest: {
+              id: guest.id,
+              username: guest.username,
+              email: guest.email
+            },
+            authentications: { error: error.message }
+          };
+        }
+      })
+    );
+    
+    // Analyze what fields contain MAC data
+    const allAuthFields = new Set();
+    const macFieldsFound = {};
+    
+    guestsWithAuth.forEach(({ authentications }) => {
+      if (authentications?.sample && Array.isArray(authentications.sample)) {
+        authentications.sample.forEach(auth => {
+          if (auth && typeof auth === 'object') {
+            Object.entries(auth).forEach(([key, value]) => {
+              allAuthFields.add(key);
+              if (key.toLowerCase().includes('mac') || 
+                  key.toLowerCase().includes('station') ||
+                  key.toLowerCase().includes('ap_') ||
+                  key.toLowerCase().includes('client_')) {
+                macFieldsFound[key] = value;
+              }
+            });
+          }
+        });
+      }
+    });
+    
+    res.json({
+      success: true,
+      totalGuests: guestsResult.total_items,
+      sampledGuests: guests.length,
+      guests: guestsWithAuth,
+      analysis: {
+        authenticationFields: [...allAuthFields].sort(),
+        macRelatedFieldsFound: macFieldsFound,
+        hasMacData: Object.keys(macFieldsFound).length > 0,
+        recommendation: Object.keys(macFieldsFound).length > 0 
+          ? 'MAC data found in authentication records - can sync from API!'
+          : 'No MAC data in API responses - webhook may be required'
+      }
+    });
+  } catch (error) {
+    logger.error('Error sampling guests with auth:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

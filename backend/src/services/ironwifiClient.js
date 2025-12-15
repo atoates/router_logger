@@ -425,6 +425,235 @@ async function testConnection() {
   }
 }
 
+/**
+ * Get a single guest by ID with full details
+ * This may include additional attributes like MAC addresses
+ * @param {string} guestId - Guest ID from IronWifi
+ * @returns {Promise<object>} Full guest object
+ */
+async function getGuestById(guestId) {
+  const client = getClient();
+  const response = await client.get(`/guests/${guestId}`);
+  return response.data;
+}
+
+/**
+ * Get user/guest attributes
+ * These may include MAC addresses and other metadata
+ * @param {string} userId - User/Guest ID
+ * @returns {Promise<object>} User attributes
+ */
+async function getUserAttributes(userId) {
+  const client = getClient();
+  try {
+    const response = await client.get(`/users/${userId}/attributes`);
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 404) {
+      // Try guest attributes endpoint
+      try {
+        const guestResponse = await client.get(`/guests/${userId}/attributes`);
+        return guestResponse.data;
+      } catch {
+        return null;
+      }
+    }
+    throw error;
+  }
+}
+
+/**
+ * Get authentications/sessions for a specific user
+ * This should include MAC address data per authentication
+ * @param {string} userId - User/Guest ID  
+ * @returns {Promise<Array>} Authentication records
+ */
+async function getUserAuthentications(userId) {
+  const client = getClient();
+  try {
+    const response = await client.get(`/users/${userId}/authentications`);
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 404) {
+      // Try guest authentications endpoint
+      try {
+        const guestResponse = await client.get(`/guests/${userId}/authentications`);
+        return guestResponse.data;
+      } catch {
+        return null;
+      }
+    }
+    throw error;
+  }
+}
+
+/**
+ * Get captive portals - these are where guests authenticate
+ * May provide connection details
+ * @returns {Promise<object>} Captive portals list
+ */
+async function getCaptivePortals() {
+  const client = getClient();
+  try {
+    const response = await client.get('/captiveportals');
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 404) {
+      logger.warn('Captive portals endpoint not available');
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Get venues - locations where access points are
+ * @returns {Promise<object>} Venues list
+ */
+async function getVenues() {
+  const client = getClient();
+  try {
+    const response = await client.get('/venues');
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 404) {
+      logger.warn('Venues endpoint not available');
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Get guest registrations report - may contain MAC data
+ * @param {Object} options - Query options
+ * @returns {Promise<object>} Registration data
+ */
+async function getGuestRegistrations(options = {}) {
+  const client = getClient();
+  const params = {
+    earliest: options.earliest || '-7d',
+    latest: options.latest || 'now',
+    page: options.page || 1,
+    page_size: options.pageSize || 100
+  };
+  
+  logger.info('Fetching guest registrations', params);
+  
+  // Try various report endpoints
+  const endpoints = [
+    '/reports/guest-registrations',
+    '/reports/registrations', 
+    '/reports/authentications',
+    '/authentications',
+    '/registrations'
+  ];
+  
+  for (const endpoint of endpoints) {
+    try {
+      const response = await client.get(endpoint, { params });
+      logger.info(`Found data at ${endpoint}`);
+      return { endpoint, data: response.data };
+    } catch (error) {
+      if (error.response?.status !== 404 && error.response?.status !== 405) {
+        throw error;
+      }
+      // Continue to next endpoint
+    }
+  }
+  
+  return { endpoint: null, data: null, message: 'No guest registration endpoint found' };
+}
+
+/**
+ * Explore API to find all available endpoints
+ * @returns {Promise<object>} Available endpoints and sample data
+ */
+async function exploreApi() {
+  const client = getClient();
+  const results = {
+    timestamp: new Date().toISOString(),
+    apiUrl: process.env.IRONWIFI_API_URL || DEFAULT_API_URL,
+    endpoints: {}
+  };
+  
+  // List of endpoints to test
+  const endpointsToTest = [
+    { path: '/networks', name: 'Networks' },
+    { path: '/guests', name: 'Guests' },
+    { path: '/users', name: 'Users' },
+    { path: '/devices', name: 'Devices (Access Points)' },
+    { path: '/captiveportals', name: 'Captive Portals' },
+    { path: '/venues', name: 'Venues' },
+    { path: '/authentications', name: 'Authentications' },
+    { path: '/registrations', name: 'Registrations' },
+    { path: '/sessions', name: 'Sessions' },
+    { path: '/reports', name: 'Reports List' }
+  ];
+  
+  for (const endpoint of endpointsToTest) {
+    try {
+      const response = await client.get(endpoint.path, { 
+        params: { page: 1, page_size: 3 } 
+      });
+      
+      // Extract sample and structure
+      const data = response.data;
+      let sample = null;
+      let count = 0;
+      let fields = [];
+      
+      if (data._embedded) {
+        // HAL format
+        const key = Object.keys(data._embedded)[0];
+        sample = data._embedded[key]?.[0];
+        count = data.total_items || data._embedded[key]?.length || 0;
+        fields = sample ? Object.keys(sample) : [];
+      } else if (Array.isArray(data)) {
+        sample = data[0];
+        count = data.length;
+        fields = sample ? Object.keys(sample) : [];
+      } else if (data.items) {
+        sample = data.items[0];
+        count = data.total_items || data.items.length;
+        fields = sample ? Object.keys(sample) : [];
+      } else {
+        sample = data;
+        fields = typeof data === 'object' ? Object.keys(data) : [];
+      }
+      
+      // Check for MAC-related fields
+      const macFields = fields.filter(f => 
+        f.toLowerCase().includes('mac') || 
+        f.toLowerCase().includes('station') ||
+        f.toLowerCase().includes('ap_') ||
+        f.toLowerCase().includes('client_')
+      );
+      
+      results.endpoints[endpoint.path] = {
+        name: endpoint.name,
+        status: 'available',
+        count,
+        fields: fields.sort(),
+        macRelatedFields: macFields,
+        sample: sample
+      };
+      
+    } catch (error) {
+      results.endpoints[endpoint.path] = {
+        name: endpoint.name,
+        status: error.response?.status === 404 ? 'not_found' : 
+                error.response?.status === 405 ? 'method_not_allowed' : 
+                'error',
+        error: error.message,
+        statusCode: error.response?.status
+      };
+    }
+  }
+  
+  return results;
+}
+
 // Reset client on config change (for testing)
 function resetClient() {
   clientInstance = null;
@@ -439,12 +668,19 @@ module.exports = {
   getGuests,
   getAllGuests,
   getRecentGuests,
+  getGuestById,
+  getUserAttributes,
+  getUserAuthentications,
   getNetworks,
   getDevices,
+  getCaptivePortals,
+  getVenues,
   getAccountingReport,
   requestAsyncReport,
   getAsyncReportData,
   getActiveSessions,
+  getGuestRegistrations,
+  exploreApi,
   testConnection,
   resetClient
 };
