@@ -3,6 +3,73 @@ const router = express.Router();
 const { requireAdmin } = require('./session');
 const { pool } = require('../config/database');
 
+// Debug endpoint for router location/date issues
+router.get('/debug/router-dates/:routerId', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    
+    // Get router data
+    const routerResult = await pool.query(`
+      SELECT 
+        router_id, name,
+        clickup_location_task_id,
+        clickup_location_task_name,
+        location_linked_at,
+        date_installed,
+        current_property_task_id,
+        current_property_name,
+        property_installed_at
+      FROM routers
+      WHERE router_id = $1 OR name ILIKE $2
+    `, [routerId, `%${routerId}%`]);
+    
+    if (routerResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Router not found' });
+    }
+    
+    const router = routerResult.rows[0];
+    
+    // Get property assignment history
+    const historyResult = await pool.query(`
+      SELECT *
+      FROM router_property_assignments
+      WHERE router_id = $1
+      ORDER BY installed_at DESC
+    `, [router.router_id]);
+    
+    res.json({
+      router: {
+        router_id: router.router_id,
+        name: router.name,
+        location: {
+          task_id: router.clickup_location_task_id,
+          task_name: router.clickup_location_task_name,
+          linked_at: router.location_linked_at,
+          date_installed: router.date_installed,
+          date_installed_formatted: router.date_installed 
+            ? new Date(Number(router.date_installed)).toISOString() 
+            : null
+        },
+        property: {
+          task_id: router.current_property_task_id,
+          name: router.current_property_name,
+          installed_at: router.property_installed_at
+        }
+      },
+      assignmentHistory: historyResult.rows,
+      analysis: {
+        hasLocation: !!router.clickup_location_task_id,
+        hasDateInstalled: !!router.date_installed,
+        hasLocationLinkedAt: !!router.location_linked_at,
+        dateInstalledIsMillis: router.date_installed > 1000000000000,
+        historyRecords: historyResult.rows.length
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Public debug endpoint for RMS sync status (no auth required)
 router.get('/debug/sync-status', async (req, res) => {
   try {
