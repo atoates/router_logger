@@ -1832,4 +1832,320 @@ router.get('/scan-for-macs', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/ironwifi/diagnose-pairing
+ * Comprehensive diagnostic to understand the user-router pairing problem
+ */
+router.get('/diagnose-pairing', async (req, res) => {
+  try {
+    logger.info('Running user-router pairing diagnostics...');
+    
+    const diagnostics = {
+      timestamp: new Date().toISOString(),
+      summary: {},
+      database: {},
+      api: {},
+      webhook: {},
+      recommendations: []
+    };
+    
+    // 1. Check what's in the database
+    const guestCount = await pool.query('SELECT COUNT(*) FROM ironwifi_guests');
+    const guestsWithApMac = await pool.query('SELECT COUNT(*) FROM ironwifi_guests WHERE ap_mac IS NOT NULL');
+    const guestsWithClientMac = await pool.query('SELECT COUNT(*) FROM ironwifi_guests WHERE client_mac IS NOT NULL');
+    const guestsWithRouterId = await pool.query('SELECT COUNT(*) FROM ironwifi_guests WHERE router_id IS NOT NULL');
+    
+    diagnostics.database = {
+      totalGuests: parseInt(guestCount.rows[0].count),
+      guestsWithApMac: parseInt(guestsWithApMac.rows[0].count),
+      guestsWithClientMac: parseInt(guestsWithClientMac.rows[0].count),
+      guestsLinkedToRouters: parseInt(guestsWithRouterId.rows[0].count)
+    };
+    
+    // Get sample of guests with and without MAC
+    const sampleWithMac = await pool.query(`
+      SELECT ironwifi_id, username, email, ap_mac, client_mac, router_id, source, auth_date
+      FROM ironwifi_guests 
+      WHERE ap_mac IS NOT NULL OR client_mac IS NOT NULL
+      LIMIT 5
+    `);
+    
+    const sampleWithoutMac = await pool.query(`
+      SELECT ironwifi_id, username, email, source, auth_date
+      FROM ironwifi_guests 
+      WHERE ap_mac IS NULL AND client_mac IS NULL
+      LIMIT 5
+    `);
+    
+    diagnostics.database.samplesWithMac = sampleWithMac.rows;
+    diagnostics.database.samplesWithoutMac = sampleWithoutMac.rows;
+    
+    // 2. Check webhook logs
+    try {
+      const webhookLogCount = await pool.query('SELECT COUNT(*) FROM ironwifi_webhook_log');
+      const recentWebhooks = await pool.query(`
+        SELECT received_at, content_type, record_count, processed, 
+               LEFT(raw_sample, 500) as sample_preview
+        FROM ironwifi_webhook_log 
+        ORDER BY received_at DESC 
+        LIMIT 5
+      `);
+      
+      diagnostics.webhook = {
+        totalReceived: parseInt(webhookLogCount.rows[0].count),
+        recentWebhooks: recentWebhooks.rows,
+        status: webhookLogCount.rows[0].count > 0 ? 'Receiving data' : 'No webhooks received'
+      };
+    } catch (e) {
+      diagnostics.webhook = {
+        status: 'Table not found',
+        error: e.message
+      };
+    }
+    
+    // 3. Check router MACs in our database
+    const routersResult = await pool.query(`
+      SELECT router_id, name, mac 
+      FROM routers 
+      WHERE mac IS NOT NULL 
+      ORDER BY name 
+      LIMIT 10
+    `);
+    
+    diagnostics.database.routerMacs = routersResult.rows.map(r => ({
+      router_id: r.router_id,
+      name: r.name,
+      mac: r.mac,
+      macPrefix: r.mac ? r.mac.toLowerCase().replace(/[-:]/g, ':').substring(0, 14) : null
+    }));
+    
+    // 4. Test API for MAC data
+    if (ironwifiClient.isConfigured()) {
+      try {
+        // Get a sample guest and check for MAC fields
+        const guests = await ironwifiClient.getGuests({ page: 1, pageSize: 5 });
+        
+        diagnostics.api.guestsApiWorking = true;
+        diagnostics.api.totalGuestsInApi = guests.total_items;
+        
+        // Check fields in sample guest
+        if (guests.items.length > 0) {
+          const sampleGuest = guests.items[0];
+          const allFields = Object.keys(sampleGuest);
+          const macRelatedFields = allFields.filter(f => 
+            f.toLowerCase().includes('mac') || 
+            f.toLowerCase().includes('station') ||
+            f.toLowerCase().includes('ap_') ||
+            f.toLowerCase().includes('client_')
+          );
+          
+          diagnostics.api.sampleGuestFields = allFields;
+          diagnostics.api.macRelatedFieldsInList = macRelatedFields;
+          
+          // Try to get full guest details
+          try {
+            const fullGuest = await ironwifiClient.getGuestById(sampleGuest.id);
+            const fullFields = Object.keys(fullGuest);
+            const fullMacFields = fullFields.filter(f => 
+              f.toLowerCase().includes('mac') || 
+              f.toLowerCase().includes('station')
+            );
+            
+            diagnostics.api.fullGuestFields = fullFields;
+            diagnostics.api.macRelatedFieldsInDetails = fullMacFields;
+            diagnostics.api.sampleGuestHasMac = !!(fullGuest.client_mac || fullGuest.ap_mac || fullGuest.mac_address);
+            diagnostics.api.sampleGuestMacValues = {
+              client_mac: fullGuest.client_mac || null,
+              ap_mac: fullGuest.ap_mac || null,
+              mac_address: fullGuest.mac_address || null
+            };
+          } catch (e) {
+            diagnostics.api.guestDetailsError = e.message;
+          }
+        }
+        
+        // Try registrations endpoint
+        try {
+          const registrations = await ironwifiClient.getGuestRegistrations({ 
+            earliest: '-7d', 
+            latest: 'now', 
+            pageSize: 5 
+          });
+          diagnostics.api.registrationsEndpoint = registrations.endpoint || 'not found';
+          if (registrations.data) {
+            const regData = registrations.data;
+            if (regData._embedded) {
+              const key = Object.keys(regData._embedded)[0];
+              const sample = regData._embedded[key]?.[0];
+              if (sample) {
+                diagnostics.api.registrationFields = Object.keys(sample);
+                diagnostics.api.registrationSample = sample;
+              }
+            }
+          }
+        } catch (e) {
+          diagnostics.api.registrationsError = e.message;
+        }
+        
+      } catch (e) {
+        diagnostics.api.error = e.message;
+      }
+    } else {
+      diagnostics.api.configured = false;
+    }
+    
+    // 5. Generate recommendations
+    const dbStats = diagnostics.database;
+    
+    if (dbStats.guestsWithApMac === 0 && dbStats.guestsWithClientMac === 0) {
+      diagnostics.recommendations.push({
+        priority: 'critical',
+        issue: 'No MAC addresses in database',
+        detail: 'Guests are being synced but without MAC address data',
+        solutions: [
+          '1. Configure IronWifi Report Scheduler to send "Guest Registrations" or "RADIUS Accounting" reports to webhook',
+          '2. The report must include Called-Station-Id (ap_mac) and Calling-Station-Id (client_mac) fields',
+          '3. Webhook URL: POST https://your-backend.railway.app/api/ironwifi/webhook',
+          '4. Recommended report: Guest Registrations with JSON format'
+        ]
+      });
+    }
+    
+    if (diagnostics.webhook.totalReceived === 0) {
+      diagnostics.recommendations.push({
+        priority: 'high',
+        issue: 'No webhooks received',
+        detail: 'The webhook endpoint has never received data from IronWifi',
+        solutions: [
+          '1. Go to IronWifi Console → Reports → Report Scheduler',
+          '2. Create a new scheduled report',
+          '3. Select "Guest Registrations" report type',
+          '4. Set format to JSON',
+          '5. Set webhook URL: POST https://your-backend.railway.app/api/ironwifi/webhook',
+          '6. Schedule to run every 15 minutes or as needed'
+        ]
+      });
+    }
+    
+    if (dbStats.guestsLinkedToRouters === 0 && dbStats.guestsWithApMac > 0) {
+      diagnostics.recommendations.push({
+        priority: 'medium',
+        issue: 'MAC addresses exist but no router matches',
+        detail: `${dbStats.guestsWithApMac} guests have ap_mac but none match router MACs`,
+        solutions: [
+          '1. Check router MAC format in database vs IronWifi',
+          '2. Ensure routers have MAC addresses populated',
+          '3. IronWifi may use different MAC format (e.g., hyphens vs colons)'
+        ]
+      });
+    }
+    
+    if (diagnostics.recommendations.length === 0) {
+      if (dbStats.guestsLinkedToRouters > 0) {
+        diagnostics.recommendations.push({
+          priority: 'info',
+          issue: 'Pairing is working!',
+          detail: `${dbStats.guestsLinkedToRouters} guests are linked to routers`,
+          solutions: []
+        });
+      }
+    }
+    
+    // Summary
+    diagnostics.summary = {
+      pairingWorking: dbStats.guestsLinkedToRouters > 0,
+      guestsTotal: dbStats.totalGuests,
+      guestsPaired: dbStats.guestsLinkedToRouters,
+      pairingPercentage: dbStats.totalGuests > 0 
+        ? ((dbStats.guestsLinkedToRouters / dbStats.totalGuests) * 100).toFixed(1) + '%'
+        : '0%',
+      webhooksReceived: diagnostics.webhook.totalReceived || 0,
+      macDataSource: dbStats.guestsWithApMac > 0 ? 'Some MAC data present' : 'No MAC data - need webhook'
+    };
+    
+    res.json(diagnostics);
+    
+  } catch (error) {
+    logger.error('Error running pairing diagnostics:', error);
+    res.status(500).json({ error: error.message, stack: error.stack });
+  }
+});
+
+/**
+ * POST /api/ironwifi/test-webhook
+ * Send a test webhook payload to verify processing
+ */
+router.post('/test-webhook', async (req, res) => {
+  try {
+    // Create a test payload that simulates what IronWifi should send
+    const testPayload = [
+      {
+        username: 'test.user@example.com',
+        email: 'test.user@example.com',
+        fullname: 'Test User',
+        client_mac: 'AA:BB:CC:DD:EE:FF',
+        ap_mac: '20:97:27:2D:01:6F', // Example router MAC
+        authdate: new Date().toISOString(),
+        calledstationid: '20-97-27-2D-01-6F',
+        callingstationid: 'AA-BB-CC-DD-EE-FF'
+      }
+    ];
+    
+    logger.info('Processing test webhook payload...');
+    
+    // Process it through the same logic as real webhooks
+    for (const record of testPayload) {
+      const apMac = record.calledstationid || record.ap_mac;
+      const clientMac = record.callingstationid || record.client_mac;
+      
+      // Try to find matching router
+      let routerId = null;
+      if (apMac) {
+        const normalizedMac = apMac.toLowerCase().replace(/[-:]/g, ':');
+        const macPrefix = normalizedMac.substring(0, 14); // First 5 bytes
+        
+        const routerMatch = await pool.query(`
+          SELECT router_id, name, mac 
+          FROM routers 
+          WHERE LOWER(REPLACE(mac, '-', ':')) LIKE $1 || '%'
+          LIMIT 1
+        `, [macPrefix]);
+        
+        if (routerMatch.rows.length > 0) {
+          routerId = routerMatch.rows[0].router_id;
+          logger.info(`Test: Matched MAC ${apMac} to router ${routerMatch.rows[0].name}`);
+        } else {
+          logger.info(`Test: No router match for MAC prefix ${macPrefix}`);
+        }
+      }
+      
+      // Return the analysis
+      res.json({
+        success: true,
+        testPayload: record,
+        analysis: {
+          apMacNormalized: apMac ? apMac.toLowerCase().replace(/[-:]/g, ':') : null,
+          clientMacNormalized: clientMac ? clientMac.toLowerCase().replace(/[-:]/g, ':') : null,
+          macPrefix: apMac ? apMac.toLowerCase().replace(/[-:]/g, ':').substring(0, 14) : null,
+          routerMatch: routerId ? 'Found' : 'Not found',
+          routerId
+        },
+        howToFix: !routerId ? [
+          'The test MAC did not match any router in the database.',
+          'Run /api/ironwifi/diagnose-pairing to see your router MACs.',
+          'Ensure routers have MAC addresses populated in the database.',
+          'The matching uses first 5 bytes (10 chars + 4 colons = 14 chars) of the MAC.'
+        ] : [
+          'Router matching is working!',
+          'Ensure IronWifi sends webhooks with calledstationid or ap_mac fields.'
+        ]
+      });
+    }
+    
+  } catch (error) {
+    logger.error('Error testing webhook:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
