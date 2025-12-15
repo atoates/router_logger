@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getRouters, getClickUpSpaces, getClickUpWorkspaceMembers, assignRouter } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
+import StatusBadge from '../components/StatusBadge';
 import './AssignPage.css';
 
 function AssignPage() {
@@ -22,6 +24,8 @@ function AssignPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [assigningToMe, setAssigningToMe] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchRouters();
@@ -137,6 +141,39 @@ function AssignPage() {
     setFilteredMembers(filtered);
   };
 
+  const handleAssignToMe = async () => {
+    if (!selectedRouter) {
+      setError('Please select a router first');
+      return;
+    }
+
+    if (!user) {
+      setError('You must be logged in to assign routers');
+      return;
+    }
+
+    try {
+      setAssigningToMe(true);
+      setError(null);
+      setSuccess(null);
+
+      await assignRouter(selectedRouter.router_id, {
+        assignee_user_ids: [user.clickup_user_id || user.id],
+        assignee_usernames: [user.username || user.email || 'Me']
+      });
+
+      setSuccess(`Router #${selectedRouter.router_id} assigned to you!`);
+      
+      setTimeout(() => {
+        navigate(`/router/${selectedRouter.router_id}?refresh=${Date.now()}`);
+      }, 1000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to assign router');
+    } finally {
+      setAssigningToMe(false);
+    }
+  };
+
   const handleAssign = async () => {
     if (!selectedRouter || !selectedMember) {
       setError('Please select both a router and a person');
@@ -194,6 +231,27 @@ function AssignPage() {
         </div>
       )}
 
+      {/* Quick Action: Assign to Me */}
+      {selectedRouter && user && (
+        <div className="quick-action-section">
+          <button
+            onClick={handleAssignToMe}
+            disabled={assigningToMe || loading}
+            className="quick-assign-button"
+          >
+            {assigningToMe ? (
+              <span>⏳ Assigning...</span>
+            ) : (
+              <>
+                <span className="quick-assign-icon">👤</span>
+                <span>Assign to Me</span>
+              </>
+            )}
+          </button>
+          <p className="quick-assign-hint">Quick assign Router #{selectedRouter.router_id} to yourself</p>
+        </div>
+      )}
+
       {/* Step 1: Select Router */}
       <div className="assign-section">
         <h2>1. Select Router</h2>
@@ -217,7 +275,11 @@ function AssignPage() {
                 className={`router-select-button ${selectedRouter?.router_id === router.router_id ? 'active' : ''}`}
                 onClick={() => setSelectedRouter(router)}
               >
-                #{router.router_id} {router.name && `- ${router.name}`}
+                <div className="router-select-info">
+                  <span className="router-select-id">#{router.router_id}</span>
+                  {router.name && <span className="router-select-name">{router.name}</span>}
+                </div>
+                <StatusBadge router={router} size="small" showLabel={false} />
               </button>
             ))
           )}

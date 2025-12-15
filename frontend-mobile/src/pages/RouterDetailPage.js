@@ -4,6 +4,8 @@ import { getRouters, unlinkRouterFromLocation, removeRouterAssignees, getUsageSt
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
+import StatusBadge, { OnlineIndicator, getRouterStatus } from '../components/StatusBadge';
+import AssignmentModal from '../components/AssignmentModal';
 import './RouterDetailPage.css';
 
 function RouterDetailPage() {
@@ -19,6 +21,7 @@ function RouterDetailPage() {
   const [usageStats, setUsageStats] = useState(null);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState(null);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const { isAdmin } = useAuth();
 
   useEffect(() => {
@@ -108,12 +111,23 @@ function RouterDetailPage() {
       // Refresh router data
       await fetchRouter(true);
       
-      alert('Router uninstalled successfully');
+      // Show assignment modal instead of just alert
+      setShowAssignmentModal(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to uninstall router');
     } finally {
       setUninstalling(false);
     }
+  };
+
+  const handleAssignmentComplete = (result) => {
+    setShowAssignmentModal(false);
+    // Refresh router data to show new assignee
+    fetchRouter(true);
+  };
+
+  const handleAssignmentClose = () => {
+    setShowAssignmentModal(false);
   };
 
   const handleUnassign = async () => {
@@ -243,6 +257,9 @@ function RouterDetailPage() {
     );
   }
 
+  // Get unified status
+  const routerStatus = getRouterStatus(router);
+  
   // Handle various formats: 'online', 'offline', 1, 0, '1', '0', true, false, 'Online'
   const state = router.current_status || router.current_state;
   const isOnline = state === 'online' || 
@@ -283,24 +300,13 @@ function RouterDetailPage() {
         </div>
       )}
 
-      {/* Status Badges */}
+      {/* Status Badges - Unified */}
       <div className="detail-section">
         <div className="status-badge-container">
-          <span className={`status-badge ${isOnline ? 'status-online' : 'status-offline'}`}>
+          <StatusBadge router={router} size="large" />
+          <span className={`online-badge ${isOnline ? 'online-yes' : 'online-no'}`}>
             {isOnline ? '● Online' : '○ Offline'}
           </span>
-          {isInstalled && (
-            <span className="status-badge status-installed">Installed</span>
-          )}
-          {isBeingReturned && (
-            <span className="status-badge status-returning">Being Returned</span>
-          )}
-          {isDecommissioned && (
-            <span className="status-badge status-decommissioned">Decommissioned</span>
-          )}
-          {isReady && (
-            <span className="status-badge status-ready">Ready</span>
-          )}
         </div>
       </div>
 
@@ -431,53 +437,68 @@ function RouterDetailPage() {
       <div className="detail-section">
         <h2>Actions</h2>
         {isAdmin && (
-          <>
-            {/* If router has assignees, show unassign button */}
-            {hasAssignees() ? (
+          <div className="action-buttons">
+            {/* Primary action based on state */}
+            {hasLocation ? (
+              // Installed router - primary action is Uninstall
+              <button
+                onClick={handleUninstall}
+                disabled={uninstalling}
+                className="action-button action-button-danger action-button-large"
+              >
+                {uninstalling ? '⏳ Uninstalling...' : '📤 Uninstall Router'}
+              </button>
+            ) : hasAssignees() ? (
+              // Assigned but not installed - primary action is Install
+              <button
+                onClick={handleInstall}
+                disabled={assigning}
+                className="action-button action-button-primary action-button-large"
+              >
+                📍 Install at Location
+              </button>
+            ) : (
+              // Not assigned, not installed - show both options
+              <>
+                <button
+                  onClick={handleAssign}
+                  disabled={assigning}
+                  className="action-button action-button-primary action-button-large"
+                >
+                  👤 Assign Router
+                </button>
+                <button
+                  onClick={handleInstall}
+                  disabled={assigning}
+                  className="action-button action-button-secondary"
+                >
+                  📍 Install at Location
+                </button>
+              </>
+            )}
+            
+            {/* Secondary actions */}
+            {hasAssignees() && !hasLocation && (
               <button
                 onClick={handleUnassign}
                 disabled={unassigning}
                 className="action-button action-button-warning"
               >
-                {unassigning ? 'Unassigning...' : 'Unassign Router'}
+                {unassigning ? 'Unassigning...' : '🔓 Unassign Router'}
               </button>
-            ) : (
-              /* If router is not installed, show assign button */
-              !hasLocation && (
-                <button
-                  onClick={handleAssign}
-                  disabled={assigning}
-                  className="action-button action-button-primary"
-                >
-                  Assign Router
-                </button>
-              )
             )}
-            
-            {/* If router has a location, show uninstall button */}
-            {hasLocation ? (
-              <button
-                onClick={handleUninstall}
-                disabled={uninstalling}
-                className="action-button action-button-danger"
-              >
-                {uninstalling ? 'Uninstalling...' : 'Uninstall Router'}
-              </button>
-            ) : (
-              /* If router has no assignees, show install button */
-              !hasAssignees() && (
-                <button
-                  onClick={handleInstall}
-                  disabled={assigning}
-                  className="action-button action-button-primary"
-                >
-                  Install Router
-                </button>
-              )
-            )}
-          </>
+          </div>
         )}
       </div>
+
+      {/* Assignment Modal - shown after uninstall */}
+      {showAssignmentModal && router && (
+        <AssignmentModal
+          router={router}
+          onClose={handleAssignmentClose}
+          onAssigned={handleAssignmentComplete}
+        />
+      )}
     </div>
   );
 }

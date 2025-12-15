@@ -1,0 +1,144 @@
+/* Unified Status Badge Component */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+/* Sizes */
+.status-size-small {
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  gap: 4px;
+}
+
+.status-size-medium {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
+.status-size-large {
+  padding: 8px 16px;
+  font-size: 1rem;
+}
+
+.status-indicator {
+  font-size: 1em;
+  line-height: 1;
+}
+
+/* Status Types */
+.status-working {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.status-attention {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  animation: pulse-attention 2s infinite;
+}
+
+@keyframes pulse-attention {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.status-ready {
+  background: rgba(234, 179, 8, 0.2);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.status-assigned {
+  background: rgba(139, 92, 246, 0.2);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.status-available {
+  background: rgba(6, 182, 212, 0.2);
+  color: #06b6d4;
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+.status-stock {
+  background: rgba(107, 114, 128, 0.2);
+  color: #9ca3af;
+  border: 1px solid rgba(107, 114, 128, 0.3);
+}
+
+.status-returning {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.status-decommissioned {
+  background: rgba(107, 114, 128, 0.15);
+  color: #6b7280;
+  border: 1px solid rgba(107, 114, 128, 0.2);
+  text-decoration: line-through;
+  opacity: 0.8;
+}
+
+.status-unknown {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+  border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+/* Online Indicator */
+.online-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.online-size-small {
+  font-size: 0.6rem;
+}
+
+.online-size-medium {
+  font-size: 0.8rem;
+}
+
+.online-size-large {
+  font-size: 1rem;
+}
+
+.online-yes {
+  color: #22c55e;
+}
+
+.online-no {
+  color: #6b7280;
+}
+
+/* Status Legend (for reference screens) */
+.status-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+.status-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #888);
+}
+

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import StatusBadge, { getRouterStatus } from './StatusBadge';
 import './RouterCard.css';
 
 function RouterCard({ router }) {
@@ -15,19 +16,19 @@ function RouterCard({ router }) {
                    state === true ||
                    (typeof state === 'string' && state.toLowerCase() === 'online');
 
+  const routerStatus = getRouterStatus(router);
+
   const handleClick = () => {
     navigate(`/router/${router.router_id}`);
   };
 
   return (
-    <div className={`router-card ${isOnline ? 'router-card-online' : 'router-card-offline'}`}>
+    <div className={`router-card router-card-${routerStatus.key}`}>
       <div className="router-card-header">
         <div className="router-card-name">
           {router.name || `Router #${router.router_id}`}
         </div>
-        <div className={`router-card-status ${isOnline ? 'status-online' : 'status-offline'}`}>
-          {isOnline ? '● Online' : '○ Offline'}
-        </div>
+        <StatusBadge router={router} size="small" />
       </div>
       
       <div className="router-card-id">#{router.router_id}</div>

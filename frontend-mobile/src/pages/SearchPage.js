@@ -3,6 +3,7 @@ import { getRouters } from '../services/api';
 import RouterCard from '../components/RouterCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
+import { getRouterStatus } from '../components/StatusBadge';
 import './SearchPage.css';
 
 function SearchPage() {
@@ -11,11 +12,46 @@ function SearchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // all, online, offline, alerts
+  const [statusFilter, setStatusFilter] = useState('all'); // all, online, offline, alerts, assigned, unassigned
+  const [statusCounts, setStatusCounts] = useState({});
 
   useEffect(() => {
     fetchRouters();
   }, []);
+
+  // Calculate status counts when routers change
+  useEffect(() => {
+    const counts = {
+      all: routers.length,
+      online: 0,
+      offline: 0,
+      alerts: 0,
+      working: 0,
+      assigned: 0,
+      unassigned: 0
+    };
+
+    routers.forEach(router => {
+      const status = getRouterStatus(router);
+      const state = router.current_status || router.current_state;
+      const isOnline = state === 'online' || 
+                      state === 'Online' ||
+                      state === 1 || 
+                      state === '1' || 
+                      state === true ||
+                      (typeof state === 'string' && state.toLowerCase() === 'online');
+
+      if (isOnline) counts.online++;
+      else counts.offline++;
+
+      if (status.key === 'attention') counts.alerts++;
+      if (status.key === 'working') counts.working++;
+      if (status.key === 'assigned' || status.key === 'ready') counts.assigned++;
+      if (status.key === 'stock' || status.key === 'available') counts.unassigned++;
+    });
+
+    setStatusCounts(counts);
+  }, [routers]);
 
   useEffect(() => {
     filterRouters();
@@ -129,26 +165,26 @@ function SearchPage() {
             className={`filter-button ${statusFilter === 'all' ? 'active' : ''}`}
             onClick={() => setStatusFilter('all')}
           >
-            All
+            All <span className="filter-count">{statusCounts.all || 0}</span>
           </button>
           <button
-            className={`filter-button ${statusFilter === 'online' ? 'active' : ''}`}
+            className={`filter-button filter-button-online ${statusFilter === 'online' ? 'active' : ''}`}
             onClick={() => setStatusFilter('online')}
           >
-            Online
+            🟢 <span className="filter-count">{statusCounts.online || 0}</span>
           </button>
           <button
-            className={`filter-button ${statusFilter === 'offline' ? 'active' : ''}`}
+            className={`filter-button filter-button-offline ${statusFilter === 'offline' ? 'active' : ''}`}
             onClick={() => setStatusFilter('offline')}
           >
-            Offline
+            ⚪ <span className="filter-count">{statusCounts.offline || 0}</span>
           </button>
           <button
             className={`filter-button filter-button-alert ${statusFilter === 'alerts' ? 'active' : ''}`}
             onClick={() => setStatusFilter('alerts')}
-            title="Offline routers with linked locations"
+            title="Offline routers with linked locations (need attention)"
           >
-            🔔
+            🔴 <span className="filter-count">{statusCounts.alerts || 0}</span>
           </button>
         </div>
       </div>

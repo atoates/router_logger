@@ -12,12 +12,53 @@
   transform: scale(0.98);
 }
 
+/* Status-based border colors */
+.router-card-working {
+  border-left-color: #22c55e;
+}
+
+.router-card-attention {
+  border-left-color: #ef4444;
+  animation: pulse-border 2s infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% { border-left-color: #ef4444; }
+  50% { border-left-color: #fca5a5; }
+}
+
+.router-card-ready {
+  border-left-color: #eab308;
+}
+
+.router-card-assigned {
+  border-left-color: #8b5cf6;
+}
+
+.router-card-available {
+  border-left-color: #06b6d4;
+}
+
+.router-card-stock {
+  border-left-color: #6b7280;
+}
+
+.router-card-returning {
+  border-left-color: #f59e0b;
+}
+
+.router-card-decommissioned {
+  border-left-color: #6b7280;
+  opacity: 0.7;
+}
+
+/* Legacy support */
 .router-card-online {
-  border-left-color: var(--accent-primary);
+  border-left-color: #22c55e;
 }
 
 .router-card-offline {
-  border-left-color: #dc2626;
+  border-left-color: #ef4444;
 }
 
 .router-card-header {
