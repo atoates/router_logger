@@ -111,6 +111,9 @@ export default function SystemStatusPage() {
   // Routers
   const [routers, setRouters] = useState([]);
   const [statusSummary, setStatusSummary] = useState(null);
+  
+  // VM Performance
+  const [vmPerformance, setVmPerformance] = useState(null);
 
   useEffect(() => {
     fetchAllData();
@@ -138,7 +141,8 @@ export default function SystemStatusPage() {
         rmsStatusRes,
         dbHealthRes,
         apiHealthRes,
-        ironwifiStatusRes
+        ironwifiStatusRes,
+        vmPerformanceRes
       ] = await Promise.allSettled([
         getRouters(),
         getStorageStats({ sample_size: 800 }),
@@ -151,7 +155,8 @@ export default function SystemStatusPage() {
         api.get('/rms/status'),
         api.get('/monitoring/db-health'),
         api.get('/health'),
-        getIronwifiStatus()
+        getIronwifiStatus(),
+        api.get('/monitoring/performance')
       ]);
       
       if (routersRes.status === 'fulfilled') setRouters(routersRes.value.data || []);
@@ -166,6 +171,7 @@ export default function SystemStatusPage() {
       if (dbHealthRes.status === 'fulfilled') setDbHealth(dbHealthRes.value.data || null);
       if (apiHealthRes.status === 'fulfilled') setApiHealth(apiHealthRes.value.data || null);
       if (ironwifiStatusRes.status === 'fulfilled') setIronwifiStatus(ironwifiStatusRes.value.data || null);
+      if (vmPerformanceRes.status === 'fulfilled') setVmPerformance(vmPerformanceRes.value.data || null);
       
       setLastUpdated(new Date());
       
@@ -309,6 +315,126 @@ export default function SystemStatusPage() {
           />
         </div>
       </div>
+
+      {/* VM Performance */}
+      {vmPerformance && (
+        <CollapsibleSection title="VM Performance" defaultOpen={true}>
+          <div className="vm-performance-section">
+            {/* Overall Health Score */}
+            <div className="performance-health">
+              <div className={`health-score ${vmPerformance.health?.status || 'unknown'}`}>
+                <div className="score-value">{vmPerformance.health?.overall || 0}</div>
+                <div className="score-label">Health Score</div>
+                <div className="score-status">{vmPerformance.health?.status || 'Unknown'}</div>
+              </div>
+              <div className="health-breakdown">
+                <div className="breakdown-item">
+                  <span className="breakdown-label">Process Memory</span>
+                  <div className="breakdown-bar-container">
+                    <div 
+                      className={`breakdown-bar ${vmPerformance.health?.scores?.processMemory < 30 ? 'critical' : vmPerformance.health?.scores?.processMemory < 60 ? 'warning' : 'good'}`}
+                      style={{ width: `${vmPerformance.health?.scores?.processMemory || 0}%` }}
+                    />
+                  </div>
+                  <span className="breakdown-value">{vmPerformance.health?.scores?.processMemory || 0}%</span>
+                </div>
+                <div className="breakdown-item">
+                  <span className="breakdown-label">System Memory</span>
+                  <div className="breakdown-bar-container">
+                    <div 
+                      className={`breakdown-bar ${vmPerformance.health?.scores?.systemMemory < 30 ? 'critical' : vmPerformance.health?.scores?.systemMemory < 60 ? 'warning' : 'good'}`}
+                      style={{ width: `${vmPerformance.health?.scores?.systemMemory || 0}%` }}
+                    />
+                  </div>
+                  <span className="breakdown-value">{vmPerformance.health?.scores?.systemMemory || 0}%</span>
+                </div>
+                <div className="breakdown-item">
+                  <span className="breakdown-label">Event Loop</span>
+                  <div className="breakdown-bar-container">
+                    <div 
+                      className={`breakdown-bar ${vmPerformance.health?.scores?.eventLoop < 50 ? 'critical' : vmPerformance.health?.scores?.eventLoop < 80 ? 'warning' : 'good'}`}
+                      style={{ width: `${vmPerformance.health?.scores?.eventLoop || 0}%` }}
+                    />
+                  </div>
+                  <span className="breakdown-value">{vmPerformance.health?.scores?.eventLoop || 0}%</span>
+                </div>
+                <div className="breakdown-item">
+                  <span className="breakdown-label">Database</span>
+                  <div className="breakdown-bar-container">
+                    <div 
+                      className={`breakdown-bar ${vmPerformance.health?.scores?.database < 50 ? 'critical' : vmPerformance.health?.scores?.database < 80 ? 'warning' : 'good'}`}
+                      style={{ width: `${vmPerformance.health?.scores?.database || 0}%` }}
+                    />
+                  </div>
+                  <span className="breakdown-value">{vmPerformance.health?.scores?.database || 0}%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Resource Summary */}
+            <div className="resource-summary">
+              <div className="resource-card">
+                <div className="resource-icon">💾</div>
+                <div className="resource-info">
+                  <div className="resource-label">Process Memory</div>
+                  <div className="resource-value">{vmPerformance.summary?.processMemory || 'N/A'}</div>
+                </div>
+              </div>
+              <div className="resource-card">
+                <div className="resource-icon">🖥️</div>
+                <div className="resource-info">
+                  <div className="resource-label">System Memory</div>
+                  <div className="resource-value">{vmPerformance.summary?.systemMemory || 'N/A'}</div>
+                </div>
+              </div>
+              <div className="resource-card">
+                <div className="resource-icon">⚡</div>
+                <div className="resource-info">
+                  <div className="resource-label">Event Loop Lag</div>
+                  <div className="resource-value">{vmPerformance.summary?.eventLoopLag || 'N/A'}</div>
+                </div>
+              </div>
+              <div className="resource-card">
+                <div className="resource-icon">🗄️</div>
+                <div className="resource-info">
+                  <div className="resource-label">DB Latency</div>
+                  <div className="resource-value">{vmPerformance.summary?.dbLatency || 'N/A'}</div>
+                </div>
+              </div>
+              <div className="resource-card">
+                <div className="resource-icon">🔗</div>
+                <div className="resource-info">
+                  <div className="resource-label">DB Connections</div>
+                  <div className="resource-value">{vmPerformance.summary?.dbConnections || 'N/A'}</div>
+                </div>
+              </div>
+              <div className="resource-card">
+                <div className="resource-icon">⏱️</div>
+                <div className="resource-info">
+                  <div className="resource-label">Uptime</div>
+                  <div className="resource-value">{vmPerformance.summary?.uptime || 'N/A'}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Recommendations */}
+            {vmPerformance.recommendations && vmPerformance.recommendations.length > 0 && (
+              <div className="performance-recommendations">
+                <h4>Recommendations</h4>
+                {vmPerformance.recommendations.map((rec, i) => (
+                  <div key={i} className={`recommendation ${rec.type}`}>
+                    <span className="rec-icon">
+                      {rec.type === 'critical' ? '🔴' : rec.type === 'warning' ? '🟠' : '🟢'}
+                    </span>
+                    <span className="rec-area">{rec.area}</span>
+                    <span className="rec-message">{rec.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CollapsibleSection>
+      )}
 
       {/* Database Health Checks */}
       {inspections && inspections.length > 0 && (
