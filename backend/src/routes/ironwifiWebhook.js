@@ -1150,6 +1150,208 @@ router.get('/registrations', async (req, res) => {
 });
 
 /**
+ * GET /api/ironwifi/radius-data
+ * Try to get RADIUS accounting data which contains MAC addresses
+ * This data can be linked to guests via username
+ */
+router.get('/radius-data', async (req, res) => {
+  try {
+    const { earliest = '-24h', latest = 'now' } = req.query;
+    
+    logger.info('Fetching RADIUS accounting data...');
+    
+    // Try the accounting report endpoint
+    const accountingData = await ironwifiClient.getAccountingReport({
+      earliest,
+      latest
+    });
+    
+    // Analyze what we got
+    let records = [];
+    if (Array.isArray(accountingData)) {
+      records = accountingData;
+    } else if (accountingData?.items) {
+      records = accountingData.items;
+    } else if (accountingData?.data) {
+      records = accountingData.data;
+    } else if (accountingData?._embedded) {
+      const key = Object.keys(accountingData._embedded)[0];
+      records = accountingData._embedded[key] || [];
+    }
+    
+    // Check what fields we have
+    const sampleRecord = records[0];
+    const fields = sampleRecord ? Object.keys(sampleRecord).sort() : [];
+    
+    // Look for MAC-related fields
+    const macFields = {};
+    if (sampleRecord) {
+      Object.entries(sampleRecord).forEach(([key, value]) => {
+        const lowerKey = key.toLowerCase();
+        if (lowerKey.includes('mac') || 
+            lowerKey.includes('station') ||
+            lowerKey.includes('called') ||
+            lowerKey.includes('calling') ||
+            lowerKey.includes('nas')) {
+          macFields[key] = value;
+        }
+      });
+    }
+    
+    res.json({
+      success: true,
+      source: 'RADIUS Accounting Report',
+      recordCount: records.length,
+      fields: fields,
+      macRelatedFields: macFields,
+      sample: records.slice(0, 5),
+      hasMacData: Object.keys(macFields).length > 0,
+      canLinkToGuests: records.length > 0 && sampleRecord?.username,
+      rawResponse: typeof accountingData === 'object' ? 
+        { type: typeof accountingData, keys: Object.keys(accountingData) } : 
+        typeof accountingData
+    });
+  } catch (error) {
+    logger.error('Error fetching RADIUS data:', error);
+    res.status(500).json({ 
+      error: error.message,
+      suggestion: 'RADIUS data may only be available via webhook reports'
+    });
+  }
+});
+
+/**
+ * GET /api/ironwifi/test-all-endpoints
+ * Comprehensive test of all possible IronWifi API endpoints for RADIUS/session data
+ */
+router.get('/test-all-endpoints', async (req, res) => {
+  try {
+    const axios = require('axios');
+    const https = require('https');
+    
+    const apiKey = process.env.IRONWIFI_API_KEY;
+    const apiUrl = process.env.IRONWIFI_API_URL || 'https://console.ironwifi.com/api';
+    
+    const client = axios.create({
+      baseURL: apiUrl,
+      timeout: 15000,
+      httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    // List of endpoints to test
+    const endpoints = [
+      // Core resources
+      { path: '/accounting', name: 'Accounting' },
+      { path: '/radius', name: 'RADIUS' },
+      { path: '/radius/accounting', name: 'RADIUS Accounting' },
+      { path: '/sessions', name: 'Sessions' },
+      { path: '/authentications', name: 'Authentications' },
+      { path: '/authorizations', name: 'Authorizations' },
+      { path: '/connections', name: 'Connections' },
+      
+      // Report endpoints
+      { path: '/reports', name: 'Reports List' },
+      { path: '/reports/accounting', name: 'Reports Accounting' },
+      { path: '/reports/sessions', name: 'Reports Sessions' },
+      { path: '/reports/authentications', name: 'Reports Authentications' },
+      { path: '/reports/guest-registrations', name: 'Reports Guest Registrations' },
+      
+      // Numbered reports (IronWifi specific)
+      { path: '/110', name: 'Report 110 (RADIUS Accounting Sync)' },
+      { path: '/115', name: 'Report 115 (RADIUS Accounting Async)' },
+      { path: '/120', name: 'Report 120' },
+      
+      // Other resources
+      { path: '/logs', name: 'Logs' },
+      { path: '/events', name: 'Events' },
+      { path: '/activity', name: 'Activity' }
+    ];
+    
+    const results = {};
+    
+    for (const endpoint of endpoints) {
+      try {
+        const response = await client.get(endpoint.path, {
+          params: { page: 1, page_size: 3, earliest: '-24h', latest: 'now' }
+        });
+        
+        let count = 0;
+        let sample = null;
+        let fields = [];
+        
+        const data = response.data;
+        if (Array.isArray(data)) {
+          count = data.length;
+          sample = data[0];
+        } else if (data?._embedded) {
+          const key = Object.keys(data._embedded)[0];
+          count = data.total_items || data._embedded[key]?.length || 0;
+          sample = data._embedded[key]?.[0];
+        } else if (data?.items) {
+          count = data.total_items || data.items.length;
+          sample = data.items[0];
+        }
+        
+        if (sample) {
+          fields = Object.keys(sample).sort();
+        }
+        
+        // Check for MAC fields
+        const hasMacFields = fields.some(f => 
+          f.toLowerCase().includes('mac') ||
+          f.toLowerCase().includes('station') ||
+          f.toLowerCase().includes('called') ||
+          f.toLowerCase().includes('calling')
+        );
+        
+        results[endpoint.path] = {
+          name: endpoint.name,
+          status: 'available',
+          count,
+          fields,
+          hasMacFields,
+          sample: sample ? Object.fromEntries(
+            Object.entries(sample).slice(0, 10)
+          ) : null
+        };
+        
+      } catch (error) {
+        results[endpoint.path] = {
+          name: endpoint.name,
+          status: error.response?.status === 404 ? 'not_found' :
+                  error.response?.status === 405 ? 'method_not_allowed' :
+                  error.response?.status === 401 ? 'unauthorized' :
+                  'error',
+          statusCode: error.response?.status,
+          error: error.message
+        };
+      }
+    }
+    
+    // Find endpoints with MAC data
+    const endpointsWithMac = Object.entries(results)
+      .filter(([_, v]) => v.hasMacFields)
+      .map(([path, v]) => ({ path, name: v.name, count: v.count }));
+    
+    res.json({
+      success: true,
+      apiUrl,
+      totalEndpointsTested: endpoints.length,
+      endpointsWithMacData: endpointsWithMac,
+      results
+    });
+    
+  } catch (error) {
+    logger.error('Error testing endpoints:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/ironwifi/captive-portals
  * Get captive portals list
  */
