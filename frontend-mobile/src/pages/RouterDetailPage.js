@@ -195,7 +195,14 @@ function RouterDetailPage() {
       if (dateValue instanceof Date) {
         date = dateValue;
       } else if (typeof dateValue === 'string') {
-        date = new Date(dateValue);
+        // Check if string is a numeric timestamp (BIGINT from PostgreSQL)
+        if (/^\d+$/.test(dateValue)) {
+          const numValue = Number(dateValue);
+          // Handle Unix timestamp (seconds or milliseconds)
+          date = new Date(numValue > 1000000000000 ? numValue : numValue * 1000);
+        } else {
+          date = new Date(dateValue);
+        }
       } else if (typeof dateValue === 'number') {
         // Handle Unix timestamp (seconds or milliseconds)
         date = new Date(dateValue > 1000000000000 ? dateValue : dateValue * 1000);

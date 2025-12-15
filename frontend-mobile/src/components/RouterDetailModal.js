@@ -61,7 +61,20 @@ function RouterDetailModal({ router, onClose, onUpdate }) {
   const formatDate = (dateValue) => {
     if (!dateValue) return 'N/A';
     try {
-      return new Date(dateValue).toLocaleDateString('en-GB', {
+      let date;
+      // Handle numeric strings (BIGINT from PostgreSQL)
+      if (typeof dateValue === 'string' && /^\d+$/.test(dateValue)) {
+        const numValue = Number(dateValue);
+        date = new Date(numValue > 1000000000000 ? numValue : numValue * 1000);
+      } else if (typeof dateValue === 'number') {
+        date = new Date(dateValue > 1000000000000 ? dateValue : dateValue * 1000);
+      } else {
+        date = new Date(dateValue);
+      }
+      
+      if (isNaN(date.getTime())) return 'Invalid date';
+      
+      return date.toLocaleDateString('en-GB', {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
