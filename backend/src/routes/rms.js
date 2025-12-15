@@ -1,8 +1,63 @@
 const express = require('express');
 const router = express.Router();
 const { requireAdmin } = require('./session');
+const { pool } = require('../config/database');
 
-// All RMS routes require admin access
+// Public debug endpoint for RMS sync status (no auth required)
+router.get('/debug/sync-status', async (req, res) => {
+  try {
+    const { getRMSSyncStats } = require('../services/rmsSync');
+    const syncStats = getRMSSyncStats();
+    
+    // Get router #53 specifically (find it by name pattern)
+    const router53Result = await pool.query(`
+      SELECT router_id, name, serial, current_status, last_seen, updated_at
+      FROM routers 
+      WHERE name ILIKE '%53%' OR serial LIKE '%53%'
+      ORDER BY name
+      LIMIT 5
+    `);
+    
+    // Get recent offline routers
+    const offlineRouters = await pool.query(`
+      SELECT router_id, name, current_status, last_seen, updated_at
+      FROM routers 
+      WHERE current_status != 'online'
+      ORDER BY updated_at DESC
+      LIMIT 10
+    `);
+    
+    // Get total router counts
+    const counts = await pool.query(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE current_status = 'online') as online,
+        COUNT(*) FILTER (WHERE current_status != 'online') as offline,
+        MAX(updated_at) as last_update
+      FROM routers
+    `);
+    
+    res.json({
+      syncStats: {
+        lastSyncTime: syncStats.lastSyncTime,
+        lastSyncSuccess: syncStats.lastSyncSuccess,
+        lastSyncErrors: syncStats.lastSyncErrors,
+        lastSyncTotal: syncStats.lastSyncTotal,
+        lastSyncDuration: syncStats.lastSyncDuration,
+        totalSyncs24h: syncStats.totalSyncs24h,
+        isRunning: syncStats.isRunning
+      },
+      routerCounts: counts.rows[0],
+      router53Candidates: router53Result.rows,
+      recentOfflineRouters: offlineRouters.rows,
+      serverTime: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// All other RMS routes require admin access
 router.use(requireAdmin);
 const { syncFromRMS } = require('../services/rmsSync');
 const { mergeDuplicateRouters } = require('../models/router');
