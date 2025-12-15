@@ -264,20 +264,36 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
 
   // Summary table
   doc.setFontSize(14);
+  doc.setTextColor(0, 0, 0); // Ensure black text
   const summaryStartY = y + 10;
   doc.text('Uptime Summary', 14, summaryStartY);
+  
+  const offlineRecords = totalRecords - onlineRecords;
   const summaryData = [
     ['Total Records', totalRecords],
     ['Online Records', onlineRecords],
+    ['Offline Records', offlineRecords],
     ['Overall Uptime', `${uptimePercent.toFixed(2)}%`],
-    ['Total Uptime', fmtHMS(totalUptimeSec)]
+    ['Total Uptime', fmtHMS(totalUptimeSec)],
+    ['Total Offline', fmtHMS(totalOfflineSec)]
   ];
   doc.autoTable({
     startY: summaryStartY + 4,
     head: [['Metric', 'Value']],
     body: summaryData,
     theme: 'grid',
-    headStyles: { fillColor: [91, 127, 92] }, // Brand Green #5b7f5c
+    headStyles: { fillColor: [91, 127, 92], textColor: [255, 255, 255] }, // Brand Green with white text
+    styles: { textColor: [0, 0, 0] }, // Black text for body
+    didParseCell: function(data) {
+      // Make offline-related rows red
+      if (data.section === 'body') {
+        const label = data.row.raw[0];
+        if (label === 'Offline Records' || label === 'Total Offline') {
+          data.cell.styles.textColor = [220, 38, 38]; // Red color
+          data.cell.styles.fontStyle = 'bold';
+        }
+      }
+    }
   });
 
   // Data Usage section (if stats available)
@@ -308,15 +324,39 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
   // Daily breakdown table
   const dailyStartY = (doc.lastAutoTable?.finalY || (summaryStartY + 30)) + 10;
   doc.setFontSize(12);
+  doc.setTextColor(0, 0, 0); // Ensure black text
   doc.text('Daily Activity within Range', 14, dailyStartY);
-  const dailyBody = byDay.map(d => [d.date, d.total, d.online, `${d.pct.toFixed(2)}%`]);
+  
+  // Add offline count to daily data
+  const dailyBody = byDay.map(d => {
+    const offline = d.total - d.online;
+    return [d.date, d.total, d.online, offline, `${d.pct.toFixed(2)}%`];
+  });
+  
   doc.autoTable({
     startY: dailyStartY + 4,
-    head: [['Date', 'Samples', 'Online', 'Uptime %']],
+    head: [['Date', 'Samples', 'Online', 'Offline', 'Uptime %']],
     body: dailyBody,
     theme: 'striped',
-    headStyles: { fillColor: [91, 127, 92] }, // Brand Green #5b7f5c
-    styles: { cellPadding: 2 }
+    headStyles: { fillColor: [91, 127, 92], textColor: [255, 255, 255] }, // Brand Green with white text
+    styles: { cellPadding: 2, textColor: [0, 0, 0] }, // Black text for body
+    columnStyles: { 
+      3: { textColor: [220, 38, 38] } // Offline column in red
+    },
+    didParseCell: function(data) {
+      // Color code uptime percentage based on value
+      if (data.section === 'body' && data.column.index === 4) {
+        const pctText = data.cell.raw;
+        const pct = parseFloat(pctText);
+        if (pct < 50) {
+          data.cell.styles.textColor = [220, 38, 38]; // Red for poor uptime
+        } else if (pct < 90) {
+          data.cell.styles.textColor = [234, 179, 8]; // Yellow/orange for mediocre
+        } else {
+          data.cell.styles.textColor = [22, 163, 74]; // Green for good uptime
+        }
+      }
+    }
   });
 
   // Generate filename
