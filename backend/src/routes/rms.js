@@ -8,31 +8,28 @@ router.get('/debug/router-location/:routerId', async (req, res) => {
   try {
     const { routerId } = req.params;
     
-    // Get router with location data from latest log
-    const result = await pool.query(`
-      WITH latest_log AS (
-        SELECT DISTINCT ON (router_id)
-          router_id, latitude, longitude, location_accuracy, 
-          timestamp, wan_ip, operator
-        FROM router_logs
-        WHERE router_id = $1 AND latitude IS NOT NULL
-        ORDER BY router_id, timestamp DESC
-      )
-      SELECT 
-        r.router_id, r.name,
-        ll.latitude, ll.longitude, ll.location_accuracy,
-        ll.timestamp as last_location_update,
-        ll.wan_ip, ll.operator
-      FROM routers r
-      LEFT JOIN latest_log ll ON r.router_id = ll.router_id
-      WHERE r.router_id = $1 OR r.name ILIKE $2
+    // First find the router
+    const routerResult = await pool.query(`
+      SELECT router_id, name FROM routers
+      WHERE router_id = $1 OR name ILIKE $2
+      LIMIT 1
     `, [routerId, `%${routerId}%`]);
     
-    if (result.rows.length === 0) {
+    if (routerResult.rows.length === 0) {
       return res.status(404).json({ error: 'Router not found' });
     }
     
-    const router = result.rows[0];
+    const router = routerResult.rows[0];
+    
+    // Get latest log with location data
+    const logResult = await pool.query(`
+      SELECT latitude, longitude, location_accuracy, 
+             timestamp, wan_ip, operator
+      FROM router_logs
+      WHERE router_id = $1 AND latitude IS NOT NULL
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `, [router.router_id]);
     
     // Count total location entries
     const countResult = await pool.query(`
@@ -41,16 +38,32 @@ router.get('/debug/router-location/:routerId', async (req, res) => {
       WHERE router_id = $1 AND latitude IS NOT NULL
     `, [router.router_id]);
     
+    // Also get any logs at all
+    const anyLogResult = await pool.query(`
+      SELECT latitude, longitude, timestamp
+      FROM router_logs
+      WHERE router_id = $1
+      ORDER BY timestamp DESC
+      LIMIT 5
+    `, [router.router_id]);
+    
+    const latestLog = logResult.rows[0] || null;
+    
     res.json({
       router_id: router.router_id,
       name: router.name,
-      hasLocation: !!router.latitude,
-      latitude: router.latitude,
-      longitude: router.longitude,
-      accuracy: router.location_accuracy,
-      lastUpdate: router.last_location_update,
-      operator: router.operator,
-      totalLocationRecords: parseInt(countResult.rows[0].location_count)
+      hasLocation: !!latestLog?.latitude,
+      latitude: latestLog?.latitude || null,
+      longitude: latestLog?.longitude || null,
+      accuracy: latestLog?.location_accuracy || null,
+      lastUpdate: latestLog?.timestamp || null,
+      operator: latestLog?.operator || null,
+      totalLocationRecords: parseInt(countResult.rows[0].location_count),
+      recentLogs: anyLogResult.rows.map(log => ({
+        lat: log.latitude,
+        lng: log.longitude,
+        time: log.timestamp
+      }))
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
