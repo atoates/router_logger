@@ -35,7 +35,12 @@ async function processRouterTelemetry(data) {
         mnc: data.mnc,
         lac: data.cell.lac,
         tac: data.cell.tac,
-        cell_id: data.cell.cid || data.cell.cell_id
+        cell_id: data.cell.cid || data.cell.cell_id,
+        // Additional params for better accuracy
+        network_type: data.network_type,
+        rsrp: data.cell.rsrp,
+        pci: data.cell.pc_id || data.cell.pci || data.cell.phys_cell_id,
+        earfcn: data.cell.earfcn
       });
     }
 

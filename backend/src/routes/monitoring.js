@@ -382,4 +382,49 @@ router.get('/api/monitoring/db-settings', async (req, res) => {
   }
 });
 
+// Location API status (Unwired Labs)
+router.get('/api/monitoring/location-api', async (req, res) => {
+  try {
+    const { getLocationCacheStats } = require('../services/geoService');
+    const axios = require('axios');
+    
+    const apiKey = process.env.LOCATION_API;
+    const cacheStats = getLocationCacheStats();
+    
+    let balance = null;
+    let balanceError = null;
+    
+    if (apiKey) {
+      try {
+        // Check Unwired Labs balance
+        const balanceRes = await axios.get(
+          `https://eu1.unwiredlabs.com/v2/balance?token=${apiKey}`,
+          { timeout: 5000 }
+        );
+        if (balanceRes.data && balanceRes.data.status === 'ok') {
+          balance = {
+            geolocation: balanceRes.data.balance_geolocation,
+            geocoding: balanceRes.data.balance_geocoding
+          };
+        }
+      } catch (err) {
+        balanceError = err.response?.data?.message || err.message;
+      }
+    }
+    
+    res.json({
+      configured: !!apiKey,
+      provider: 'Unwired Labs',
+      endpoint: 'eu1.unwiredlabs.com',
+      balance,
+      balanceError,
+      cache: cacheStats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error fetching location API status:', error);
+    res.status(500).json({ error: 'Failed to fetch location API status' });
+  }
+});
+
 module.exports = { router, trackRMSCall, trackClickUpCall, apiMetrics, clickupMetrics, isApproachingQuota, getQuotaStatus };
