@@ -1223,6 +1223,7 @@ router.get('/radius-data', async (req, res) => {
 /**
  * GET /api/ironwifi/test-all-endpoints
  * Comprehensive test of all possible IronWifi API endpoints for RADIUS/session data
+ * Note: This is a public endpoint for testing purposes - no auth required
  */
 router.get('/test-all-endpoints', async (req, res) => {
   try {
