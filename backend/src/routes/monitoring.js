@@ -1,7 +1,29 @@
 const express = require('express');
 const router = express.Router();
+const os = require('os');
+const v8 = require('v8');
 const { requireAdmin } = require('./session');
 const { pool, logger } = require('../config/database');
+
+// Track server start time for uptime calculation
+const serverStartTime = Date.now();
+
+// Track event loop lag
+let eventLoopLag = 0;
+let lastLoopCheck = Date.now();
+setInterval(() => {
+  const now = Date.now();
+  const expectedDelay = 100; // Check every 100ms
+  eventLoopLag = Math.max(0, now - lastLoopCheck - expectedDelay);
+  lastLoopCheck = now;
+}, 100);
+
+// Track request metrics
+let requestMetrics = {
+  total: 0,
+  last5min: [],
+  errors: 0
+};
 
 // All monitoring routes require admin access
 router.use(requireAdmin);
@@ -381,6 +403,238 @@ router.get('/api/monitoring/db-settings', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch DB settings' });
   }
 });
+
+// System performance metrics (CPU, Memory, Event Loop)
+router.get('/api/monitoring/system', async (req, res) => {
+  try {
+    const memUsage = process.memoryUsage();
+    const cpuUsage = process.cpuUsage();
+    const heapStats = v8.getHeapStatistics();
+    
+    // Calculate CPU percentage (rough approximation)
+    const cpus = os.cpus();
+    const cpuCount = cpus.length;
+    
+    // System memory
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    
+    // Process uptime
+    const uptimeSeconds = process.uptime();
+    const serverUptimeMs = Date.now() - serverStartTime;
+    
+    // Format bytes to human readable
+    const formatBytes = (bytes) => {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+      return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    };
+    
+    // Format uptime
+    const formatUptime = (seconds) => {
+      const days = Math.floor(seconds / 86400);
+      const hours = Math.floor((seconds % 86400) / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      if (days > 0) return `${days}d ${hours}h ${mins}m`;
+      if (hours > 0) return `${hours}h ${mins}m ${secs}s`;
+      if (mins > 0) return `${mins}m ${secs}s`;
+      return `${secs}s`;
+    };
+    
+    res.json({
+      process: {
+        pid: process.pid,
+        nodeVersion: process.version,
+        platform: process.platform,
+        arch: process.arch,
+        uptime: formatUptime(uptimeSeconds),
+        uptimeSeconds: Math.round(uptimeSeconds)
+      },
+      memory: {
+        process: {
+          rss: formatBytes(memUsage.rss),
+          rssBytes: memUsage.rss,
+          heapTotal: formatBytes(memUsage.heapTotal),
+          heapUsed: formatBytes(memUsage.heapUsed),
+          heapUsedPercent: ((memUsage.heapUsed / memUsage.heapTotal) * 100).toFixed(1) + '%',
+          external: formatBytes(memUsage.external),
+          arrayBuffers: formatBytes(memUsage.arrayBuffers || 0)
+        },
+        heap: {
+          totalHeapSize: formatBytes(heapStats.total_heap_size),
+          usedHeapSize: formatBytes(heapStats.used_heap_size),
+          heapSizeLimit: formatBytes(heapStats.heap_size_limit),
+          usedPercent: ((heapStats.used_heap_size / heapStats.heap_size_limit) * 100).toFixed(1) + '%',
+          mallocedMemory: formatBytes(heapStats.malloced_memory)
+        },
+        system: {
+          total: formatBytes(totalMem),
+          used: formatBytes(usedMem),
+          free: formatBytes(freeMem),
+          usedPercent: ((usedMem / totalMem) * 100).toFixed(1) + '%'
+        }
+      },
+      cpu: {
+        cores: cpuCount,
+        model: cpus[0]?.model || 'Unknown',
+        userTime: (cpuUsage.user / 1000000).toFixed(2) + 's',
+        systemTime: (cpuUsage.system / 1000000).toFixed(2) + 's',
+        loadAvg: os.loadavg().map(l => l.toFixed(2))
+      },
+      eventLoop: {
+        lagMs: eventLoopLag,
+        status: eventLoopLag < 50 ? 'healthy' : eventLoopLag < 200 ? 'moderate' : 'stressed'
+      },
+      handles: {
+        active: process._getActiveHandles?.()?.length || 'N/A',
+        requests: process._getActiveRequests?.()?.length || 'N/A'
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error fetching system metrics:', error);
+    res.status(500).json({ error: 'Failed to fetch system metrics' });
+  }
+});
+
+// Combined performance dashboard
+router.get('/api/monitoring/performance', async (req, res) => {
+  try {
+    const memUsage = process.memoryUsage();
+    const heapStats = v8.getHeapStatistics();
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    
+    // Get database pool stats
+    const poolStats = {
+      totalCount: pool.totalCount,
+      idleCount: pool.idleCount,
+      waitingCount: pool.waitingCount
+    };
+    
+    // Quick DB performance check
+    const dbPerfStart = Date.now();
+    await pool.query('SELECT 1');
+    const dbLatency = Date.now() - dbPerfStart;
+    
+    // Get active query count
+    const activeQueries = await pool.query(`
+      SELECT COUNT(*)::int as count 
+      FROM pg_stat_activity 
+      WHERE datname = current_database() 
+        AND state = 'active' 
+        AND pid <> pg_backend_pid()
+    `);
+    
+    // Calculate health scores (0-100)
+    const memoryScore = 100 - ((memUsage.heapUsed / heapStats.heap_size_limit) * 100);
+    const systemMemScore = 100 - (((totalMem - freeMem) / totalMem) * 100);
+    const eventLoopScore = eventLoopLag < 10 ? 100 : eventLoopLag < 50 ? 80 : eventLoopLag < 200 ? 50 : 20;
+    const dbScore = dbLatency < 10 ? 100 : dbLatency < 50 ? 80 : dbLatency < 200 ? 50 : 20;
+    
+    const overallScore = Math.round((memoryScore + systemMemScore + eventLoopScore + dbScore) / 4);
+    
+    res.json({
+      health: {
+        overall: overallScore,
+        status: overallScore > 80 ? 'excellent' : overallScore > 60 ? 'good' : overallScore > 40 ? 'degraded' : 'critical',
+        scores: {
+          processMemory: Math.round(memoryScore),
+          systemMemory: Math.round(systemMemScore),
+          eventLoop: eventLoopScore,
+          database: dbScore
+        }
+      },
+      summary: {
+        processMemory: `${(memUsage.heapUsed / 1024 / 1024).toFixed(0)} MB / ${(heapStats.heap_size_limit / 1024 / 1024).toFixed(0)} MB`,
+        systemMemory: `${((totalMem - freeMem) / 1024 / 1024 / 1024).toFixed(1)} GB / ${(totalMem / 1024 / 1024 / 1024).toFixed(1)} GB`,
+        eventLoopLag: `${eventLoopLag} ms`,
+        dbLatency: `${dbLatency} ms`,
+        dbConnections: `${poolStats.totalCount - poolStats.idleCount} active / ${poolStats.totalCount} total`,
+        activeQueries: activeQueries.rows[0]?.count || 0,
+        uptime: `${Math.round(process.uptime() / 60)} minutes`
+      },
+      recommendations: generateRecommendations({
+        memoryScore, systemMemScore, eventLoopScore, dbScore, 
+        poolStats, dbLatency, heapStats, memUsage, totalMem, freeMem
+      }),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error fetching performance dashboard:', error);
+    res.status(500).json({ error: 'Failed to fetch performance dashboard' });
+  }
+});
+
+// Generate performance recommendations
+function generateRecommendations(metrics) {
+  const recs = [];
+  
+  if (metrics.memoryScore < 30) {
+    recs.push({
+      type: 'critical',
+      area: 'memory',
+      message: 'Process memory usage is very high. Consider increasing RAM or optimizing memory usage.'
+    });
+  } else if (metrics.memoryScore < 50) {
+    recs.push({
+      type: 'warning',
+      area: 'memory',
+      message: 'Process memory usage is elevated. Monitor for potential memory leaks.'
+    });
+  }
+  
+  if (metrics.systemMemScore < 20) {
+    recs.push({
+      type: 'critical',
+      area: 'system',
+      message: 'System memory is nearly exhausted. Upgrade VM or reduce workload immediately.'
+    });
+  } else if (metrics.systemMemScore < 40) {
+    recs.push({
+      type: 'warning',
+      area: 'system',
+      message: 'System memory is running low. Consider upgrading VM resources.'
+    });
+  }
+  
+  if (metrics.eventLoopScore < 50) {
+    recs.push({
+      type: 'warning',
+      area: 'cpu',
+      message: 'Event loop is delayed. CPU may be overloaded or blocking operations detected.'
+    });
+  }
+  
+  if (metrics.dbLatency > 100) {
+    recs.push({
+      type: 'warning',
+      area: 'database',
+      message: 'Database latency is high. Check for slow queries or connection issues.'
+    });
+  }
+  
+  if (metrics.poolStats.waitingCount > 0) {
+    recs.push({
+      type: 'warning',
+      area: 'database',
+      message: `${metrics.poolStats.waitingCount} queries waiting for connections. Consider increasing pool size.`
+    });
+  }
+  
+  if (recs.length === 0) {
+    recs.push({
+      type: 'info',
+      area: 'overall',
+      message: 'All systems operating normally. No immediate action required.'
+    });
+  }
+  
+  return recs;
+}
 
 // Location API status (Unwired Labs)
 router.get('/api/monitoring/location-api', async (req, res) => {
