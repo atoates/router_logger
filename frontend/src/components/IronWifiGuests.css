@@ -297,6 +297,47 @@
   margin-top: 8px;
 }
 
+/* Load More */
+.ironwifi-load-more {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  padding: 20px;
+  border-top: 1px solid var(--border-color);
+  margin-top: 8px;
+}
+
+.ironwifi-load-btn,
+.ironwifi-load-all-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.ironwifi-load-btn {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.ironwifi-load-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.ironwifi-load-all-btn {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.ironwifi-load-all-btn:hover {
+  background: var(--bg-primary);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .ironwifi-header {

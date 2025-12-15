@@ -4,6 +4,7 @@ import './IronWifiGuests.css';
 
 function IronWifiGuests() {
   const [guests, setGuests] = useState([]);
+  const [guestsTotal, setGuestsTotal] = useState(0);
   const [status, setStatus] = useState(null);
   const [webhookHistory, setWebhookHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,6 +12,7 @@ function IronWifiGuests() {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('guests');
+  const [displayLimit, setDisplayLimit] = useState(100);
   const { getAuthHeaders, API_URL } = useAuth();
 
   const fetchData = useCallback(async () => {
@@ -21,7 +23,7 @@ function IronWifiGuests() {
       // Fetch in parallel
       const [statusRes, guestsRes, webhookRes] = await Promise.all([
         fetch(`${API_URL}/api/ironwifi/status`, { headers: getAuthHeaders() }),
-        fetch(`${API_URL}/api/ironwifi/guests?limit=100&search=${encodeURIComponent(search)}`, { headers: getAuthHeaders() }),
+        fetch(`${API_URL}/api/ironwifi/guests?limit=${displayLimit}&search=${encodeURIComponent(search)}`, { headers: getAuthHeaders() }),
         fetch(`${API_URL}/api/ironwifi/webhook/history?limit=20`, { headers: getAuthHeaders() })
       ]);
 
@@ -33,6 +35,7 @@ function IronWifiGuests() {
       if (guestsRes.ok) {
         const guestsData = await guestsRes.json();
         setGuests(guestsData.guests || []);
+        setGuestsTotal(guestsData.total || guestsData.guests?.length || 0);
       }
 
       if (webhookRes.ok) {
@@ -45,7 +48,7 @@ function IronWifiGuests() {
     } finally {
       setLoading(false);
     }
-  }, [API_URL, getAuthHeaders, search]);
+  }, [API_URL, getAuthHeaders, search, displayLimit]);
 
   useEffect(() => {
     fetchData();
@@ -143,8 +146,8 @@ function IronWifiGuests() {
         <div className="ironwifi-card">
           <div className="ironwifi-card-icon">👥</div>
           <div className="ironwifi-card-content">
-            <div className="ironwifi-card-value">{guests.length}</div>
-            <div className="ironwifi-card-label">Cached Guests</div>
+            <div className="ironwifi-card-value">{guestsTotal.toLocaleString()}</div>
+            <div className="ironwifi-card-label">Total Guests in DB</div>
           </div>
         </div>
         <div className="ironwifi-card">
@@ -185,7 +188,7 @@ function IronWifiGuests() {
           className={`ironwifi-tab ${activeTab === 'guests' ? 'active' : ''}`}
           onClick={() => setActiveTab('guests')}
         >
-          👥 Guests ({guests.length})
+          👥 Guests ({guests.length}{guestsTotal > guests.length ? ` of ${guestsTotal.toLocaleString()}` : ''})
         </button>
         <button 
           className={`ironwifi-tab ${activeTab === 'webhooks' ? 'active' : ''}`}
@@ -249,6 +252,24 @@ function IronWifiGuests() {
                   ))}
                 </tbody>
               </table>
+              
+              {/* Load More */}
+              {guestsTotal > guests.length && (
+                <div className="ironwifi-load-more">
+                  <button 
+                    onClick={() => setDisplayLimit(prev => prev + 200)}
+                    className="ironwifi-load-btn"
+                  >
+                    Load More ({guests.length} of {guestsTotal.toLocaleString()} shown)
+                  </button>
+                  <button 
+                    onClick={() => setDisplayLimit(guestsTotal)}
+                    className="ironwifi-load-all-btn"
+                  >
+                    Show All
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
