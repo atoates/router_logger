@@ -162,8 +162,6 @@ async function getAllRouters() {
         timestamp,
         wan_ip,
         operator,
-        latitude,
-        longitude,
         cell_id,
         tac,
         mcc,
@@ -171,6 +169,17 @@ async function getAllRouters() {
         earfcn,
         pc_id
       FROM router_logs
+      ORDER BY router_id, timestamp DESC
+    ),
+    latest_location AS (
+      SELECT DISTINCT ON (router_id)
+        router_id,
+        latitude,
+        longitude,
+        location_accuracy,
+        timestamp as location_timestamp
+      FROM router_logs
+      WHERE latitude IS NOT NULL AND longitude IS NOT NULL
       ORDER BY router_id, timestamp DESC
     ),
     last_online AS (
@@ -217,8 +226,9 @@ async function getAllRouters() {
       ll.current_status,
       ll.wan_ip,
       ll.operator,
-      ll.latitude,
-      ll.longitude,
+      lloc.latitude,
+      lloc.longitude,
+      lloc.location_accuracy,
       ll.cell_id,
       ll.tac,
       ll.mcc,
@@ -229,6 +239,7 @@ async function getAllRouters() {
       COALESCE(lf.firmware_version, r.firmware_version) as firmware_version
     FROM routers r
     LEFT JOIN latest_logs ll ON ll.router_id = r.router_id
+    LEFT JOIN latest_location lloc ON lloc.router_id = r.router_id
     LEFT JOIN last_online lo ON lo.router_id = r.router_id
     LEFT JOIN latest_imei li ON li.router_id = r.router_id
     LEFT JOIN latest_firmware lf ON lf.router_id = r.router_id
@@ -255,8 +266,6 @@ async function getRoutersForUser(userId) {
         timestamp,
         wan_ip,
         operator,
-        latitude,
-        longitude,
         cell_id,
         tac,
         mcc,
@@ -264,6 +273,17 @@ async function getRoutersForUser(userId) {
         earfcn,
         pc_id
       FROM router_logs
+      ORDER BY router_id, timestamp DESC
+    ),
+    latest_location AS (
+      SELECT DISTINCT ON (router_id)
+        router_id,
+        latitude,
+        longitude,
+        location_accuracy,
+        timestamp as location_timestamp
+      FROM router_logs
+      WHERE latitude IS NOT NULL AND longitude IS NOT NULL
       ORDER BY router_id, timestamp DESC
     ),
     last_online AS (
@@ -310,8 +330,9 @@ async function getRoutersForUser(userId) {
       ll.current_status,
       ll.wan_ip,
       ll.operator,
-      ll.latitude,
-      ll.longitude,
+      lloc.latitude,
+      lloc.longitude,
+      lloc.location_accuracy,
       ll.cell_id,
       ll.tac,
       ll.mcc,
@@ -324,6 +345,7 @@ async function getRoutersForUser(userId) {
       ura.notes as assignment_notes
     FROM user_router_assignments ura
     JOIN routers r ON r.router_id = ura.router_id
+    LEFT JOIN latest_location lloc ON lloc.router_id = r.router_id
     LEFT JOIN latest_logs ll ON ll.router_id = r.router_id
     LEFT JOIN last_online lo ON lo.router_id = r.router_id
     LEFT JOIN latest_imei li ON li.router_id = r.router_id
