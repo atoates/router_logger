@@ -9,9 +9,21 @@ router.get('/debug/sync-status', async (req, res) => {
     const { getRMSSyncStats } = require('../services/rmsSync');
     const syncStats = getRMSSyncStats();
     
+    // First, get the column names from the routers table
+    const columnsResult = await pool.query(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'routers'
+      ORDER BY ordinal_position
+    `);
+    const columns = columnsResult.rows.map(r => r.column_name);
+    
+    // Determine the status column name
+    const statusCol = columns.includes('current_status') ? 'current_status' : 
+                      columns.includes('status') ? 'status' : null;
+    
     // Get router #53 specifically (find it by name pattern)
     const router53Result = await pool.query(`
-      SELECT router_id, name, current_status, last_seen, updated_at
+      SELECT router_id, name, ${statusCol || "'unknown'"} as status, last_seen
       FROM routers 
       WHERE name ILIKE '%53%' OR router_id::text LIKE '%53%'
       ORDER BY name
@@ -19,23 +31,23 @@ router.get('/debug/sync-status', async (req, res) => {
     `);
     
     // Get recent offline routers
-    const offlineRouters = await pool.query(`
-      SELECT router_id, name, current_status, last_seen, updated_at
+    const offlineRouters = statusCol ? await pool.query(`
+      SELECT router_id, name, ${statusCol} as status, last_seen
       FROM routers 
-      WHERE current_status != 'online'
-      ORDER BY updated_at DESC
+      WHERE ${statusCol} != 'online'
+      ORDER BY last_seen DESC
       LIMIT 10
-    `);
+    `) : { rows: [] };
     
     // Get total router counts
-    const counts = await pool.query(`
+    const counts = statusCol ? await pool.query(`
       SELECT 
         COUNT(*) as total,
-        COUNT(*) FILTER (WHERE current_status = 'online') as online,
-        COUNT(*) FILTER (WHERE current_status != 'online') as offline,
-        MAX(updated_at) as last_update
+        COUNT(*) FILTER (WHERE ${statusCol} = 'online') as online,
+        COUNT(*) FILTER (WHERE ${statusCol} != 'online') as offline,
+        MAX(last_seen) as last_update
       FROM routers
-    `);
+    `) : await pool.query('SELECT COUNT(*) as total FROM routers');
     
     res.json({
       syncStats: {
@@ -47,13 +59,15 @@ router.get('/debug/sync-status', async (req, res) => {
         totalSyncs24h: syncStats.totalSyncs24h,
         isRunning: syncStats.isRunning
       },
+      statusColumn: statusCol,
+      availableColumns: columns.slice(0, 20), // Show first 20 columns for debug
       routerCounts: counts.rows[0],
       router53Candidates: router53Result.rows,
       recentOfflineRouters: offlineRouters.rows,
       serverTime: new Date().toISOString()
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message, stack: error.stack });
   }
 });
 
