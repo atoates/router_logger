@@ -125,6 +125,7 @@ function RouterMap({
         center={center}
         zoom={zoom}
         className="router-map"
+        style={{ height: '100%', width: '100%' }}
         zoomControl={false}
         attributionControl={false}
       >
