@@ -1,9 +1,9 @@
 /**
- * Property Service - SIMPLIFIED
+ * Property Service
  * Handles:
- * 1. Linking routers to location tasks
+ * 1. Linking routers to location tasks (with history tracking)
  * 2. Assigning routers to ClickUp users (syncs with ClickUp assignees)
- * NO property history logging
+ * 3. Property assignment history in router_property_assignments table
  */
 
 const { pool, logger } = require('../config/database');
@@ -49,6 +49,8 @@ async function linkRouterToLocation(linkage) {
       locationTaskName 
     });
 
+    const linkDate = new Date();
+    
     // Update router with location task info
     const result = await client.query(
       `UPDATE routers 
@@ -57,8 +59,28 @@ async function linkRouterToLocation(linkage) {
            location_linked_at = $3
        WHERE router_id = $4
        RETURNING *`,
-      [locationTaskId, locationTaskName, new Date(), routerId]
+      [locationTaskId, locationTaskName, linkDate, routerId]
     );
+
+    // Record in property assignment history
+    try {
+      await client.query(
+        `INSERT INTO router_property_assignments 
+         (router_id, property_clickup_task_id, property_name, installed_at, installed_by, notes)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [routerId, locationTaskId, locationTaskName, linkDate, linkedBy, notes]
+      );
+      logger.info('Recorded property assignment in history', { 
+        routerId, 
+        locationTaskId,
+        installedAt: linkDate.toISOString()
+      });
+    } catch (historyError) {
+      logger.warn('Failed to record property assignment history (link still recorded)', {
+        routerId,
+        error: historyError.message
+      });
+    }
 
     // Fetch and sync date_installed from ClickUp
     const DATE_INSTALLED_FIELD_ID = CLICKUP_FIELD_IDS.DATE_INSTALLED;
@@ -223,7 +245,9 @@ async function unlinkRouterFromLocation(unlinkage) {
       throw new Error(`Router ${routerId} is not linked to any location`);
     }
 
-    // Update router to remove location link
+    const unlinkDate = new Date();
+
+    // Update router to remove location link (keep date_installed for history reference)
     const result = await client.query(
       `UPDATE routers 
        SET clickup_location_task_id = NULL,
@@ -233,6 +257,28 @@ async function unlinkRouterFromLocation(unlinkage) {
        RETURNING *`,
       [routerId]
     );
+
+    // Record the removal in property assignment history
+    try {
+      await client.query(
+        `UPDATE router_property_assignments 
+         SET removed_at = $1, removed_by = $2, notes = COALESCE(notes || E'\n', '') || $3
+         WHERE router_id = $4 
+           AND property_clickup_task_id = $5 
+           AND removed_at IS NULL`,
+        [unlinkDate, unlinkedBy, notes || '', routerId, wasLinkedToLocation]
+      );
+      logger.info('Recorded property removal in history', { 
+        routerId, 
+        locationTaskId: wasLinkedToLocation,
+        removedAt: unlinkDate.toISOString()
+      });
+    } catch (historyError) {
+      logger.warn('Failed to record property removal history (unlink still recorded)', {
+        routerId,
+        error: historyError.message
+      });
+    }
 
     await client.query('COMMIT');
 
