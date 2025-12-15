@@ -1315,6 +1315,58 @@ router.get('/test-reports-api', async (req, res) => {
       };
     }
     
+    // Try /reports with various required parameters
+    const reportFormats = [
+      { type: 'guest_registrations', format: 'json' },
+      { report_type: 'guest_registrations' },
+      { name: 'guest_registrations', output: 'json' },
+      { category: 'guests', type: 'registrations' }
+    ];
+    
+    for (const format of reportFormats) {
+      try {
+        const response = await client.post('/reports', format);
+        results[`postReportsFormat_${JSON.stringify(format)}`] = { 
+          status: 'success', 
+          data: response.data 
+        };
+      } catch (error) {
+        results[`postReportsFormat_${JSON.stringify(format)}`] = {
+          status: error.response?.status,
+          detail: error.response?.data?.detail,
+          data: error.response?.data
+        };
+      }
+    }
+    
+    // Try to get available report types
+    try {
+      const response = await client.get('/report-types');
+      results.reportTypes = { 
+        status: 'success', 
+        data: response.data 
+      };
+    } catch (error) {
+      results.reportTypes = {
+        status: error.response?.status,
+        message: error.message
+      };
+    }
+    
+    // Try to list scheduled reports
+    try {
+      const response = await client.get('/scheduled-reports');
+      results.scheduledReports = { 
+        status: 'success', 
+        data: response.data 
+      };
+    } catch (error) {
+      results.scheduledReports = {
+        status: error.response?.status,
+        message: error.message
+      };
+    }
+    
     // Try to get authentications list
     try {
       const response = await client.get('/guests', {
