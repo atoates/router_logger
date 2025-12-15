@@ -117,6 +117,10 @@ export const removeRouterAssignees = (routerId) => api.post(`/routers/${routerId
 // Router Status Updates
 export const updateRouterStatus = (routerId, status, notes) => api.patch(`/routers/${routerId}/status`, { status, notes });
 
+// Upload PDF report to ClickUp
+export const uploadReportToClickUp = (routerId, pdfData, reportType, dateRange) => 
+  api.post(`/routers/${routerId}/upload-report`, { pdfData, reportType, dateRange });
+
 // Admin - Cache Management
 export const clearRouterCache = () => {
   // Clear frontend cache immediately

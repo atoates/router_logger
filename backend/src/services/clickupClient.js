@@ -4,6 +4,7 @@
  */
 
 const axios = require('axios');
+const FormData = require('form-data');
 const clickupOAuthService = require('./clickupOAuthService');
 const logger = require('../config/database').logger;
 const { trackClickUpCall } = require('../routes/monitoring');
@@ -536,6 +537,109 @@ class ClickUpClient {
         throw error;
       }
     }, 3, `createTaskComment(${taskId})`);
+  }
+
+  /**
+   * Upload an attachment to a task
+   * @param {string} taskId - Task ID
+   * @param {Buffer} fileBuffer - File data as buffer
+   * @param {string} filename - Name for the file
+   * @param {string} userId - User identifier
+   * @returns {Promise<Object>} Uploaded attachment info
+   */
+  async uploadTaskAttachment(taskId, fileBuffer, filename, userId = 'default') {
+    let attempt = 0;
+    return retryWithBackoff(async () => {
+      const isRetry = attempt > 0;
+      attempt++;
+      
+      try {
+        const token = await clickupOAuthService.getToken(userId);
+        if (!token) {
+          throw new Error('No ClickUp token found. Please authorize the application.');
+        }
+
+        const form = new FormData();
+        form.append('attachment', fileBuffer, {
+          filename: filename,
+          contentType: 'application/pdf'
+        });
+
+        logger.info('ClickUp uploadTaskAttachment request:', {
+          taskId,
+          filename,
+          fileSize: fileBuffer.length
+        });
+
+        const response = await axios.post(
+          `${CLICKUP_API_BASE}/task/${taskId}/attachment`,
+          form,
+          {
+            headers: {
+              'Authorization': token,
+              ...form.getHeaders()
+            },
+            timeout: 30000 // 30 second timeout for file uploads
+          }
+        );
+
+        trackClickUpCall('uploadTaskAttachment', response.status, isRetry);
+
+        logger.info('ClickUp uploadTaskAttachment response:', {
+          taskId,
+          filename,
+          attachmentId: response.data?.id,
+          status: response.status
+        });
+
+        return response.data;
+      } catch (error) {
+        trackClickUpCall('uploadTaskAttachment', error.response?.status || 500, isRetry);
+        logger.error('Error uploading task attachment:', {
+          taskId,
+          filename,
+          status: error.response?.status,
+          errorData: error.response?.data,
+          message: error.message
+        });
+        throw error;
+      }
+    }, 3, `uploadTaskAttachment(${taskId})`);
+  }
+
+  /**
+   * Create a comment with attachment on a task
+   * First uploads the attachment, then creates a comment referencing it
+   * @param {string} taskId - Task ID
+   * @param {string} commentText - Comment text
+   * @param {Buffer} fileBuffer - File data as buffer
+   * @param {string} filename - Name for the file
+   * @param {string} userId - User identifier
+   * @returns {Promise<Object>} Result with attachment and comment info
+   */
+  async createCommentWithAttachment(taskId, commentText, fileBuffer, filename, userId = 'default') {
+    try {
+      // First upload the attachment
+      const attachment = await this.uploadTaskAttachment(taskId, fileBuffer, filename, userId);
+      
+      // Then create a comment
+      const comment = await this.createTaskComment(taskId, commentText, { notifyAll: false }, userId);
+      
+      logger.info('Created comment with attachment:', {
+        taskId,
+        attachmentId: attachment?.id,
+        commentId: comment?.id
+      });
+      
+      return { attachment, comment };
+    } catch (error) {
+      logger.error('Error creating comment with attachment:', {
+        taskId,
+        filename,
+        message: error.message
+      });
+      throw error;
+    }
   }
 
   /**

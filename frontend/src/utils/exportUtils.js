@@ -2,7 +2,7 @@ import Papa from 'papaparse';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { format } from 'date-fns';
-import { getRouterGeo } from '../services/api';
+import { getRouterGeo, uploadReportToClickUp } from '../services/api';
 
 /**
  * Export logs to CSV
@@ -319,8 +319,26 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
     styles: { cellPadding: 2 }
   });
 
-  // Save
-  doc.save(`router-uptime-report-${routerId}-${format(new Date(), 'yyyyMMdd')}.pdf`);
+  // Generate filename
+  const filename = `router-uptime-report-${routerId}-${format(new Date(), 'yyyyMMdd')}.pdf`;
+  
+  // Save locally
+  doc.save(filename);
+  
+  // Upload to ClickUp if router has a ClickUp task
+  if (router?.clickup_task_id) {
+    try {
+      // Get PDF as base64
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      const dateRange = `${format(new Date(startDate), 'MMM d, yyyy')} - ${format(new Date(endDate), 'MMM d, yyyy')}`;
+      
+      await uploadReportToClickUp(routerId, pdfBase64, 'uptime-report', dateRange);
+      console.log('Report uploaded to ClickUp successfully');
+    } catch (error) {
+      console.error('Failed to upload report to ClickUp:', error);
+      // Don't throw - the PDF was still saved locally
+    }
+  }
 }
 
 /**

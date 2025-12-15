@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import { uploadReportToClickUp } from '../services/api';
 
 export async function generateInstallationReport({ router, stats, logs, gpsLocation, technician }) {
   const doc = new jsPDF();
@@ -544,5 +545,21 @@ export async function generateInstallationReport({ router, stats, logs, gpsLocat
   // ============================================================================
   
   const fileName = `Installation_Report_${router.router_id}_${new Date().toISOString().split('T')[0]}.pdf`;
+  
+  // Save locally
   doc.save(fileName);
+  
+  // Upload to ClickUp if router has a ClickUp task
+  if (router?.clickup_task_id) {
+    try {
+      // Get PDF as base64
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      
+      await uploadReportToClickUp(router.router_id, pdfBase64, 'installation-report', null);
+      console.log('Installation report uploaded to ClickUp successfully');
+    } catch (error) {
+      console.error('Failed to upload installation report to ClickUp:', error);
+      // Don't throw - the PDF was still saved locally
+    }
+  }
 }
