@@ -157,6 +157,12 @@ export const getUsageStats = (params) => api.get('/stats/usage', { params });
 export const getUptimeData = (params) => api.get('/stats/uptime', { params });
 export const getTopRouters = (days = 1, limit = 100) => 
   api.get('/stats/top-routers', { params: { days, limit } });
+export const getNetworkUsage = (days = 7) => 
+  api.get('/stats/network-usage', { params: { days } });
+export const getNetworkUsageRolling = (days = 7) => 
+  api.get('/stats/network-usage-rolling', { params: { days } });
+export const getOperatorDistribution = (days = 30) => 
+  api.get('/stats/operators', { params: { days } });
 
 // Session management
 export const login = (username, password) => 
