@@ -2,7 +2,7 @@ import Papa from 'papaparse';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { format } from 'date-fns';
-import { getRouterGeo, uploadReportToClickUp } from '../services/api';
+import { getRouterGeo, uploadReportToClickUp, getRouterLocationHistory } from '../services/api';
 
 /**
  * Generate a static map image as base64 using OpenStreetMap tiles
@@ -452,17 +452,27 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
     });
   }
 
-  // Location Map section (if coordinates available)
-  console.log('PDF Export - Router location data:', { 
-    hasLatitude: !!router?.latitude, 
-    hasLongitude: !!router?.longitude,
-    latitude: router?.latitude,
-    longitude: router?.longitude,
-    routerKeys: router ? Object.keys(router) : []
-  });
+  // Location Map section - fetch from location history API if not on router object
+  let locationLat = router?.latitude;
+  let locationLon = router?.longitude;
+  let locationAccuracy = router?.location_accuracy;
   
-  if (router?.latitude && router?.longitude) {
-    console.log('PDF Export - Generating map for coordinates:', router.latitude, router.longitude);
+  // Try to fetch current location from API if not present on router
+  if ((!locationLat || !locationLon) && routerId) {
+    try {
+      const locRes = await getRouterLocationHistory(routerId, { limit: 1 });
+      if (locRes.data?.current) {
+        locationLat = locRes.data.current.latitude;
+        locationLon = locRes.data.current.longitude;
+        locationAccuracy = locRes.data.current.accuracy;
+      }
+    } catch (e) {
+      // Ignore - location just won't be shown
+      console.log('Could not fetch location for PDF:', e.message);
+    }
+  }
+  
+  if (locationLat && locationLon) {
     const mapStartY = (doc.lastAutoTable?.finalY || (summaryStartY + 30)) + 10;
     
     // Check if we need a new page for the map
@@ -474,8 +484,8 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
       try {
         // Generate static map - zoom level 10 for wider area view
         const mapDataUrl = await generateStaticMapImage(
-          parseFloat(router.latitude),
-          parseFloat(router.longitude),
+          parseFloat(locationLat),
+          parseFloat(locationLon),
           10, // Zoomed out to show wider area
           400,
           180
@@ -487,15 +497,15 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
         // Add coordinates text below map
         doc.setFontSize(9);
         doc.setTextColor(80);
-        doc.text(`Coordinates: ${router.latitude}, ${router.longitude}`, 14, 110);
-        if (router.location_accuracy) {
-          doc.text(`Accuracy: ±${Math.round(router.location_accuracy)}m`, 100, 110);
+        doc.text(`Coordinates: ${locationLat}, ${locationLon}`, 14, 110);
+        if (locationAccuracy) {
+          doc.text(`Accuracy: ±${Math.round(locationAccuracy)}m`, 100, 110);
         }
         doc.setTextColor(0);
       } catch (mapError) {
         console.error('Failed to generate map for PDF:', mapError);
         doc.setFontSize(10);
-        doc.text(`Location: ${router.latitude}, ${router.longitude}`, 14, 28);
+        doc.text(`Location: ${locationLat}, ${locationLon}`, 14, 28);
       }
     } else {
       doc.setFontSize(14);
@@ -504,8 +514,8 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
       try {
         // Generate static map - zoom level 10 for wider area view
         const mapDataUrl = await generateStaticMapImage(
-          parseFloat(router.latitude),
-          parseFloat(router.longitude),
+          parseFloat(locationLat),
+          parseFloat(locationLon),
           10, // Zoomed out to show wider area
           400,
           180
@@ -517,9 +527,9 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
         // Add coordinates text below map
         doc.setFontSize(9);
         doc.setTextColor(80);
-        doc.text(`Coordinates: ${router.latitude}, ${router.longitude}`, 14, mapStartY + 90);
-        if (router.location_accuracy) {
-          doc.text(`Accuracy: ±${Math.round(router.location_accuracy)}m`, 100, mapStartY + 90);
+        doc.text(`Coordinates: ${locationLat}, ${locationLon}`, 14, mapStartY + 90);
+        if (locationAccuracy) {
+          doc.text(`Accuracy: ±${Math.round(locationAccuracy)}m`, 100, mapStartY + 90);
         }
         doc.setTextColor(0);
         
@@ -528,7 +538,7 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
       } catch (mapError) {
         console.error('Failed to generate map for PDF:', mapError);
         doc.setFontSize(10);
-        doc.text(`Location: ${router.latitude}, ${router.longitude}`, 14, mapStartY + 8);
+        doc.text(`Location: ${locationLat}, ${locationLon}`, 14, mapStartY + 8);
       }
     }
   }

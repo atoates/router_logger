@@ -7,6 +7,122 @@ const clickupClient = require('./clickupClient');
 const lastGeoLookup = new Map();
 const GEO_LOOKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+// Distance threshold for "significant" location change (in meters)
+const LOCATION_CHANGE_THRESHOLD_METERS = 500;
+
+/**
+ * Calculate distance between two coordinates using Haversine formula
+ * Returns distance in meters
+ */
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Earth's radius in meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
+
+/**
+ * Get the current active location for a router
+ */
+async function getActiveLocation(routerId) {
+  try {
+    const result = await pool.query(`
+      SELECT id, latitude, longitude, accuracy, cell_id, started_at
+      FROM router_locations 
+      WHERE router_id = $1 AND ended_at IS NULL
+      ORDER BY started_at DESC
+      LIMIT 1
+    `, [routerId]);
+    return result.rows[0] || null;
+  } catch (error) {
+    logger.warn('Error fetching active location:', { error: error.message });
+    return null;
+  }
+}
+
+/**
+ * Create or update location record based on whether location has changed
+ */
+async function updateLocationRecord(routerId, geoData, cellInfo) {
+  if (!geoData || !geoData.latitude || !geoData.longitude) {
+    return null;
+  }
+  
+  try {
+    const activeLocation = await getActiveLocation(routerId);
+    
+    if (activeLocation) {
+      // Calculate distance from current location
+      const distance = calculateDistance(
+        parseFloat(activeLocation.latitude),
+        parseFloat(activeLocation.longitude),
+        geoData.latitude,
+        geoData.longitude
+      );
+      
+      if (distance < LOCATION_CHANGE_THRESHOLD_METERS) {
+        // Same location - increment sample count and update timestamp
+        await pool.query(`
+          UPDATE router_locations 
+          SET sample_count = sample_count + 1, 
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = $1
+        `, [activeLocation.id]);
+        
+        logger.debug(`Location unchanged for ${routerId} (distance: ${Math.round(distance)}m)`);
+        return { type: 'unchanged', locationId: activeLocation.id, distance };
+      } else {
+        // Location changed - close old record and create new one
+        await pool.query(`
+          UPDATE router_locations 
+          SET ended_at = CURRENT_TIMESTAMP, 
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = $1
+        `, [activeLocation.id]);
+        
+        logger.info(`Location changed for ${routerId}: ${Math.round(distance)}m from previous`);
+      }
+    }
+    
+    // Create new location record
+    const result = await pool.query(`
+      INSERT INTO router_locations (
+        router_id, latitude, longitude, accuracy,
+        cell_id, tac, lac, mcc, mnc, operator, network_type,
+        started_at, sample_count
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP, 1)
+      RETURNING id
+    `, [
+      routerId,
+      geoData.latitude,
+      geoData.longitude,
+      geoData.accuracy,
+      cellInfo?.cell_id,
+      cellInfo?.tac,
+      cellInfo?.lac,
+      cellInfo?.mcc,
+      cellInfo?.mnc,
+      cellInfo?.operator,
+      cellInfo?.network_type
+    ]);
+    
+    logger.info(`New location recorded for ${routerId}: ${geoData.latitude}, ${geoData.longitude}`);
+    return { type: 'new', locationId: result.rows[0].id };
+    
+  } catch (error) {
+    logger.error('Error updating location record:', { error: error.message, routerId });
+    return null;
+  }
+}
+
 /**
  * Check if we should do a geolocation lookup for this router
  * Returns true if 24h has passed since last lookup OR if we have no location data
@@ -92,6 +208,17 @@ async function processRouterTelemetry(data) {
           // Update in-memory cache
           lastGeoLookup.set(data.device_id, Date.now());
           logger.info(`Geolocation updated for ${data.device_id}: ${geoData.latitude}, ${geoData.longitude}`);
+          
+          // Update location tracking table (handles change detection)
+          await updateLocationRecord(data.device_id, geoData, {
+            cell_id: data.cell?.cid || data.cell?.cell_id,
+            tac: data.cell?.tac,
+            lac: data.cell?.lac,
+            mcc: data.mcc,
+            mnc: data.mnc,
+            operator: data.operator,
+            network_type: data.network_type
+          });
         }
       } else {
         logger.debug(`Skipping geolocation for ${data.device_id} (within 24h throttle)`);

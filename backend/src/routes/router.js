@@ -321,6 +321,96 @@ router.get('/routers/:routerId/geo-location', requireRouterAccess, async (req, r
   }
 });
 
+// Get router's location history with start/end times (from router_locations table)
+// This shows distinct locations the router has been at, not individual samples
+router.get('/routers/:routerId/location-history', requireRouterAccess, async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const { start_date, end_date, limit = 50 } = req.query;
+    
+    let query = `
+      SELECT 
+        id,
+        latitude,
+        longitude,
+        accuracy,
+        cell_id,
+        tac,
+        lac,
+        mcc,
+        mnc,
+        operator,
+        network_type,
+        started_at,
+        ended_at,
+        sample_count,
+        CASE WHEN ended_at IS NULL THEN true ELSE false END as is_current
+      FROM router_locations
+      WHERE router_id = $1
+    `;
+    
+    const params = [routerId];
+    let paramIndex = 2;
+    
+    // Filter by date range if provided
+    if (start_date) {
+      query += ` AND (ended_at >= $${paramIndex} OR ended_at IS NULL)`;
+      params.push(start_date);
+      paramIndex++;
+    }
+    
+    if (end_date) {
+      query += ` AND started_at <= $${paramIndex}`;
+      params.push(end_date);
+      paramIndex++;
+    }
+    
+    query += ` ORDER BY started_at DESC LIMIT $${paramIndex}`;
+    params.push(parseInt(limit, 10));
+    
+    const result = await pool.query(query, params);
+    
+    // Calculate duration for each location
+    const locations = result.rows.map(loc => {
+      const startTime = new Date(loc.started_at).getTime();
+      const endTime = loc.ended_at ? new Date(loc.ended_at).getTime() : Date.now();
+      const durationMs = endTime - startTime;
+      
+      return {
+        ...loc,
+        duration_ms: durationMs,
+        duration_readable: formatDuration(durationMs)
+      };
+    });
+    
+    // Get the current active location
+    const current = locations.find(loc => loc.is_current) || null;
+    
+    res.json({
+      routerId,
+      current,
+      locations,
+      count: locations.length
+    });
+  } catch (error) {
+    logger.error('Error fetching location history:', error);
+    res.status(500).json({ error: 'Failed to fetch location history' });
+  }
+});
+
+// Helper function to format duration
+function formatDuration(ms) {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  if (minutes > 0) return `${minutes}m`;
+  return `${seconds}s`;
+}
+
 router.get('/routers/with-locations', requireAdmin, async (req, res) => {
   try {
     // Check cache

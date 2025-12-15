@@ -1,45 +1,48 @@
-import React, { useEffect, useState } from 'react';
-import { getRouterGeoLocation } from '../services/api';
+import React, { useEffect, useState, useCallback } from 'react';
+import { getRouterLocationHistory } from '../services/api';
 
 /**
  * LocationMap Component
- * Shows an interactive map with the router's approximate location based on cell tower data.
+ * Shows an interactive map with the router's location history based on cell tower data.
  * Uses OpenStreetMap tiles via Leaflet (loaded dynamically).
+ * Displays distinct locations with start/end times and duration.
  */
 export default function LocationMap({ routerId }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [locationData, setLocationData] = useState(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState(null);
 
   // Load location data
-  useEffect(() => {
+  const loadLocations = useCallback(async () => {
     if (!routerId) return;
     
     setLoading(true);
     setError(null);
     
-    getRouterGeoLocation(routerId, 30)
-      .then(res => {
-        setLocationData(res.data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Failed to load geo location:', err);
-        setError('Failed to load location data');
-        setLoading(false);
-      });
+    try {
+      const res = await getRouterLocationHistory(routerId, { limit: 50 });
+      setLocationData(res.data);
+      setLoading(false);
+    } catch (err) {
+      console.error('Failed to load location history:', err);
+      setError('Failed to load location data');
+      setLoading(false);
+    }
   }, [routerId]);
+
+  useEffect(() => {
+    loadLocations();
+  }, [loadLocations]);
 
   // Dynamically load Leaflet CSS and JS
   useEffect(() => {
-    // Check if already loaded
     if (window.L) {
       setMapLoaded(true);
       return;
     }
 
-    // Load Leaflet CSS
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
@@ -47,104 +50,112 @@ export default function LocationMap({ routerId }) {
     link.crossOrigin = '';
     document.head.appendChild(link);
 
-    // Load Leaflet JS
     const script = document.createElement('script');
     script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
     script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
     script.crossOrigin = '';
     script.onload = () => setMapLoaded(true);
     document.head.appendChild(script);
-
-    return () => {
-      // Cleanup not strictly necessary for CDN resources
-    };
   }, []);
 
-  // Initialize map when both data and Leaflet are ready
+  // Initialize map
   useEffect(() => {
-    if (!mapLoaded || !locationData?.current || loading) return;
+    if (!mapLoaded || !locationData?.locations?.length || loading) return;
 
     const L = window.L;
     const mapContainer = document.getElementById('router-location-map');
-    
     if (!mapContainer) return;
 
-    // Clear any existing map
     mapContainer.innerHTML = '';
 
-    const { latitude, longitude, accuracy } = locationData.current;
+    const currentLoc = locationData.current || locationData.locations[0];
+    const { latitude, longitude, accuracy } = currentLoc;
     
-    // Initialize map
-    const map = L.map('router-location-map').setView([latitude, longitude], 14);
+    const map = L.map('router-location-map').setView([latitude, longitude], 12);
 
-    // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       maxZoom: 19
     }).addTo(map);
 
-    // Add marker for current location
-    const marker = L.marker([latitude, longitude]).addTo(map);
-    marker.bindPopup(`
-      <strong>Approximate Location</strong><br/>
-      <small>Based on cell tower data</small><br/>
-      Accuracy: ~${accuracy}m<br/>
-      Operator: ${locationData.current.operator || 'Unknown'}<br/>
-      Network: ${locationData.current.network_type || 'Unknown'}
-    `).openPopup();
+    const getLocationColor = (index, total, isCurrent) => {
+      if (isCurrent) return '#22c55e';
+      const ratio = index / Math.max(total - 1, 1);
+      const r = Math.round(59 + ratio * 100);
+      const g = Math.round(130 + ratio * 60);
+      const b = Math.round(246 - ratio * 100);
+      return `rgb(${r}, ${g}, ${b})`;
+    };
 
-    // Add accuracy circle
-    if (accuracy && !isNaN(accuracy)) {
-      L.circle([latitude, longitude], {
-        color: '#3b82f6',
-        fillColor: '#3b82f6',
-        fillOpacity: 0.15,
-        radius: parseInt(accuracy, 10)
-      }).addTo(map);
-    }
-
-    // Add markers for location history (if available)
-    if (locationData.history && locationData.history.length > 1) {
-      // Create path from history
-      const historyPoints = locationData.history
-        .filter(h => h.latitude && h.longitude)
-        .map(h => [h.latitude, h.longitude]);
+    const markers = [];
+    locationData.locations.forEach((loc, idx) => {
+      if (!loc.latitude || !loc.longitude) return;
       
-      if (historyPoints.length > 1) {
-        L.polyline(historyPoints, {
-          color: '#6366f1',
-          weight: 2,
-          opacity: 0.6,
-          dashArray: '5, 10'
+      const color = getLocationColor(idx, locationData.locations.length, loc.is_current);
+      const radius = loc.is_current ? 10 : 7;
+      
+      const marker = L.circleMarker([loc.latitude, loc.longitude], {
+        color, fillColor: color,
+        fillOpacity: loc.is_current ? 0.8 : 0.5,
+        radius, weight: loc.is_current ? 3 : 2
+      }).addTo(map);
+      
+      const startDate = new Date(loc.started_at).toLocaleString();
+      const endDate = loc.ended_at ? new Date(loc.ended_at).toLocaleString() : 'Present';
+      
+      marker.bindPopup(`
+        <div style="min-width: 180px;">
+          <strong style="color: ${color};">${loc.is_current ? '📍 Current Location' : `Location #${locationData.locations.length - idx}`}</strong><br/>
+          <hr style="margin: 4px 0; border-color: #e5e7eb;"/>
+          <strong>From:</strong> ${startDate}<br/>
+          <strong>To:</strong> ${endDate}<br/>
+          <strong>Duration:</strong> ${loc.duration_readable}<br/>
+          <hr style="margin: 4px 0; border-color: #e5e7eb;"/>
+          <strong>Operator:</strong> ${loc.operator || 'Unknown'}<br/>
+          <strong>Network:</strong> ${loc.network_type || 'Unknown'}<br/>
+          ${loc.accuracy ? `<strong>Accuracy:</strong> ~${loc.accuracy}m<br/>` : ''}
+          <small style="color: #9ca3af;">${loc.sample_count} sample${loc.sample_count !== 1 ? 's' : ''}</small>
+        </div>
+      `);
+      
+      marker.on('click', () => setSelectedLocation(loc));
+      markers.push({ marker, loc });
+
+      if (loc.is_current && accuracy && !isNaN(accuracy)) {
+        L.circle([latitude, longitude], {
+          color: '#22c55e', fillColor: '#22c55e',
+          fillOpacity: 0.1, radius: parseInt(accuracy, 10)
         }).addTo(map);
       }
+    });
 
-      // Add small circles for history points
-      locationData.history.slice(1).forEach((loc, idx) => {
-        if (!loc.latitude || !loc.longitude) return;
-        L.circleMarker([loc.latitude, loc.longitude], {
-          color: '#6366f1',
-          fillColor: '#6366f1',
-          fillOpacity: 0.4,
-          radius: 4
-        }).addTo(map).bindPopup(`
-          <small>${new Date(loc.timestamp).toLocaleString()}</small><br/>
-          ${loc.operator || 'Unknown'} (${loc.network_type || '?'})
-        `);
-      });
+    if (locationData.locations.length > 1) {
+      const sortedLocs = [...locationData.locations].reverse();
+      const pathPoints = sortedLocs.filter(loc => loc.latitude && loc.longitude).map(loc => [loc.latitude, loc.longitude]);
+      
+      if (pathPoints.length > 1) {
+        L.polyline(pathPoints, { color: '#6366f1', weight: 2, opacity: 0.5, dashArray: '8, 8' }).addTo(map);
+      }
     }
 
-    // Cleanup on unmount
-    return () => {
-      map.remove();
-    };
+    if (markers.length > 1) {
+      const bounds = L.latLngBounds(markers.map(m => [m.loc.latitude, m.loc.longitude]));
+      map.fitBounds(bounds, { padding: [30, 30] });
+    }
+
+    if (markers.length > 0 && markers[0].loc.is_current) {
+      markers[0].marker.openPopup();
+      setSelectedLocation(markers[0].loc);
+    }
+
+    return () => map.remove();
   }, [mapLoaded, locationData, loading]);
 
   if (loading) {
     return (
       <div className="location-map-container" style={{ padding: '20px', textAlign: 'center' }}>
         <div className="loading-spinner" style={{ margin: '0 auto' }}></div>
-        <p style={{ marginTop: '10px', color: '#6b7280' }}>Loading location data...</p>
+        <p style={{ marginTop: '10px', color: '#6b7280' }}>Loading location history...</p>
       </div>
     );
   }
@@ -157,12 +168,12 @@ export default function LocationMap({ routerId }) {
     );
   }
 
-  if (!locationData?.current) {
+  if (!locationData?.locations?.length) {
     return (
       <div className="location-map-container" style={{ padding: '20px', textAlign: 'center' }}>
         <p style={{ color: '#6b7280' }}>📍 No location data available yet</p>
         <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '8px' }}>
-          Location is determined from cell tower data and updates every 24 hours.
+          Location is determined from cell tower data and updates when the router moves.
         </p>
       </div>
     );
@@ -170,37 +181,50 @@ export default function LocationMap({ routerId }) {
 
   return (
     <div className="location-map-container">
-      <div 
-        id="router-location-map" 
-        style={{ 
-          height: '400px', 
-          width: '100%', 
-          borderRadius: '8px',
-          overflow: 'hidden'
-        }}
-      />
-      <div style={{ 
-        marginTop: '12px', 
-        display: 'flex', 
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        fontSize: '12px',
-        color: '#6b7280'
-      }}>
-        <div>
-          <strong>Last Updated:</strong> {new Date(locationData.current.timestamp).toLocaleString()}
-        </div>
-        <div>
-          <strong>Accuracy:</strong> ~{locationData.current.accuracy || '?'}m
-        </div>
-        <div>
-          <strong>Signal:</strong> {locationData.current.rsrp || locationData.current.rssi || '?'} dBm
-        </div>
+      <div id="router-location-map" style={{ height: '400px', width: '100%', borderRadius: '8px', overflow: 'hidden' }} />
+      
+      <div style={{ marginTop: '12px', padding: '12px', background: '#f9fafb', borderRadius: '8px', fontSize: '13px' }}>
+        {selectedLocation ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+            <div><span style={{ color: '#6b7280' }}>Started:</span><br/><strong>{new Date(selectedLocation.started_at).toLocaleString()}</strong></div>
+            <div><span style={{ color: '#6b7280' }}>Ended:</span><br/><strong>{selectedLocation.ended_at ? new Date(selectedLocation.ended_at).toLocaleString() : '—'}</strong></div>
+            <div><span style={{ color: '#6b7280' }}>Duration:</span><br/><strong>{selectedLocation.duration_readable}</strong></div>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', color: '#6b7280' }}>Click a location marker to see details</div>
+        )}
       </div>
-      {locationData.count > 1 && (
-        <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '8px', textAlign: 'center' }}>
-          Showing {locationData.count} location samples. Dashed line shows movement history.
-        </p>
+
+      {locationData.locations.length > 1 && (
+        <div style={{ marginTop: '16px' }}>
+          <div style={{ fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+            📍 Location History ({locationData.count} locations)
+          </div>
+          <div style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '12px', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+            {locationData.locations.map((loc, idx) => (
+              <div 
+                key={loc.id}
+                onClick={() => setSelectedLocation(loc)}
+                style={{ 
+                  padding: '8px 12px',
+                  borderBottom: idx < locationData.locations.length - 1 ? '1px solid #e5e7eb' : 'none',
+                  cursor: 'pointer',
+                  background: selectedLocation?.id === loc.id ? '#eff6ff' : 'transparent',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: loc.is_current ? '#22c55e' : '#6366f1', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontWeight: loc.is_current ? '600' : '400' }}>{loc.is_current ? 'Current' : new Date(loc.started_at).toLocaleDateString()}</div>
+                    <div style={{ color: '#9ca3af', fontSize: '11px' }}>{loc.operator || 'Unknown'} • {loc.duration_readable}</div>
+                  </div>
+                </div>
+                <div style={{ color: '#9ca3af', fontSize: '11px' }}>{loc.sample_count} sample{loc.sample_count !== 1 ? 's' : ''}</div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -90,6 +90,7 @@ export const getInspectionHistory = (routerId) => api.get(`/inspections/${router
 export const getRouterStatusSummary = () => api.get('/routers/status-summary');
 export const getRouterGeo = (ip) => api.get('/routers/geo', { params: { ip } });
 export const getRouterGeoLocation = (routerId, limit = 30) => api.get(`/routers/${routerId}/geo-location`, { params: { limit } });
+export const getRouterLocationHistory = (routerId, params = {}) => api.get(`/routers/${routerId}/location-history`, { params });
 
 // Monitoring
 export const getRMSUsage = () => api.get('/monitoring/rms-usage');
