@@ -197,11 +197,14 @@ async function getIpLocation(ip) {
     return null;
   }
 
+  // Strip CIDR suffix if present (e.g., "100.64.26.197/32" -> "100.64.26.197")
+  const cleanIp = ip.split('/')[0];
+
   try {
     // Using ip-api.com (free for non-commercial, no key required for basic)
     // Note: Free endpoint is HTTP only, but we are in backend so it's fine.
     // Rate limit: 45 requests per minute
-    const url = `http://ip-api.com/json/${ip}`;
+    const url = `http://ip-api.com/json/${cleanIp}`;
     const response = await axios.get(url, { timeout: 5000 });
     
     if (response.data && response.data.status === 'success') {
