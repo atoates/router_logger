@@ -1274,6 +1274,103 @@ router.get('/sample-guests-with-auth', async (req, res) => {
 });
 
 /**
+ * GET /api/ironwifi/analyze-sources
+ * Analyze unique source/captive portal IDs from guests
+ * Looking for patterns that might contain MAC addresses
+ */
+router.get('/analyze-sources', async (req, res) => {
+  try {
+    const { pages = 10, pageSize = 100 } = req.query;
+    
+    logger.info('Analyzing captive portal sources...');
+    
+    const sources = new Map(); // source -> count
+    const cpIds = new Set();    // unique captive portal IDs
+    const venueIds = new Set(); // unique venue/session IDs
+    let totalGuests = 0;
+    
+    for (let page = 1; page <= parseInt(pages); page++) {
+      const result = await ironwifiClient.getGuests({ page, pageSize: parseInt(pageSize) });
+      
+      for (const guest of result.items) {
+        totalGuests++;
+        const source = guest.source || '';
+        
+        // Count sources
+        sources.set(source, (sources.get(source) || 0) + 1);
+        
+        // Parse source field: typically "cp-{uuid}|{uuid}" format
+        if (source.includes('|')) {
+          const [cpPart, venuePart] = source.split('|');
+          if (cpPart) cpIds.add(cpPart);
+          if (venuePart) venueIds.add(venuePart);
+        } else if (source.startsWith('cp-')) {
+          cpIds.add(source);
+        }
+      }
+      
+      if (page >= result.page_count) break;
+    }
+    
+    // Sort sources by count
+    const sortedSources = [...sources.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20);
+    
+    // Analyze captive portal IDs for patterns
+    const cpIdAnalysis = [...cpIds].map(cpId => {
+      // Check if it might contain a MAC address pattern
+      // MAC addresses are 12 hex chars, UUIDs contain hex chars too
+      const cleanId = cpId.replace('cp-', '').replace(/-/g, '');
+      
+      // Look for MAC-like patterns (groups of hex chars)
+      const hexGroups = cleanId.match(/[0-9a-f]{12}/gi) || [];
+      
+      return {
+        cpId,
+        length: cpId.length,
+        containsHex12: hexGroups.length > 0,
+        potentialMacs: hexGroups.map(h => 
+          h.match(/.{2}/g).join(':')
+        )
+      };
+    });
+    
+    // Check for MAC patterns in venue IDs too
+    const venueIdAnalysis = [...venueIds].slice(0, 10).map(venueId => {
+      const cleanId = venueId.replace(/-/g, '');
+      const hexGroups = cleanId.match(/[0-9a-f]{12}/gi) || [];
+      
+      return {
+        venueId,
+        length: venueId.length,
+        containsHex12: hexGroups.length > 0,
+        potentialMacs: hexGroups.map(h => 
+          h.match(/.{2}/g).join(':')
+        )
+      };
+    });
+    
+    res.json({
+      success: true,
+      totalGuestsScanned: totalGuests,
+      uniqueCaptivePortals: cpIds.size,
+      uniqueVenueIds: venueIds.size,
+      topSources: sortedSources.map(([source, count]) => ({ source, count })),
+      captivePortalAnalysis: cpIdAnalysis,
+      venueIdAnalysis: venueIdAnalysis,
+      summary: {
+        possibleMacInCpIds: cpIdAnalysis.filter(a => a.containsHex12).length,
+        possibleMacInVenueIds: venueIdAnalysis.filter(a => a.containsHex12).length
+      }
+    });
+  } catch (error) {
+    logger.error('Error analyzing sources:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/ironwifi/scan-for-macs
  * Scan multiple guests to find ones with MAC data populated
  * This helps determine if MAC data is available in the API at all
