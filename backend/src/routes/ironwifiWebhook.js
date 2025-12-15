@@ -2079,29 +2079,71 @@ router.get('/diagnose-pairing', async (req, res) => {
 router.get('/pairing-status', async (req, res) => {
   try {
     // Check if required columns exist (migration may not have run yet)
-    const columnCheck = await pool.query(`
-      SELECT column_name FROM information_schema.columns 
-      WHERE table_name = 'ironwifi_guests' AND column_name IN ('router_id', 'ap_mac', 'client_mac')
-    `);
-    const hasRouterIdColumn = columnCheck.rows.some(r => r.column_name === 'router_id');
-    const hasApMacColumn = columnCheck.rows.some(r => r.column_name === 'ap_mac');
+    let hasRouterIdColumn = false;
+    let hasApMacColumn = false;
     
-    if (!hasRouterIdColumn) {
+    try {
+      const columnCheck = await pool.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'ironwifi_guests' AND column_name IN ('router_id', 'ap_mac', 'client_mac')
+      `);
+      hasRouterIdColumn = columnCheck.rows.some(r => r.column_name === 'router_id');
+      hasApMacColumn = columnCheck.rows.some(r => r.column_name === 'ap_mac');
+    } catch (e) {
+      logger.warn('Column check failed:', e.message);
+    }
+    
+    // Check if ironwifi_guests table exists at all
+    let guestTableExists = false;
+    try {
+      await pool.query('SELECT 1 FROM ironwifi_guests LIMIT 1');
+      guestTableExists = true;
+    } catch (e) {
       return res.json({
-        status: 'migration_pending',
-        message: 'Database migration 024_add_guest_mac_fields.sql needs to be applied',
-        solution: 'Restart the backend service to trigger migration, or run: ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS router_id INTEGER REFERENCES routers(router_id);'
+        status: 'table_missing',
+        message: 'ironwifi_guests table does not exist',
+        solution: 'The database schema may need to be initialized'
       });
     }
     
+    // Get basic counts without the router_id column
+    const totalGuests = await pool.query('SELECT COUNT(*) FROM ironwifi_guests');
+    const total = parseInt(totalGuests.rows[0].count);
+    
+    // If router_id column doesn't exist, return early with partial data
+    if (!hasRouterIdColumn) {
+      const webhookCount = await pool.query('SELECT COUNT(*) FROM ironwifi_webhook_log').catch(() => ({ rows: [{ count: 0 }] }));
+      const routerWithMac = await pool.query('SELECT COUNT(*) FROM routers WHERE mac IS NOT NULL');
+      
+      return res.json({
+        status: 'migration_pending',
+        message: 'Database migration 024_add_guest_mac_fields.sql needs to be applied',
+        summary: {
+          totalWifiGuests: total,
+          guestsPairedWithRouters: 0,
+          pairingPercentage: '0%',
+          webhooksReceived: parseInt(webhookCount.rows[0]?.count || 0),
+          routersWithMacAddress: parseInt(routerWithMac.rows[0].count),
+          migrationNeeded: true
+        },
+        problem: {
+          issue: 'Missing router_id column in ironwifi_guests table',
+          solution: [
+            '1. Restart the Railway backend service to trigger migration',
+            '2. Or manually run: ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS router_id INTEGER REFERENCES routers(router_id);'
+          ]
+        },
+        webhookUrl: 'POST https://routerlogger-production.up.railway.app/api/ironwifi/webhook'
+      });
+    }
+    
+    // Full query with all columns available
     const [
-      totalGuests,
       pairedGuests,
       recentPaired,
       webhookCount,
       routerWithMac
     ] = await Promise.all([
-      pool.query('SELECT COUNT(*) FROM ironwifi_guests'),
       pool.query('SELECT COUNT(*) FROM ironwifi_guests WHERE router_id IS NOT NULL'),
       pool.query(`
         SELECT g.username, g.email, g.ap_mac, r.name as router_name, g.auth_date
@@ -2114,9 +2156,8 @@ router.get('/pairing-status', async (req, res) => {
       pool.query('SELECT COUNT(*) FROM routers WHERE mac IS NOT NULL')
     ]);
     
-    const total = parseInt(totalGuests.rows[0].count);
     const paired = parseInt(pairedGuests.rows[0].count);
-    const webhooks = parseInt(webhookCount.rows[0].count);
+    const webhooks = parseInt(webhookCount.rows[0]?.count || 0);
     const routersWithMac = parseInt(routerWithMac.rows[0].count);
     
     res.json({
