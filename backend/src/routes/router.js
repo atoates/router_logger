@@ -58,7 +58,6 @@ const {
   getInspectionHistory
 } = require('../models/router');
 const { logger, pool } = require('../config/database');
-const clickupClient = require('../services/clickupClient');
 const cacheManager = require('../services/cacheManager');
 
 // ============================================================================

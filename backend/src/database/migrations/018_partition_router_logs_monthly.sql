@@ -50,7 +50,8 @@ BEGIN
   -- Recreate router_logs as a partitioned parent with identical columns/defaults.
   -- NOTE: we intentionally do NOT carry over constraints from the legacy table,
   -- because its primary key (id) is not valid for a partitioned table.
-  EXECUTE 'CREATE TABLE router_logs (LIKE router_logs__legacy INCLUDING DEFAULTS INCLUDING CONSTRAINTS) PARTITION BY RANGE (timestamp)';
+  -- Use INCLUDING DEFAULTS only (not INCLUDING CONSTRAINTS) to avoid copying the old PK.
+  EXECUTE 'CREATE TABLE router_logs (LIKE router_logs__legacy INCLUDING DEFAULTS) PARTITION BY RANGE (timestamp)';
 
   -- Constraints on the parent.
   -- Unique/PK constraints on partitioned tables must include the partition key.
