@@ -90,7 +90,7 @@
 .assign-button {
   width: 100%;
   padding: 12px;
-  background: white;
+  background: rgba(255, 255, 255, 0.9);
   color: var(--accent-primary);
   border: none;
   border-radius: 6px;
@@ -102,7 +102,7 @@
 }
 
 .assign-button:hover:not(:disabled) {
-  background: #f0f0f0;
+  background: rgba(255, 255, 255, 1);
 }
 
 .assign-button:disabled {

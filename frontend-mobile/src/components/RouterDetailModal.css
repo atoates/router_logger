@@ -1,10 +1,11 @@
+/* Router Detail Modal - Dark Theme */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -13,13 +14,14 @@
 }
 
 .modal-content {
-  background: white;
+  background: var(--bg-card, #2d302d);
   border-radius: 16px;
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .modal-header {
@@ -27,13 +29,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .modal-header h2 {
   font-size: 20px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--text-primary, #F6F7F8);
   margin: 0;
 }
 
@@ -41,7 +43,7 @@
   background: none;
   border: none;
   font-size: 32px;
-  color: #6b7280;
+  color: var(--text-muted, #747975);
   cursor: pointer;
   padding: 0;
   width: 44px;
@@ -57,11 +59,11 @@
 }
 
 .modal-close:hover {
-  background: #f3f4f6;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .modal-close:active {
-  background: #e5e7eb;
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .modal-body {
@@ -79,7 +81,7 @@
 .detail-section h3 {
   font-size: 16px;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-secondary, #C7DFB9);
   margin-bottom: 12px;
 }
 
@@ -88,7 +90,7 @@
   justify-content: space-between;
   align-items: flex-start;
   padding: 10px 0;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .detail-row:last-child {
@@ -97,7 +99,7 @@
 
 .detail-label {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-muted, #747975);
   font-weight: 500;
   flex-shrink: 0;
   margin-right: 16px;
@@ -105,7 +107,7 @@
 
 .detail-value {
   font-size: 14px;
-  color: #1f2937;
+  color: var(--text-primary, #F6F7F8);
   font-weight: 600;
   text-align: right;
   flex: 1;
@@ -191,7 +193,6 @@
 }
 
 .action-button-danger:disabled {
-  background: #9ca3af;
+  background: #4b5563;
   cursor: not-allowed;
 }
-

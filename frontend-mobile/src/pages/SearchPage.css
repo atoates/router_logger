@@ -35,7 +35,7 @@
 }
 
 .refresh-button:active {
-  background: #e5e7eb;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .search-filters {
@@ -99,9 +99,9 @@
 }
 
 .filter-button-alert:not(.active) {
-  background: #fef2f2;
-  border-color: #fecaca;
-  color: #dc2626;
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
 }
 
 .filter-button-online:not(.active) {

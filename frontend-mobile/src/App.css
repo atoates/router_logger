@@ -1,19 +1,19 @@
-/* Global app styles */
+/* Global app styles - Dark Theme */
 .app-loading {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #f3f4f6;
+  background: var(--bg-primary, #232523);
   gap: 16px;
 }
 
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #e5e7eb;
-  border-top-color: #2563eb;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--accent-primary, #5b7f5c);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -25,7 +25,7 @@
 }
 
 .app-loading p {
-  color: #6b7280;
+  color: var(--text-secondary, #C7DFB9);
   font-size: 16px;
 }
 
@@ -34,7 +34,7 @@
   padding: 16px;
   padding-bottom: 100px;
   min-height: 100vh;
-  background: #f9fafb;
+  background: var(--bg-primary, #232523);
 }
 
 .page-header {
@@ -47,7 +47,7 @@
 .page-header h1 {
   font-size: 24px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--text-primary, #F6F7F8);
 }
 
 .alert {
@@ -58,19 +58,21 @@
 }
 
 .alert-error {
-  background: #fee2e2;
-  color: #dc2626;
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 .alert-success {
-  background: #d1fae5;
-  color: #10b981;
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
 }
 
 .empty-state {
   text-align: center;
   padding: 48px 20px;
-  color: #6b7280;
+  color: var(--text-secondary, #C7DFB9);
 }
 
 .empty-state p {
@@ -80,6 +82,5 @@
 
 .empty-hint {
   font-size: 14px;
-  color: #9ca3af;
+  color: var(--text-muted, #747975);
 }
-
