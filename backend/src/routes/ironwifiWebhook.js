@@ -1905,9 +1905,9 @@ router.get('/diagnose-pairing', async (req, res) => {
     
     // 3. Check router MACs in our database
     const routersResult = await pool.query(`
-      SELECT router_id, name, mac 
+      SELECT router_id, name, mac_address 
       FROM routers 
-      WHERE mac IS NOT NULL 
+      WHERE mac_address IS NOT NULL 
       ORDER BY name 
       LIMIT 10
     `);
@@ -1915,8 +1915,8 @@ router.get('/diagnose-pairing', async (req, res) => {
     diagnostics.database.routerMacs = routersResult.rows.map(r => ({
       router_id: r.router_id,
       name: r.name,
-      mac: r.mac,
-      macPrefix: r.mac ? r.mac.toLowerCase().replace(/[-:]/g, ':').substring(0, 14) : null
+      mac: r.mac_address,
+      macPrefix: r.mac_address ? r.mac_address.toLowerCase().replace(/[-:]/g, ':').substring(0, 14) : null
     }));
     
     // 4. Test API for MAC data
@@ -2113,7 +2113,7 @@ router.get('/pairing-status', async (req, res) => {
     // If router_id column doesn't exist, return early with partial data
     if (!hasRouterIdColumn) {
       const webhookCount = await pool.query('SELECT COUNT(*) FROM ironwifi_webhook_log').catch(() => ({ rows: [{ count: 0 }] }));
-      const routerWithMac = await pool.query('SELECT COUNT(*) FROM routers WHERE mac IS NOT NULL');
+      const routerWithMac = await pool.query('SELECT COUNT(*) FROM routers WHERE mac_address IS NOT NULL');
       
       return res.json({
         status: 'migration_pending',
@@ -2153,7 +2153,7 @@ router.get('/pairing-status', async (req, res) => {
         LIMIT 5
       `).catch(() => ({ rows: [] })),
       pool.query('SELECT COUNT(*) FROM ironwifi_webhook_log').catch(() => ({ rows: [{ count: 0 }] })),
-      pool.query('SELECT COUNT(*) FROM routers WHERE mac IS NOT NULL')
+      pool.query('SELECT COUNT(*) FROM routers WHERE mac_address IS NOT NULL')
     ]);
     
     const paired = parseInt(pairedGuests.rows[0].count);
