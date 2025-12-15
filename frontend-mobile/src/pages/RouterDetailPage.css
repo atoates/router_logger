@@ -31,9 +31,9 @@
 
 .page-subtitle {
   font-size: 14px;
-  color: var(--text-secondary);
+  color: #a0a4a0; /* Lighter grey for better visibility on dark bg */
   margin: 0;
-  font-weight: 400;
+  font-weight: 500;
 }
 
 .back-button {
@@ -130,33 +130,39 @@
 }
 
 .status-online {
-  background: var(--accent-tea);
-  color: var(--accent-primary);
+  background: rgba(34, 197, 94, 0.25);
+  color: #4ade80; /* Brighter green for dark bg */
+  border: 1px solid rgba(34, 197, 94, 0.4);
 }
 
 .status-offline {
-  background: #fee2e2;
-  color: #dc2626;
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171; /* Brighter red for dark bg */
+  border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 .status-installed {
-  background: var(--accent-tea);
-  color: var(--accent-primary);
+  background: rgba(34, 197, 94, 0.25);
+  color: #4ade80; /* Brighter green for dark bg */
+  border: 1px solid rgba(34, 197, 94, 0.4);
 }
 
 .status-returning {
-  background: #fef3c7;
-  color: #d97706;
+  background: rgba(245, 158, 11, 0.25);
+  color: #fbbf24; /* Brighter amber for dark bg */
+  border: 1px solid rgba(245, 158, 11, 0.4);
 }
 
 .status-decommissioned {
-  background: var(--bg-primary);
-  color: var(--text-secondary);
+  background: rgba(107, 114, 128, 0.2);
+  color: #9ca3af; /* Light grey */
+  border: 1px solid rgba(107, 114, 128, 0.3);
 }
 
 .status-ready {
-  background: var(--accent-tea);
-  color: var(--accent-primary);
+  background: rgba(234, 179, 8, 0.25);
+  color: #facc15; /* Brighter yellow for dark bg */
+  border: 1px solid rgba(234, 179, 8, 0.4);
 }
 
 .action-button {
