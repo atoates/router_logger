@@ -1,13 +1,19 @@
 /**
- * IronWifi Webhook Receiver
- * Receives scheduled reports from IronWifi via webhook
- * Processes device status, session data, and accounting information
+ * IronWifi Integration Routes
+ * 
+ * Supports two data ingestion methods:
+ * 1. Webhook - Receives scheduled reports from IronWifi Report Scheduler
+ * 2. API Polling - Fetches data from IronWifi REST API
+ * 
+ * Both methods store session data in ironwifi_sessions table.
  */
 
 const express = require('express');
 const router = express.Router();
 const { pool, logger } = require('../config/database');
 const { validateIronwifiWebhookPayload } = require('../utils/validation');
+const ironwifiSync = require('../services/ironwifiSync');
+const ironwifiClient = require('../services/ironwifiClient');
 
 /**
  * POST /api/ironwifi/webhook
@@ -191,16 +197,30 @@ async function processTextReport(text) {
 }
 
 /**
+ * Normalize MAC address to consistent format
+ */
+function normalizeMac(mac) {
+  if (!mac) return null;
+  const cleaned = mac.toLowerCase().replace(/[:-]/g, '');
+  if (cleaned.length < 10 || !/^[0-9a-f]+$/.test(cleaned)) return null;
+  const padded = cleaned.padEnd(12, '0').slice(0, 12);
+  return padded.match(/.{1,2}/g).join(':');
+}
+
+/**
+ * Get MAC prefix (first 5 bytes) for matching
+ */
+function getMacPrefix(mac) {
+  const normalized = normalizeMac(mac);
+  if (!normalized) return null;
+  return normalized.slice(0, 14); // aa:bb:cc:dd:ee
+}
+
+/**
  * Store session data received from webhook
  */
 async function storeSessionFromWebhook(sessionData) {
   try {
-    // Normalize MAC address
-    const normalizeMac = (mac) => {
-      if (!mac) return null;
-      return mac.toLowerCase().replace(/[:-]/g, '').match(/.{1,2}/g)?.join(':') || null;
-    };
-
     const apMac = normalizeMac(sessionData.ap_mac);
     const userMac = normalizeMac(sessionData.user_mac);
 
@@ -209,15 +229,33 @@ async function storeSessionFromWebhook(sessionData) {
       return;
     }
 
-    // Try to match to a router by MAC address
+    // Try to match to a router by MAC address using prefix matching
     let routerId = null;
     if (apMac) {
-      const routerResult = await pool.query(
-        'SELECT router_id FROM routers WHERE mac_address = $1',
+      // First try exact match
+      let routerResult = await pool.query(
+        'SELECT router_id, name FROM routers WHERE mac_address = $1',
         [apMac]
       );
+      
+      // If no exact match, try prefix match (first 5 bytes)
+      if (routerResult.rows.length === 0) {
+        const prefix = getMacPrefix(apMac);
+        if (prefix) {
+          routerResult = await pool.query(
+            'SELECT router_id, name, mac_address FROM routers WHERE LEFT(mac_address, 14) = $1',
+            [prefix]
+          );
+          if (routerResult.rows.length > 0) {
+            logger.info(`Matched by MAC prefix: ${apMac} -> ${routerResult.rows[0].name} (${routerResult.rows[0].mac_address})`);
+          }
+        }
+      }
+      
       if (routerResult.rows.length > 0) {
         routerId = routerResult.rows[0].router_id;
+      } else {
+        logger.debug(`No router found for MAC: ${apMac} (prefix: ${getMacPrefix(apMac)})`);
       }
     }
 
@@ -317,6 +355,345 @@ router.get('/webhook/stats', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error getting webhook stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// API-BASED ENDPOINTS (for sync status, manual sync, and session queries)
+// ============================================================================
+
+/**
+ * GET /api/ironwifi/status
+ * Get current IronWifi integration status
+ */
+router.get('/status', async (req, res) => {
+  try {
+    const status = ironwifiSync.getStatus();
+    const sessionStats = await ironwifiSync.getSessionStats();
+    
+    // Test API connection if configured
+    let apiStatus = null;
+    if (status.configured) {
+      apiStatus = await ironwifiClient.testConnection();
+    }
+    
+    res.json({
+      success: true,
+      ...status,
+      apiConnected: apiStatus?.connected || false,
+      apiMessage: apiStatus?.message,
+      sessionStats
+    });
+  } catch (error) {
+    logger.error('Error getting IronWifi status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/ironwifi/sync
+ * Trigger manual sync from IronWifi API
+ */
+router.post('/sync', async (req, res) => {
+  try {
+    logger.info('Manual IronWifi sync triggered');
+    const result = await ironwifiSync.runSync();
+    res.json(result);
+  } catch (error) {
+    logger.error('Error triggering IronWifi sync:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+});
+
+/**
+ * GET /api/ironwifi/sessions
+ * Get all sessions with optional filters
+ */
+router.get('/sessions', async (req, res) => {
+  try {
+    const { limit = 100, offset = 0, active, router_id } = req.query;
+    
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+    let paramIndex = 1;
+    
+    if (active === 'true') {
+      whereClause += ' AND is_active = true';
+    } else if (active === 'false') {
+      whereClause += ' AND is_active = false';
+    }
+    
+    if (router_id) {
+      whereClause += ` AND router_id = $${paramIndex}`;
+      params.push(router_id);
+      paramIndex++;
+    }
+    
+    const result = await pool.query(`
+      SELECT 
+        s.id,
+        s.session_id,
+        s.router_id,
+        r.name as router_name,
+        s.username,
+        s.user_device_mac,
+        s.session_start,
+        s.session_end,
+        s.is_active,
+        s.bytes_uploaded,
+        s.bytes_downloaded,
+        s.bytes_total,
+        s.duration_seconds,
+        s.ip_address,
+        s.created_at
+      FROM ironwifi_sessions s
+      LEFT JOIN routers r ON s.router_id = r.router_id
+      ${whereClause}
+      ORDER BY s.session_start DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `, [...params, parseInt(limit), parseInt(offset)]);
+    
+    const countResult = await pool.query(`
+      SELECT COUNT(*) FROM ironwifi_sessions ${whereClause}
+    `, params);
+    
+    res.json({
+      success: true,
+      sessions: result.rows,
+      total: parseInt(countResult.rows[0].count),
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    logger.error('Error fetching sessions:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/ironwifi/router/:routerId/active-users
+ * Get active users for a specific router
+ */
+router.get('/router/:routerId/active-users', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const sessions = await ironwifiSync.getRouterActiveSessions(routerId);
+    
+    res.json({
+      success: true,
+      routerId,
+      activeUsers: sessions.length,
+      sessions
+    });
+  } catch (error) {
+    logger.error('Error fetching router active users:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/ironwifi/router/:routerId/sessions
+ * Get session history for a specific router
+ */
+router.get('/router/:routerId/sessions', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const { limit = 100, offset = 0, start_date, end_date } = req.query;
+    
+    const sessions = await ironwifiSync.getRouterSessionHistory(routerId, {
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      startDate: start_date,
+      endDate: end_date
+    });
+    
+    res.json({
+      success: true,
+      routerId,
+      sessions,
+      count: sessions.length
+    });
+  } catch (error) {
+    logger.error('Error fetching router session history:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/ironwifi/router/:routerId/stats
+ * Get usage statistics for a specific router
+ */
+router.get('/router/:routerId/stats', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const { period = '7d' } = req.query;
+    
+    const stats = await ironwifiSync.getRouterStats(routerId, period);
+    
+    res.json({
+      success: true,
+      routerId,
+      period,
+      stats
+    });
+  } catch (error) {
+    logger.error('Error fetching router stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/ironwifi/routers-with-mac
+ * Get all routers that have MAC addresses configured
+ */
+router.get('/routers-with-mac', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT router_id, name, mac_address, last_seen
+      FROM routers
+      WHERE mac_address IS NOT NULL AND mac_address != ''
+      ORDER BY name
+    `);
+    
+    res.json({
+      success: true,
+      routers: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    logger.error('Error fetching routers with MAC:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/ironwifi/network/active-users
+ * Get active users across all routers
+ */
+router.get('/network/active-users', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        r.router_id,
+        r.name as router_name,
+        COUNT(s.id) as active_sessions,
+        COUNT(DISTINCT s.username) as unique_users
+      FROM routers r
+      LEFT JOIN ironwifi_sessions s ON r.router_id = s.router_id AND s.is_active = true
+      WHERE r.mac_address IS NOT NULL
+      GROUP BY r.router_id, r.name
+      HAVING COUNT(s.id) > 0
+      ORDER BY active_sessions DESC
+    `);
+    
+    const totalActive = result.rows.reduce((sum, r) => sum + parseInt(r.active_sessions), 0);
+    
+    res.json({
+      success: true,
+      totalActiveUsers: totalActive,
+      routersWithUsers: result.rows.length,
+      byRouter: result.rows
+    });
+  } catch (error) {
+    logger.error('Error fetching network active users:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/ironwifi/network/stats
+ * Get network-wide statistics
+ */
+router.get('/network/stats', async (req, res) => {
+  try {
+    const { period = '7d' } = req.query;
+    
+    const intervals = {
+      '24h': '24 hours',
+      '7d': '7 days',
+      '30d': '30 days',
+      '90d': '90 days'
+    };
+    const interval = intervals[period] || '7 days';
+    
+    const result = await pool.query(`
+      SELECT 
+        COUNT(DISTINCT username) as unique_users,
+        COUNT(*) as total_sessions,
+        COUNT(DISTINCT router_id) as routers_used,
+        COALESCE(SUM(bytes_total), 0) as total_bytes,
+        COALESCE(AVG(duration_seconds), 0)::integer as avg_session_duration
+      FROM ironwifi_sessions
+      WHERE session_start >= NOW() - INTERVAL '${interval}'
+    `);
+    
+    // Top routers
+    const topRouters = await pool.query(`
+      SELECT 
+        s.router_id,
+        r.name as router_name,
+        COUNT(*) as session_count,
+        COUNT(DISTINCT s.username) as unique_users
+      FROM ironwifi_sessions s
+      LEFT JOIN routers r ON s.router_id = r.router_id
+      WHERE s.session_start >= NOW() - INTERVAL '${interval}'
+      AND s.router_id IS NOT NULL
+      GROUP BY s.router_id, r.name
+      ORDER BY session_count DESC
+      LIMIT 10
+    `);
+    
+    res.json({
+      success: true,
+      period,
+      stats: result.rows[0],
+      topRouters: topRouters.rows
+    });
+  } catch (error) {
+    logger.error('Error fetching network stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/ironwifi/update-daily-stats
+ * Manually trigger daily stats recalculation
+ */
+router.post('/update-daily-stats', async (req, res) => {
+  try {
+    await pool.query(`
+      INSERT INTO router_user_stats (router_id, date, unique_users, total_sessions, 
+        bytes_uploaded, bytes_downloaded, bytes_total, total_duration_seconds)
+      SELECT 
+        router_id,
+        DATE(session_start) as date,
+        COUNT(DISTINCT username) as unique_users,
+        COUNT(*) as total_sessions,
+        COALESCE(SUM(bytes_uploaded), 0) as bytes_uploaded,
+        COALESCE(SUM(bytes_downloaded), 0) as bytes_downloaded,
+        COALESCE(SUM(bytes_total), 0) as bytes_total,
+        COALESCE(SUM(duration_seconds), 0) as total_duration_seconds
+      FROM ironwifi_sessions
+      WHERE router_id IS NOT NULL
+      AND session_start >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY router_id, DATE(session_start)
+      ON CONFLICT (router_id, date) DO UPDATE SET
+        unique_users = EXCLUDED.unique_users,
+        total_sessions = EXCLUDED.total_sessions,
+        bytes_uploaded = EXCLUDED.bytes_uploaded,
+        bytes_downloaded = EXCLUDED.bytes_downloaded,
+        bytes_total = EXCLUDED.bytes_total,
+        total_duration_seconds = EXCLUDED.total_duration_seconds,
+        updated_at = CURRENT_TIMESTAMP
+    `);
+    
+    res.json({ success: true, message: 'Daily stats updated' });
+  } catch (error) {
+    logger.error('Error updating daily stats:', error);
     res.status(500).json({ error: error.message });
   }
 });

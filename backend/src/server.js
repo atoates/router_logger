@@ -11,6 +11,7 @@ const { initializeDatabase, runMigrations } = require('./database/migrate');
 const { initMQTT, closeMQTT } = require('./services/mqttService');
 const { startRMSSync } = require('./services/rmsSync');
 const { startClickUpSync } = require('./services/clickupSync');
+const { startSyncScheduler: startIronWifiSync } = require('./services/ironwifiSync');
 const distributedLockService = require('./services/distributedLockService');
 const oauthService = require('./services/oauthService');
 const routerRoutes = require('./routes/router');
@@ -206,9 +207,16 @@ async function startServer() {
     startClickUpSync(parseInt(clickupSyncInterval), false); // lock-gated
     logger.info(`ClickUp sync scheduler startup attempted (every ${clickupSyncInterval} minutes, no startup sync)`);
     
-    // IronWifi: Webhook-only integration (no API polling)
-    // Configure webhook in IronWifi Console → Reports → Report Scheduler
-    // Webhook URL: /api/ironwifi/webhook
+    // IronWifi: Supports both Webhook and API polling
+    // Webhook: Configure in IronWifi Console → Reports → Report Scheduler
+    // API Polling: Set IRONWIFI_API_KEY environment variable
+    const ironwifiSyncInterval = parseInt(process.env.IRONWIFI_SYNC_INTERVAL_MINUTES || '15', 10);
+    if (process.env.IRONWIFI_API_KEY) {
+      startIronWifiSync(ironwifiSyncInterval);
+      logger.info(`IronWifi sync scheduler started (every ${ironwifiSyncInterval} minutes)`);
+    } else {
+      logger.info('IronWifi API sync not started (IRONWIFI_API_KEY not set)');
+    }
     logger.info('IronWifi webhook endpoint ready at /api/ironwifi/webhook');
     
     // Cleanup expired OAuth states every hour

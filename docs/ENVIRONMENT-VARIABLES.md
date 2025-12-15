@@ -63,6 +63,28 @@ RMS_SYNC_INTERVAL_MINUTES=5
 # Data flows automatically when IronWifi sends reports
 ```
 
+### IronWifi Integration - API Polling (Alternative)
+
+```bash
+# IronWifi API key (from IronWifi Console → Account → API Keys)
+IRONWIFI_API_KEY=your-api-key-from-ironwifi-console
+
+# IMPORTANT: Use your regional API URL (check top-right of IronWifi Console)
+# Examples: europe-west2, us-east1, etc.
+IRONWIFI_API_URL=https://europe-west2.ironwifi.com/api
+
+# Sync interval in minutes (default: 15)
+IRONWIFI_SYNC_INTERVAL_MINUTES=15
+
+# Hourly API call limit for rate limiting (default: 1000)
+IRONWIFI_HOURLY_LIMIT=1000
+
+# SSL certificate validation (set to 'false' if certificate issues)
+IRONWIFI_REJECT_UNAUTHORIZED=false
+```
+
+**Important**: The API provides guest data (username, name, auth time) but NOT the `Called-Station-Id` (router MAC). For linking guests to specific routers, you MUST configure the IronWifi **webhook** which sends RADIUS accounting data.
+
 ### MQTT (Optional - for router push)
 
 ```bash

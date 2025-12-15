@@ -4,16 +4,28 @@
 
 This integration connects your router tracking system with IronWifi's captive portal service to monitor which routers have active users connecting. The system tracks user sessions, connection statistics, and provides insights into router usage patterns.
 
-## ✅ Recommended Method: Webhook Integration
+## Integration Methods
 
-**Use webhooks, not API polling!** Webhooks provide:
+The system supports **two methods** for receiving session data:
+
+### 1. ✅ Webhook Integration (Recommended)
+
+**Use webhooks for real-time data!** Webhooks provide:
 - ✅ No rate limits (IronWifi pushes to you)
 - ✅ Real-time data delivery
-- ✅ No API key management
+- ✅ No API key management needed
 - ✅ Lower server load
 - ✅ More reliable data flow
 
 See [IRONWIFI-WEBHOOK-SETUP.md](IRONWIFI-WEBHOOK-SETUP.md) for complete webhook setup instructions.
+
+### 2. API Polling (Alternative)
+
+If webhooks aren't available or you need on-demand data:
+- Configure `IRONWIFI_API_KEY` environment variable
+- Scheduler automatically polls every 15 minutes (configurable)
+- Includes rate limiting protection
+- Can manually trigger sync via API
 
 ## How It Works
 
