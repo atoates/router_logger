@@ -20,10 +20,18 @@ function hashSessionToken(sessionToken) {
 }
 
 async function getSessionFromRequest(req) {
-  const sessionToken = req.headers.authorization?.replace('Bearer ', '');
-  if (!sessionToken) return null;
+  const authHeader = req.headers.authorization;
+  const sessionToken = authHeader?.replace('Bearer ', '');
+  
+  if (!sessionToken) {
+    logger.debug('No session token in request');
+    return null;
+  }
 
+  // Log first/last few chars for debugging (not the full token for security)
+  const tokenPreview = `${sessionToken.substring(0, 8)}...${sessionToken.substring(sessionToken.length - 4)}`;
   const tokenHash = hashSessionToken(sessionToken);
+  const hashPreview = tokenHash.substring(0, 16);
   
   try {
     const result = await pool.query(
@@ -34,7 +42,10 @@ async function getSessionFromRequest(req) {
       [tokenHash]
     );
 
-    if (result.rows.length === 0) return null;
+    if (result.rows.length === 0) {
+      logger.warn(`Session not found in DB for token ${tokenPreview} (hash: ${hashPreview})`);
+      return null;
+    }
 
     const row = result.rows[0];
     const expiresAt = new Date(row.expires_at);
@@ -135,7 +146,9 @@ router.post('/login', async (req, res) => {
       }
     }
 
-    logger.info(`User logged in: ${user.username} (${user.role})`);
+    const tokenPreview = `${sessionToken.substring(0, 8)}...${sessionToken.substring(sessionToken.length - 4)}`;
+    const hashPreview = tokenHash.substring(0, 16);
+    logger.info(`User logged in: ${user.username} (${user.role}), token: ${tokenPreview}, hash: ${hashPreview}`);
 
     res.json({
       success: true,
@@ -172,6 +185,51 @@ router.post('/logout', (req, res) => {
     .catch((err) => logger.warn('Failed to delete session during logout', { error: err.message }));
 
   return res.json({ success: true });
+});
+
+/**
+ * GET /api/session/debug
+ * Debug endpoint to check session table status (no auth required)
+ */
+router.get('/debug', async (req, res) => {
+  try {
+    // Check if table exists and count sessions
+    const countResult = await pool.query(`
+      SELECT 
+        COUNT(*) as total_sessions,
+        COUNT(CASE WHEN expires_at > NOW() THEN 1 END) as valid_sessions,
+        COUNT(CASE WHEN expires_at <= NOW() THEN 1 END) as expired_sessions
+      FROM user_sessions
+    `);
+    
+    // Check recent sessions (last 24h)
+    const recentResult = await pool.query(`
+      SELECT username, role, created_at, expires_at, 
+             CASE WHEN expires_at > NOW() THEN 'valid' ELSE 'expired' END as status
+      FROM user_sessions
+      WHERE created_at > NOW() - INTERVAL '24 hours'
+      ORDER BY created_at DESC
+      LIMIT 10
+    `);
+    
+    return res.json({
+      tableExists: true,
+      stats: countResult.rows[0],
+      recentSessions: recentResult.rows.map(r => ({
+        username: r.username,
+        role: r.role,
+        createdAt: r.created_at,
+        expiresAt: r.expires_at,
+        status: r.status
+      }))
+    });
+  } catch (error) {
+    if (error.code === '42P01') {
+      return res.json({ tableExists: false, error: 'user_sessions table does not exist' });
+    }
+    logger.error('Session debug error:', error);
+    return res.status(500).json({ error: error.message });
+  }
 });
 
 /**
