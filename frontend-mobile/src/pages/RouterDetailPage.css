@@ -63,6 +63,16 @@
   transition: background-color 0.3s ease;
 }
 
+/* Map section special styling */
+.detail-section.map-section {
+  padding: 16px 16px 0 16px;
+  overflow: hidden;
+}
+
+.detail-section.map-section h2 {
+  margin-bottom: 12px;
+}
+
 .detail-section h2 {
   font-size: 18px;
   font-weight: 600;

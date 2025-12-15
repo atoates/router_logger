@@ -124,6 +124,11 @@ export const unlinkRouterFromLocation = async (routerId, data) => {
   return res;
 };
 
+// Get router location history (from cell tower triangulation)
+export const getLocationHistory = async (routerId, limit = 10) => {
+  return api.get(`/routers/${routerId}/location-history?limit=${limit}`);
+};
+
 // Get current location for router
 export const getCurrentLocation = (routerId) => 
   api.get(`/routers/${routerId}/current-location`);

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { getRouters, unlinkRouterFromLocation, removeRouterAssignees, getUsageStats } from '../services/api';
+import { getRouters, unlinkRouterFromLocation, removeRouterAssignees, getUsageStats, getLocationHistory } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import StatusBadge, { OnlineIndicator, getRouterStatus } from '../components/StatusBadge';
 import AssignmentModal from '../components/AssignmentModal';
+import RouterMap from '../components/RouterMap';
 import './RouterDetailPage.css';
 
 function RouterDetailPage() {
@@ -21,6 +22,7 @@ function RouterDetailPage() {
   const [usageStats, setUsageStats] = useState(null);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState(null);
+  const [locationHistory, setLocationHistory] = useState([]);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const { isAdmin } = useAuth();
 
@@ -92,6 +94,16 @@ function RouterDetailPage() {
       setUsageError(err.response?.data?.error || 'Failed to load usage stats');
     } finally {
       setUsageLoading(false);
+    }
+  };
+
+  const fetchLocationHistory = async (routerIdValue) => {
+    try {
+      const res = await getLocationHistory(routerIdValue, 10);
+      setLocationHistory(res?.data?.locations || []);
+    } catch (err) {
+      // Silent fail - location history is optional
+      setLocationHistory([]);
     }
   };
 
@@ -233,10 +245,11 @@ function RouterDetailPage() {
     }
   };
 
-  // Fetch 24h usage + network stats once router is loaded
+  // Fetch 24h usage + network stats and location history once router is loaded
   useEffect(() => {
     if (!router?.router_id) return;
     fetchUsageStats(router.router_id);
+    fetchLocationHistory(router.router_id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router?.router_id]);
 
@@ -315,6 +328,18 @@ function RouterDetailPage() {
             {isOnline ? '● Online' : '○ Offline'}
           </span>
         </div>
+      </div>
+
+      {/* Location Map */}
+      <div className="detail-section map-section">
+        <h2>📍 Location</h2>
+        <RouterMap 
+          router={router} 
+          locationHistory={locationHistory}
+          isOnline={isOnline}
+          showHistory={locationHistory.length > 1}
+          height="220px"
+        />
       </div>
 
       {/* Basic Info */}
