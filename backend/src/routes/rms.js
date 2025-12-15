@@ -11,9 +11,9 @@ router.get('/debug/sync-status', async (req, res) => {
     
     // Get router #53 specifically (find it by name pattern)
     const router53Result = await pool.query(`
-      SELECT router_id, name, serial, current_status, last_seen, updated_at
+      SELECT router_id, name, current_status, last_seen, updated_at
       FROM routers 
-      WHERE name ILIKE '%53%' OR serial LIKE '%53%'
+      WHERE name ILIKE '%53%' OR router_id::text LIKE '%53%'
       ORDER BY name
       LIMIT 5
     `);
