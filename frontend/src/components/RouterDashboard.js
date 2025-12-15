@@ -424,7 +424,7 @@ export default function RouterDashboard({ router }) {
                     <XAxis 
                       dataKey="timestamp" 
                       tickFormatter={(t)=> { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleDateString([], { month: 'short', day: 'numeric' }); }}
-                      tick={{ fontSize: 10 }}
+                      tick={{ fontSize: 10, fill: '#374151' }}
                       interval="preserveStartEnd"
                       minTickGap={20}
                     />
@@ -432,7 +432,7 @@ export default function RouterDashboard({ router }) {
                       domain={[0, 1]} 
                       ticks={[0, 1]} 
                       tickFormatter={(v) => v === 1 ? 'Online' : 'Offline'}
-                      tick={{ fontSize: 10 }}
+                      tick={{ fontSize: 10, fill: '#374151' }}
                       width={50}
                     />
                     <Tooltip 
