@@ -13,6 +13,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import UsersManagement from './components/UsersManagement';
 import AdminDebugTools from './components/AdminDebugTools';
 import GuestDashboard from './components/GuestDashboard';
+import IronWifiGuests from './components/IronWifiGuests';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer, toast } from 'react-toastify';
 import { getRouters } from './services/api';
@@ -96,6 +97,7 @@ function AppContent() {
     { path: '/', label: 'My Routers', icon: '📱', title: 'My Routers' },
   ] : [
     { path: '/', label: 'Analytics', icon: '📊', title: 'Network Analytics' },
+    { path: '/wifi-guests', label: 'WiFi', icon: '📶', title: 'WiFi Guest Logins' },
     { path: '/assignments', label: 'Assign', icon: '📍', title: 'Router Assignments' },
     { path: '/stored', label: 'Stored', icon: '📦', title: 'Stored Routers' },
     { path: '/returns', label: 'Returns', icon: '🔄', title: 'Returns' },
@@ -205,6 +207,11 @@ function AppContent() {
                 ) : (
                   <DashboardV3 page="network" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
                 )}
+              </ProtectedRoute>
+            } />
+            <Route path="/wifi-guests" element={
+              <ProtectedRoute requireAdmin>
+                <IronWifiGuests />
               </ProtectedRoute>
             } />
             <Route path="/assignments" element={

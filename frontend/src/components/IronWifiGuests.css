@@ -1,0 +1,328 @@
+.ironwifi-container {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.ironwifi-loading {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  font-size: 18px;
+}
+
+.ironwifi-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.ironwifi-title h1 {
+  margin: 0 0 8px 0;
+  font-size: 28px;
+  color: var(--text-primary);
+}
+
+.ironwifi-title p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.ironwifi-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.ironwifi-sync-btn,
+.ironwifi-refresh-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.ironwifi-sync-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.ironwifi-sync-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.ironwifi-sync-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ironwifi-refresh-btn {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.ironwifi-refresh-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+/* Status Cards */
+.ironwifi-status-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ironwifi-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.ironwifi-card-icon {
+  font-size: 28px;
+}
+
+.ironwifi-card-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ironwifi-card-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Error */
+.ironwifi-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+/* Tabs */
+.ironwifi-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0;
+}
+
+.ironwifi-tab {
+  padding: 12px 24px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s;
+}
+
+.ironwifi-tab:hover {
+  color: var(--text-primary);
+}
+
+.ironwifi-tab.active {
+  color: var(--accent-primary);
+  border-bottom-color: var(--accent-primary);
+}
+
+/* Panel */
+.ironwifi-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.ironwifi-info {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.ironwifi-info code {
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+/* Search */
+.ironwifi-search {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.ironwifi-search input {
+  flex: 1;
+  padding: 12px 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.ironwifi-search input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.ironwifi-search button {
+  padding: 12px 20px;
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+/* Empty State */
+.ironwifi-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+}
+
+.ironwifi-empty ul {
+  display: inline-block;
+  text-align: left;
+  margin-top: 16px;
+  padding-left: 20px;
+}
+
+.ironwifi-empty code {
+  background: var(--bg-tertiary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Table */
+.ironwifi-table-container {
+  overflow-x: auto;
+}
+
+.ironwifi-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.ironwifi-table th {
+  text-align: left;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ironwifi-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.ironwifi-table tr:hover {
+  background: var(--bg-tertiary);
+}
+
+.ironwifi-email {
+  font-weight: 500;
+  color: var(--accent-primary);
+}
+
+.ironwifi-secondary {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.ironwifi-time {
+  font-weight: 500;
+}
+
+.ironwifi-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ironwifi-json {
+  background: var(--bg-primary);
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-top: 8px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .ironwifi-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ironwifi-actions {
+    justify-content: flex-start;
+  }
+
+  .ironwifi-status-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ironwifi-tabs {
+    flex-wrap: wrap;
+  }
+
+  .ironwifi-table {
+    font-size: 12px;
+  }
+
+  .ironwifi-table th,
+  .ironwifi-table td {
+    padding: 10px 12px;
+  }
+}
+

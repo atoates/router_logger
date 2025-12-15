@@ -439,6 +439,51 @@ CREATE INDEX IF NOT EXISTS idx_router_user_stats_date ON router_user_stats(date 
 CREATE INDEX IF NOT EXISTS idx_router_user_stats_router_date ON router_user_stats(router_id, date DESC);
 
 -- ============================================================================
+-- IRONWIFI WEBHOOK AND GUEST CACHE TABLES
+-- ============================================================================
+
+-- Webhook log for debugging
+CREATE TABLE IF NOT EXISTS ironwifi_webhook_log (
+  id SERIAL PRIMARY KEY,
+  received_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  content_type VARCHAR(100),
+  record_count INTEGER DEFAULT 0,
+  raw_sample TEXT,
+  processed BOOLEAN DEFAULT FALSE,
+  processed_at TIMESTAMP,
+  error_message TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ironwifi_webhook_log_received ON ironwifi_webhook_log(received_at DESC);
+
+-- Cached guest data from IronWifi API
+CREATE TABLE IF NOT EXISTS ironwifi_guests (
+  id SERIAL PRIMARY KEY,
+  ironwifi_id VARCHAR(100) UNIQUE NOT NULL,
+  username VARCHAR(255),
+  email VARCHAR(255),
+  fullname VARCHAR(255),
+  firstname VARCHAR(100),
+  lastname VARCHAR(100),
+  phone VARCHAR(50),
+  auth_date TIMESTAMP,
+  creation_date TIMESTAMP,
+  source VARCHAR(255),
+  owner_id VARCHAR(100),
+  first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  auth_count INTEGER DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_username ON ironwifi_guests(username);
+CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_email ON ironwifi_guests(email);
+CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_auth_date ON ironwifi_guests(auth_date DESC);
+CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_last_seen ON ironwifi_guests(last_seen_at DESC);
+
+-- ============================================================================
 -- TRIGGERS
 -- ============================================================================
 

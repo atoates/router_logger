@@ -28,11 +28,36 @@ const ironwifiClient = require('../services/ironwifiClient');
 router.post('/webhook', async (req, res) => {
   try {
     const webhookData = req.body;
+    const receivedAt = new Date().toISOString();
     
+    // Log webhook receipt with details for debugging
     logger.info('IronWifi webhook received', {
       bodyType: typeof webhookData,
-      contentType: req.headers['content-type']
+      contentType: req.headers['content-type'],
+      bodyLength: JSON.stringify(webhookData).length,
+      isArray: Array.isArray(webhookData),
+      recordCount: Array.isArray(webhookData) ? webhookData.length : 
+                   (webhookData?.records?.length || webhookData?.data?.length || 'N/A'),
+      sampleFields: webhookData && typeof webhookData === 'object' ? 
+                    Object.keys(Array.isArray(webhookData) ? (webhookData[0] || {}) : webhookData).slice(0, 10) : [],
+      receivedAt
     });
+    
+    // Store webhook receipt in database for debugging
+    try {
+      await pool.query(`
+        INSERT INTO ironwifi_webhook_log (received_at, content_type, record_count, raw_sample, processed)
+        VALUES ($1, $2, $3, $4, false)
+      `, [
+        receivedAt,
+        req.headers['content-type'],
+        Array.isArray(webhookData) ? webhookData.length : 1,
+        JSON.stringify(webhookData).slice(0, 5000) // Store first 5KB for debugging
+      ]);
+    } catch (dbError) {
+      // Table might not exist yet, log but continue
+      logger.debug('Could not log webhook to database:', dbError.message);
+    }
 
     // Validate basic shape; we always ACK 200 to avoid aggressive retries,
     // but we will skip processing invalid payloads to protect the DB.
@@ -655,6 +680,170 @@ router.get('/network/stats', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error fetching network stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/ironwifi/webhook/history
+ * View recent webhook receipts for debugging
+ */
+router.get('/webhook/history', async (req, res) => {
+  try {
+    const { limit = 20 } = req.query;
+    
+    const result = await pool.query(`
+      SELECT id, received_at, content_type, record_count, processed, error_message,
+             LEFT(raw_sample, 500) as sample_preview
+      FROM ironwifi_webhook_log
+      ORDER BY received_at DESC
+      LIMIT $1
+    `, [parseInt(limit)]);
+    
+    res.json({
+      success: true,
+      webhooks: result.rows,
+      count: result.rows.length,
+      message: result.rows.length === 0 ? 
+        'No webhooks received yet. Check IronWifi Console → Reports → Report Scheduler' : null
+    });
+  } catch (error) {
+    // Table might not exist
+    if (error.code === '42P01') {
+      res.json({
+        success: true,
+        webhooks: [],
+        count: 0,
+        message: 'Webhook log table not created yet. Deploy and restart to create it.'
+      });
+    } else {
+      logger.error('Error fetching webhook history:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+});
+
+/**
+ * GET /api/ironwifi/guests
+ * Get cached guest data from database
+ * This is the main endpoint for displaying guest WiFi users
+ */
+router.get('/guests', async (req, res) => {
+  try {
+    const { limit = 50, offset = 0, search } = req.query;
+    
+    let whereClause = '';
+    const params = [];
+    let paramIndex = 1;
+    
+    if (search) {
+      whereClause = `WHERE username ILIKE $${paramIndex} OR email ILIKE $${paramIndex} OR fullname ILIKE $${paramIndex}`;
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
+    
+    const result = await pool.query(`
+      SELECT id, ironwifi_id, username, email, fullname, phone, 
+             auth_date, creation_date, auth_count, first_seen_at, last_seen_at
+      FROM ironwifi_guests
+      ${whereClause}
+      ORDER BY auth_date DESC NULLS LAST
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `, [...params, parseInt(limit), parseInt(offset)]);
+    
+    const countResult = await pool.query(`
+      SELECT COUNT(*) FROM ironwifi_guests ${whereClause}
+    `, params);
+    
+    res.json({
+      success: true,
+      guests: result.rows,
+      total: parseInt(countResult.rows[0].count),
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    if (error.code === '42P01') {
+      res.json({
+        success: true,
+        guests: [],
+        total: 0,
+        message: 'Guest table not created yet. Deploy and restart to create it.'
+      });
+    } else {
+      logger.error('Error fetching guests:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+});
+
+/**
+ * POST /api/ironwifi/sync/guests
+ * Sync guests from IronWifi API to local database
+ * This caches guest data to reduce API calls
+ */
+router.post('/sync/guests', async (req, res) => {
+  try {
+    const { pages = 5 } = req.body;
+    
+    logger.info('Starting guest sync from IronWifi API');
+    
+    // Fetch guests from API
+    const allGuests = await ironwifiClient.getAllGuests({ maxPages: parseInt(pages), pageSize: 100 });
+    
+    let inserted = 0;
+    let updated = 0;
+    
+    for (const guest of allGuests) {
+      try {
+        const result = await pool.query(`
+          INSERT INTO ironwifi_guests (
+            ironwifi_id, username, email, fullname, firstname, lastname,
+            phone, auth_date, creation_date, source, owner_id, last_seen_at, auth_count
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP, 1)
+          ON CONFLICT (ironwifi_id) DO UPDATE SET
+            username = EXCLUDED.username,
+            email = EXCLUDED.email,
+            fullname = EXCLUDED.fullname,
+            phone = EXCLUDED.phone,
+            auth_date = GREATEST(EXCLUDED.auth_date, ironwifi_guests.auth_date),
+            last_seen_at = CURRENT_TIMESTAMP,
+            auth_count = ironwifi_guests.auth_count + 1,
+            updated_at = CURRENT_TIMESTAMP
+          RETURNING (xmax = 0) AS was_inserted
+        `, [
+          guest.id,
+          guest.username,
+          guest.email,
+          guest.fullname,
+          guest.firstname,
+          guest.lastname,
+          guest.phone,
+          guest.authdate ? new Date(guest.authdate) : null,
+          guest.creationdate ? new Date(guest.creationdate) : null,
+          guest.source,
+          guest.owner_id
+        ]);
+        
+        if (result.rows[0]?.was_inserted) {
+          inserted++;
+        } else {
+          updated++;
+        }
+      } catch (err) {
+        logger.error('Error storing guest:', { id: guest.id, error: err.message });
+      }
+    }
+    
+    res.json({
+      success: true,
+      fetched: allGuests.length,
+      inserted,
+      updated,
+      apiUsage: ironwifiClient.getApiUsage()
+    });
+  } catch (error) {
+    logger.error('Error syncing guests:', error);
     res.status(500).json({ error: error.message });
   }
 });
