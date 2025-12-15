@@ -3,6 +3,60 @@ const router = express.Router();
 const { requireAdmin } = require('./session');
 const { pool } = require('../config/database');
 
+// Debug endpoint for router location data (lat/lng from cell tower)
+router.get('/debug/router-location/:routerId', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    
+    // Get router with location data from latest log
+    const result = await pool.query(`
+      WITH latest_log AS (
+        SELECT DISTINCT ON (router_id)
+          router_id, latitude, longitude, location_accuracy, 
+          timestamp, wan_ip, operator
+        FROM router_logs
+        WHERE router_id = $1 AND latitude IS NOT NULL
+        ORDER BY router_id, timestamp DESC
+      )
+      SELECT 
+        r.router_id, r.name,
+        ll.latitude, ll.longitude, ll.location_accuracy,
+        ll.timestamp as last_location_update,
+        ll.wan_ip, ll.operator
+      FROM routers r
+      LEFT JOIN latest_log ll ON r.router_id = ll.router_id
+      WHERE r.router_id = $1 OR r.name ILIKE $2
+    `, [routerId, `%${routerId}%`]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Router not found' });
+    }
+    
+    const router = result.rows[0];
+    
+    // Count total location entries
+    const countResult = await pool.query(`
+      SELECT COUNT(*) as location_count
+      FROM router_logs
+      WHERE router_id = $1 AND latitude IS NOT NULL
+    `, [router.router_id]);
+    
+    res.json({
+      router_id: router.router_id,
+      name: router.name,
+      hasLocation: !!router.latitude,
+      latitude: router.latitude,
+      longitude: router.longitude,
+      accuracy: router.location_accuracy,
+      lastUpdate: router.last_location_update,
+      operator: router.operator,
+      totalLocationRecords: parseInt(countResult.rows[0].location_count)
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Debug endpoint for router location/date issues
 router.get('/debug/router-dates/:routerId', async (req, res) => {
   try {
