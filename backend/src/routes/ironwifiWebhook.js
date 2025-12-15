@@ -1273,4 +1273,86 @@ router.get('/sample-guests-with-auth', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/ironwifi/scan-for-macs
+ * Scan multiple guests to find ones with MAC data populated
+ * This helps determine if MAC data is available in the API at all
+ */
+router.get('/scan-for-macs', async (req, res) => {
+  try {
+    const { pages = 3, pageSize = 50 } = req.query;
+    
+    logger.info(`Scanning ${pages} pages of guests for MAC data...`);
+    
+    const guestsWithMac = [];
+    const guestsWithoutMac = [];
+    let totalScanned = 0;
+    
+    for (let page = 1; page <= parseInt(pages); page++) {
+      const guestsResult = await ironwifiClient.getGuests({ page, pageSize: parseInt(pageSize) });
+      
+      for (const guest of guestsResult.items) {
+        totalScanned++;
+        
+        try {
+          // Fetch full guest details to get MAC fields
+          const fullGuest = await ironwifiClient.getGuestById(guest.id);
+          
+          const hasMac = fullGuest.client_mac || fullGuest.ap_mac || fullGuest.mac_address;
+          
+          if (hasMac) {
+            guestsWithMac.push({
+              id: guest.id,
+              username: guest.username,
+              email: guest.email,
+              authdate: guest.authdate,
+              client_mac: fullGuest.client_mac,
+              ap_mac: fullGuest.ap_mac,
+              mac_address: fullGuest.mac_address,
+              source: fullGuest.source
+            });
+            
+            // Found some! Log it
+            logger.info(`Found guest with MAC data: ${guest.username}`, {
+              client_mac: fullGuest.client_mac,
+              ap_mac: fullGuest.ap_mac
+            });
+          } else {
+            guestsWithoutMac.push({
+              id: guest.id,
+              username: guest.username,
+              source: guest.source?.substring(0, 50)
+            });
+          }
+        } catch (err) {
+          logger.debug(`Error fetching guest ${guest.id}: ${err.message}`);
+        }
+      }
+      
+      // If we found some with MAC, report early
+      if (guestsWithMac.length >= 5) {
+        break;
+      }
+    }
+    
+    res.json({
+      success: true,
+      totalScanned,
+      guestsWithMac: guestsWithMac.length,
+      guestsWithoutMac: guestsWithoutMac.length,
+      samplesWithMac: guestsWithMac.slice(0, 10),
+      analysis: {
+        macDataAvailable: guestsWithMac.length > 0,
+        percentageWithMac: totalScanned > 0 ? ((guestsWithMac.length / totalScanned) * 100).toFixed(1) : 0,
+        recommendation: guestsWithMac.length > 0
+          ? `MAC data found! ${guestsWithMac.length}/${totalScanned} guests have MAC addresses. Can sync from API.`
+          : 'No MAC data found in any guests. The webhook/RADIUS accounting is required for MAC data.'
+      }
+    });
+  } catch (error) {
+    logger.error('Error scanning for MACs:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
