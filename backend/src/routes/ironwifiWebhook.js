@@ -2072,6 +2072,72 @@ router.get('/diagnose-pairing', async (req, res) => {
 });
 
 /**
+ * GET /api/ironwifi/pairing-status
+ * Simple status check - how many users are paired with routers
+ * This is a PUBLIC endpoint for quick checks
+ */
+router.get('/pairing-status', async (req, res) => {
+  try {
+    const [
+      totalGuests,
+      pairedGuests,
+      recentPaired,
+      webhookCount,
+      routerWithMac
+    ] = await Promise.all([
+      pool.query('SELECT COUNT(*) FROM ironwifi_guests'),
+      pool.query('SELECT COUNT(*) FROM ironwifi_guests WHERE router_id IS NOT NULL'),
+      pool.query(`
+        SELECT g.username, g.email, g.ap_mac, r.name as router_name, g.auth_date
+        FROM ironwifi_guests g
+        JOIN routers r ON g.router_id = r.router_id
+        ORDER BY g.auth_date DESC NULLS LAST
+        LIMIT 5
+      `),
+      pool.query('SELECT COUNT(*) FROM ironwifi_webhook_log').catch(() => ({ rows: [{ count: 0 }] })),
+      pool.query('SELECT COUNT(*) FROM routers WHERE mac IS NOT NULL')
+    ]);
+    
+    const total = parseInt(totalGuests.rows[0].count);
+    const paired = parseInt(pairedGuests.rows[0].count);
+    const webhooks = parseInt(webhookCount.rows[0].count);
+    const routersWithMac = parseInt(routerWithMac.rows[0].count);
+    
+    res.json({
+      status: paired > 0 ? 'working' : (webhooks > 0 ? 'receiving_but_not_matching' : 'not_receiving'),
+      summary: {
+        totalWifiGuests: total,
+        guestsPairedWithRouters: paired,
+        pairingPercentage: total > 0 ? `${((paired / total) * 100).toFixed(1)}%` : '0%',
+        webhooksReceived: webhooks,
+        routersWithMacAddress: routersWithMac
+      },
+      recentPairings: recentPaired.rows,
+      problem: paired === 0 ? {
+        issue: webhooks === 0 
+          ? 'No webhooks received from IronWifi'
+          : 'Webhooks received but MAC addresses not matching routers',
+        solution: webhooks === 0 ? [
+          '1. Go to IronWifi Console → Reports → Report Scheduler',
+          '2. Create a scheduled report: "Guest Registrations" or "RADIUS Accounting"',
+          '3. Set output format: JSON',
+          '4. Set webhook URL: POST https://routerlogger-production.up.railway.app/api/ironwifi/webhook',
+          '5. Schedule frequency: Every 15 minutes',
+          '6. Make sure report includes: client_mac (or Calling-Station-Id) and ap_mac (or Called-Station-Id)'
+        ] : [
+          '1. Check that routers have MAC addresses in the database',
+          '2. MAC format should match: IronWifi uses formats like "20-97-27-2D-01-6F"',
+          '3. Check /api/ironwifi/diagnose-pairing for detailed analysis'
+        ]
+      } : null,
+      webhookUrl: 'POST https://routerlogger-production.up.railway.app/api/ironwifi/webhook'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/ironwifi/test-webhook
  * Send a test webhook payload to verify processing
  */
