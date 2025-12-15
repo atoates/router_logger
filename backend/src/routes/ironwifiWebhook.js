@@ -2195,6 +2195,105 @@ router.get('/pairing-status', async (req, res) => {
 });
 
 /**
+ * GET /api/ironwifi/check-migrations
+ * Check which migrations have been applied
+ */
+router.get('/check-migrations', async (req, res) => {
+  try {
+    // Check if migration_history table exists
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'migration_history'
+      )
+    `);
+    
+    if (!tableCheck.rows[0].exists) {
+      return res.json({
+        status: 'no_migration_table',
+        message: 'migration_history table does not exist'
+      });
+    }
+    
+    // Get all applied migrations
+    const migrations = await pool.query(`
+      SELECT name, applied_at 
+      FROM migration_history 
+      ORDER BY applied_at DESC
+    `);
+    
+    // Check for specific IronWifi-related migrations
+    const ironwifiMigrations = migrations.rows.filter(m => 
+      m.name.includes('ironwifi') || m.name.includes('024')
+    );
+    
+    res.json({
+      status: 'ok',
+      totalMigrations: migrations.rows.length,
+      recentMigrations: migrations.rows.slice(0, 10),
+      ironwifiRelated: ironwifiMigrations,
+      needsMigration024: !migrations.rows.some(m => m.name.includes('024'))
+    });
+  } catch (error) {
+    logger.error('Error checking migrations:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/ironwifi/run-migration-024
+ * Manually run the migration to add MAC fields
+ */
+router.post('/run-migration-024', async (req, res) => {
+  try {
+    logger.info('Manually running migration 024...');
+    
+    // Run the migration SQL directly
+    await pool.query(`
+      -- client_mac = Calling-Station-Id = User's device MAC
+      ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS client_mac VARCHAR(50);
+      
+      -- ap_mac = Called-Station-Id = Router/AP MAC (for router linking)  
+      ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS ap_mac VARCHAR(50);
+      
+      -- router_id = Matched router from ap_mac
+      ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS router_id INTEGER REFERENCES routers(router_id);
+      
+      -- Additional context fields
+      ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS captive_portal_name VARCHAR(255);
+      ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS venue_id VARCHAR(100);
+      ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS public_ip VARCHAR(50);
+    `);
+    
+    // Create indexes
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_client_mac ON ironwifi_guests(client_mac);
+      CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_ap_mac ON ironwifi_guests(ap_mac);
+      CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_router_id ON ironwifi_guests(router_id);
+      CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_venue ON ironwifi_guests(venue_id);
+    `);
+    
+    // Record the migration
+    await pool.query(`
+      INSERT INTO migration_history (name, applied_at)
+      VALUES ('024_add_guest_mac_fields.sql', NOW())
+      ON CONFLICT DO NOTHING
+    `);
+    
+    logger.info('Migration 024 applied successfully');
+    
+    res.json({
+      success: true,
+      message: 'Migration 024 applied successfully',
+      columnsAdded: ['client_mac', 'ap_mac', 'router_id', 'captive_portal_name', 'venue_id', 'public_ip']
+    });
+  } catch (error) {
+    logger.error('Error running migration 024:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/ironwifi/test-webhook
  * Send a test webhook payload to verify processing
  */
