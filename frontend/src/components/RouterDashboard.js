@@ -442,7 +442,9 @@ export default function RouterDashboard({ router }) {
                         if (name === 'offline') return ['Offline', 'Status'];
                         return [value, name];
                       }}
-                      contentStyle={{ fontSize: '12px' }}
+                      contentStyle={{ fontSize: '12px', backgroundColor: '#fff', border: '1px solid #e5e7eb' }}
+                      labelStyle={{ color: '#374151', fontWeight: 600 }}
+                      itemStyle={{ color: '#374151' }}
                     />
                     <Line 
                       type="stepAfter" 
