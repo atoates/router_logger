@@ -796,19 +796,28 @@ router.post('/sync/guests', async (req, res) => {
     
     for (const guest of allGuests) {
       try {
+        // Use creation_date from IronWifi as first_seen_at
+        const creationDate = guest.creationdate ? new Date(guest.creationdate) : null;
+        const authDate = guest.authdate ? new Date(guest.authdate) : null;
+        
         const result = await pool.query(`
           INSERT INTO ironwifi_guests (
             ironwifi_id, username, email, fullname, firstname, lastname,
-            phone, auth_date, creation_date, source, owner_id, last_seen_at, auth_count
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP, 1)
+            phone, auth_date, creation_date, source, owner_id, first_seen_at, last_seen_at, auth_count
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP, 1)
           ON CONFLICT (ironwifi_id) DO UPDATE SET
             username = EXCLUDED.username,
             email = EXCLUDED.email,
             fullname = EXCLUDED.fullname,
             phone = EXCLUDED.phone,
-            auth_date = GREATEST(EXCLUDED.auth_date, ironwifi_guests.auth_date),
             last_seen_at = CURRENT_TIMESTAMP,
-            auth_count = ironwifi_guests.auth_count + 1,
+            -- Only increment auth_count if auth_date has changed (new authentication)
+            auth_count = CASE 
+              WHEN EXCLUDED.auth_date IS DISTINCT FROM ironwifi_guests.auth_date 
+              THEN ironwifi_guests.auth_count + 1 
+              ELSE ironwifi_guests.auth_count 
+            END,
+            auth_date = COALESCE(EXCLUDED.auth_date, ironwifi_guests.auth_date),
             updated_at = CURRENT_TIMESTAMP
           RETURNING (xmax = 0) AS was_inserted
         `, [
@@ -819,10 +828,11 @@ router.post('/sync/guests', async (req, res) => {
           guest.firstname,
           guest.lastname,
           guest.phone,
-          guest.authdate ? new Date(guest.authdate) : null,
-          guest.creationdate ? new Date(guest.creationdate) : null,
+          authDate,
+          creationDate,
           guest.source,
-          guest.owner_id
+          guest.owner_id,
+          creationDate  // Use creation_date as first_seen_at
         ]);
         
         if (result.rows[0]?.was_inserted) {
