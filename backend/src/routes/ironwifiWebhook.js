@@ -2200,31 +2200,31 @@ router.get('/pairing-status', async (req, res) => {
  */
 router.get('/check-migrations', async (req, res) => {
   try {
-    // Check if migration_history table exists
+    // Check if migrations table exists (table is called 'migrations', not 'migration_history')
     const tableCheck = await pool.query(`
       SELECT EXISTS (
         SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'migration_history'
+        WHERE table_name = 'migrations'
       )
     `);
     
     if (!tableCheck.rows[0].exists) {
       return res.json({
         status: 'no_migration_table',
-        message: 'migration_history table does not exist'
+        message: 'migrations table does not exist - migrations may not have run on startup'
       });
     }
     
     // Get all applied migrations
     const migrations = await pool.query(`
-      SELECT name, applied_at 
-      FROM migration_history 
+      SELECT filename, applied_at 
+      FROM migrations 
       ORDER BY applied_at DESC
     `);
     
     // Check for specific IronWifi-related migrations
     const ironwifiMigrations = migrations.rows.filter(m => 
-      m.name.includes('ironwifi') || m.name.includes('024')
+      m.filename.includes('ironwifi') || m.filename.includes('024')
     );
     
     res.json({
@@ -2232,7 +2232,7 @@ router.get('/check-migrations', async (req, res) => {
       totalMigrations: migrations.rows.length,
       recentMigrations: migrations.rows.slice(0, 10),
       ironwifiRelated: ironwifiMigrations,
-      needsMigration024: !migrations.rows.some(m => m.name.includes('024'))
+      needsMigration024: !migrations.rows.some(m => m.filename.includes('024'))
     });
   } catch (error) {
     logger.error('Error checking migrations:', error);
@@ -2273,11 +2273,11 @@ router.post('/run-migration-024', async (req, res) => {
       CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_venue ON ironwifi_guests(venue_id);
     `);
     
-    // Record the migration
+    // Record the migration (table is called 'migrations' with 'filename' column)
     await pool.query(`
-      INSERT INTO migration_history (name, applied_at)
+      INSERT INTO migrations (filename, applied_at)
       VALUES ('024_add_guest_mac_fields.sql', NOW())
-      ON CONFLICT DO NOTHING
+      ON CONFLICT (filename) DO NOTHING
     `);
     
     logger.info('Migration 024 applied successfully');
