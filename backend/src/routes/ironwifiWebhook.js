@@ -1221,6 +1221,131 @@ router.get('/radius-data', async (req, res) => {
 });
 
 /**
+ * GET /api/ironwifi/test-reports-api
+ * Test the Reports API to see how to fetch RADIUS/session data
+ * The Reports API might require POST to schedule a report, then GET to fetch results
+ */
+router.get('/test-reports-api', async (req, res) => {
+  try {
+    const axios = require('axios');
+    const https = require('https');
+    
+    const apiKey = process.env.IRONWIFI_API_KEY;
+    const apiUrl = process.env.IRONWIFI_API_URL || 'https://console.ironwifi.com/api';
+    
+    const client = axios.create({
+      baseURL: apiUrl,
+      timeout: 30000,
+      httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const results = {};
+    
+    // Try to list available report types
+    const reportTypes = [
+      'radius-accounting',
+      'guest-registrations',
+      'session-history',
+      'access-point-status',
+      'data-usage'
+    ];
+    
+    // Try POST to /reports to see available options
+    try {
+      const response = await client.post('/reports', {});
+      results.postReports = { 
+        status: 'success', 
+        data: response.data 
+      };
+    } catch (error) {
+      results.postReports = {
+        status: error.response?.status,
+        message: error.message,
+        data: error.response?.data
+      };
+    }
+    
+    // Try GET on scheduled reports
+    try {
+      const response = await client.get('/report-scheduler');
+      results.reportScheduler = { 
+        status: 'success', 
+        data: response.data 
+      };
+    } catch (error) {
+      results.reportScheduler = {
+        status: error.response?.status,
+        message: error.message
+      };
+    }
+    
+    // Try GET on report-tasks (async reports)
+    try {
+      const response = await client.get('/report-tasks');
+      results.reportTasks = { 
+        status: 'success', 
+        data: response.data 
+      };
+    } catch (error) {
+      results.reportTasks = {
+        status: error.response?.status,
+        message: error.message
+      };
+    }
+    
+    // Try to create a guest-registrations report
+    try {
+      const response = await client.post('/reports/guest-registrations', {
+        earliest: '-7d',
+        latest: 'now'
+      });
+      results.guestRegistrationsReport = { 
+        status: 'success', 
+        data: response.data 
+      };
+    } catch (error) {
+      results.guestRegistrationsReport = {
+        status: error.response?.status,
+        message: error.message,
+        data: error.response?.data
+      };
+    }
+    
+    // Try to get authentications list
+    try {
+      const response = await client.get('/guests', {
+        params: { page: 1, page_size: 5, include: 'authentications' }
+      });
+      results.guestsWithAuth = { 
+        status: 'success', 
+        count: response.data?._embedded?.guests?.length || 0,
+        sample: response.data?._embedded?.guests?.[0]
+      };
+    } catch (error) {
+      results.guestsWithAuth = {
+        status: error.response?.status,
+        message: error.message
+      };
+    }
+    
+    res.json({
+      success: true,
+      message: 'Testing IronWifi Reports API',
+      conclusion: 'RADIUS data is only available via Report Scheduler webhooks',
+      results
+    });
+    
+  } catch (error) {
+    logger.error('Error testing reports API:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/ironwifi/test-all-endpoints
  * Comprehensive test of all possible IronWifi API endpoints for RADIUS/session data
  * Note: This is a public endpoint for testing purposes - no auth required
