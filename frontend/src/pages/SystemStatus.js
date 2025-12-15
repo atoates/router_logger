@@ -6,7 +6,8 @@ import {
   getRMSUsage, 
   getClickUpUsage, 
   getRouterStatusSummary,
-  getClickUpAuthStatus
+  getClickUpAuthStatus,
+  getIronwifiStatus
 } from '../services/api';
 import api from '../services/api';
 import './SystemStatus.css';
@@ -100,6 +101,7 @@ export default function SystemStatusPage() {
   const [clickupStatus, setClickupStatus] = useState(null);
   const [rmsUsage, setRmsUsage] = useState(null);
   const [clickupUsage, setClickupUsage] = useState(null);
+  const [ironwifiStatus, setIronwifiStatus] = useState(null);
   
   // Database
   const [storage, setStorage] = useState(null);
@@ -135,7 +137,8 @@ export default function SystemStatusPage() {
         clickupAuthRes,
         rmsStatusRes,
         dbHealthRes,
-        apiHealthRes
+        apiHealthRes,
+        ironwifiStatusRes
       ] = await Promise.allSettled([
         getRouters(),
         getStorageStats({ sample_size: 800 }),
@@ -147,7 +150,8 @@ export default function SystemStatusPage() {
         getClickUpAuthStatus(),
         api.get('/rms/status'),
         api.get('/monitoring/db-health'),
-        api.get('/health')
+        api.get('/health'),
+        getIronwifiStatus()
       ]);
       
       if (routersRes.status === 'fulfilled') setRouters(routersRes.value.data || []);
@@ -161,6 +165,7 @@ export default function SystemStatusPage() {
       if (rmsStatusRes.status === 'fulfilled') setRmsStatus(rmsStatusRes.value.data || null);
       if (dbHealthRes.status === 'fulfilled') setDbHealth(dbHealthRes.value.data || null);
       if (apiHealthRes.status === 'fulfilled') setApiHealth(apiHealthRes.value.data || null);
+      if (ironwifiStatusRes.status === 'fulfilled') setIronwifiStatus(ironwifiStatusRes.value.data || null);
       
       setLastUpdated(new Date());
       
@@ -217,7 +222,8 @@ export default function SystemStatusPage() {
     (apiHealth?.status === 'healthy' || apiHealth?.status === 'OK') &&
     (dbHealth?.status === 'healthy' || dbHealth?.status === 'OK') &&
     (!rmsStatus || rmsStatus.enabled) &&
-    (clickupStatus?.connected);
+    (clickupStatus?.connected) &&
+    (!ironwifiStatus || !ironwifiStatus.configured || ironwifiStatus.apiConnected);
 
   return (
     <div className="system-status-page">
@@ -261,6 +267,10 @@ export default function SystemStatusPage() {
           <StatusBadge 
             status={clickupStatus?.connected ? 'connected' : 'disconnected'} 
             label="ClickUp Integration" 
+          />
+          <StatusBadge 
+            status={ironwifiStatus?.configured ? (ironwifiStatus.apiConnected ? 'connected' : 'disconnected') : 'disabled'} 
+            label="IronWifi Integration" 
           />
         </div>
       </div>
@@ -404,6 +414,60 @@ export default function SystemStatusPage() {
               )}
             </div>
           )}
+          
+          {/* IronWifi Integration */}
+          {ironwifiStatus && (
+            <div className="integration-card">
+              <div className="integration-header">
+                <div className="integration-title">
+                  <span className="integration-icon">📶</span>
+                  <h3>IronWifi Integration</h3>
+                </div>
+                <StatusBadge 
+                  status={ironwifiStatus.configured ? (ironwifiStatus.apiConnected ? 'connected' : 'disconnected') : 'disabled'} 
+                  label={!ironwifiStatus.configured ? 'Not Configured' : (ironwifiStatus.apiConnected ? 'Connected' : 'Disconnected')} 
+                />
+              </div>
+              {ironwifiStatus.configured && (
+                <div className="integration-details">
+                  <div className="detail-row">
+                    <span className="detail-label">Last Sync</span>
+                    <span className="detail-value">
+                      {formatTimeAgo(ironwifiStatus.lastSync)}
+                    </span>
+                  </div>
+                  {ironwifiStatus.syncSchedulerRunning && (
+                    <div className="detail-row">
+                      <span className="detail-label">Sync Interval</span>
+                      <span className="detail-value">{ironwifiStatus.syncInterval} minutes</span>
+                    </div>
+                  )}
+                  {ironwifiStatus.sessionStats && (
+                    <>
+                      <div className="detail-row">
+                        <span className="detail-label">Sessions (24h)</span>
+                        <span className="detail-value">{parseInt(ironwifiStatus.sessionStats.total_sessions || 0).toLocaleString()}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="detail-label">Unique Users</span>
+                        <span className="detail-value">{parseInt(ironwifiStatus.sessionStats.unique_users || 0).toLocaleString()}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="detail-label">Active Sessions</span>
+                        <span className="detail-value">{parseInt(ironwifiStatus.sessionStats.active_sessions || 0).toLocaleString()}</span>
+                      </div>
+                    </>
+                  )}
+                  {ironwifiStatus.apiMessage && (
+                    <div className="detail-row">
+                      <span className="detail-label">Status</span>
+                      <span className="detail-value">{ironwifiStatus.apiMessage}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </CollapsibleSection>
 
@@ -470,6 +534,36 @@ export default function SystemStatusPage() {
                     )}
                   </>
                 )}
+              </div>
+            </div>
+          )}
+          
+          {ironwifiStatus && ironwifiStatus.configured && ironwifiStatus.apiUsage && (
+            <div className="usage-card">
+              <h3>IronWifi API</h3>
+              <div className="usage-details">
+                <div className="usage-metric">
+                  <span className="usage-label">Calls This Hour</span>
+                  <span className="usage-value">{ironwifiStatus.apiUsage.callsMade?.toLocaleString() || 0}</span>
+                </div>
+                <div className="usage-metric">
+                  <span className="usage-label">Hourly Limit</span>
+                  <span className="usage-value">{ironwifiStatus.apiUsage.limit?.toLocaleString() || 1000}</span>
+                </div>
+                <div className="usage-metric">
+                  <span className="usage-label">Remaining</span>
+                  <span className="usage-value">{ironwifiStatus.apiUsage.remaining?.toLocaleString() || 0}</span>
+                </div>
+                <div className="usage-metric">
+                  <span className="usage-label">Usage</span>
+                  <span className={`usage-value ${parseFloat(ironwifiStatus.apiUsage.percentageUsed || 0) > 80 ? 'warning' : ''}`}>
+                    {ironwifiStatus.apiUsage.percentageUsed || '0'}%
+                  </span>
+                </div>
+                <div className="usage-metric">
+                  <span className="usage-label">Resets In</span>
+                  <span className="usage-value">{ironwifiStatus.apiUsage.resetInMinutes || 0} minutes</span>
+                </div>
               </div>
             </div>
           )}

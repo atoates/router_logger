@@ -96,6 +96,10 @@ export const getRouterLocationHistory = (routerId, params = {}) => api.get(`/rou
 export const getRMSUsage = () => api.get('/monitoring/rms-usage');
 export const getClickUpUsage = () => api.get('/monitoring/clickup-usage');
 
+// IronWifi Integration
+export const getIronwifiStatus = () => api.get('/ironwifi/status');
+export const getIronwifiWebhookStats = () => api.get('/ironwifi/webhook/stats');
+
 // ClickUp Integration
 export const getClickUpAuthStatus = () => api.get('/clickup/auth/status');
 export const getClickUpAuthUrl = () => api.get('/clickup/auth/url');
