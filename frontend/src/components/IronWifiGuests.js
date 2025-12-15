@@ -81,6 +81,37 @@ function IronWifiGuests() {
     }
   };
 
+  const handleReset = async () => {
+    if (!window.confirm('This will DELETE all cached guest data and re-sync fresh from IronWifi. Continue?')) {
+      return;
+    }
+    
+    try {
+      setSyncing(true);
+      const response = await fetch(`${API_URL}/api/ironwifi/reset-guests`, {
+        method: 'POST',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ pages: 10, confirm: 'yes' })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`Reset complete! Deleted ${result.deleted}, inserted ${result.inserted} fresh records`);
+        fetchData();
+      } else {
+        const errorData = await response.json();
+        alert(`Reset failed: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      alert(`Reset error: ${err.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
     const date = new Date(dateStr);
@@ -131,6 +162,14 @@ function IronWifiGuests() {
             disabled={syncing}
           >
             {syncing ? '⏳ Syncing...' : '🔄 Sync Guests'}
+          </button>
+          <button 
+            className="ironwifi-reset-btn"
+            onClick={handleReset}
+            disabled={syncing}
+            title="Delete all and re-sync fresh"
+          >
+            🗑️ Reset & Re-sync
           </button>
           <button 
             className="ironwifi-refresh-btn"

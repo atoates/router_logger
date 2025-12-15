@@ -38,7 +38,8 @@
 }
 
 .ironwifi-sync-btn,
-.ironwifi-refresh-btn {
+.ironwifi-refresh-btn,
+.ironwifi-reset-btn {
   padding: 10px 20px;
   border-radius: 8px;
   font-size: 14px;
@@ -58,9 +59,20 @@
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
-.ironwifi-sync-btn:disabled {
+.ironwifi-sync-btn:disabled,
+.ironwifi-reset-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.ironwifi-reset-btn {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+}
+
+.ironwifi-reset-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
 }
 
 .ironwifi-refresh-btn {

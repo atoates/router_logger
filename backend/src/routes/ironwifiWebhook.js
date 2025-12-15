@@ -859,6 +859,76 @@ router.post('/sync/guests', async (req, res) => {
 });
 
 /**
+ * POST /api/ironwifi/reset-guests
+ * Clear all guest data and re-sync fresh from IronWifi
+ * Use this to fix incorrect first_seen_at or auth_count values
+ */
+router.post('/reset-guests', async (req, res) => {
+  try {
+    const { pages = 10, confirm } = req.body;
+    
+    if (confirm !== 'yes') {
+      return res.status(400).json({
+        error: 'Must confirm reset by sending { confirm: "yes" }',
+        message: 'This will delete all cached guest data and re-sync from IronWifi'
+      });
+    }
+    
+    logger.info('Resetting guest data - deleting all records');
+    
+    // Delete all existing guests
+    const deleteResult = await pool.query('DELETE FROM ironwifi_guests');
+    const deletedCount = deleteResult.rowCount;
+    
+    logger.info(`Deleted ${deletedCount} guest records, starting fresh sync`);
+    
+    // Fetch and insert fresh from API
+    const allGuests = await ironwifiClient.getAllGuests({ maxPages: parseInt(pages), pageSize: 100 });
+    
+    let inserted = 0;
+    for (const guest of allGuests) {
+      try {
+        const creationDate = guest.creationdate ? new Date(guest.creationdate) : null;
+        const authDate = guest.authdate ? new Date(guest.authdate) : null;
+        
+        await pool.query(`
+          INSERT INTO ironwifi_guests (
+            ironwifi_id, username, email, fullname, firstname, lastname,
+            phone, auth_date, creation_date, source, owner_id, first_seen_at, last_seen_at, auth_count
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP, 1)
+        `, [
+          guest.id,
+          guest.username,
+          guest.email,
+          guest.fullname,
+          guest.firstname,
+          guest.lastname,
+          guest.phone,
+          authDate,
+          creationDate,
+          guest.source,
+          guest.owner_id,
+          creationDate  // Use creation_date as first_seen_at
+        ]);
+        inserted++;
+      } catch (err) {
+        logger.error('Error inserting guest:', { id: guest.id, error: err.message });
+      }
+    }
+    
+    res.json({
+      success: true,
+      deleted: deletedCount,
+      inserted,
+      apiUsage: ironwifiClient.getApiUsage()
+    });
+  } catch (error) {
+    logger.error('Error resetting guests:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/ironwifi/update-daily-stats
  * Manually trigger daily stats recalculation
  */
