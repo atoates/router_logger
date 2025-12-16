@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell, ReferenceLine, ReferenceArea } from 'recharts';
-import { getLogs, getUsageStats, getUptimeData, logInspection, getInspectionHistory, getIronwifiGuestsByRouter } from '../services/api';
+import { getLogs, getUsageStats, getUptimeData, logInspection, getInspectionHistory, getGuestsByRouter } from '../services/api';
 import { exportUptimeReportToPDF } from '../utils/exportUtils';
 import { toast } from 'react-toastify';
 import ClickUpTaskWidget from './ClickUpTaskWidget';
@@ -85,7 +85,7 @@ export default function RouterDashboard({ router }) {
           getUsageStats({ router_id: routerId, start_date: start, end_date: end }),
           getUptimeData({ router_id: routerId, start_date: start, end_date: end }),
           getInspectionHistory(routerId),
-          getIronwifiGuestsByRouter(routerId, 500, 0).catch(() => ({ data: { guests: [] } }))
+          getGuestsByRouter(routerId, 500, 0).catch(() => ({ data: { guests: [] } }))
         ]);
         // Ignore if a newer load started or component unmounted
         if (!mounted || seq !== loadSeqRef.current) return;
