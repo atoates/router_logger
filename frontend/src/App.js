@@ -14,6 +14,7 @@ import UsersManagement from './components/UsersManagement';
 import AdminDebugTools from './components/AdminDebugTools';
 import GuestDashboard from './components/GuestDashboard';
 import IronWifiGuests from './components/IronWifiGuests';
+import WifiGuestDetail from './components/WifiGuestDetail';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer, toast } from 'react-toastify';
 import { getRouters } from './services/api';
@@ -212,6 +213,11 @@ function AppContent() {
             <Route path="/wifi-guests" element={
               <ProtectedRoute requireAdmin>
                 <IronWifiGuests />
+              </ProtectedRoute>
+            } />
+            <Route path="/wifi-guest/:guestId" element={
+              <ProtectedRoute requireAdmin>
+                <WifiGuestDetail />
               </ProtectedRoute>
             } />
             <Route path="/assignments" element={

@@ -2703,4 +2703,232 @@ router.get('/upload-stats', async (req, res) => {
   }
 });
 
+// ============================================================================
+// GUEST DETAIL ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /api/ironwifi/guest/:id
+ * Get detailed information about a specific guest including login history
+ */
+router.get('/guest/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get guest details
+    const guestResult = await pool.query(`
+      SELECT 
+        g.*,
+        r.name as router_name,
+        r.location as router_location
+      FROM ironwifi_guests g
+      LEFT JOIN routers r ON g.router_id = r.router_id
+      WHERE g.id = $1
+    `, [id]);
+    
+    if (guestResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Guest not found'
+      });
+    }
+    
+    const guest = guestResult.rows[0];
+    
+    // Get all login records for this user (by username/email)
+    // This finds all entries with the same username or email
+    const loginHistoryResult = await pool.query(`
+      SELECT 
+        g.id,
+        g.ironwifi_id,
+        g.username,
+        g.email,
+        g.client_mac,
+        g.ap_mac,
+        g.router_id,
+        r.name as router_name,
+        r.location as router_location,
+        g.captive_portal_name,
+        g.venue_id,
+        g.public_ip,
+        g.creation_date,
+        g.auth_date,
+        g.first_seen_at,
+        g.last_seen_at
+      FROM ironwifi_guests g
+      LEFT JOIN routers r ON g.router_id = r.router_id
+      WHERE g.username = $1 OR g.email = $1 OR g.username = $2 OR g.email = $2
+      ORDER BY g.creation_date DESC NULLS LAST, g.auth_date DESC NULLS LAST
+    `, [guest.username, guest.email]);
+    
+    // Get unique routers this user has connected to
+    const routerSummaryResult = await pool.query(`
+      SELECT 
+        r.router_id,
+        r.name as router_name,
+        r.location as router_location,
+        COUNT(*) as login_count,
+        MIN(g.creation_date) as first_login,
+        MAX(g.creation_date) as last_login
+      FROM ironwifi_guests g
+      JOIN routers r ON g.router_id = r.router_id
+      WHERE (g.username = $1 OR g.email = $1 OR g.username = $2 OR g.email = $2)
+        AND g.router_id IS NOT NULL
+      GROUP BY r.router_id, r.name, r.location
+      ORDER BY last_login DESC NULLS LAST
+    `, [guest.username, guest.email]);
+    
+    // Get unique devices (client_mac) used by this user
+    const devicesResult = await pool.query(`
+      SELECT 
+        client_mac,
+        COUNT(*) as login_count,
+        MIN(creation_date) as first_seen,
+        MAX(creation_date) as last_seen
+      FROM ironwifi_guests
+      WHERE (username = $1 OR email = $1 OR username = $2 OR email = $2)
+        AND client_mac IS NOT NULL
+      GROUP BY client_mac
+      ORDER BY last_seen DESC NULLS LAST
+    `, [guest.username, guest.email]);
+    
+    res.json({
+      success: true,
+      guest: {
+        id: guest.id,
+        ironwifi_id: guest.ironwifi_id,
+        username: guest.username,
+        email: guest.email,
+        fullname: guest.fullname,
+        firstname: guest.firstname,
+        lastname: guest.lastname,
+        phone: guest.phone,
+        auth_count: guest.auth_count,
+        first_seen_at: guest.first_seen_at,
+        last_seen_at: guest.last_seen_at,
+        creation_date: guest.creation_date,
+        current_router: guest.router_name,
+        current_router_location: guest.router_location
+      },
+      loginHistory: loginHistoryResult.rows,
+      routerSummary: routerSummaryResult.rows,
+      devices: devicesResult.rows,
+      stats: {
+        totalLogins: loginHistoryResult.rows.length,
+        uniqueRouters: routerSummaryResult.rows.length,
+        uniqueDevices: devicesResult.rows.length
+      }
+    });
+    
+  } catch (error) {
+    logger.error('Error fetching guest details:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/ironwifi/guests/search
+ * Search guests with pagination
+ */
+router.get('/guests/search', async (req, res) => {
+  try {
+    const { q = '', limit = 50, offset = 0 } = req.query;
+    
+    let whereClause = '';
+    const params = [];
+    let paramIndex = 1;
+    
+    if (q) {
+      whereClause = `WHERE username ILIKE $${paramIndex} 
+                     OR email ILIKE $${paramIndex} 
+                     OR fullname ILIKE $${paramIndex}
+                     OR phone ILIKE $${paramIndex}
+                     OR client_mac ILIKE $${paramIndex}`;
+      params.push(`%${q}%`);
+      paramIndex++;
+    }
+    
+    const result = await pool.query(`
+      SELECT 
+        g.id, 
+        g.ironwifi_id, 
+        g.username, 
+        g.email, 
+        g.fullname, 
+        g.phone,
+        g.client_mac,
+        g.ap_mac,
+        g.router_id,
+        r.name as router_name,
+        g.auth_date, 
+        g.creation_date, 
+        g.auth_count, 
+        g.first_seen_at, 
+        g.last_seen_at
+      FROM ironwifi_guests g
+      LEFT JOIN routers r ON g.router_id = r.router_id
+      ${whereClause}
+      ORDER BY g.creation_date DESC NULLS LAST, g.auth_date DESC NULLS LAST
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `, [...params, parseInt(limit), parseInt(offset)]);
+    
+    const countResult = await pool.query(`
+      SELECT COUNT(*) FROM ironwifi_guests g ${whereClause}
+    `, params);
+    
+    res.json({
+      success: true,
+      guests: result.rows,
+      total: parseInt(countResult.rows[0].count),
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    logger.error('Error searching guests:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/ironwifi/guests/by-router/:routerId
+ * Get all guests that have connected to a specific router
+ */
+router.get('/guests/by-router/:routerId', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const { limit = 100, offset = 0 } = req.query;
+    
+    const result = await pool.query(`
+      SELECT 
+        g.id, 
+        g.username, 
+        g.email, 
+        g.fullname, 
+        g.phone,
+        g.client_mac,
+        g.creation_date,
+        g.auth_date,
+        g.auth_count
+      FROM ironwifi_guests g
+      WHERE g.router_id = $1
+      ORDER BY g.creation_date DESC NULLS LAST
+      LIMIT $2 OFFSET $3
+    `, [routerId, parseInt(limit), parseInt(offset)]);
+    
+    const countResult = await pool.query(`
+      SELECT COUNT(*) FROM ironwifi_guests WHERE router_id = $1
+    `, [routerId]);
+    
+    res.json({
+      success: true,
+      guests: result.rows,
+      total: parseInt(countResult.rows[0].count),
+      routerId
+    });
+  } catch (error) {
+    logger.error('Error fetching guests by router:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

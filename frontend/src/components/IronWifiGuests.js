@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { uploadIronwifiCSV, getIronwifiUploadStats } from '../services/api';
 import './IronWifiGuests.css';
@@ -34,6 +35,7 @@ function IronWifiGuests() {
   const [displayLimit, setDisplayLimit] = useState(100);
   const searchInputRef = useRef(null);
   const { getAuthHeaders, API_URL } = useAuth();
+  const navigate = useNavigate();
   
   // Upload state
   const [uploadFile, setUploadFile] = useState(null);
@@ -419,7 +421,12 @@ function IronWifiGuests() {
                 </thead>
                 <tbody>
                   {guests.map((guest) => (
-                    <tr key={guest.id}>
+                    <tr 
+                      key={guest.id}
+                      onClick={() => navigate(`/wifi-guest/${guest.id}`)}
+                      className="clickable-row"
+                      title="Click to view guest details"
+                    >
                       <td>
                         <div className="ironwifi-email">
                           {highlightText(guest.username || guest.email, searchInput)}

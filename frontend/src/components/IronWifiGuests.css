@@ -353,6 +353,20 @@
   background: var(--bg-tertiary);
 }
 
+.ironwifi-table tr.clickable-row {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ironwifi-table tr.clickable-row:hover {
+  background: rgba(59, 130, 246, 0.1);
+  transform: translateX(2px);
+}
+
+.ironwifi-table tr.clickable-row:active {
+  background: rgba(59, 130, 246, 0.15);
+}
+
 .ironwifi-email {
   font-weight: 500;
   color: var(--accent-primary);
