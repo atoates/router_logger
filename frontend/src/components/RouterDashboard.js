@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { AreaChart, Area, BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
-import { getLogs, getUsageStats, getUptimeData, logInspection, getInspectionHistory } from '../services/api';
+import { AreaChart, Area, BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell, ReferenceLine, ReferenceArea } from 'recharts';
+import { getLogs, getUsageStats, getUptimeData, logInspection, getInspectionHistory, getIronwifiGuestsByRouter } from '../services/api';
 import { exportUptimeReportToPDF } from '../utils/exportUtils';
 import { toast } from 'react-toastify';
 import ClickUpTaskWidget from './ClickUpTaskWidget';
 import PropertySearchWidget from './PropertySearchWidget';
 import LocationMap from './LocationMap';
+import { useNavigate } from 'react-router-dom';
 import './RouterDashboard.css';
 
 function formatBytes(bytes) {
@@ -33,6 +34,7 @@ function StatusPill({ status }) {
 }
 
 export default function RouterDashboard({ router }) {
+  const navigate = useNavigate();
   const [range, setRange] = useState({ type: 'hours', value: 24 }); // hours|days|custom
   const [customStart, setCustomStart] = useState(null);
   const [customEnd, setCustomEnd] = useState(null);
@@ -41,9 +43,11 @@ export default function RouterDashboard({ router }) {
   const [stats, setStats] = useState(null);
   const [uptime, setUptime] = useState([]);
   const [inspections, setInspections] = useState([]);
+  const [wifiGuests, setWifiGuests] = useState([]); // WiFi guest logins for this router
+  const [showUserLogins, setShowUserLogins] = useState(true); // Toggle for showing user logins on chart
   const [showRawData, setShowRawData] = useState(false); // Toggle for chart scale (false = normalized)
   const [useRollingAverage, setUseRollingAverage] = useState(true); // Toggle for rolling average (true = smoothed by default)
-  const [expandedSection, setExpandedSection] = useState('location'); // Accordion state: 'location', 'latest', 'uptime', or 'inspections'
+  const [expandedSection, setExpandedSection] = useState('location'); // Accordion state: 'location', 'latest', 'uptime', 'inspections', or 'wifi-users'
   const propertyWidgetRef = useRef(null);
 
   const routerId = router?.router_id;
@@ -76,11 +80,12 @@ export default function RouterDashboard({ router }) {
       if (!routerId) return;
       setLoading(true);
       try {
-        const [logsRes, statsRes, upRes, inspRes] = await Promise.all([
+        const [logsRes, statsRes, upRes, inspRes, guestsRes] = await Promise.all([
           getLogs({ router_id: routerId, start_date: start, end_date: end, limit: 5000 }),
           getUsageStats({ router_id: routerId, start_date: start, end_date: end }),
           getUptimeData({ router_id: routerId, start_date: start, end_date: end }),
-          getInspectionHistory(routerId)
+          getInspectionHistory(routerId),
+          getIronwifiGuestsByRouter(routerId, 500, 0).catch(() => ({ data: { guests: [] } }))
         ]);
         // Ignore if a newer load started or component unmounted
         if (!mounted || seq !== loadSeqRef.current) return;
@@ -90,6 +95,7 @@ export default function RouterDashboard({ router }) {
         setStats(extractedStats);
         setUptime(Array.isArray(upRes.data) ? upRes.data : []);
         setInspections(Array.isArray(inspRes.data) ? inspRes.data : []);
+        setWifiGuests(Array.isArray(guestsRes.data?.guests) ? guestsRes.data.guests : []);
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Failed to load router dashboard', e);
@@ -98,6 +104,7 @@ export default function RouterDashboard({ router }) {
         setStats(null);
         setUptime([]);
         setInspections([]);
+        setWifiGuests([]);
       } finally {
         if (mounted && seq === loadSeqRef.current) setLoading(false);
       }
@@ -191,6 +198,32 @@ export default function RouterDashboard({ router }) {
   const yMax = useMemo(() => {
     let m = 1; for (const d of series.txrx||[]) { if (d.tx_bytes>m) m=d.tx_bytes; if (d.rx_bytes>m) m=d.rx_bytes; } return Math.ceil(m*1.1);
   }, [series]);
+
+  // Filter WiFi guests to those within the selected time range
+  const filteredGuests = useMemo(() => {
+    if (!wifiGuests || wifiGuests.length === 0) return [];
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    
+    return wifiGuests.filter(guest => {
+      const guestDate = new Date(guest.creation_date || guest.auth_date);
+      return guestDate >= startDate && guestDate <= endDate;
+    }).sort((a, b) => new Date(b.creation_date || b.auth_date) - new Date(a.creation_date || a.auth_date));
+  }, [wifiGuests, start, end]);
+
+  // Generate unique colors for users
+  const userColors = useMemo(() => {
+    const colors = [
+      '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', 
+      '#f97316', '#06b6d4', '#84cc16', '#a855f7', '#22c55e'
+    ];
+    const uniqueUsers = [...new Set(filteredGuests.map(g => g.username || g.email))];
+    const colorMap = {};
+    uniqueUsers.forEach((user, idx) => {
+      colorMap[user] = colors[idx % colors.length];
+    });
+    return colorMap;
+  }, [filteredGuests]);
 
   // Calculate inspection status
   const inspectionStatus = useMemo(() => {
@@ -567,48 +600,200 @@ export default function RouterDashboard({ router }) {
           )}
         </div>
 
+        {/* WiFi Users Section */}
+        <div className={`accordion-item ${expandedSection === 'wifi-users' ? 'expanded' : ''}`}>
+          <div 
+            className="accordion-header" 
+            onClick={() => setExpandedSection(expandedSection === 'wifi-users' ? null : 'wifi-users')}
+          >
+            <span className="accordion-title">
+              📶 WiFi Users {filteredGuests.length > 0 && <span className="badge">{filteredGuests.length}</span>}
+            </span>
+            <span className="accordion-icon">{expandedSection === 'wifi-users' ? '▼' : '▶'}</span>
+          </div>
+          {expandedSection === 'wifi-users' && (
+            <div className="accordion-content">
+              {filteredGuests.length === 0 ? (
+                <div className="wifi-users-empty">
+                  <p>No WiFi user logins recorded for this router in the selected time range.</p>
+                  <p className="muted" style={{ fontSize: '12px', marginTop: '8px' }}>
+                    WiFi guest data comes from IronWifi integration. Make sure the router MAC address is configured and matching.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="wifi-users-summary" style={{ marginBottom: '16px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                    <div className="wifi-stat">
+                      <span className="wifi-stat-value">{filteredGuests.length}</span>
+                      <span className="wifi-stat-label">Total Logins</span>
+                    </div>
+                    <div className="wifi-stat">
+                      <span className="wifi-stat-value">{[...new Set(filteredGuests.map(g => g.username || g.email))].length}</span>
+                      <span className="wifi-stat-label">Unique Users</span>
+                    </div>
+                  </div>
+                  <div className="table-wrap" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                    <table className="wifi-users-table">
+                      <thead>
+                        <tr>
+                          <th>User</th>
+                          <th>Login Time</th>
+                          <th>Device MAC</th>
+                          <th>Auth Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredGuests.map((guest, idx) => {
+                          const userName = guest.username || guest.email || 'Unknown';
+                          const userColor = userColors[userName];
+                          return (
+                            <tr 
+                              key={guest.id || idx} 
+                              className="wifi-user-row clickable"
+                              onClick={() => navigate(`/wifi-guest/${guest.id}`)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span 
+                                    className="user-color-dot" 
+                                    style={{ 
+                                      width: '10px', 
+                                      height: '10px', 
+                                      borderRadius: '50%', 
+                                      backgroundColor: userColor,
+                                      flexShrink: 0
+                                    }} 
+                                  />
+                                  <div>
+                                    <div style={{ fontWeight: 500 }}>{userName}</div>
+                                    {guest.fullname && guest.fullname !== userName && (
+                                      <div className="muted" style={{ fontSize: '11px' }}>{guest.fullname}</div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td>
+                                <div>{new Date(guest.creation_date || guest.auth_date).toLocaleDateString()}</div>
+                                <div className="muted" style={{ fontSize: '11px' }}>
+                                  {new Date(guest.creation_date || guest.auth_date).toLocaleTimeString()}
+                                </div>
+                              </td>
+                              <td>
+                                <code style={{ fontSize: '11px', backgroundColor: '#f3f4f6', padding: '2px 6px', borderRadius: '4px' }}>
+                                  {guest.client_mac || '—'}
+                                </code>
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                {guest.auth_count || 1}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
       </div>
 
       {/* TX/RX Chart - Full Width */}
       <div className="card">
-        <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
           <span>TX/RX ({label})</span>
-          <button
-            onClick={() => setShowRawData(!showRawData)}
-            style={{
-              padding: '6px 12px',
-              fontSize: '12px',
-              fontWeight: '500',
-              background: showRawData ? '#3b82f6' : '#6b7280',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-            title={showRawData ? 'Showing all data (including spikes)' : 'Outliers capped at 5x median for better visibility'}
-          >
-            {showRawData ? '📊 Raw Data' : '📉 Normalized'}
-          </button>
-          <button
-            onClick={() => setUseRollingAverage(!useRollingAverage)}
-            style={{
-              padding: '6px 12px',
-              fontSize: '13px',
-              fontWeight: '500',
-              background: useRollingAverage ? '#8b5cf6' : '#6b7280',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              marginLeft: '8px'
-            }}
-            title={useRollingAverage ? 'Showing rolling average (smoothed)' : 'Showing raw deltas (spiky)'}
-          >
-            {useRollingAverage ? '📈 Smoothed' : '⚡ Instant'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {filteredGuests.length > 0 && (
+              <button
+                onClick={() => setShowUserLogins(!showUserLogins)}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  background: showUserLogins ? '#f59e0b' : '#6b7280',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                title={showUserLogins ? 'Hiding user login markers' : 'Showing user login markers on chart'}
+              >
+                {showUserLogins ? `👤 ${filteredGuests.length} Logins` : '👤 Show Logins'}
+              </button>
+            )}
+            <button
+              onClick={() => setShowRawData(!showRawData)}
+              style={{
+                padding: '6px 12px',
+                fontSize: '12px',
+                fontWeight: '500',
+                background: showRawData ? '#3b82f6' : '#6b7280',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              title={showRawData ? 'Showing all data (including spikes)' : 'Outliers capped at 5x median for better visibility'}
+            >
+              {showRawData ? '📊 Raw Data' : '📉 Normalized'}
+            </button>
+            <button
+              onClick={() => setUseRollingAverage(!useRollingAverage)}
+              style={{
+                padding: '6px 12px',
+                fontSize: '13px',
+                fontWeight: '500',
+                background: useRollingAverage ? '#8b5cf6' : '#6b7280',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              title={useRollingAverage ? 'Showing rolling average (smoothed)' : 'Showing raw deltas (spiky)'}
+            >
+              {useRollingAverage ? '📈 Smoothed' : '⚡ Instant'}
+            </button>
+          </div>
         </div>
+        
+        {/* User login legend */}
+        {showUserLogins && filteredGuests.length > 0 && (
+          <div className="user-login-legend" style={{ 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: '12px', 
+            marginBottom: '12px',
+            padding: '8px 12px',
+            backgroundColor: '#f9fafb',
+            borderRadius: '6px',
+            fontSize: '12px'
+          }}>
+            {Object.entries(userColors).slice(0, 10).map(([user, color]) => (
+              <div key={user} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ 
+                  width: '12px', 
+                  height: '12px', 
+                  backgroundColor: color, 
+                  borderRadius: '2px',
+                  flexShrink: 0
+                }} />
+                <span style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {user}
+                </span>
+              </div>
+            ))}
+            {Object.keys(userColors).length > 10 && (
+              <span className="muted">+{Object.keys(userColors).length - 10} more</span>
+            )}
+          </div>
+        )}
+        
         <div style={{ height: 260 }}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={series.txrx} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -636,13 +821,40 @@ export default function RouterDashboard({ router }) {
                 allowDataOverflow={false} 
               />
               <Tooltip 
-                formatter={(v)=>formatBytes(v)} 
+                formatter={(v, name) => {
+                  if (name === 'TX' || name === 'RX') return formatBytes(v);
+                  return v;
+                }}
                 labelFormatter={(t)=> new Date(t).toLocaleString()}
                 contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151' }}
                 labelStyle={{ color: '#f3f4f6' }}
                 itemStyle={{ color: '#f3f4f6' }}
               />
               <Legend />
+              
+              {/* User login reference lines */}
+              {showUserLogins && filteredGuests.map((guest, idx) => {
+                const loginDate = new Date(guest.creation_date || guest.auth_date).toISOString();
+                const userName = guest.username || guest.email || 'Unknown';
+                const userColor = userColors[userName];
+                return (
+                  <ReferenceLine 
+                    key={`login-${guest.id || idx}`}
+                    x={loginDate}
+                    stroke={userColor}
+                    strokeWidth={2}
+                    strokeDasharray="4 4"
+                    label={{
+                      value: userName.split('@')[0].substring(0, 8),
+                      position: 'top',
+                      fill: userColor,
+                      fontSize: 9,
+                      fontWeight: 600
+                    }}
+                  />
+                );
+              })}
+              
               <Area type="monotone" dataKey="tx_bytes" stroke="#6366f1" fill="url(#rdTx)" name="TX" />
               <Area type="monotone" dataKey="rx_bytes" stroke="#10b981" fill="url(#rdRx)" name="RX" />
             </AreaChart>
