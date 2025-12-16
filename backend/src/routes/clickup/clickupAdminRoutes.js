@@ -722,6 +722,150 @@ router.put('/settings/smart-sync', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/clickup/create-missing-tasks
+ * Create ClickUp tasks for all routers that don't have one
+ * Useful for initial setup or after adding multiple routers
+ */
+router.post('/create-missing-tasks', async (req, res) => {
+  try {
+    logger.info('Manual create missing ClickUp tasks triggered');
+    
+    // Check if CLICKUP_ROUTERS_LIST_ID is configured
+    if (!process.env.CLICKUP_ROUTERS_LIST_ID) {
+      return res.status(400).json({
+        error: 'CLICKUP_ROUTERS_LIST_ID not configured',
+        message: 'Set the CLICKUP_ROUTERS_LIST_ID environment variable to the ID of your "Routers" list in ClickUp',
+        hint: 'Find the list ID by opening the list in ClickUp and copying from the URL'
+      });
+    }
+    
+    const { createMissingClickUpTasks } = require('../../services/clickupSync');
+    const result = await createMissingClickUpTasks();
+    
+    res.json({
+      success: true,
+      message: `Created ${result.created} ClickUp tasks`,
+      ...result
+    });
+  } catch (error) {
+    logger.error('Error creating missing tasks:', sanitizeError(error));
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/clickup/create-task/:routerId
+ * Create a ClickUp task for a specific router (if it doesn't have one)
+ */
+router.post('/create-task/:routerId', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    
+    // Check if CLICKUP_ROUTERS_LIST_ID is configured
+    if (!process.env.CLICKUP_ROUTERS_LIST_ID) {
+      return res.status(400).json({
+        error: 'CLICKUP_ROUTERS_LIST_ID not configured',
+        message: 'Set the CLICKUP_ROUTERS_LIST_ID environment variable'
+      });
+    }
+    
+    // Get router data
+    const routerResult = await pool.query(
+      `SELECT 
+        r.router_id,
+        r.name,
+        r.imei,
+        r.firmware_version,
+        r.last_seen,
+        r.mac_address,
+        r.current_status,
+        r.clickup_task_id,
+        (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as latest_status
+      FROM routers r
+      WHERE r.router_id = $1`,
+      [routerId]
+    );
+    
+    if (routerResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Router not found' });
+    }
+    
+    const router = routerResult.rows[0];
+    
+    if (router.clickup_task_id) {
+      return res.status(400).json({
+        error: 'Router already has a ClickUp task',
+        clickup_task_id: router.clickup_task_id
+      });
+    }
+    
+    const { autoCreateClickUpTask } = require('../../services/clickupSync');
+    const routerWithStatus = {
+      ...router,
+      current_status: router.current_status || router.latest_status || 'offline'
+    };
+    
+    const task = await autoCreateClickUpTask(routerWithStatus);
+    
+    if (!task) {
+      return res.status(500).json({ error: 'Failed to create ClickUp task' });
+    }
+    
+    logger.info(`Created ClickUp task ${task.id} for router ${routerId}`);
+    
+    res.json({
+      success: true,
+      message: 'ClickUp task created',
+      task: {
+        id: task.id,
+        name: task.name,
+        url: task.url
+      },
+      router_id: routerId
+    });
+  } catch (error) {
+    logger.error(`Error creating task for router ${req.params.routerId}:`, sanitizeError(error));
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/clickup/auto-create-status
+ * Get the status of auto-create functionality
+ */
+router.get('/auto-create-status', async (req, res) => {
+  try {
+    const autoCreateEnabled = process.env.CLICKUP_AUTO_CREATE_TASKS !== 'false';
+    const routersListId = process.env.CLICKUP_ROUTERS_LIST_ID;
+    
+    // Count routers without tasks
+    const countResult = await pool.query(`
+      SELECT COUNT(*) as count
+      FROM routers
+      WHERE clickup_task_id IS NULL
+        AND (clickup_task_status IS NULL OR LOWER(clickup_task_status) NOT IN ('decommissioned'))
+    `);
+    
+    const routersWithoutTasks = parseInt(countResult.rows[0].count);
+    
+    res.json({
+      autoCreateEnabled,
+      routersListConfigured: !!routersListId,
+      routersListId: routersListId || null,
+      routersWithoutTasks,
+      status: autoCreateEnabled && routersListId 
+        ? 'ready' 
+        : autoCreateEnabled && !routersListId 
+          ? 'missing_list_id'
+          : 'disabled'
+    });
+  } catch (error) {
+    logger.error('Error getting auto-create status:', sanitizeError(error));
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
 
 

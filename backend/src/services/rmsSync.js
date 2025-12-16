@@ -375,7 +375,21 @@ async function syncFromRMS() {
     
     rmsSyncStats.totalSyncs24h = rmsSyncStats.syncHistory24h.length;
     
-    return { successCount, errorCount, total: devices.length, duration };
+    // Auto-create ClickUp tasks for any new routers without tasks
+    // This runs after RMS sync completes to ensure new routers get tasks
+    let clickupTasksCreated = 0;
+    try {
+      const { createMissingClickUpTasks } = require('./clickupSync');
+      const clickupResult = await createMissingClickUpTasks();
+      clickupTasksCreated = clickupResult.created || 0;
+      if (clickupTasksCreated > 0) {
+        logger.info(`Auto-created ${clickupTasksCreated} ClickUp tasks for new routers`);
+      }
+    } catch (clickupError) {
+      logger.warn('Failed to auto-create ClickUp tasks (RMS sync still successful):', clickupError.message);
+    }
+    
+    return { successCount, errorCount, total: devices.length, duration, clickupTasksCreated };
   } catch (error) {
     logger.error('RMS sync failed:', error.message);
     

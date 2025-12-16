@@ -853,6 +853,211 @@ function getSyncStats() {
   };
 }
 
+/**
+ * Auto-create ClickUp task for a new router
+ * Called when a router is detected without a clickup_task_id
+ * 
+ * @param {Object} router - Router object with router_id, name, imei, etc.
+ * @returns {Promise<Object|null>} Created task or null if failed
+ */
+async function autoCreateClickUpTask(router) {
+  // Check if auto-creation is enabled
+  const autoCreateEnabled = process.env.CLICKUP_AUTO_CREATE_TASKS !== 'false';
+  if (!autoCreateEnabled) {
+    logger.debug(`Auto-create disabled, skipping task creation for router ${router.router_id}`);
+    return null;
+  }
+
+  // Get the Routers list ID from env
+  const routersListId = process.env.CLICKUP_ROUTERS_LIST_ID;
+  if (!routersListId) {
+    logger.warn('CLICKUP_ROUTERS_LIST_ID not configured - cannot auto-create tasks');
+    return null;
+  }
+
+  try {
+    logger.info(`Auto-creating ClickUp task for new router ${router.router_id} (${router.name || 'unnamed'})`);
+
+    const frontendUrl = process.env.FRONTEND_URL || 'https://routerlogger-frontend-production.up.railway.app';
+    const customFields = [];
+
+    // Router ID (text) - required
+    customFields.push({
+      id: CUSTOM_FIELDS.ROUTER_ID,
+      value: router.router_id.toString()
+    });
+
+    // IMEI (text - ClickUp field is now text type)
+    if (router.imei) {
+      customFields.push({
+        id: CUSTOM_FIELDS.IMEI,
+        value: router.imei.toString()
+      });
+    }
+
+    // Firmware (text)
+    if (router.firmware_version) {
+      customFields.push({
+        id: CUSTOM_FIELDS.FIRMWARE,
+        value: router.firmware_version
+      });
+    }
+
+    // Last Online (date timestamp in milliseconds)
+    if (router.last_seen) {
+      customFields.push({
+        id: CUSTOM_FIELDS.LAST_ONLINE,
+        value: new Date(router.last_seen).getTime()
+      });
+    }
+
+    // Operational Status (dropdown: use orderindex)
+    const isOnline = router.current_status === 'online' || router.status === 'online';
+    customFields.push({
+      id: CUSTOM_FIELDS.OPERATIONAL_STATUS,
+      value: isOnline ? STATUS_OPTIONS.ONLINE : STATUS_OPTIONS.OFFLINE
+    });
+
+    // Router Dashboard URL
+    const dashboardUrl = `${frontendUrl}/router/${router.router_id}`;
+    customFields.push({
+      id: CUSTOM_FIELDS.ROUTER_DASHBOARD,
+      value: dashboardUrl
+    });
+
+    // MAC Address if available
+    if (router.mac_address) {
+      const macFieldId = await discoverMacAddressField();
+      if (macFieldId) {
+        customFields.push({
+          id: macFieldId,
+          value: router.mac_address
+        });
+      }
+    }
+
+    const taskData = {
+      name: router.name || `Router #${router.router_id}`,
+      priority: 3, // Normal priority
+      tags: ['router', 'auto-created'],
+      custom_fields: customFields
+    };
+
+    // Create the task in ClickUp
+    const task = await clickupClient.createTask(routersListId, taskData, 'default');
+
+    if (!task || !task.id) {
+      logger.error(`Failed to create ClickUp task for router ${router.router_id} - no task returned`);
+      return null;
+    }
+
+    // Link the task to the router in database
+    const taskUrl = task.url || `https://app.clickup.com/t/${task.id}`;
+    await pool.query(
+      `UPDATE routers
+       SET clickup_task_id = $1,
+           clickup_task_url = $2,
+           clickup_list_id = $3
+       WHERE router_id = $4`,
+      [task.id, taskUrl, routersListId, router.router_id]
+    );
+
+    logger.info(`✅ Auto-created ClickUp task ${task.id} for router ${router.router_id} (${router.name || 'unnamed'})`);
+
+    return task;
+  } catch (error) {
+    logger.error(`Failed to auto-create ClickUp task for router ${router.router_id}:`, error.message);
+    // Log the full error for first few failures to help debugging
+    if (error.response?.data) {
+      logger.error('ClickUp API error details:', JSON.stringify(error.response.data));
+    }
+    return null;
+  }
+}
+
+/**
+ * Check for routers without ClickUp tasks and create them
+ * Can be called periodically or after RMS sync
+ * 
+ * @returns {Promise<Object>} Summary of created tasks
+ */
+async function createMissingClickUpTasks() {
+  const autoCreateEnabled = process.env.CLICKUP_AUTO_CREATE_TASKS !== 'false';
+  if (!autoCreateEnabled) {
+    logger.info('Auto-create tasks is disabled (CLICKUP_AUTO_CREATE_TASKS=false)');
+    return { created: 0, errors: 0, skipped: 0 };
+  }
+
+  const routersListId = process.env.CLICKUP_ROUTERS_LIST_ID;
+  if (!routersListId) {
+    logger.warn('CLICKUP_ROUTERS_LIST_ID not configured - cannot auto-create tasks');
+    return { created: 0, errors: 0, skipped: 0, error: 'CLICKUP_ROUTERS_LIST_ID not configured' };
+  }
+
+  try {
+    logger.info('Checking for routers without ClickUp tasks...');
+
+    // Find routers without ClickUp tasks (exclude decommissioned)
+    const result = await pool.query(`
+      SELECT 
+        r.router_id,
+        r.name,
+        r.imei,
+        r.firmware_version,
+        r.last_seen,
+        r.mac_address,
+        r.current_status,
+        (SELECT status FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as latest_status
+      FROM routers r
+      WHERE r.clickup_task_id IS NULL
+        AND (r.clickup_task_status IS NULL OR LOWER(r.clickup_task_status) NOT IN ('decommissioned'))
+      ORDER BY r.created_at DESC
+    `);
+
+    if (result.rows.length === 0) {
+      logger.info('All routers already have ClickUp tasks');
+      return { created: 0, errors: 0, skipped: 0 };
+    }
+
+    logger.info(`Found ${result.rows.length} routers without ClickUp tasks`);
+
+    let created = 0;
+    let errors = 0;
+    let skipped = 0;
+
+    for (const router of result.rows) {
+      try {
+        // Use latest_status if current_status is not set
+        const routerWithStatus = {
+          ...router,
+          current_status: router.current_status || router.latest_status || 'offline'
+        };
+
+        const task = await autoCreateClickUpTask(routerWithStatus);
+        
+        if (task) {
+          created++;
+        } else {
+          skipped++;
+        }
+
+        // Rate limiting delay
+        await new Promise(resolve => setTimeout(resolve, 300));
+      } catch (error) {
+        logger.error(`Error creating task for router ${router.router_id}:`, error.message);
+        errors++;
+      }
+    }
+
+    logger.info(`Auto-create complete: ${created} created, ${skipped} skipped, ${errors} errors`);
+
+    return { created, errors, skipped, total: result.rows.length };
+  } catch (error) {
+    logger.error('Error in createMissingClickUpTasks:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   syncRouterToClickUp,
   syncAllRoutersToClickUp,
@@ -860,5 +1065,7 @@ module.exports = {
   syncMacAddressesFromClickUp,
   startClickUpSync,
   stopClickUpSync,
-  getSyncStats
+  getSyncStats,
+  autoCreateClickUpTask,
+  createMissingClickUpTasks
 };

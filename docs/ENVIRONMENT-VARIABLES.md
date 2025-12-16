@@ -85,6 +85,25 @@ IRONWIFI_REJECT_UNAUTHORIZED=false
 
 **Important**: The API provides guest data (username, name, auth time) but NOT the `Called-Station-Id` (router MAC). For linking guests to specific routers, you MUST configure the IronWifi **webhook** which sends RADIUS accounting data.
 
+### ClickUp Integration
+
+```bash
+# ClickUp OAuth (configured via /api/clickup/auth/start)
+# Tokens are stored in database after OAuth flow
+
+# ClickUp Routers List ID (REQUIRED for auto-creating tasks)
+# Find this by opening your "Routers" list in ClickUp and copying from URL
+# URL format: https://app.clickup.com/{workspace_id}/v/li/{LIST_ID}
+CLICKUP_ROUTERS_LIST_ID=901517043586
+
+# Auto-create ClickUp tasks for new routers (default: true)
+# Set to 'false' to disable automatic task creation
+CLICKUP_AUTO_CREATE_TASKS=true
+
+# ClickUp sync interval in minutes (default: 30)
+CLICKUP_SYNC_INTERVAL_MINUTES=30
+```
+
 ### MQTT (Optional - for router push)
 
 ```bash
