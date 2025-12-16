@@ -6,6 +6,7 @@ import {
   getClickUpRoutersList,
   getClickUpTasks,
   createClickUpTask,
+  createClickUpTaskForRouter,
   linkRouterToTask,
   unlinkRouterFromTask,
   updateRouterStatus,
@@ -89,23 +90,9 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
   };
 
   const handleOpenCreateModal = async () => {
-    setModalMode('create');
-    setShowModal(true);
-    setNewTaskName(`${router.name || `Router #${router.router_id}`} - Maintenance`);
-    
-    // Still need to load workspace and list
-    try {
-      const workspacesResponse = await getClickUpWorkspaces();
-      const ws = workspacesResponse.data.workspaces?.[0];
-      setWorkspace(ws);
-
-      if (ws) {
-        const listResponse = await getClickUpRoutersList(ws.id);
-        setRoutersList(listResponse.data.list);
-      }
-    } catch (error) {
-      console.error('Error loading workspace:', error);
-    }
+    // Directly create the task using the backend endpoint (no modal needed)
+    // This uses autoCreateClickUpTask which includes all router data
+    await handleCreateAndLink();
   };
 
   const handleLinkTask = async (task) => {
@@ -129,25 +116,16 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
   };
 
   const handleCreateAndLink = async () => {
-    if (!newTaskName.trim()) {
-      alert('Please enter a task name');
-      return;
-    }
-
     try {
       setCreating(true);
-      const taskData = {
-        name: newTaskName,
-        description: `Router maintenance task for ${router.name || router.router_id}`,
-        routerId: router.router_id,
-        routerName: router.name
-      };
-
-      const createResponse = await createClickUpTask(routersList.id, taskData);
+      
+      // Use the backend endpoint that creates task with all router data (IMEI, firmware, etc.)
+      const createResponse = await createClickUpTaskForRouter(router.router_id);
       const createdTask = createResponse.data.task;
 
-      // Link the newly created task
-      await linkRouterToTask(router.router_id, createdTask.id, routersList.id);
+      if (!createdTask) {
+        throw new Error(createResponse.data?.error || 'Failed to create task');
+      }
       
       setLinkedTask({
         id: createdTask.id,
@@ -158,10 +136,16 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
       
       setShowModal(false);
       setNewTaskName('');
-      alert('Task created and linked successfully!');
+      toast.success('Task created with all router data!');
+      
+      // Refresh the page to show updated task info
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error) {
       console.error('Error creating task:', error);
-      alert('Failed to create task');
+      const errorMsg = error.response?.data?.error || error.message || 'Failed to create task';
+      toast.error(errorMsg);
     } finally {
       setCreating(false);
     }
