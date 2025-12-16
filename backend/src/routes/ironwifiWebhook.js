@@ -2384,4 +2384,323 @@ router.post('/test-webhook', async (req, res) => {
   }
 });
 
+// ============================================================================
+// CSV UPLOAD ENDPOINT
+// ============================================================================
+
+/**
+ * POST /api/ironwifi/upload-csv
+ * Upload and process IronWifi CSV export
+ * Expected format: Guest Registrations CSV export from IronWifi Console
+ */
+router.post('/upload-csv', async (req, res) => {
+  try {
+    const { csvData } = req.body;
+    
+    if (!csvData || typeof csvData !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'No CSV data provided. Send { csvData: "csv content here" }'
+      });
+    }
+    
+    logger.info('Processing IronWifi CSV upload...');
+    
+    // Parse CSV
+    const lines = csvData.split('\n').filter(line => line.trim());
+    
+    if (lines.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'CSV must have at least a header row and one data row'
+      });
+    }
+    
+    // Parse header row
+    const headers = parseCSVLine(lines[0]);
+    logger.info(`CSV headers: ${headers.join(', ')}`);
+    
+    // Map expected IronWifi CSV fields to our database fields
+    const fieldMapping = {
+      'username': 'username',
+      'firstname': 'firstname',
+      'lastname': 'lastname',
+      'phone': 'phone',
+      'mobilephone': 'phone',  // fallback
+      'client_mac': 'client_mac',
+      'ap_mac': 'ap_mac',
+      'email': 'email',
+      'creationdate': 'creation_date',
+      'expirationdate': 'expiration_date',
+      'captive_portal_name': 'captive_portal_name',
+      'venue_id': 'venue_id',
+      'public_ip': 'public_ip',
+      'request_id': 'request_id'
+    };
+    
+    // Find which columns we have
+    const columnIndexes = {};
+    headers.forEach((header, index) => {
+      const normalizedHeader = header.toLowerCase().trim();
+      if (fieldMapping[normalizedHeader]) {
+        columnIndexes[fieldMapping[normalizedHeader]] = index;
+      }
+    });
+    
+    logger.info(`Found columns: ${Object.keys(columnIndexes).join(', ')}`);
+    
+    // Process data rows
+    const results = {
+      total: 0,
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [],
+      linkedToRouters: 0
+    };
+    
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue;
+      
+      results.total++;
+      
+      try {
+        const values = parseCSVLine(lines[i]);
+        
+        // Extract values based on column mapping
+        const getValue = (field) => {
+          const index = columnIndexes[field];
+          return index !== undefined ? values[index]?.trim() || null : null;
+        };
+        
+        const username = getValue('username');
+        const email = getValue('email') || username;
+        const firstname = getValue('firstname');
+        const lastname = getValue('lastname');
+        const phone = getValue('phone');
+        const clientMac = normalizeUploadMac(getValue('client_mac'));
+        const apMac = normalizeUploadMac(getValue('ap_mac'));
+        const creationDate = parseDate(getValue('creation_date'));
+        const captivePortalName = getValue('captive_portal_name');
+        const venueId = getValue('venue_id');
+        const publicIp = getValue('public_ip');
+        const requestId = getValue('request_id');
+        
+        // Skip if no username/email
+        if (!username && !email) {
+          results.skipped++;
+          continue;
+        }
+        
+        // Generate a unique ID for this record
+        // Use request_id if available, otherwise generate from username + creation_date
+        const ironwifiId = requestId || `csv_${(username || email)}_${creationDate?.toISOString() || Date.now()}`;
+        
+        // Try to match ap_mac to a router
+        let routerId = null;
+        if (apMac) {
+          const routerResult = await pool.query(
+            `SELECT router_id, name FROM routers 
+             WHERE LOWER(REPLACE(mac_address, '-', ':')) = LOWER($1)
+             OR LEFT(LOWER(REPLACE(mac_address, '-', ':')), 14) = LEFT(LOWER($1), 14)`,
+            [apMac]
+          );
+          
+          if (routerResult.rows.length > 0) {
+            routerId = routerResult.rows[0].router_id;
+            results.linkedToRouters++;
+          }
+        }
+        
+        // Upsert guest record
+        const upsertResult = await pool.query(`
+          INSERT INTO ironwifi_guests (
+            ironwifi_id, username, email, fullname, firstname, lastname,
+            phone, auth_date, creation_date, client_mac, ap_mac, router_id,
+            captive_portal_name, venue_id, public_ip, first_seen_at, last_seen_at, auth_count
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, CURRENT_TIMESTAMP, 1)
+          ON CONFLICT (ironwifi_id) DO UPDATE SET
+            username = COALESCE(EXCLUDED.username, ironwifi_guests.username),
+            email = COALESCE(EXCLUDED.email, ironwifi_guests.email),
+            fullname = COALESCE(EXCLUDED.fullname, ironwifi_guests.fullname),
+            firstname = COALESCE(EXCLUDED.firstname, ironwifi_guests.firstname),
+            lastname = COALESCE(EXCLUDED.lastname, ironwifi_guests.lastname),
+            phone = COALESCE(EXCLUDED.phone, ironwifi_guests.phone),
+            client_mac = COALESCE(EXCLUDED.client_mac, ironwifi_guests.client_mac),
+            ap_mac = COALESCE(EXCLUDED.ap_mac, ironwifi_guests.ap_mac),
+            router_id = COALESCE(EXCLUDED.router_id, ironwifi_guests.router_id),
+            captive_portal_name = COALESCE(EXCLUDED.captive_portal_name, ironwifi_guests.captive_portal_name),
+            venue_id = COALESCE(EXCLUDED.venue_id, ironwifi_guests.venue_id),
+            public_ip = COALESCE(EXCLUDED.public_ip, ironwifi_guests.public_ip),
+            last_seen_at = CURRENT_TIMESTAMP,
+            auth_count = ironwifi_guests.auth_count + 1,
+            updated_at = CURRENT_TIMESTAMP
+          RETURNING (xmax = 0) AS was_inserted
+        `, [
+          ironwifiId,
+          username,
+          email,
+          [firstname, lastname].filter(Boolean).join(' ') || null,
+          firstname,
+          lastname,
+          phone,
+          creationDate,  // Use creation_date as auth_date
+          creationDate,
+          clientMac,
+          apMac,
+          routerId,
+          captivePortalName,
+          venueId,
+          publicIp,
+          creationDate  // first_seen_at
+        ]);
+        
+        if (upsertResult.rows[0]?.was_inserted) {
+          results.inserted++;
+        } else {
+          results.updated++;
+        }
+        
+      } catch (rowError) {
+        results.errors.push({
+          row: i,
+          error: rowError.message
+        });
+        if (results.errors.length >= 10) {
+          results.errors.push({ message: 'Too many errors, stopping early' });
+          break;
+        }
+      }
+    }
+    
+    logger.info('CSV upload complete', results);
+    
+    res.json({
+      success: true,
+      message: `Processed ${results.total} records`,
+      results,
+      columnsFound: Object.keys(columnIndexes)
+    });
+    
+  } catch (error) {
+    logger.error('Error processing CSV upload:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+});
+
+/**
+ * Parse a CSV line handling quoted values
+ */
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  
+  result.push(current.trim());
+  return result;
+}
+
+/**
+ * Normalize MAC address from upload (handles various formats)
+ */
+function normalizeUploadMac(mac) {
+  if (!mac) return null;
+  
+  // Remove quotes if present
+  mac = mac.replace(/^"|"$/g, '').trim();
+  
+  if (!mac) return null;
+  
+  // Convert to lowercase and normalize separators
+  const cleaned = mac.toLowerCase().replace(/[-:]/g, '');
+  
+  // Validate it looks like a MAC
+  if (cleaned.length < 10 || !/^[0-9a-f]+$/.test(cleaned)) {
+    return null;
+  }
+  
+  // Pad to 12 chars if needed and format with colons
+  const padded = cleaned.padEnd(12, '0').slice(0, 12);
+  return padded.match(/.{1,2}/g).join(':');
+}
+
+/**
+ * Parse date from various formats
+ */
+function parseDate(dateStr) {
+  if (!dateStr) return null;
+  
+  // Remove quotes
+  dateStr = dateStr.replace(/^"|"$/g, '').trim();
+  
+  if (!dateStr || dateStr === '0000-00-00 00:00:00') return null;
+  
+  try {
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * GET /api/ironwifi/upload-stats
+ * Get statistics about uploaded data
+ */
+router.get('/upload-stats', async (req, res) => {
+  try {
+    const stats = await pool.query(`
+      SELECT 
+        COUNT(*) as total_guests,
+        COUNT(DISTINCT client_mac) as unique_devices,
+        COUNT(DISTINCT ap_mac) as unique_aps,
+        COUNT(router_id) as linked_to_routers,
+        COUNT(DISTINCT router_id) as unique_routers_linked,
+        COUNT(DISTINCT captive_portal_name) as captive_portals,
+        MIN(creation_date) as earliest_record,
+        MAX(creation_date) as latest_record
+      FROM ironwifi_guests
+    `);
+    
+    // Get top APs by guest count
+    const topAPs = await pool.query(`
+      SELECT 
+        ap_mac,
+        r.name as router_name,
+        COUNT(*) as guest_count
+      FROM ironwifi_guests g
+      LEFT JOIN routers r ON g.router_id = r.router_id
+      WHERE ap_mac IS NOT NULL
+      GROUP BY ap_mac, r.name
+      ORDER BY guest_count DESC
+      LIMIT 10
+    `);
+    
+    res.json({
+      success: true,
+      stats: stats.rows[0],
+      topAccessPoints: topAPs.rows
+    });
+  } catch (error) {
+    logger.error('Error getting upload stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { uploadIronwifiCSV, getIronwifiUploadStats } from '../services/api';
 import './IronWifiGuests.css';
 
 // Custom hook for debouncing
@@ -33,6 +34,14 @@ function IronWifiGuests() {
   const [displayLimit, setDisplayLimit] = useState(100);
   const searchInputRef = useRef(null);
   const { getAuthHeaders, API_URL } = useAuth();
+  
+  // Upload state
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState(null);
+  const [uploadStats, setUploadStats] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Debounce search input - waits 300ms after user stops typing
   const debouncedSearch = useDebounce(searchInput, 300);
@@ -145,6 +154,112 @@ function IronWifiGuests() {
     );
   }, []);
 
+  // Fetch upload stats when upload tab is selected
+  useEffect(() => {
+    if (activeTab === 'upload') {
+      fetchUploadStats();
+    }
+  }, [activeTab]);
+
+  const fetchUploadStats = async () => {
+    try {
+      const response = await getIronwifiUploadStats();
+      setUploadStats(response.data);
+    } catch (err) {
+      console.error('Error fetching upload stats:', err);
+    }
+  };
+
+  // Handle file selection
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      validateAndSetFile(file);
+    }
+  };
+
+  const validateAndSetFile = (file) => {
+    if (!file.name.endsWith('.csv')) {
+      setUploadResult({ success: false, error: 'Please select a CSV file' });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      setUploadResult({ success: false, error: 'File too large. Maximum 10MB.' });
+      return;
+    }
+    setUploadFile(file);
+    setUploadResult(null);
+  };
+
+  // Handle drag and drop
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      validateAndSetFile(file);
+    }
+  };
+
+  // Upload the file
+  const handleUpload = async () => {
+    if (!uploadFile) return;
+
+    setUploading(true);
+    setUploadResult(null);
+
+    try {
+      // Read file content
+      const text = await uploadFile.text();
+      
+      // Send to backend
+      const response = await uploadIronwifiCSV(text);
+      
+      setUploadResult({
+        success: true,
+        ...response.data
+      });
+      
+      // Refresh stats and guest list
+      fetchUploadStats();
+      fetchData(debouncedSearch);
+      
+      // Clear file
+      setUploadFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      
+    } catch (err) {
+      setUploadResult({
+        success: false,
+        error: err.response?.data?.error || err.message || 'Upload failed'
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const clearUpload = () => {
+    setUploadFile(null);
+    setUploadResult(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   if (loading) {
     return (
       <div className="ironwifi-container">
@@ -229,6 +344,12 @@ function IronWifiGuests() {
           onClick={() => setActiveTab('webhooks')}
         >
           📨 Webhook Debug ({webhookHistory.length})
+        </button>
+        <button 
+          className={`ironwifi-tab ${activeTab === 'upload' ? 'active' : ''}`}
+          onClick={() => setActiveTab('upload')}
+        >
+          📤 Upload CSV
         </button>
       </div>
 
@@ -401,6 +522,203 @@ function IronWifiGuests() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Upload Tab */}
+      {activeTab === 'upload' && (
+        <div className="ironwifi-panel">
+          <div className="ironwifi-info">
+            <strong>📤 Upload IronWifi Export</strong>
+            <p style={{ marginTop: '8px' }}>
+              Upload a CSV export from IronWifi Console to import guest registration data.
+              Go to <strong>IronWifi Console → Reports → Export</strong> and download the Guest Registrations report.
+            </p>
+          </div>
+
+          {/* Upload Zone */}
+          <div 
+            className={`upload-zone ${dragActive ? 'drag-active' : ''} ${uploadFile ? 'has-file' : ''}`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+            onClick={() => !uploadFile && fileInputRef.current?.click()}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              onChange={handleFileSelect}
+              style={{ display: 'none' }}
+            />
+            
+            {uploadFile ? (
+              <div className="upload-file-info">
+                <div className="upload-file-icon">📄</div>
+                <div className="upload-file-details">
+                  <div className="upload-file-name">{uploadFile.name}</div>
+                  <div className="upload-file-size">
+                    {(uploadFile.size / 1024).toFixed(1)} KB
+                  </div>
+                </div>
+                <button 
+                  className="upload-clear-btn"
+                  onClick={(e) => { e.stopPropagation(); clearUpload(); }}
+                  title="Remove file"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <div className="upload-placeholder">
+                <div className="upload-icon">📁</div>
+                <div className="upload-text">
+                  <strong>Drop CSV file here</strong>
+                  <span>or click to browse</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Upload Button */}
+          {uploadFile && (
+            <div className="upload-actions">
+              <button 
+                className="upload-btn"
+                onClick={handleUpload}
+                disabled={uploading}
+              >
+                {uploading ? '⏳ Uploading...' : '📤 Upload & Process'}
+              </button>
+            </div>
+          )}
+
+          {/* Upload Result */}
+          {uploadResult && (
+            <div className={`upload-result ${uploadResult.success ? 'success' : 'error'}`}>
+              {uploadResult.success ? (
+                <>
+                  <div className="upload-result-header">
+                    ✅ Upload Successful
+                  </div>
+                  <div className="upload-result-stats">
+                    <div className="upload-stat">
+                      <span className="upload-stat-value">{uploadResult.results?.total || 0}</span>
+                      <span className="upload-stat-label">Total Records</span>
+                    </div>
+                    <div className="upload-stat">
+                      <span className="upload-stat-value">{uploadResult.results?.inserted || 0}</span>
+                      <span className="upload-stat-label">New Guests</span>
+                    </div>
+                    <div className="upload-stat">
+                      <span className="upload-stat-value">{uploadResult.results?.updated || 0}</span>
+                      <span className="upload-stat-label">Updated</span>
+                    </div>
+                    <div className="upload-stat">
+                      <span className="upload-stat-value">{uploadResult.results?.linkedToRouters || 0}</span>
+                      <span className="upload-stat-label">Linked to Routers</span>
+                    </div>
+                  </div>
+                  {uploadResult.columnsFound && (
+                    <div className="upload-result-columns">
+                      <strong>Columns processed:</strong> {uploadResult.columnsFound.join(', ')}
+                    </div>
+                  )}
+                  {uploadResult.results?.errors?.length > 0 && (
+                    <div className="upload-result-errors">
+                      <strong>⚠️ {uploadResult.results.errors.length} errors:</strong>
+                      <ul>
+                        {uploadResult.results.errors.slice(0, 5).map((err, i) => (
+                          <li key={i}>Row {err.row}: {err.error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="upload-result-header">
+                    ❌ Upload Failed
+                  </div>
+                  <div className="upload-result-error">
+                    {uploadResult.error}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Upload Stats */}
+          {uploadStats && (
+            <div className="upload-stats-section">
+              <h3>📊 Database Statistics</h3>
+              <div className="upload-stats-grid">
+                <div className="upload-stats-card">
+                  <div className="upload-stats-value">{uploadStats.stats?.total_guests?.toLocaleString() || 0}</div>
+                  <div className="upload-stats-label">Total Guests</div>
+                </div>
+                <div className="upload-stats-card">
+                  <div className="upload-stats-value">{uploadStats.stats?.unique_devices?.toLocaleString() || 0}</div>
+                  <div className="upload-stats-label">Unique Devices</div>
+                </div>
+                <div className="upload-stats-card">
+                  <div className="upload-stats-value">{uploadStats.stats?.unique_aps?.toLocaleString() || 0}</div>
+                  <div className="upload-stats-label">Unique APs</div>
+                </div>
+                <div className="upload-stats-card">
+                  <div className="upload-stats-value">{uploadStats.stats?.linked_to_routers?.toLocaleString() || 0}</div>
+                  <div className="upload-stats-label">Linked to Routers</div>
+                </div>
+              </div>
+              
+              {uploadStats.topAccessPoints?.length > 0 && (
+                <div className="upload-top-aps">
+                  <h4>Top Access Points</h4>
+                  <table className="ironwifi-table">
+                    <thead>
+                      <tr>
+                        <th>AP MAC</th>
+                        <th>Router</th>
+                        <th>Guests</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {uploadStats.topAccessPoints.slice(0, 5).map((ap, i) => (
+                        <tr key={i}>
+                          <td><code>{ap.ap_mac}</code></td>
+                          <td>{ap.router_name || <span style={{ color: 'var(--warning-color)' }}>Not linked</span>}</td>
+                          <td>{ap.guest_count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Expected Format Info */}
+          <div className="upload-format-info">
+            <details>
+              <summary>📋 Expected CSV Format</summary>
+              <div className="upload-format-content">
+                <p>The CSV should contain these columns from IronWifi Guest Registrations export:</p>
+                <ul>
+                  <li><code>username</code> - Guest email/username</li>
+                  <li><code>firstname</code>, <code>lastname</code> - Guest name</li>
+                  <li><code>phone</code> / <code>mobilephone</code> - Phone number</li>
+                  <li><code>email</code> - Email address</li>
+                  <li><code>client_mac</code> - User's device MAC address</li>
+                  <li><code>ap_mac</code> - Router/AP MAC address (for linking)</li>
+                  <li><code>creationdate</code> - Registration date</li>
+                  <li><code>captive_portal_name</code> - Portal name</li>
+                  <li><code>venue_id</code> - Venue identifier</li>
+                  <li><code>public_ip</code> - Public IP address</li>
+                </ul>
+              </div>
+            </details>
+          </div>
         </div>
       )}
     </div>

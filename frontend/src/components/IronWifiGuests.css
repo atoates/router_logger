@@ -440,6 +440,336 @@
   background: var(--bg-primary);
 }
 
+/* ============================================
+   Upload Tab Styles
+   ============================================ */
+
+.upload-zone {
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--bg-primary);
+  margin: 20px 0;
+}
+
+.upload-zone:hover {
+  border-color: var(--accent-color);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.upload-zone.drag-active {
+  border-color: var(--accent-color);
+  background: rgba(59, 130, 246, 0.1);
+  transform: scale(1.01);
+}
+
+.upload-zone.has-file {
+  border-style: solid;
+  border-color: var(--success-color);
+  background: rgba(34, 197, 94, 0.05);
+  cursor: default;
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.upload-icon {
+  font-size: 48px;
+  opacity: 0.6;
+}
+
+.upload-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-secondary);
+}
+
+.upload-text strong {
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.upload-text span {
+  font-size: 13px;
+}
+
+.upload-file-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: center;
+}
+
+.upload-file-icon {
+  font-size: 36px;
+}
+
+.upload-file-details {
+  text-align: left;
+}
+
+.upload-file-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.upload-file-size {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.upload-clear-btn {
+  background: var(--bg-tertiary);
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.upload-clear-btn:hover {
+  background: var(--error-bg);
+  color: var(--error-color);
+}
+
+.upload-actions {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.upload-btn {
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  padding: 14px 32px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.upload-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.upload-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Upload Result */
+.upload-result {
+  border-radius: 12px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.upload-result.success {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid var(--success-color);
+}
+
+.upload-result.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--error-color);
+}
+
+.upload-result-header {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.upload-result.success .upload-result-header {
+  color: var(--success-color);
+}
+
+.upload-result.error .upload-result-header {
+  color: var(--error-color);
+}
+
+.upload-result-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.upload-stat {
+  text-align: center;
+  padding: 12px;
+  background: var(--bg-primary);
+  border-radius: 8px;
+}
+
+.upload-stat-value {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.upload-stat-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.upload-result-columns {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 12px;
+  background: var(--bg-primary);
+  border-radius: 8px;
+}
+
+.upload-result-columns code {
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin: 0 2px;
+}
+
+.upload-result-errors {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.upload-result-errors ul {
+  margin: 8px 0 0 20px;
+  padding: 0;
+}
+
+.upload-result-error {
+  color: var(--error-color);
+  font-size: 14px;
+}
+
+/* Upload Stats Section */
+.upload-stats-section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+.upload-stats-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.upload-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.upload-stats-card {
+  background: var(--bg-secondary);
+  padding: 16px;
+  border-radius: 10px;
+  text-align: center;
+  border: 1px solid var(--border-color);
+}
+
+.upload-stats-value {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent-color);
+}
+
+.upload-stats-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.upload-top-aps {
+  margin-top: 20px;
+}
+
+.upload-top-aps h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Format Info */
+.upload-format-info {
+  margin-top: 24px;
+}
+
+.upload-format-info summary {
+  cursor: pointer;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  font-weight: 500;
+  color: var(--text-primary);
+  transition: background 0.2s ease;
+}
+
+.upload-format-info summary:hover {
+  background: var(--bg-tertiary);
+}
+
+.upload-format-content {
+  padding: 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  margin-top: -4px;
+}
+
+.upload-format-content p {
+  margin: 0 0 12px 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.upload-format-content ul {
+  margin: 0;
+  padding: 0 0 0 20px;
+}
+
+.upload-format-content li {
+  margin: 6px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.upload-format-content code {
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 12px;
+  color: var(--accent-color);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .ironwifi-header {
@@ -466,6 +796,15 @@
   .ironwifi-table th,
   .ironwifi-table td {
     padding: 10px 12px;
+  }
+
+  .upload-result-stats,
+  .upload-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .upload-zone {
+    padding: 24px;
   }
 }
 
