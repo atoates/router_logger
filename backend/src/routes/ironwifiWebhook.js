@@ -829,10 +829,12 @@ router.get('/test-api-fields', async (req, res) => {
  * POST /api/ironwifi/sync/guests
  * Sync guests from IronWifi API to local database
  * This caches guest data to reduce API calls
+ * 
+ * Default: 20 pages (2000 guests) - increase if you have more users
  */
 router.post('/sync/guests', async (req, res) => {
   try {
-    const { pages = 5 } = req.body;
+    const { pages = 20 } = req.body;
     
     logger.info('Starting guest sync from IronWifi API');
     
@@ -2927,6 +2929,254 @@ router.get('/guests/by-router/:routerId', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error fetching guests by router:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/ironwifi/sync-diagnostics
+ * Comprehensive diagnostic to understand why guests might not be syncing
+ */
+router.get('/sync-diagnostics', async (req, res) => {
+  try {
+    const diagnostics = {
+      timestamp: new Date().toISOString(),
+      database: {},
+      api: {},
+      recommendations: []
+    };
+    
+    // 1. Database stats
+    const dbStats = await pool.query(`
+      SELECT 
+        COUNT(*) as total_guests,
+        COUNT(DISTINCT ironwifi_id) as unique_ironwifi_ids,
+        MIN(creation_date) as earliest_guest,
+        MAX(creation_date) as latest_guest,
+        MAX(last_seen_at) as last_sync_time
+      FROM ironwifi_guests
+    `);
+    
+    diagnostics.database = {
+      ...dbStats.rows[0],
+      totalGuests: parseInt(dbStats.rows[0].total_guests)
+    };
+    
+    // 2. Check API status and guest count
+    if (ironwifiClient.isConfigured()) {
+      try {
+        // Just get page 1 to see total_items
+        const apiResult = await ironwifiClient.getGuests({ page: 1, pageSize: 1 });
+        
+        diagnostics.api = {
+          configured: true,
+          totalGuestsInApi: apiResult.total_items,
+          pageCount: apiResult.page_count,
+          apiUsage: ironwifiClient.getApiUsage()
+        };
+        
+        // Compare API vs DB
+        const apiTotal = apiResult.total_items;
+        const dbTotal = diagnostics.database.totalGuests;
+        const missing = apiTotal - dbTotal;
+        
+        if (missing > 0) {
+          diagnostics.recommendations.push({
+            priority: 'high',
+            issue: `${missing} guests in IronWifi API not in local database`,
+            detail: `API has ${apiTotal} guests, DB has ${dbTotal}`,
+            solutions: [
+              `1. Run POST /api/ironwifi/sync/guests with { "pages": ${Math.ceil(apiTotal / 100)} }`,
+              '2. The automatic sync may not be fetching enough pages',
+              '3. Check if IRONWIFI_API_KEY is set correctly'
+            ]
+          });
+        }
+        
+        // Check if we need more pages
+        const pagesNeeded = Math.ceil(apiTotal / 100);
+        if (pagesNeeded > 20) {
+          diagnostics.recommendations.push({
+            priority: 'medium',
+            issue: `You have ${apiTotal} guests which requires ${pagesNeeded} pages to sync all`,
+            detail: 'Default sync fetches 20 pages (2000 guests)',
+            solutions: [
+              `Run POST /api/ironwifi/sync/guests with { "pages": ${pagesNeeded} }`,
+              'Or increase the default in the code'
+            ]
+          });
+        }
+        
+      } catch (apiError) {
+        diagnostics.api = {
+          configured: true,
+          error: apiError.message
+        };
+        diagnostics.recommendations.push({
+          priority: 'critical',
+          issue: 'API connection failed',
+          detail: apiError.message,
+          solutions: ['Check IRONWIFI_API_KEY is valid', 'Check IronWifi service status']
+        });
+      }
+    } else {
+      diagnostics.api = {
+        configured: false,
+        message: 'IRONWIFI_API_KEY not set'
+      };
+      diagnostics.recommendations.push({
+        priority: 'critical',
+        issue: 'IronWifi API not configured',
+        solutions: ['Set IRONWIFI_API_KEY environment variable']
+      });
+    }
+    
+    // 3. Check recent activity
+    const recentGuests = await pool.query(`
+      SELECT 
+        COUNT(*) as guests_last_24h
+      FROM ironwifi_guests
+      WHERE creation_date > NOW() - INTERVAL '24 hours'
+    `);
+    
+    diagnostics.recentActivity = {
+      guestsCreatedLast24h: parseInt(recentGuests.rows[0].guests_last_24h)
+    };
+    
+    // 4. Get sync status from service
+    diagnostics.syncService = ironwifiSync.getStatus();
+    
+    res.json(diagnostics);
+    
+  } catch (error) {
+    logger.error('Error running sync diagnostics:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/ironwifi/sync/full
+ * Force a full sync of ALL guests from IronWifi API
+ * This will fetch ALL pages to ensure no guests are missed
+ */
+router.post('/sync/full', async (req, res) => {
+  try {
+    logger.info('Starting FULL guest sync from IronWifi API');
+    
+    // First, check how many guests exist in IronWifi
+    const apiResult = await ironwifiClient.getGuests({ page: 1, pageSize: 1 });
+    const totalGuests = apiResult.total_items;
+    const pagesNeeded = Math.ceil(totalGuests / 100);
+    
+    logger.info(`IronWifi has ${totalGuests} guests, need ${pagesNeeded} pages`);
+    
+    // Fetch ALL guests
+    const allGuests = await ironwifiClient.getAllGuests({ 
+      maxPages: pagesNeeded + 1, // +1 for safety
+      pageSize: 100 
+    });
+    
+    let inserted = 0;
+    let updated = 0;
+    let errors = 0;
+    
+    for (const guest of allGuests) {
+      try {
+        const creationDate = guest.creationdate ? new Date(guest.creationdate) : null;
+        const authDate = guest.authdate ? new Date(guest.authdate) : null;
+        
+        const clientMac = guest.client_mac ? normalizeMac(guest.client_mac) : null;
+        const apMac = guest.ap_mac ? normalizeMac(guest.ap_mac) : null;
+        
+        // Try to match ap_mac to a router
+        let routerId = null;
+        if (apMac) {
+          const routerResult = await pool.query(
+            `SELECT router_id FROM routers 
+             WHERE LOWER(REPLACE(mac_address, '-', ':')) = LOWER($1)
+             OR LEFT(LOWER(REPLACE(mac_address, '-', ':')), 14) = LEFT(LOWER($1), 14)`,
+            [apMac]
+          );
+          if (routerResult.rows.length > 0) {
+            routerId = routerResult.rows[0].router_id;
+          }
+        }
+        
+        const result = await pool.query(`
+          INSERT INTO ironwifi_guests (
+            ironwifi_id, username, email, fullname, firstname, lastname,
+            phone, auth_date, creation_date, source, owner_id, 
+            client_mac, ap_mac, router_id, captive_portal_name, venue_id, public_ip,
+            first_seen_at, last_seen_at, auth_count
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, CURRENT_TIMESTAMP, 1)
+          ON CONFLICT (ironwifi_id) DO UPDATE SET
+            username = COALESCE(EXCLUDED.username, ironwifi_guests.username),
+            email = COALESCE(EXCLUDED.email, ironwifi_guests.email),
+            fullname = COALESCE(EXCLUDED.fullname, ironwifi_guests.fullname),
+            phone = COALESCE(EXCLUDED.phone, ironwifi_guests.phone),
+            client_mac = COALESCE(EXCLUDED.client_mac, ironwifi_guests.client_mac),
+            ap_mac = COALESCE(EXCLUDED.ap_mac, ironwifi_guests.ap_mac),
+            router_id = COALESCE(EXCLUDED.router_id, ironwifi_guests.router_id),
+            captive_portal_name = COALESCE(EXCLUDED.captive_portal_name, ironwifi_guests.captive_portal_name),
+            venue_id = COALESCE(EXCLUDED.venue_id, ironwifi_guests.venue_id),
+            public_ip = COALESCE(EXCLUDED.public_ip, ironwifi_guests.public_ip),
+            last_seen_at = CURRENT_TIMESTAMP,
+            auth_count = CASE 
+              WHEN EXCLUDED.auth_date IS DISTINCT FROM ironwifi_guests.auth_date 
+              THEN ironwifi_guests.auth_count + 1 
+              ELSE ironwifi_guests.auth_count 
+            END,
+            auth_date = COALESCE(EXCLUDED.auth_date, ironwifi_guests.auth_date),
+            updated_at = CURRENT_TIMESTAMP
+          RETURNING (xmax = 0) AS was_inserted
+        `, [
+          guest.id,
+          guest.username,
+          guest.email,
+          guest.fullname,
+          guest.firstname,
+          guest.lastname,
+          guest.phone,
+          authDate,
+          creationDate,
+          guest.source,
+          guest.owner_id,
+          clientMac,
+          apMac,
+          routerId,
+          guest.captive_portal_name || null,
+          guest.venue_id || null,
+          guest.public_ip || null,
+          creationDate
+        ]);
+        
+        if (result.rows[0]?.was_inserted) {
+          inserted++;
+        } else {
+          updated++;
+        }
+      } catch (err) {
+        errors++;
+        logger.error('Error storing guest:', { id: guest.id, error: err.message });
+      }
+    }
+    
+    logger.info(`Full sync complete: ${inserted} inserted, ${updated} updated, ${errors} errors`);
+    
+    res.json({
+      success: true,
+      message: 'Full sync complete',
+      apiTotalGuests: totalGuests,
+      pagesFetched: pagesNeeded,
+      guestsFetched: allGuests.length,
+      inserted,
+      updated,
+      errors,
+      apiUsage: ironwifiClient.getApiUsage()
+    });
+    
+  } catch (error) {
+    logger.error('Error during full sync:', error);
     res.status(500).json({ error: error.message });
   }
 });

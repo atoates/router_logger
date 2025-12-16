@@ -322,11 +322,12 @@ async function updateDailyStats() {
 }
 
 /**
- * Sync guests from IronWifi API
- * Stores guest data even without AP matching (useful for auditing)
+ * Sync guests from IronWifi API to ironwifi_guests table
+ * Fetches ALL guests (not just recent) and stores them in the guests table
+ * @param {number} maxPages - Maximum pages to fetch (default: 20)
  * @returns {Promise<object>} Sync result
  */
-async function syncGuests() {
+async function syncGuests(maxPages = 20) {
   const startTime = Date.now();
   
   try {
@@ -334,52 +335,112 @@ async function syncGuests() {
       return { success: false, reason: 'Not configured' };
     }
     
-    logger.info('Syncing guests from IronWifi...');
+    logger.info(`Syncing guests from IronWifi (up to ${maxPages} pages)...`);
     
-    // Get recent guests (last 24h authentications)
-    const guests = await ironwifiClient.getRecentGuests();
+    // Fetch ALL guests, not just recent ones
+    const allGuests = await ironwifiClient.getAllGuests({ maxPages, pageSize: 100 });
     
-    // Get router maps for potential matching
-    const routerMaps = await getRoutersWithMac();
+    let inserted = 0;
+    let updated = 0;
+    let errors = 0;
     
-    let storedCount = 0;
-    let matchedCount = 0;
-    
-    for (const guest of guests) {
+    for (const guest of allGuests) {
       try {
-        // Create a session record from guest data
-        // Note: Guest data doesn't include Called-Station-Id, so we can't match to router
-        // The webhook data is needed for router matching
-        const sessionData = {
-          session_id: `guest_${guest.id}`,
-          username: guest.username || guest.email,
-          session_start: guest.authdate || guest.creationdate,
-          session_end: null,
-          ap_mac: null, // Not available from guest API
-          user_mac: null,
-          bytes_in: 0,
-          bytes_out: 0,
-          duration: 0,
-          framed_ip: null,
-          nas_ip: null,
-          terminate_cause: null
-        };
+        // Parse dates
+        const creationDate = guest.creationdate ? new Date(guest.creationdate) : null;
+        const authDate = guest.authdate ? new Date(guest.authdate) : null;
         
-        await upsertSession(sessionData, null);
-        storedCount++;
+        // Normalize MAC addresses if present (usually not in /guests API)
+        const clientMac = guest.client_mac ? normalizeMac(guest.client_mac) : null;
+        const apMac = guest.ap_mac ? normalizeMac(guest.ap_mac) : null;
+        
+        // Try to match ap_mac to a router (if available)
+        let routerId = null;
+        if (apMac) {
+          const prefix = getMacPrefix(apMac);
+          if (prefix) {
+            const routerResult = await pool.query(
+              `SELECT router_id FROM routers 
+               WHERE LOWER(REPLACE(mac_address, '-', ':')) = LOWER($1)
+               OR LEFT(LOWER(REPLACE(mac_address, '-', ':')), 14) = LEFT(LOWER($1), 14)`,
+              [apMac]
+            );
+            if (routerResult.rows.length > 0) {
+              routerId = routerResult.rows[0].router_id;
+            }
+          }
+        }
+        
+        // Upsert into ironwifi_guests table
+        const result = await pool.query(`
+          INSERT INTO ironwifi_guests (
+            ironwifi_id, username, email, fullname, firstname, lastname,
+            phone, auth_date, creation_date, source, owner_id, 
+            client_mac, ap_mac, router_id, captive_portal_name, venue_id, public_ip,
+            first_seen_at, last_seen_at, auth_count
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, CURRENT_TIMESTAMP, 1)
+          ON CONFLICT (ironwifi_id) DO UPDATE SET
+            username = COALESCE(EXCLUDED.username, ironwifi_guests.username),
+            email = COALESCE(EXCLUDED.email, ironwifi_guests.email),
+            fullname = COALESCE(EXCLUDED.fullname, ironwifi_guests.fullname),
+            phone = COALESCE(EXCLUDED.phone, ironwifi_guests.phone),
+            client_mac = COALESCE(EXCLUDED.client_mac, ironwifi_guests.client_mac),
+            ap_mac = COALESCE(EXCLUDED.ap_mac, ironwifi_guests.ap_mac),
+            router_id = COALESCE(EXCLUDED.router_id, ironwifi_guests.router_id),
+            captive_portal_name = COALESCE(EXCLUDED.captive_portal_name, ironwifi_guests.captive_portal_name),
+            venue_id = COALESCE(EXCLUDED.venue_id, ironwifi_guests.venue_id),
+            public_ip = COALESCE(EXCLUDED.public_ip, ironwifi_guests.public_ip),
+            last_seen_at = CURRENT_TIMESTAMP,
+            -- Only increment auth_count if auth_date has changed (new authentication)
+            auth_count = CASE 
+              WHEN EXCLUDED.auth_date IS DISTINCT FROM ironwifi_guests.auth_date 
+              THEN ironwifi_guests.auth_count + 1 
+              ELSE ironwifi_guests.auth_count 
+            END,
+            auth_date = COALESCE(EXCLUDED.auth_date, ironwifi_guests.auth_date),
+            updated_at = CURRENT_TIMESTAMP
+          RETURNING (xmax = 0) AS was_inserted
+        `, [
+          guest.id,
+          guest.username,
+          guest.email,
+          guest.fullname,
+          guest.firstname,
+          guest.lastname,
+          guest.phone,
+          authDate,
+          creationDate,
+          guest.source,
+          guest.owner_id,
+          clientMac,
+          apMac,
+          routerId,
+          guest.captive_portal_name || null,
+          guest.venue_id || null,
+          guest.public_ip || null,
+          creationDate  // Use creation_date as first_seen_at
+        ]);
+        
+        if (result.rows[0]?.was_inserted) {
+          inserted++;
+        } else {
+          updated++;
+        }
       } catch (error) {
-        logger.error('Error storing guest:', { message: error.message, guest: guest.username });
+        errors++;
+        logger.error('Error storing guest:', { message: error.message, guest: guest.username || guest.id });
       }
     }
     
     const duration = Date.now() - startTime;
-    logger.info(`Guest sync complete: ${storedCount} guests stored in ${duration}ms`);
+    logger.info(`Guest sync complete: ${inserted} inserted, ${updated} updated, ${errors} errors in ${duration}ms`);
     
     return {
       success: true,
-      guestsProcessed: guests.length,
-      stored: storedCount,
-      matched: matchedCount,
+      guestsProcessed: allGuests.length,
+      inserted,
+      updated,
+      errors,
       duration: `${duration}ms`
     };
   } catch (error) {
@@ -467,10 +528,12 @@ async function runSync() {
       }
     }
     
-    // Also sync guests (for username/email data)
+    // Sync guests to ironwifi_guests table (this is the main guest data store)
+    // Use a higher page limit to ensure we get all guests, not just recent ones
     let guestResult = { success: false };
     try {
-      guestResult = await syncGuests();
+      // Fetch up to 20 pages (2000 guests) - adjust based on your IronWifi account size
+      guestResult = await syncGuests(20);
     } catch (error) {
       logger.warn('Guest sync failed:', { message: error.message });
     }
