@@ -14,6 +14,7 @@ const { pool, logger } = require('../config/database');
 const { validateIronwifiWebhookPayload } = require('../utils/validation');
 const ironwifiSync = require('../services/ironwifiSync');
 const ironwifiClient = require('../services/ironwifiClient');
+const guestDeduplication = require('../services/guestDeduplication');
 
 /**
  * POST /api/ironwifi/webhook
@@ -3177,6 +3178,95 @@ router.post('/sync/full', async (req, res) => {
     
   } catch (error) {
     logger.error('Error during full sync:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// DEDUPLICATION ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /api/ironwifi/deduplication/stats
+ * Get statistics about duplicate guests
+ */
+router.get('/deduplication/stats', async (req, res) => {
+  try {
+    const stats = await guestDeduplication.getDeduplicationStats();
+    res.json({
+      success: true,
+      ...stats,
+      schedulerRunning: guestDeduplication.isSchedulerRunning()
+    });
+  } catch (error) {
+    logger.error('Error getting deduplication stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/ironwifi/deduplication/run
+ * Run deduplication manually
+ * @param {boolean} dryRun - If true, only show what would be done
+ */
+router.post('/deduplication/run', async (req, res) => {
+  try {
+    const { dryRun = false } = req.body;
+    
+    logger.info(`Manual deduplication triggered (dryRun: ${dryRun})`);
+    
+    const result = await guestDeduplication.runDeduplication(dryRun);
+    res.json(result);
+  } catch (error) {
+    logger.error('Error running deduplication:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/ironwifi/deduplication/schedule/start
+ * Start the daily deduplication scheduler
+ * @param {number} hourOfDay - Hour to run (0-23, default 3 = 3 AM)
+ */
+router.post('/deduplication/schedule/start', async (req, res) => {
+  try {
+    const { hourOfDay = 3 } = req.body;
+    
+    if (guestDeduplication.isSchedulerRunning()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Scheduler is already running'
+      });
+    }
+    
+    guestDeduplication.startDailyDeduplication(hourOfDay);
+    
+    res.json({
+      success: true,
+      message: `Daily deduplication scheduled at ${hourOfDay}:00`,
+      schedulerRunning: true
+    });
+  } catch (error) {
+    logger.error('Error starting deduplication scheduler:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/ironwifi/deduplication/schedule/stop
+ * Stop the daily deduplication scheduler
+ */
+router.post('/deduplication/schedule/stop', async (req, res) => {
+  try {
+    guestDeduplication.stopDailyDeduplication();
+    
+    res.json({
+      success: true,
+      message: 'Deduplication scheduler stopped',
+      schedulerRunning: false
+    });
+  } catch (error) {
+    logger.error('Error stopping deduplication scheduler:', error);
     res.status(500).json({ error: error.message });
   }
 });

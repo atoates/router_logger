@@ -81,9 +81,14 @@ IRONWIFI_HOURLY_LIMIT=1000
 
 # SSL certificate validation (set to 'false' if certificate issues)
 IRONWIFI_REJECT_UNAUTHORIZED=false
+
+# Hour of day to run daily deduplication (0-23, default: 3 = 3 AM)
+IRONWIFI_DEDUPLICATION_HOUR=3
 ```
 
 **Important**: The API provides guest data (username, name, auth time) but NOT the `Called-Station-Id` (router MAC). For linking guests to specific routers, you MUST configure the IronWifi **webhook** which sends RADIUS accounting data.
+
+**Deduplication**: The system automatically removes duplicate guest records daily. Duplicates are identified by matching username or email. When duplicates are found, the most recent record is kept and data from others is merged (MAC addresses, auth counts, etc.).
 
 ### ClickUp Integration
 

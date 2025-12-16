@@ -12,6 +12,7 @@ const { initMQTT, closeMQTT } = require('./services/mqttService');
 const { startRMSSync } = require('./services/rmsSync');
 const { startClickUpSync } = require('./services/clickupSync');
 const { startSyncScheduler: startIronWifiSync } = require('./services/ironwifiSync');
+const { startDailyDeduplication } = require('./services/guestDeduplication');
 const distributedLockService = require('./services/distributedLockService');
 const oauthService = require('./services/oauthService');
 const routerRoutes = require('./routes/router');
@@ -218,6 +219,11 @@ async function startServer() {
     if (process.env.IRONWIFI_API_KEY) {
       startIronWifiSync(ironwifiSyncInterval);
       logger.info(`IronWifi sync scheduler started (every ${ironwifiSyncInterval} minutes)`);
+      
+      // Start daily deduplication at 3 AM (configurable via env var)
+      const deduplicationHour = parseInt(process.env.IRONWIFI_DEDUPLICATION_HOUR || '3', 10);
+      startDailyDeduplication(deduplicationHour);
+      logger.info(`IronWifi guest deduplication scheduled daily at ${deduplicationHour}:00`);
     } else {
       logger.info('IronWifi API sync not started (IRONWIFI_API_KEY not set)');
     }
