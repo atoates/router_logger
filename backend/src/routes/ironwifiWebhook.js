@@ -2257,8 +2257,8 @@ router.post('/run-migration-024', async (req, res) => {
     const columns = [
       { name: 'client_mac', sql: 'ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS client_mac VARCHAR(50)' },
       { name: 'ap_mac', sql: 'ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS ap_mac VARCHAR(50)' },
-      // Skip foreign key for now - add as simple integer
-      { name: 'router_id', sql: 'ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS router_id INTEGER' },
+      // router_id must be VARCHAR(255) to match routers.router_id type (RMS device IDs like "6001744613")
+      { name: 'router_id', sql: 'ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS router_id VARCHAR(255)' },
       { name: 'captive_portal_name', sql: 'ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS captive_portal_name VARCHAR(255)' },
       { name: 'venue_id', sql: 'ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS venue_id VARCHAR(100)' },
       { name: 'public_ip', sql: 'ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS public_ip VARCHAR(50)' }
@@ -2307,6 +2307,78 @@ router.post('/run-migration-024', async (req, res) => {
   } catch (error) {
     logger.error('Error running migration 024:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/ironwifi/run-migration-026
+ * Fix router_id column type from INTEGER to VARCHAR(255) to match routers.router_id
+ * This fixes: "operator does not exist: integer = character varying" error
+ * and "value X is out of range for type integer" errors on CSV upload
+ */
+router.post('/run-migration-026', async (req, res) => {
+  try {
+    logger.info('Running migration 026: Fix router_id column type...');
+    
+    const results = [];
+    
+    // Check current column type
+    const typeCheck = await pool.query(`
+      SELECT data_type FROM information_schema.columns 
+      WHERE table_name = 'ironwifi_guests' AND column_name = 'router_id'
+    `);
+    
+    const currentType = typeCheck.rows[0]?.data_type;
+    results.push({ check: 'current_type', value: currentType || 'column not found' });
+    
+    if (currentType === 'integer') {
+      // Drop the index first
+      try {
+        await pool.query('DROP INDEX IF EXISTS idx_ironwifi_guests_router_id');
+        results.push({ step: 'drop_index', status: 'success' });
+      } catch (e) {
+        results.push({ step: 'drop_index', status: 'skipped', note: e.message });
+      }
+      
+      // Change column type from INTEGER to VARCHAR(255)
+      await pool.query(`
+        ALTER TABLE ironwifi_guests 
+        ALTER COLUMN router_id TYPE VARCHAR(255) 
+        USING router_id::VARCHAR(255)
+      `);
+      results.push({ step: 'alter_column', status: 'success' });
+      
+      // Recreate the index
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_ironwifi_guests_router_id ON ironwifi_guests(router_id)');
+      results.push({ step: 'recreate_index', status: 'success' });
+      
+    } else if (currentType === 'character varying') {
+      results.push({ step: 'alter_column', status: 'skipped', note: 'Already VARCHAR' });
+    } else {
+      results.push({ step: 'alter_column', status: 'skipped', note: 'Column does not exist or unexpected type' });
+    }
+    
+    // Record the migration
+    await pool.query(`
+      INSERT INTO migrations (filename, applied_at)
+      VALUES ('026_fix_ironwifi_guests_router_id_type.sql', NOW())
+      ON CONFLICT (filename) DO NOTHING
+    `);
+    results.push({ step: 'record_migration', status: 'success' });
+    
+    logger.info('Migration 026 completed', { results });
+    
+    res.json({
+      success: true,
+      message: 'Migration 026 applied - router_id column fixed',
+      results
+    });
+  } catch (error) {
+    logger.error('Error running migration 026:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
   }
 });
 
@@ -2718,6 +2790,15 @@ router.get('/guest/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
+    // Parse id as integer for the primary key lookup
+    const guestId = parseInt(id, 10);
+    if (isNaN(guestId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid guest ID - must be a number'
+      });
+    }
+    
     // Get guest details
     const guestResult = await pool.query(`
       SELECT 
@@ -2727,7 +2808,7 @@ router.get('/guest/:id', async (req, res) => {
       FROM ironwifi_guests g
       LEFT JOIN routers r ON g.router_id = r.router_id
       WHERE g.id = $1
-    `, [id]);
+    `, [guestId]);
     
     if (guestResult.rows.length === 0) {
       return res.status(404).json({

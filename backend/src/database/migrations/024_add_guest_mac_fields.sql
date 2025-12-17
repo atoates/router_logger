@@ -9,7 +9,8 @@ ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS ap_mac VARCHAR(50);
 
 -- router_id = Matched router from ap_mac
 -- Note: No foreign key constraint to avoid migration failures if table has orphaned data
-ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS router_id INTEGER;
+-- Must be VARCHAR(255) to match routers.router_id type (RMS device IDs like "6001744613")
+ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS router_id VARCHAR(255);
 
 -- Additional context fields
 ALTER TABLE ironwifi_guests ADD COLUMN IF NOT EXISTS captive_portal_name VARCHAR(255);
