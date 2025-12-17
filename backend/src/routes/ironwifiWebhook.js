@@ -2566,74 +2566,91 @@ router.post('/upload-csv', async (req, res) => {
           results.skipped++;
           continue;
         }
-        
-        // Generate a unique ID for this record
-        // Use request_id if available, otherwise generate from username + creation_date
-        const ironwifiId = requestId || `csv_${(username || email)}_${creationDate?.toISOString() || Date.now()}`;
-        
+
         // Try to match ap_mac to a router
         let routerId = null;
         if (apMac) {
           const routerResult = await pool.query(
-            `SELECT router_id, name FROM routers 
+            `SELECT router_id, name FROM routers
              WHERE LOWER(REPLACE(mac_address, '-', ':')) = LOWER($1)
              OR LEFT(LOWER(REPLACE(mac_address, '-', ':')), 14) = LEFT(LOWER($1), 14)`,
             [apMac]
           );
-          
+
           if (routerResult.rows.length > 0) {
             routerId = routerResult.rows[0].router_id;
             results.linkedToRouters++;
           }
         }
-        
-        // Upsert guest record
-        const upsertResult = await pool.query(`
-          INSERT INTO ironwifi_guests (
-            ironwifi_id, username, email, fullname, firstname, lastname,
-            phone, auth_date, creation_date, client_mac, ap_mac, router_id,
-            captive_portal_name, venue_id, public_ip, first_seen_at, last_seen_at, auth_count
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, CURRENT_TIMESTAMP, 1)
-          ON CONFLICT (ironwifi_id) DO UPDATE SET
-            username = COALESCE(EXCLUDED.username, ironwifi_guests.username),
-            email = COALESCE(EXCLUDED.email, ironwifi_guests.email),
-            fullname = COALESCE(EXCLUDED.fullname, ironwifi_guests.fullname),
-            firstname = COALESCE(EXCLUDED.firstname, ironwifi_guests.firstname),
-            lastname = COALESCE(EXCLUDED.lastname, ironwifi_guests.lastname),
-            phone = COALESCE(EXCLUDED.phone, ironwifi_guests.phone),
-            client_mac = COALESCE(EXCLUDED.client_mac, ironwifi_guests.client_mac),
-            ap_mac = COALESCE(EXCLUDED.ap_mac, ironwifi_guests.ap_mac),
-            router_id = COALESCE(EXCLUDED.router_id, ironwifi_guests.router_id),
-            captive_portal_name = COALESCE(EXCLUDED.captive_portal_name, ironwifi_guests.captive_portal_name),
-            venue_id = COALESCE(EXCLUDED.venue_id, ironwifi_guests.venue_id),
-            public_ip = COALESCE(EXCLUDED.public_ip, ironwifi_guests.public_ip),
-            last_seen_at = CURRENT_TIMESTAMP,
-            auth_count = ironwifi_guests.auth_count + 1,
-            updated_at = CURRENT_TIMESTAMP
-          RETURNING (xmax = 0) AS was_inserted
-        `, [
-          ironwifiId,
-          username,
-          email,
-          [firstname, lastname].filter(Boolean).join(' ') || null,
-          firstname,
-          lastname,
-          phone,
-          creationDate,  // Use creation_date as auth_date
-          creationDate,
-          clientMac,
-          apMac,
-          routerId,
-          captivePortalName,
-          venueId,
-          publicIp,
-          creationDate  // first_seen_at
-        ]);
-        
-        if (upsertResult.rows[0]?.was_inserted) {
-          results.inserted++;
-        } else {
+
+        // First, try to find existing guest by email or username
+        // This allows CSV data to enrich existing API-synced guests with MAC addresses
+        const existingGuest = await pool.query(
+          `SELECT id, ironwifi_id FROM ironwifi_guests
+           WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)
+           LIMIT 1`,
+          [email || username]
+        );
+
+        if (existingGuest.rows.length > 0) {
+          // Update existing guest with MAC addresses and router link from CSV
+          await pool.query(`
+            UPDATE ironwifi_guests SET
+              client_mac = COALESCE($1, client_mac),
+              ap_mac = COALESCE($2, ap_mac),
+              router_id = COALESCE($3, router_id),
+              firstname = COALESCE($4, firstname),
+              lastname = COALESCE($5, lastname),
+              phone = COALESCE($6, phone),
+              captive_portal_name = COALESCE($7, captive_portal_name),
+              venue_id = COALESCE($8, venue_id),
+              public_ip = COALESCE($9, public_ip),
+              last_seen_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+            WHERE id = $10
+          `, [
+            clientMac,
+            apMac,
+            routerId,
+            firstname,
+            lastname,
+            phone,
+            captivePortalName,
+            venueId,
+            publicIp,
+            existingGuest.rows[0].id
+          ]);
           results.updated++;
+        } else {
+          // No existing guest found - insert new record
+          const ironwifiId = requestId || `csv_${(username || email)}_${creationDate?.toISOString() || Date.now()}`;
+
+          await pool.query(`
+            INSERT INTO ironwifi_guests (
+              ironwifi_id, username, email, fullname, firstname, lastname,
+              phone, auth_date, creation_date, client_mac, ap_mac, router_id,
+              captive_portal_name, venue_id, public_ip, first_seen_at, last_seen_at, auth_count
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, CURRENT_TIMESTAMP, 1)
+            ON CONFLICT (ironwifi_id) DO NOTHING
+          `, [
+            ironwifiId,
+            username,
+            email,
+            [firstname, lastname].filter(Boolean).join(' ') || null,
+            firstname,
+            lastname,
+            phone,
+            creationDate,
+            creationDate,
+            clientMac,
+            apMac,
+            routerId,
+            captivePortalName,
+            venueId,
+            publicIp,
+            creationDate
+          ]);
+          results.inserted++;
         }
         
       } catch (rowError) {
