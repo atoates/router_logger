@@ -30,6 +30,72 @@ const { router: monitoringRoutes } = require('./routes/monitoring');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// IronWifi MAC address diagnostic - runs on startup to help debug router matching
+async function runIronWifiMacDiagnostic() {
+  const { pool } = require('./config/database');
+
+  try {
+    logger.info('=== IronWifi MAC Address Diagnostic ===');
+
+    // Check routers MAC status
+    const routerStats = await pool.query(`
+      SELECT
+        COUNT(*) as total_routers,
+        COUNT(mac_address) FILTER (WHERE mac_address IS NOT NULL AND mac_address != '') as with_mac,
+        COUNT(*) FILTER (WHERE mac_address IS NULL OR mac_address = '') as without_mac
+      FROM routers
+    `);
+    const rs = routerStats.rows[0];
+    logger.info(`Routers: ${rs.total_routers} total, ${rs.with_mac} with MAC, ${rs.without_mac} without MAC`);
+
+    // Sample routers with MAC (to see format)
+    const sampleWithMac = await pool.query(`
+      SELECT router_id, name, mac_address
+      FROM routers
+      WHERE mac_address IS NOT NULL AND mac_address != ''
+      LIMIT 5
+    `);
+    if (sampleWithMac.rows.length > 0) {
+      logger.info('Sample routers with MAC:');
+      sampleWithMac.rows.forEach(r => logger.info(`  ${r.router_id}: ${r.name} -> ${r.mac_address}`));
+    }
+
+    // Check ironwifi_guests linking status
+    const guestStats = await pool.query(`
+      SELECT
+        COUNT(*) as total_guests,
+        COUNT(ap_mac) as with_ap_mac,
+        COUNT(router_id) as linked_to_router,
+        COUNT(DISTINCT ap_mac) as unique_ap_macs
+      FROM ironwifi_guests
+    `);
+    const gs = guestStats.rows[0];
+    logger.info(`Guests: ${gs.total_guests} total, ${gs.with_ap_mac} with ap_mac, ${gs.linked_to_router} linked to router`);
+    logger.info(`Unique ap_mac values: ${gs.unique_ap_macs}`);
+
+    // List unique ap_mac values that AREN'T matching any router
+    const unmatchedAps = await pool.query(`
+      SELECT g.ap_mac, COUNT(*) as guest_count
+      FROM ironwifi_guests g
+      LEFT JOIN routers r ON LOWER(REPLACE(REPLACE(r.mac_address, '-', ':'), ' ', '')) = LOWER(REPLACE(g.ap_mac, '-', ':'))
+      WHERE g.ap_mac IS NOT NULL AND r.router_id IS NULL
+      GROUP BY g.ap_mac
+      ORDER BY guest_count DESC
+      LIMIT 20
+    `);
+    if (unmatchedAps.rows.length > 0) {
+      logger.info(`Unmatched ap_mac values (${unmatchedAps.rows.length} shown):`);
+      unmatchedAps.rows.forEach(r => logger.info(`  ${r.ap_mac} -> ${r.guest_count} guests`));
+    } else {
+      logger.info('All ap_mac values are matched to routers!');
+    }
+
+    logger.info('=== End IronWifi Diagnostic ===');
+  } catch (error) {
+    logger.warn('IronWifi MAC diagnostic failed (non-fatal):', error.message);
+  }
+}
+
 // Validate critical environment variables
 function validateEnvironment() {
   const required = ['DATABASE_URL'];
@@ -228,7 +294,10 @@ async function startServer() {
       logger.info('IronWifi API sync not started (IRONWIFI_API_KEY not set)');
     }
     logger.info('IronWifi webhook endpoint ready at /api/ironwifi/webhook');
-    
+
+    // Run IronWifi MAC address diagnostic on startup
+    await runIronWifiMacDiagnostic();
+
     // Cleanup expired OAuth states every hour
     setInterval(async () => {
       try {
