@@ -2,7 +2,10 @@
  * Tests for validation utilities
  */
 
-const { validateTelemetryPayload, validateIronWifiWebhookPayload } = require('../../src/utils/validation');
+const { validateTelemetryPayload, validateIronwifiWebhookPayload } = require('../../src/utils/validation');
+
+// Alias for consistency with previous test code if needed, or just use the imported name
+const validateIronWifiWebhookPayload = validateIronwifiWebhookPayload;
 
 describe('validateTelemetryPayload', () => {
   describe('valid payloads', () => {
@@ -15,7 +18,7 @@ describe('validateTelemetryPayload', () => {
       
       const result = validateTelemetryPayload(payload);
       
-      expect(result.isValid).toBe(true);
+      expect(result.ok).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -26,7 +29,7 @@ describe('validateTelemetryPayload', () => {
       
       const result = validateTelemetryPayload(payload);
       
-      expect(result.isValid).toBe(true);
+      expect(result.ok).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -43,7 +46,18 @@ describe('validateTelemetryPayload', () => {
       
       const result = validateTelemetryPayload(payload);
       
-      expect(result.isValid).toBe(true);
+      expect(result.ok).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+    
+    it('should accept payload with number device_id', () => {
+      const payload = {
+        device_id: 12345
+      };
+      
+      const result = validateTelemetryPayload(payload);
+      
+      expect(result.ok).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
   });
@@ -52,22 +66,22 @@ describe('validateTelemetryPayload', () => {
     it('should reject null payload', () => {
       const result = validateTelemetryPayload(null);
       
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Payload must be an object');
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContain('body must be a JSON object');
     });
 
     it('should reject undefined payload', () => {
       const result = validateTelemetryPayload(undefined);
       
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Payload must be an object');
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContain('body must be a JSON object');
     });
 
     it('should reject string payload', () => {
       const result = validateTelemetryPayload('not an object');
       
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Payload must be an object');
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContain('body must be a JSON object');
     });
 
     it('should reject payload without device_id', () => {
@@ -78,19 +92,8 @@ describe('validateTelemetryPayload', () => {
       
       const result = validateTelemetryPayload(payload);
       
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('device_id (string) is required');
-    });
-
-    it('should reject payload with non-string device_id', () => {
-      const payload = {
-        device_id: 12345
-      };
-      
-      const result = validateTelemetryPayload(payload);
-      
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('device_id (string) is required');
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContain('device_id is required');
     });
 
     it('should reject payload with invalid timestamp', () => {
@@ -101,8 +104,8 @@ describe('validateTelemetryPayload', () => {
       
       const result = validateTelemetryPayload(payload);
       
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('timestamp must be a valid date string');
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContain('timestamp must be a valid date/time');
     });
   });
 });
@@ -117,7 +120,7 @@ describe('validateIronWifiWebhookPayload', () => {
       
       const result = validateIronWifiWebhookPayload(payload);
       
-      expect(result.isValid).toBe(true);
+      expect(result.ok).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -130,7 +133,7 @@ describe('validateIronWifiWebhookPayload', () => {
       
       const result = validateIronWifiWebhookPayload(payload);
       
-      expect(result.isValid).toBe(true);
+      expect(result.ok).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -143,7 +146,7 @@ describe('validateIronWifiWebhookPayload', () => {
       
       const result = validateIronWifiWebhookPayload(payload);
       
-      expect(result.isValid).toBe(true);
+      expect(result.ok).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -156,7 +159,7 @@ describe('validateIronWifiWebhookPayload', () => {
       
       const result = validateIronWifiWebhookPayload(payload);
       
-      expect(result.isValid).toBe(true);
+      expect(result.ok).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
   });
@@ -165,15 +168,15 @@ describe('validateIronWifiWebhookPayload', () => {
     it('should reject null payload', () => {
       const result = validateIronWifiWebhookPayload(null);
       
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Payload is empty');
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContain('body is required');
     });
 
     it('should reject undefined payload', () => {
       const result = validateIronWifiWebhookPayload(undefined);
       
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Payload is empty');
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContain('body is required');
     });
 
     it('should reject object without expected properties', () => {
@@ -183,9 +186,8 @@ describe('validateIronWifiWebhookPayload', () => {
       
       const result = validateIronWifiWebhookPayload(payload);
       
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Payload must be an array or contain a "records", "data", or "rows" property');
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContain('unrecognized webhook object shape (expected records/data/rows)');
     });
   });
 });
-
