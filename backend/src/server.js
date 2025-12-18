@@ -90,6 +90,40 @@ async function runIronWifiMacDiagnostic() {
       logger.info('All ap_mac values are matched to routers!');
     }
 
+    // Check guests that ARE linked to routers (via router_id column)
+    const linkedGuests = await pool.query(`
+      SELECT g.router_id, r.name as router_name, COUNT(*) as guest_count
+      FROM ironwifi_guests g
+      LEFT JOIN routers r ON g.router_id = r.router_id
+      WHERE g.router_id IS NOT NULL
+      GROUP BY g.router_id, r.name
+      ORDER BY guest_count DESC
+      LIMIT 10
+    `);
+    if (linkedGuests.rows.length > 0) {
+      logger.info(`Guests linked to routers via router_id (top 10):`);
+      linkedGuests.rows.forEach(r => logger.info(`  router_id=${r.router_id}: ${r.router_name || 'NO ROUTER MATCH!'} -> ${r.guest_count} guests`));
+    } else {
+      logger.info('NO guests have router_id set!');
+    }
+
+    // Sample a specific router to debug the query
+    const sampleRouter = await pool.query(`
+      SELECT router_id, name, mac_address FROM routers
+      WHERE mac_address IS NOT NULL AND mac_address != '' LIMIT 1
+    `);
+    if (sampleRouter.rows.length > 0) {
+      const sr = sampleRouter.rows[0];
+      logger.info(`Sample router: ${sr.router_id} (${sr.name}) MAC: ${sr.mac_address}`);
+
+      // Check if any guests are linked to this router
+      const guestsForRouter = await pool.query(
+        'SELECT COUNT(*) FROM ironwifi_guests WHERE router_id = $1',
+        [sr.router_id]
+      );
+      logger.info(`  Guests with router_id=${sr.router_id}: ${guestsForRouter.rows[0].count}`);
+    }
+
     logger.info('=== End IronWifi Diagnostic ===');
   } catch (error) {
     logger.warn('IronWifi MAC diagnostic failed (non-fatal):', error.message);

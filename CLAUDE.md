@@ -11,20 +11,22 @@ RouterLogger is a monitoring system for Teltonika RUT200 routers with integratio
 - **Frontend**: React
 - **Deployment**: Railway (auto-deploys on git push to main)
 
-## Deployment Process
+## Deployment & Testing Strategy (Preferred Method)
 
-### To deploy changes:
-1. Make changes to code
-2. `git add . && git commit -m "message"`
-3. `git push`
-4. Railway automatically deploys from main branch
-5. Wait ~2-3 minutes for deployment to complete
-6. Check Railway logs for startup output
+**The best way to verify changes is to deploy and check logs.**
+Local testing is limited because there is no local database access.
 
-### Running diagnostics on deploy:
-Since there's no local PostgreSQL access, add diagnostic code to `backend/src/server.js` in the `startServer()` function. It runs on every deploy and logs to Railway.
+### Verification Workflow:
+1. **Write Tests**: Create Jest unit tests in `backend/tests/`.
+2. **Commit & Push**: `git push` triggers Railway deployment.
+3. **Wait for Build**: Railway will run `npm test` during the build phase (configured in package.json).
+   - If tests fail, deployment halts (Safe!).
+4. **Check Logs**: For runtime verification, use the "Diagnostic on Startup" pattern below.
 
-Example pattern (see `runIronWifiMacDiagnostic()` in server.js):
+### Running diagnostics on startup:
+Add diagnostic code to `backend/src/server.js` in the `startServer()` function. It runs on every deploy.
+
+Example pattern:
 ```javascript
 async function runMyDiagnostic() {
   const { pool } = require('./config/database');
@@ -35,7 +37,6 @@ async function runMyDiagnostic() {
     logger.warn('Diagnostic failed (non-fatal):', error.message);
   }
 }
-
 // Call in startServer() before app.listen():
 await runMyDiagnostic();
 ```
