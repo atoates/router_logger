@@ -881,6 +881,49 @@ async function autoCreateClickUpTask(router) {
     const frontendUrl = process.env.FRONTEND_URL || 'https://routerlogger-frontend-production.up.railway.app';
     const customFields = [];
 
+    // --- Idempotency check: look for an existing task in the Routers list that already
+    // matches this router by custom field (ROUTER_ID or IMEI) or by name. If found,
+    // link that task instead of creating a new one to avoid duplicates.
+    try {
+      const sampleTasks = await clickupClient.getTasks(routersListId, { page: 0, limit: 200 }, 'default');
+
+      const existing = sampleTasks.find(t => {
+        // Match by custom field ROUTER_ID
+        const hasRouterId = !!t.custom_fields?.find(f => f.id === CUSTOM_FIELDS.ROUTER_ID && String(f.value) === String(router.router_id));
+        if (hasRouterId) return true;
+
+        // Match by IMEI if available
+        if (router.imei) {
+          const hasImei = !!t.custom_fields?.find(f => f.id === CUSTOM_FIELDS.IMEI && String(f.value) === String(router.imei));
+          if (hasImei) return true;
+        }
+
+        // Fallback: match by name
+        const expectedName = router.name || `Router #${router.router_id}`;
+        if (t.name === expectedName) return true;
+
+        return false;
+      });
+
+      if (existing) {
+        const taskUrl = existing.url || `https://app.clickup.com/t/${existing.id}`;
+        await pool.query(
+          `UPDATE routers
+           SET clickup_task_id = $1,
+               clickup_task_url = $2,
+               clickup_list_id = $3
+           WHERE router_id = $4`,
+          [existing.id, taskUrl, routersListId, router.router_id]
+        );
+
+        logger.info(`Linked existing ClickUp task ${existing.id} to router ${router.router_id} (${router.name || 'unnamed'})`);
+        return existing;
+      }
+    } catch (err) {
+      logger.warn('Idempotency check failed while searching for existing ClickUp tasks:', err.message);
+      // Continue to create task if check fails
+    }
+
     // Router ID (text) - required
     customFields.push({
       id: CUSTOM_FIELDS.ROUTER_ID,
