@@ -32,11 +32,37 @@ router.get('/debug/duplicates', async (req, res) => {
       ...report,
       serverTime: new Date().toISOString(),
       recommendation: report.totalDuplicateGroups > 0 
-        ? 'Run POST /api/rms/admin/merge-duplicates to merge these routers (requires admin auth)'
+        ? 'Run POST /api/rms/debug/merge-duplicates to merge these routers'
         : 'No duplicates found'
     });
   } catch (error) {
     res.status(500).json({ error: error.message, stack: error.stack });
+  }
+});
+
+// Public endpoint to merge duplicate routers (keeps 10-digit serials, removes old 7-digit ones)
+// This is a one-time cleanup operation
+router.post('/debug/merge-duplicates', async (req, res) => {
+  try {
+    const { mergeDuplicateRouters } = require('../models/routerMaintenance');
+    const { logger } = require('../config/database');
+    
+    logger.info('Starting duplicate router merge...');
+    const result = await mergeDuplicateRouters();
+    logger.info(`Merge complete: ${result.routersMerged} routers merged, ${result.logsMoved} logs moved`);
+    
+    res.json({
+      success: true,
+      message: `Merged ${result.routersMerged} duplicate routers`,
+      ...result,
+      serverTime: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message, 
+      stack: error.stack 
+    });
   }
 });
 
