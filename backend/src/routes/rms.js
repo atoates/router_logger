@@ -2,6 +2,43 @@ const express = require('express');
 const router = express.Router();
 const { requireAdmin } = require('./session');
 const { pool } = require('../config/database');
+const { getDeduplicationReport } = require('../models/routerMaintenance');
+
+// Public debug endpoint for duplicate routers (no auth required for diagnostics)
+router.get('/debug/duplicates', async (req, res) => {
+  try {
+    const report = await getDeduplicationReport();
+    
+    // Also get detailed log counts for each duplicate
+    for (const group of report.duplicates) {
+      for (const r of group.routers) {
+        // Get more details about each router's logs
+        const logStats = await pool.query(`
+          SELECT 
+            MIN(timestamp) as first_log,
+            MAX(timestamp) as last_log,
+            COUNT(*) as total_logs
+          FROM router_logs 
+          WHERE router_id = $1
+        `, [r.router_id]);
+        
+        r.first_log = logStats.rows[0]?.first_log;
+        r.last_log = logStats.rows[0]?.last_log;
+        r.total_logs = Number(logStats.rows[0]?.total_logs || 0);
+      }
+    }
+    
+    res.json({
+      ...report,
+      serverTime: new Date().toISOString(),
+      recommendation: report.totalDuplicateGroups > 0 
+        ? 'Run POST /api/rms/admin/merge-duplicates to merge these routers (requires admin auth)'
+        : 'No duplicates found'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message, stack: error.stack });
+  }
+});
 
 // Debug endpoint for router location data (lat/lng from cell tower)
 router.get('/debug/router-location/:routerId', async (req, res) => {
