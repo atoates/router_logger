@@ -7,6 +7,11 @@ const clickupClient = require('./clickupClient');
 const lastGeoLookup = new Map();
 const GEO_LOOKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+// Track pending offline notifications (router_id -> { timestamp, clickupTaskId, scheduled })
+// Offline comments are delayed by 2 hours to avoid noise from brief disconnections
+const pendingOfflineNotifications = new Map();
+const OFFLINE_NOTIFICATION_DELAY_MS = 2 * 60 * 60 * 1000; // 2 hours
+
 // Distance threshold for "significant" location change (in meters)
 const LOCATION_CHANGE_THRESHOLD_METERS = 500;
 
@@ -310,7 +315,7 @@ async function processRouterTelemetry(data) {
     
     // Check if status changed between online and offline
     if (prevStatusNormalized && newStatusNormalized && prevStatusNormalized !== newStatusNormalized) {
-      // Status changed - add comment to ClickUp task AND update Operational Status field immediately
+      // Status changed - handle ClickUp notifications
       try {
         // Get router's ClickUp task ID
         const routerResult = await pool.query(
@@ -320,33 +325,116 @@ async function processRouterTelemetry(data) {
         
         if (routerResult.rows.length > 0 && routerResult.rows[0].clickup_task_id) {
           const clickupTaskId = routerResult.rows[0].clickup_task_id;
+          const routerId = data.device_id;
           
-          const statusEmoji = newStatusNormalized === 'online' ? '🟢' : '🔴';
-          const statusText = newStatusNormalized === 'online' ? 'Online' : 'Offline';
-          const previousStatusText = prevStatusNormalized === 'online' ? 'Online' : 'Offline';
-          
-          const commentText = `${statusEmoji} **System:** Router status changed\n\n` +
-            `**Previous:** ${previousStatusText}\n` +
-            `**Current:** ${statusText}\n\n` +
-            `🕐 Changed at: ${new Date(logData.timestamp).toLocaleString()}`;
-          
-          // Post comment to ClickUp
-          await clickupClient.createTaskComment(
-            clickupTaskId,
-            commentText,
-            { notifyAll: false },
-            'default'
-          );
-          
-          logger.info('Added status change comment to router task', {
-            routerId: data.device_id,
-            clickupTaskId,
-            previousStatus: prevStatusNormalized,
-            newStatus: newStatusNormalized
-          });
+          if (newStatusNormalized === 'online') {
+            // Router came back online - cancel any pending offline notification
+            if (pendingOfflineNotifications.has(routerId)) {
+              const pending = pendingOfflineNotifications.get(routerId);
+              if (pending.timeoutId) {
+                clearTimeout(pending.timeoutId);
+              }
+              pendingOfflineNotifications.delete(routerId);
+              logger.info('Cancelled pending offline notification - router came back online', {
+                routerId,
+                wasOfflineFor: Date.now() - pending.timestamp
+              });
+            }
+            
+            // Post online comment immediately
+            const commentText = `🟢 **System:** Router status changed\n\n` +
+              `**Previous:** Offline\n` +
+              `**Current:** Online\n\n` +
+              `🕐 Changed at: ${new Date(logData.timestamp).toLocaleString()}`;
+            
+            await clickupClient.createTaskComment(
+              clickupTaskId,
+              commentText,
+              { notifyAll: false },
+              'default'
+            );
+            
+            logger.info('Added online status comment to router task', {
+              routerId,
+              clickupTaskId
+            });
+            
+          } else {
+            // Router went offline - schedule delayed notification (2 hours)
+            // Don't post immediately to avoid noise from brief disconnections
+            
+            // Cancel any existing pending notification first
+            if (pendingOfflineNotifications.has(routerId)) {
+              const existing = pendingOfflineNotifications.get(routerId);
+              if (existing.timeoutId) {
+                clearTimeout(existing.timeoutId);
+              }
+            }
+            
+            const offlineTimestamp = logData.timestamp;
+            
+            const timeoutId = setTimeout(async () => {
+              try {
+                // Check if router is still offline before posting
+                const currentStatusResult = await pool.query(
+                  'SELECT current_status FROM routers WHERE router_id = $1',
+                  [routerId]
+                );
+                
+                const currentStatus = currentStatusResult.rows[0]?.current_status;
+                const isStillOffline = currentStatus && currentStatus.toLowerCase() !== 'online';
+                
+                if (isStillOffline) {
+                  const commentText = `🔴 **System:** Router offline for extended period\n\n` +
+                    `**Previous:** Online\n` +
+                    `**Current:** Offline\n\n` +
+                    `🕐 Went offline at: ${new Date(offlineTimestamp).toLocaleString()}\n` +
+                    `⏱️ Offline duration: 2+ hours`;
+                  
+                  await clickupClient.createTaskComment(
+                    clickupTaskId,
+                    commentText,
+                    { notifyAll: false },
+                    'default'
+                  );
+                  
+                  logger.info('Posted delayed offline notification to ClickUp (2hr threshold)', {
+                    routerId,
+                    clickupTaskId,
+                    offlineSince: offlineTimestamp
+                  });
+                } else {
+                  logger.info('Skipped offline notification - router came back online', {
+                    routerId,
+                    currentStatus
+                  });
+                }
+              } catch (delayedError) {
+                logger.warn('Failed to post delayed offline notification', {
+                  routerId,
+                  error: delayedError.message
+                });
+              } finally {
+                pendingOfflineNotifications.delete(routerId);
+              }
+            }, OFFLINE_NOTIFICATION_DELAY_MS);
+            
+            pendingOfflineNotifications.set(routerId, {
+              timestamp: Date.now(),
+              offlineTimestamp,
+              clickupTaskId,
+              timeoutId
+            });
+            
+            logger.info('Scheduled offline notification for 2 hours from now', {
+              routerId,
+              clickupTaskId,
+              scheduledFor: new Date(Date.now() + OFFLINE_NOTIFICATION_DELAY_MS).toISOString()
+            });
+          }
           
           // IMMEDIATELY update Operational Status custom field in ClickUp
-          // Don't wait for the scheduled sync - status changes should be reflected in real-time
+          // This always happens regardless of comment delay
           try {
             const { CLICKUP_FIELD_IDS } = require('../config/constants');
             const STATUS_OPTIONS = {
@@ -366,11 +454,11 @@ async function processRouterTelemetry(data) {
             logger.info('Immediately updated Operational Status field in ClickUp', {
               routerId: data.device_id,
               clickupTaskId,
-              newStatus: statusText,
+              newStatus: newStatusNormalized,
               fieldValue: statusValue
             });
           } catch (fieldError) {
-            logger.warn('Failed to update Operational Status field (comment still posted)', {
+            logger.warn('Failed to update Operational Status field', {
               routerId: data.device_id,
               error: fieldError.message
             });
@@ -378,7 +466,7 @@ async function processRouterTelemetry(data) {
           }
         }
       } catch (commentError) {
-        logger.warn('Failed to add status change comment (telemetry still processed)', {
+        logger.warn('Failed to handle status change notification (telemetry still processed)', {
           routerId: data.device_id,
           error: commentError.message
         });

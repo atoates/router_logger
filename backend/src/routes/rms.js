@@ -727,38 +727,43 @@ router.post('/status/:routerId', async (req, res) => {
       }
       
       // Check if status changed between online and offline
+      // Note: Offline notifications are handled by telemetryProcessor with 2-hour delay
+      // This webhook only posts immediate online notifications
       if (prevStatusNormalized && newStatusNormalized && prevStatusNormalized !== newStatusNormalized) {
-        // Status changed - add comment to ClickUp task AND update Operational Status field immediately
         const clickupTaskId = previousResult.rows[0]?.clickup_task_id;
         if (clickupTaskId) {
           try {
             const clickupClient = require('../services/clickupClient');
-            const statusEmoji = newStatusNormalized === 'online' ? '🟢' : '🔴';
-            const statusText = newStatusNormalized === 'online' ? 'Online' : 'Offline';
-            const previousStatusText = prevStatusNormalized === 'online' ? 'Online' : 'Offline';
             
-            const commentText = `${statusEmoji} **System:** Router status changed\n\n` +
-              `**Previous:** ${previousStatusText}\n` +
-              `**Current:** ${statusText}\n\n` +
-              `🕐 Changed at: ${new Date().toLocaleString()}`;
-            
-            // Post comment to ClickUp
-            await clickupClient.createTaskComment(
-              clickupTaskId,
-              commentText,
-              { notifyAll: false },
-              'default'
-            );
-            
-            logger.info('Added status change comment to router task', {
-              routerId,
-              clickupTaskId,
-              previousStatus: prevStatusNormalized,
-              newStatus: newStatusNormalized
-            });
+            // Only post immediate comment for online status changes
+            // Offline notifications are delayed 2 hours (handled in telemetryProcessor)
+            if (newStatusNormalized === 'online') {
+              const commentText = `🟢 **System:** Router status changed\n\n` +
+                `**Previous:** Offline\n` +
+                `**Current:** Online\n\n` +
+                `🕐 Changed at: ${new Date().toLocaleString()}`;
+              
+              await clickupClient.createTaskComment(
+                clickupTaskId,
+                commentText,
+                { notifyAll: false },
+                'default'
+              );
+              
+              logger.info('Added online status comment to router task', {
+                routerId,
+                clickupTaskId
+              });
+            } else {
+              // Offline - don't post comment immediately, telemetryProcessor handles the 2hr delay
+              logger.info('Router went offline - notification will be delayed 2 hours', {
+                routerId,
+                clickupTaskId
+              });
+            }
             
             // IMMEDIATELY update Operational Status custom field in ClickUp
-            // Don't wait for the scheduled sync - status changes should be reflected in real-time
+            // This always happens regardless of comment delay
             try {
               const { CLICKUP_FIELD_IDS } = require('../config/constants');
               const STATUS_OPTIONS = {
@@ -778,18 +783,18 @@ router.post('/status/:routerId', async (req, res) => {
               logger.info('Immediately updated Operational Status field in ClickUp', {
                 routerId,
                 clickupTaskId,
-                newStatus: statusText,
+                newStatus: newStatusNormalized,
                 fieldValue: statusValue
               });
             } catch (fieldError) {
-              logger.warn('Failed to update Operational Status field (comment still posted)', {
+              logger.warn('Failed to update Operational Status field', {
                 routerId,
                 error: fieldError.message
               });
               // Don't fail if just the custom field update fails
             }
           } catch (commentError) {
-            logger.warn('Failed to add status change comment (status still updated)', {
+            logger.warn('Failed to handle status change notification (status still updated)', {
               routerId,
               error: commentError.message
             });
