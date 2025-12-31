@@ -107,6 +107,137 @@ router.get('/debug/clickup-status', async (req, res) => {
   }
 });
 
+// Debug endpoint to fetch recent ClickUp comments from router tasks
+router.get('/debug/clickup-comments', async (req, res) => {
+  try {
+    const clickupClient = require('../services/clickupClient');
+    const limit = parseInt(req.query.limit) || 10;
+    
+    // Get routers with ClickUp tasks
+    const routersResult = await pool.query(`
+      SELECT router_id, name, clickup_task_id, clickup_task_url
+      FROM routers
+      WHERE clickup_task_id IS NOT NULL
+      ORDER BY name
+      LIMIT $1
+    `, [limit]);
+    
+    const routersWithComments = [];
+    const errors = [];
+    
+    // Fetch comments for each router task
+    for (const router of routersResult.rows) {
+      try {
+        const commentsData = await clickupClient.getTaskComments(router.clickup_task_id);
+        const comments = commentsData?.comments || [];
+        
+        if (comments.length > 0) {
+          routersWithComments.push({
+            routerId: router.router_id,
+            routerName: router.name,
+            clickupTaskId: router.clickup_task_id,
+            clickupTaskUrl: router.clickup_task_url,
+            commentCount: comments.length,
+            comments: comments.map(c => ({
+              id: c.id,
+              text: c.comment_text,
+              date: c.date ? new Date(parseInt(c.date)).toISOString() : null,
+              user: c.user?.username || c.user?.email || 'Unknown'
+            }))
+          });
+        }
+      } catch (err) {
+        errors.push({
+          routerId: router.router_id,
+          routerName: router.name,
+          error: err.message
+        });
+      }
+    }
+    
+    res.json({
+      summary: {
+        routersChecked: routersResult.rows.length,
+        routersWithComments: routersWithComments.length,
+        totalComments: routersWithComments.reduce((sum, r) => sum + r.commentCount, 0),
+        errors: errors.length
+      },
+      routersWithComments,
+      errors: errors.length > 0 ? errors : undefined,
+      serverTime: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message, stack: error.stack });
+  }
+});
+
+// Debug endpoint to fetch ALL ClickUp comments across all router tasks
+router.get('/debug/clickup-all-comments', async (req, res) => {
+  try {
+    const clickupClient = require('../services/clickupClient');
+    
+    // Get ALL routers with ClickUp tasks
+    const routersResult = await pool.query(`
+      SELECT router_id, name, clickup_task_id, clickup_task_url
+      FROM routers
+      WHERE clickup_task_id IS NOT NULL
+      ORDER BY name
+    `);
+    
+    const allComments = [];
+    const errors = [];
+    let routersWithComments = 0;
+    
+    // Fetch comments for each router task
+    for (const router of routersResult.rows) {
+      try {
+        const commentsData = await clickupClient.getTaskComments(router.clickup_task_id);
+        const comments = commentsData?.comments || [];
+        
+        if (comments.length > 0) {
+          routersWithComments++;
+          for (const c of comments) {
+            allComments.push({
+              routerId: router.router_id,
+              routerName: router.name,
+              clickupTaskId: router.clickup_task_id,
+              commentId: c.id,
+              text: c.comment_text,
+              date: c.date ? new Date(parseInt(c.date)).toISOString() : null,
+              dateTimestamp: c.date,
+              user: c.user?.username || c.user?.email || 'Unknown'
+            });
+          }
+        }
+      } catch (err) {
+        errors.push({
+          routerId: router.router_id,
+          routerName: router.name,
+          error: err.message
+        });
+      }
+    }
+    
+    // Sort all comments by date (most recent first)
+    allComments.sort((a, b) => (b.dateTimestamp || 0) - (a.dateTimestamp || 0));
+    
+    res.json({
+      summary: {
+        totalRoutersWithTasks: routersResult.rows.length,
+        routersWithComments,
+        totalComments: allComments.length,
+        errors: errors.length
+      },
+      recentComments: allComments.slice(0, 50), // Top 50 most recent
+      allComments,
+      errors: errors.length > 0 ? errors : undefined,
+      serverTime: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message, stack: error.stack });
+  }
+});
+
 // Debug endpoint for router location data (lat/lng from cell tower)
 router.get('/debug/router-location/:routerId', async (req, res) => {
   try {

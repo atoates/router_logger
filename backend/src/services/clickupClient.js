@@ -540,6 +540,47 @@ class ClickUpClient {
   }
 
   /**
+   * Get comments from a task
+   * @param {string} taskId - Task ID
+   * @param {string} userId - User identifier
+   * @returns {Promise<Object>} Task comments
+   */
+  async getTaskComments(taskId, userId = 'default') {
+    let attempt = 0;
+    return retryWithBackoff(async () => {
+      const isRetry = attempt > 0;
+      attempt++;
+      
+      try {
+        const client = await this.getAuthorizedClient(userId);
+        
+        logger.info('ClickUp getTaskComments request:', { taskId });
+        
+        const response = await client.get(`/task/${taskId}/comment`);
+        
+        trackClickUpCall('getTaskComments', response.status, isRetry);
+        
+        logger.info('ClickUp getTaskComments response:', {
+          taskId,
+          commentCount: response.data?.comments?.length || 0,
+          status: response.status
+        });
+        
+        return response.data;
+      } catch (error) {
+        trackClickUpCall('getTaskComments', error.response?.status || 500, isRetry);
+        logger.error('Error getting task comments:', {
+          taskId,
+          status: error.response?.status,
+          errorData: error.response?.data,
+          message: error.message
+        });
+        throw error;
+      }
+    }, 3, `getTaskComments(${taskId})`);
+  }
+
+  /**
    * Upload an attachment to a task
    * @param {string} taskId - Task ID
    * @param {Buffer} fileBuffer - File data as buffer
