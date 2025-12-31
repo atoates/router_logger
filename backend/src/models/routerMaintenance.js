@@ -214,11 +214,54 @@ async function cleanupOrphanedLogs() {
   }
 }
 
+/**
+ * Auto-merge duplicates if any are found
+ * Called automatically after RMS sync to prevent duplicate buildup
+ * Only merges if duplicates are detected (safe to call frequently)
+ * 
+ * @returns {Object} Summary of any merges performed
+ */
+async function autoMergeDuplicatesIfNeeded() {
+  try {
+    // Quick check for duplicates first
+    const checkResult = await pool.query(`
+      SELECT COUNT(*) as dup_count FROM (
+        SELECT LOWER(name) as name_lower
+        FROM routers
+        WHERE name IS NOT NULL AND name != ''
+        GROUP BY LOWER(name)
+        HAVING COUNT(*) > 1
+      ) duplicates
+    `);
+    
+    const dupCount = Number(checkResult.rows[0]?.dup_count || 0);
+    
+    if (dupCount === 0) {
+      return { duplicatesFound: 0, merged: false };
+    }
+    
+    logger.warn(`Found ${dupCount} duplicate router groups - auto-merging...`);
+    const result = await mergeDuplicateRouters();
+    logger.info(`Auto-merge complete: ${result.routersMerged} routers merged, ${result.logsMoved} logs moved`);
+    
+    return { 
+      duplicatesFound: dupCount, 
+      merged: true, 
+      ...result 
+    };
+  } catch (error) {
+    logger.error('Error in autoMergeDuplicatesIfNeeded:', error);
+    // Don't throw - this is a background cleanup task
+    return { duplicatesFound: 0, merged: false, error: error.message };
+  }
+}
+
 module.exports = {
   mergeDuplicateRouters,
   getDeduplicationReport,
   archiveOldLogs,
   purgeArchivedLogs,
-  cleanupOrphanedLogs
+  cleanupOrphanedLogs,
+  autoMergeDuplicatesIfNeeded
 };
 
