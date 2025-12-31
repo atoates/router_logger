@@ -66,6 +66,89 @@ router.post('/debug/merge-duplicates', async (req, res) => {
   }
 });
 
+// Debug endpoint to test PDF upload to ClickUp
+router.post('/debug/test-pdf-upload', async (req, res) => {
+  try {
+    const clickupClient = require('../services/clickupClient');
+    
+    // Get a router with a ClickUp task
+    const routerResult = await pool.query(`
+      SELECT router_id, name, clickup_task_id
+      FROM routers
+      WHERE clickup_task_id IS NOT NULL
+      LIMIT 1
+    `);
+    
+    if (routerResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No routers with ClickUp tasks found' });
+    }
+    
+    const router = routerResult.rows[0];
+    
+    // Create a simple test PDF (minimal valid PDF)
+    const testPdfContent = `%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
+4 0 obj << /Length 44 >> stream
+BT /F1 12 Tf 100 700 Td (Test PDF) Tj ET
+endstream endobj
+xref
+0 5
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000214 00000 n 
+trailer << /Size 5 /Root 1 0 R >>
+startxref
+307
+%%EOF`;
+    
+    const pdfBuffer = Buffer.from(testPdfContent, 'utf-8');
+    const filename = `test-upload-${Date.now()}.pdf`;
+    
+    logger.info('Testing PDF upload to ClickUp', {
+      routerId: router.router_id,
+      clickupTaskId: router.clickup_task_id,
+      filename,
+      bufferSize: pdfBuffer.length
+    });
+    
+    // Try to upload
+    const result = await clickupClient.createCommentWithAttachment(
+      router.clickup_task_id,
+      `🧪 **Test Upload**\n\nThis is a test PDF upload from the debug endpoint.\n\n🕐 Time: ${new Date().toISOString()}`,
+      pdfBuffer,
+      filename,
+      'default'
+    );
+    
+    res.json({
+      success: true,
+      message: 'PDF uploaded successfully',
+      router: {
+        id: router.router_id,
+        name: router.name,
+        clickupTaskId: router.clickup_task_id
+      },
+      result: {
+        attachmentId: result.attachment?.id,
+        commentId: result.comment?.id
+      },
+      serverTime: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Test PDF upload failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: error.stack,
+      response: error.response?.data
+    });
+  }
+});
+
 // Debug endpoint to check ClickUp task status for all routers
 router.get('/debug/clickup-status', async (req, res) => {
   try {
