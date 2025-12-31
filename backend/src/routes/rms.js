@@ -66,6 +66,47 @@ router.post('/debug/merge-duplicates', async (req, res) => {
   }
 });
 
+// Debug endpoint to check ClickUp task status for all routers
+router.get('/debug/clickup-status', async (req, res) => {
+  try {
+    // Get routers with and without ClickUp tasks
+    const result = await pool.query(`
+      SELECT 
+        COUNT(*) as total_routers,
+        COUNT(clickup_task_id) as with_clickup_task,
+        COUNT(*) - COUNT(clickup_task_id) as without_clickup_task
+      FROM routers
+    `);
+    
+    // Get list of routers without ClickUp tasks
+    const missingTasks = await pool.query(`
+      SELECT router_id, name, created_at, last_seen
+      FROM routers
+      WHERE clickup_task_id IS NULL
+      ORDER BY name
+      LIMIT 20
+    `);
+    
+    // Get sample of routers with ClickUp tasks
+    const withTasks = await pool.query(`
+      SELECT router_id, name, clickup_task_id, clickup_task_url
+      FROM routers
+      WHERE clickup_task_id IS NOT NULL
+      ORDER BY name
+      LIMIT 10
+    `);
+    
+    res.json({
+      summary: result.rows[0],
+      routersWithoutClickUpTasks: missingTasks.rows,
+      sampleRoutersWithTasks: withTasks.rows,
+      serverTime: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Debug endpoint for router location data (lat/lng from cell tower)
 router.get('/debug/router-location/:routerId', async (req, res) => {
   try {
