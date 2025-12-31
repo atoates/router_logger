@@ -670,6 +670,45 @@ async function logInspection(routerId, inspectedBy = null, notes = null) {
     `;
     const result = await pool.query(query, [routerId, inspectedBy, notes]);
     logger.info(`Logged inspection for router ${routerId}`);
+    
+    // Post comment to ClickUp
+    try {
+      const clickupClient = require('../services/clickupClient');
+      const routerResult = await pool.query(
+        'SELECT clickup_task_id, name FROM routers WHERE router_id = $1',
+        [routerId]
+      );
+      
+      if (routerResult.rows.length > 0 && routerResult.rows[0].clickup_task_id) {
+        const clickupTaskId = routerResult.rows[0].clickup_task_id;
+        const routerName = routerResult.rows[0].name || routerId;
+        
+        const commentText = `✅ **System:** Inspection completed\n\n` +
+          (inspectedBy ? `👤 **Inspected by:** ${inspectedBy}\n` : '') +
+          (notes ? `📝 **Notes:** ${notes}\n` : '') +
+          `\n🕐 Inspected at: ${new Date().toLocaleString()}`;
+        
+        await clickupClient.createTaskComment(
+          clickupTaskId,
+          commentText,
+          { notifyAll: false },
+          'default'
+        );
+        
+        logger.info('Posted inspection comment to ClickUp', {
+          routerId,
+          routerName,
+          clickupTaskId,
+          inspectedBy
+        });
+      }
+    } catch (clickupError) {
+      logger.warn('Failed to post inspection comment to ClickUp (inspection still logged)', {
+        routerId,
+        error: clickupError.message
+      });
+    }
+    
     return result.rows[0];
   } catch (error) {
     logger.error('Error logging inspection:', error);

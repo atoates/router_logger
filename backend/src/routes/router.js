@@ -987,10 +987,39 @@ router.patch('/routers/:router_id/notes', requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Router not found' });
     }
 
+    const router = result.rows[0];
     logger.info(`Updated notes for router ${router_id}`);
+    
+    // Post comment to ClickUp if notes were updated and router has a task
+    if (notes && router.clickup_task_id) {
+      try {
+        const commentText = `📝 **System:** Notes updated\n\n` +
+          `**Notes:** ${notes}\n\n` +
+          `🕐 Updated at: ${new Date().toLocaleString()}` +
+          (req.user?.username ? `\n👤 Updated by: ${req.user.username}` : '');
+        
+        await clickupClient.createTaskComment(
+          router.clickup_task_id,
+          commentText,
+          { notifyAll: false },
+          'default'
+        );
+        
+        logger.info('Posted notes update comment to ClickUp', {
+          routerId: router_id,
+          clickupTaskId: router.clickup_task_id
+        });
+      } catch (clickupError) {
+        logger.warn('Failed to post notes update comment to ClickUp', {
+          routerId: router_id,
+          error: clickupError.message
+        });
+      }
+    }
+    
     res.json({ 
       success: true, 
-      router: result.rows[0]
+      router
     });
 
   } catch (error) {

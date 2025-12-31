@@ -15,6 +15,13 @@ const OFFLINE_NOTIFICATION_DELAY_MS = 2 * 60 * 60 * 1000; // 2 hours
 // Distance threshold for "significant" location change (in meters)
 const LOCATION_CHANGE_THRESHOLD_METERS = 500;
 
+// Track disconnection events for frequent disconnection alerts
+// Map: router_id -> { events: [{timestamp}], lastAlertTime }
+const disconnectionTracker = new Map();
+const DISCONNECTION_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+const DISCONNECTION_THRESHOLD = 5; // Alert after 5 disconnections in 24h
+const DISCONNECTION_ALERT_COOLDOWN_MS = 24 * 60 * 60 * 1000; // Only alert once per 24h
+
 /**
  * Calculate distance between two coordinates using Haversine formula
  * Returns distance in meters
@@ -472,7 +479,27 @@ async function processRouterTelemetry(data) {
         });
         // Don't fail the telemetry processing if comment fails
       }
+      
+      // Track disconnection for frequent disconnection alerts
+      if (newStatusNormalized === 'offline' && prevStatusNormalized === 'online') {
+        trackDisconnection(data.device_id);
+      }
     }
+    
+    // Check for cell tower change
+    if (previousLog && logData.cell_id && previousLog.cell_id && logData.cell_id !== previousLog.cell_id) {
+      await postCellTowerChangeComment(data.device_id, previousLog.cell_id, logData.cell_id, logData.operator);
+    }
+    
+    // Check for operator change
+    if (previousLog && logData.operator && previousLog.operator && 
+        logData.operator !== previousLog.operator && 
+        previousLog.operator !== 'Unknown' && logData.operator !== 'Unknown') {
+      await postOperatorChangeComment(data.device_id, previousLog.operator, logData.operator);
+    }
+    
+    // Check for frequent disconnections alert
+    await checkFrequentDisconnections(data.device_id);
     
     logger.info(`Processed telemetry from router ${data.device_id}, last_seen updated to ${logData.timestamp}`);
     
@@ -480,6 +507,167 @@ async function processRouterTelemetry(data) {
   } catch (error) {
     logger.error('Error processing telemetry:', error);
     throw error;
+  }
+}
+
+/**
+ * Track a disconnection event for a router
+ */
+function trackDisconnection(routerId) {
+  const now = Date.now();
+  let tracker = disconnectionTracker.get(routerId);
+  
+  if (!tracker) {
+    tracker = { events: [], lastAlertTime: 0 };
+    disconnectionTracker.set(routerId, tracker);
+  }
+  
+  // Add new event
+  tracker.events.push({ timestamp: now });
+  
+  // Clean up old events outside the window
+  tracker.events = tracker.events.filter(e => now - e.timestamp < DISCONNECTION_WINDOW_MS);
+  
+  logger.debug(`Tracked disconnection for ${routerId}, total in window: ${tracker.events.length}`);
+}
+
+/**
+ * Check if a router has frequent disconnections and post alert
+ */
+async function checkFrequentDisconnections(routerId) {
+  const tracker = disconnectionTracker.get(routerId);
+  if (!tracker) return;
+  
+  const now = Date.now();
+  const recentEvents = tracker.events.filter(e => now - e.timestamp < DISCONNECTION_WINDOW_MS);
+  
+  // Check if threshold exceeded and cooldown has passed
+  if (recentEvents.length >= DISCONNECTION_THRESHOLD && 
+      now - tracker.lastAlertTime > DISCONNECTION_ALERT_COOLDOWN_MS) {
+    
+    try {
+      const routerResult = await pool.query(
+        'SELECT clickup_task_id, name FROM routers WHERE router_id = $1',
+        [routerId]
+      );
+      
+      if (routerResult.rows.length > 0 && routerResult.rows[0].clickup_task_id) {
+        const clickupTaskId = routerResult.rows[0].clickup_task_id;
+        const routerName = routerResult.rows[0].name || routerId;
+        
+        const commentText = `⚠️ **System:** Frequent disconnections detected\n\n` +
+          `📊 **${recentEvents.length} disconnections** in the last 24 hours\n\n` +
+          `This may indicate:\n` +
+          `• Unstable power supply\n` +
+          `• Poor cellular signal\n` +
+          `• Network congestion\n` +
+          `• Hardware issues\n\n` +
+          `🕐 Alert time: ${new Date().toLocaleString()}`;
+        
+        await clickupClient.createTaskComment(
+          clickupTaskId,
+          commentText,
+          { notifyAll: false },
+          'default'
+        );
+        
+        tracker.lastAlertTime = now;
+        
+        logger.info('Posted frequent disconnection alert', {
+          routerId,
+          routerName,
+          disconnectionCount: recentEvents.length,
+          clickupTaskId
+        });
+      }
+    } catch (error) {
+      logger.warn('Failed to post frequent disconnection alert', {
+        routerId,
+        error: error.message
+      });
+    }
+  }
+}
+
+/**
+ * Post comment when cell tower changes
+ */
+async function postCellTowerChangeComment(routerId, oldCellId, newCellId, operator) {
+  try {
+    const routerResult = await pool.query(
+      'SELECT clickup_task_id, name FROM routers WHERE router_id = $1',
+      [routerId]
+    );
+    
+    if (routerResult.rows.length > 0 && routerResult.rows[0].clickup_task_id) {
+      const clickupTaskId = routerResult.rows[0].clickup_task_id;
+      
+      const commentText = `📡 **System:** Cell tower changed\n\n` +
+        `**Previous Cell ID:** ${oldCellId}\n` +
+        `**New Cell ID:** ${newCellId}\n` +
+        (operator ? `**Operator:** ${operator}\n` : '') +
+        `\n🕐 Changed at: ${new Date().toLocaleString()}`;
+      
+      await clickupClient.createTaskComment(
+        clickupTaskId,
+        commentText,
+        { notifyAll: false },
+        'default'
+      );
+      
+      logger.info('Posted cell tower change comment', {
+        routerId,
+        oldCellId,
+        newCellId,
+        clickupTaskId
+      });
+    }
+  } catch (error) {
+    logger.warn('Failed to post cell tower change comment', {
+      routerId,
+      error: error.message
+    });
+  }
+}
+
+/**
+ * Post comment when network operator changes
+ */
+async function postOperatorChangeComment(routerId, oldOperator, newOperator) {
+  try {
+    const routerResult = await pool.query(
+      'SELECT clickup_task_id, name FROM routers WHERE router_id = $1',
+      [routerId]
+    );
+    
+    if (routerResult.rows.length > 0 && routerResult.rows[0].clickup_task_id) {
+      const clickupTaskId = routerResult.rows[0].clickup_task_id;
+      
+      const commentText = `📶 **System:** Network operator changed\n\n` +
+        `**Previous Operator:** ${oldOperator}\n` +
+        `**New Operator:** ${newOperator}\n\n` +
+        `This may indicate a SIM swap or network roaming.\n\n` +
+        `🕐 Changed at: ${new Date().toLocaleString()}`;
+      
+      await clickupClient.createTaskComment(
+        clickupTaskId,
+        commentText,
+        { notifyAll: false },
+        'default'
+      );
+      
+      logger.info('Posted operator change comment', {
+        routerId,
+        oldOperator,
+        newOperator,
+        clickupTaskId
+      });
+    }
+  } catch (error) {
+    logger.warn('Failed to post operator change comment', {
+      routerId,
+      error: error.message
+    });
   }
 }
 

@@ -1007,6 +1007,32 @@ async function autoCreateClickUpTask(router) {
 
     logger.info(`✅ Auto-created ClickUp task ${task.id} for router ${router.router_id} (${router.name || 'unnamed'})`);
 
+    // Post "Router first seen" comment to the new task
+    try {
+      const commentText = `🆕 **System:** Router added to system\n\n` +
+        `**Router ID:** ${router.router_id}\n` +
+        (router.name ? `**Name:** ${router.name}\n` : '') +
+        (router.imei ? `**IMEI:** ${router.imei}\n` : '') +
+        (router.device_serial ? `**Serial:** ${router.device_serial}\n` : '') +
+        (router.firmware_version ? `**Firmware:** ${router.firmware_version}\n` : '') +
+        `\n🕐 First seen at: ${new Date().toLocaleString()}`;
+      
+      await clickupClient.createTaskComment(
+        task.id,
+        commentText,
+        { notifyAll: false },
+        'default'
+      );
+      
+      logger.info(`Posted "first seen" comment to new router task ${task.id}`);
+    } catch (commentError) {
+      logger.warn('Failed to post first seen comment (task still created)', {
+        taskId: task.id,
+        routerId: router.router_id,
+        error: commentError.message
+      });
+    }
+
     return task;
   } catch (error) {
     logger.error(`Failed to auto-create ClickUp task for router ${router.router_id}:`, error.message);
