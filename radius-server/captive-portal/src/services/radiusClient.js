@@ -153,7 +153,7 @@ async function accountingStart(sessionId, username, options = {}) {
             ['NAS-Identifier', options.nasId || 'captive-portal'],
             ['NAS-Port-Type', 'Wireless-802.11'],
             ['Acct-Authentic', 'RADIUS'],
-            ['Event-Timestamp', Math.floor(Date.now() / 1000)]
+            ['Event-Timestamp', new Date()]
         ]
     };
 
@@ -194,7 +194,7 @@ async function accountingStop(sessionId, username, options = {}) {
             ['Acct-Input-Octets', options.inputOctets || 0],
             ['Acct-Output-Octets', options.outputOctets || 0],
             ['Acct-Terminate-Cause', options.terminateCause || 'User-Request'],
-            ['Event-Timestamp', Math.floor(Date.now() / 1000)]
+            ['Event-Timestamp', new Date()]
         ]
     };
 
