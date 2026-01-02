@@ -355,10 +355,42 @@ body {
 }
 
 .ad-slot-top {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
     width: 100%;
-    max-width: 440px;
-    margin-bottom: var(--space-4);
-    z-index: 1;
+    max-width: 100%;
+    margin: 0;
+    z-index: 100;
+    border-radius: 0;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.ad-slot-top .ad-image {
+    width: 100%;
+    height: auto;
+    max-height: 80px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+}
+
+.ad-slot-top .ad-label {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    font-size: 0.65rem;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+/* Add top padding to body when banner is present */
+body.has-top-banner {
+    padding-top: 80px;
 }
 
 .ad-slot-bottom {

@@ -15,29 +15,30 @@
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📶</text></svg>">
 </head>
-<body>
-    <div class="portal-container">
-        <!-- Top Banner Ad Slot -->
-        <% if (typeof ads !== 'undefined' && ads.topBanner) { %>
-        <div class="ad-slot ad-slot-top" data-ad-position="top-banner">
-            <% if (ads.topBanner.type === 'image') { %>
-            <a href="<%= ads.topBanner.link %>" target="_blank" rel="noopener sponsored" class="ad-link" data-ad-id="<%= ads.topBanner.id %>">
-                <img src="<%= ads.topBanner.image %>" alt="<%= ads.topBanner.alt || 'Advertisement' %>" class="ad-image">
-            </a>
-            <% } else if (ads.topBanner.type === 'html') { %>
-            <div class="ad-html"><%- ads.topBanner.html %></div>
-            <% } %>
-            <span class="ad-label">Sponsored</span>
-        </div>
-        <% } else { %>
-        <!-- Static Banner Ad Fallback -->
-        <div class="ad-slot ad-slot-top" data-ad-position="top-banner">
-            <a href="https://vacatad.com" target="_blank" rel="noopener sponsored" class="ad-link" data-ad-id="static-banner-1">
-                <img src="/images/banner-ad-1.gif" alt="VacatAd Advertisement" class="ad-image">
-            </a>
-            <span class="ad-label">Sponsored</span>
-        </div>
+<body class="has-top-banner">
+    <!-- Top Banner Ad - Fixed at top of page -->
+    <% if (typeof ads !== 'undefined' && ads.topBanner) { %>
+    <div class="ad-slot ad-slot-top" data-ad-position="top-banner">
+        <% if (ads.topBanner.type === 'image') { %>
+        <a href="<%= ads.topBanner.link %>" target="_blank" rel="noopener sponsored" class="ad-link" data-ad-id="<%= ads.topBanner.id %>">
+            <img src="<%= ads.topBanner.image %>" alt="<%= ads.topBanner.alt || 'Advertisement' %>" class="ad-image">
+        </a>
+        <% } else if (ads.topBanner.type === 'html') { %>
+        <div class="ad-html"><%- ads.topBanner.html %></div>
         <% } %>
+        <span class="ad-label">Sponsored</span>
+    </div>
+    <% } else { %>
+    <!-- Static Banner Ad Fallback -->
+    <div class="ad-slot ad-slot-top" data-ad-position="top-banner">
+        <a href="https://vacatad.com" target="_blank" rel="noopener sponsored" class="ad-link" data-ad-id="static-banner-1">
+            <img src="/images/banner-ad-1.gif" alt="VacatAd Advertisement" class="ad-image">
+        </a>
+        <span class="ad-label">Sponsored</span>
+    </div>
+    <% } %>
+
+    <div class="portal-container">
 
         <div class="portal-card">
             <!-- Header -->
