@@ -11,9 +11,14 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const validator = require('validator');
 const radiusClient = require('../services/radiusClient');
 const axios = require('axios');
+
+// Will be set by server.js after portal routes are loaded
+let storeSuccessToken = null;
+router.setSuccessTokenStore = (fn) => { storeSuccessToken = fn; };
 
 // Database connection (if using shared Railway database)
 let dbPool = null;
@@ -319,10 +324,26 @@ router.post('/register', async (req, res) => {
             timestamp: new Date().toISOString()
         });
         
+        // Generate a one-time token for success page (iOS captive portal workaround)
+        const successToken = crypto.randomBytes(32).toString('hex');
+        if (storeSuccessToken) {
+            storeSuccessToken(successToken, {
+                username: guestId,
+                sessionId,
+                authenticatedAt: req.session.authenticatedAt,
+                guestName: name.trim(),
+                sessionType: 'free',
+                sessionDuration: FREE_SESSION_DURATION,
+                expiresAt: req.session.expiresAt
+            });
+        }
+        
+        console.log(`✅ Registration successful for ${email} (token: ${successToken.substring(0, 8)}...)`);
+        
         res.json({
             success: true,
             message: 'Registration successful!',
-            redirect: '/success?type=free',
+            redirect: `/success?type=free&token=${successToken}`,
             sessionDuration: FREE_SESSION_DURATION
         });
     } catch (error) {

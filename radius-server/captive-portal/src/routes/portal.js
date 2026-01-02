@@ -134,31 +134,87 @@ router.get('/', async (req, res) => {
     });
 });
 
+// In-memory token store for success page access (iOS captive portal workaround)
+const successTokens = new Map();
+
+/**
+ * Store a success token (called after successful auth)
+ */
+function storeSuccessToken(token, sessionData) {
+    successTokens.set(token, {
+        ...sessionData,
+        createdAt: Date.now()
+    });
+    // Clean up old tokens (older than 5 minutes)
+    for (const [key, value] of successTokens.entries()) {
+        if (Date.now() - value.createdAt > 5 * 60 * 1000) {
+            successTokens.delete(key);
+        }
+    }
+}
+
+// Export for use in auth routes
+router.storeSuccessToken = storeSuccessToken;
+
 /**
  * GET /success
  * Success page after authentication
  */
 router.get('/success', async (req, res) => {
-    if (!req.session.authenticated) {
+    let sessionData = null;
+    
+    // First, check for token in URL (iOS captive portal workaround)
+    if (req.query.token) {
+        sessionData = successTokens.get(req.query.token);
+        if (sessionData) {
+            // Token found - delete it (one-time use)
+            successTokens.delete(req.query.token);
+            // Also store in session for future requests
+            req.session.authenticated = true;
+            req.session.username = sessionData.username;
+            req.session.sessionId = sessionData.sessionId;
+            req.session.authenticatedAt = sessionData.authenticatedAt;
+            req.session.guestName = sessionData.guestName;
+            req.session.sessionType = sessionData.sessionType;
+            req.session.sessionDuration = sessionData.sessionDuration;
+            req.session.expiresAt = sessionData.expiresAt;
+        }
+    }
+    
+    // Fall back to session if no valid token
+    if (!sessionData && req.session.authenticated) {
+        sessionData = {
+            username: req.session.username,
+            sessionId: req.session.sessionId,
+            authenticatedAt: req.session.authenticatedAt,
+            guestName: req.session.guestName,
+            sessionType: req.session.sessionType,
+            sessionDuration: req.session.sessionDuration,
+            expiresAt: req.session.expiresAt
+        };
+    }
+    
+    // If still no auth, redirect to portal
+    if (!sessionData) {
         return res.redirect('/');
     }
 
-    const isFreeSession = req.session.sessionType === 'free' || req.query.type === 'free';
-    const sessionDuration = req.session.sessionDuration || (isFreeSession ? 1800 : 86400);
+    const isFreeSession = sessionData.sessionType === 'free' || req.query.type === 'free';
+    const sessionDuration = sessionData.sessionDuration || (isFreeSession ? 1800 : 86400);
 
     // Fetch active ads for success page (including square GIF ad)
     const ads = await getAdsForPage('success', req.query.router_id);
 
     res.render('success', {
         title: 'Connected!',
-        username: req.session.username,
-        sessionId: req.session.sessionId,
-        authenticatedAt: req.session.authenticatedAt,
-        guestName: req.session.guestName,
+        username: sessionData.username,
+        sessionId: sessionData.sessionId,
+        authenticatedAt: sessionData.authenticatedAt,
+        guestName: sessionData.guestName,
         // Session type info
         isFreeSession,
         sessionDuration,
-        expiresAt: req.session.expiresAt || new Date(Date.now() + sessionDuration * 1000).toISOString(),
+        expiresAt: sessionData.expiresAt || new Date(Date.now() + sessionDuration * 1000).toISOString(),
         // Ads
         ads
     });

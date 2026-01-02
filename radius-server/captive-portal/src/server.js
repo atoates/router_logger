@@ -75,9 +75,11 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        // Don't use secure cookies - captive portals run over HTTP
+        secure: false,
         httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        sameSite: 'lax' // Allow cookies to work in iOS captive portal
     }
 }));
 
@@ -117,6 +119,11 @@ app.get('/connecttest.txt', (req, res) => res.send('Microsoft Connect Test'));
 
 // Main portal routes
 app.use('/', portalRoutes);
+
+// Connect auth routes to portal's success token store (iOS captive portal workaround)
+if (portalRoutes.storeSuccessToken) {
+    authRoutes.setSuccessTokenStore(portalRoutes.storeSuccessToken);
+}
 
 // API routes
 app.use('/api/auth', authRoutes);
