@@ -366,6 +366,52 @@ body {
     margin: var(--space-6) 0;
 }
 
+/* Square GIF ad slot for success page */
+.ad-slot-square {
+    width: 100%;
+    max-width: 300px;
+    margin: var(--space-6) auto;
+    aspect-ratio: 1;
+    position: relative;
+    z-index: 1;
+}
+
+.ad-image-square {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: var(--radius-lg);
+    display: block;
+}
+
+/* Ad placeholder */
+.ad-placeholder {
+    background: var(--color-bg-input);
+    border: 2px dashed var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+}
+
+.ad-placeholder-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+.ad-placeholder-content svg {
+    opacity: 0.5;
+}
+
+.ad-placeholder-content span {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
 /* Ad label */
 .ad-label {
     position: absolute;

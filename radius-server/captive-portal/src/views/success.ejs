@@ -81,30 +81,25 @@
             </p>
             <% } %>
 
-            <!-- Success Page Ad Slot -->
-            <% if (typeof ads !== 'undefined' && ads.inCard) { %>
-            <div class="ad-slot ad-slot-success" data-ad-position="success-page">
-                <% if (ads.inCard.type === 'image') { %>
-                <a href="<%= ads.inCard.link %>" target="_blank" rel="noopener sponsored" class="ad-link" data-ad-id="<%= ads.inCard.id %>">
-                    <img src="<%= ads.inCard.image %>" alt="<%= ads.inCard.alt || 'Advertisement' %>" class="ad-image">
+            <!-- Success Page Square GIF Ad Slot -->
+            <% if (typeof ads !== 'undefined' && ads.squareGif) { %>
+            <div class="ad-slot ad-slot-square" data-ad-position="success-square">
+                <a href="<%= ads.squareGif.link %>" target="_blank" rel="noopener sponsored" class="ad-link" data-ad-id="<%= ads.squareGif.id %>">
+                    <img src="<%= ads.squareGif.image %>" alt="<%= ads.squareGif.alt || 'Advertisement' %>" class="ad-image-square">
                 </a>
-                <% } else if (ads.inCard.type === 'promo') { %>
-                <div class="ad-promo">
-                    <% if (ads.inCard.icon) { %>
-                    <img src="<%= ads.inCard.icon %>" alt="" class="ad-promo-icon">
-                    <% } %>
-                    <div class="ad-promo-content">
-                        <strong><%= ads.inCard.title %></strong>
-                        <span><%= ads.inCard.description %></span>
-                    </div>
-                    <a href="<%= ads.inCard.link %>" target="_blank" rel="noopener sponsored" class="btn btn-ad" data-ad-id="<%= ads.inCard.id %>">
-                        <%= ads.inCard.cta || 'Learn More' %>
-                    </a>
-                </div>
-                <% } else if (ads.inCard.type === 'html') { %>
-                <div class="ad-html"><%- ads.inCard.html %></div>
-                <% } %>
                 <span class="ad-label">Sponsored</span>
+            </div>
+            <% } else { %>
+            <!-- Placeholder for square GIF ad -->
+            <div class="ad-slot ad-slot-square ad-placeholder" data-ad-position="success-square">
+                <div class="ad-placeholder-content">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="9" y1="3" x2="9" y2="21"/>
+                        <line x1="3" y1="9" x2="21" y2="9"/>
+                    </svg>
+                    <span>Ad Space</span>
+                </div>
             </div>
             <% } %>
 

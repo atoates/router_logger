@@ -26,7 +26,8 @@ async function getAdsForPage(page, routerId = null) {
     const ads = {
         topBanner: null,
         inCard: null,
-        bottomBanner: null
+        bottomBanner: null,
+        squareGif: null
     };
 
     if (!USE_DATABASE || !dbPool) {
@@ -76,6 +77,8 @@ async function getAdsForPage(page, routerId = null) {
                 ads.inCard = ad;
             } else if (row.positions?.includes('bottom-banner') && !ads.bottomBanner) {
                 ads.bottomBanner = ad;
+            } else if (row.positions?.includes('success-square') && !ads.squareGif) {
+                ads.squareGif = ad;
             }
         }
     } catch (error) {
@@ -143,8 +146,8 @@ router.get('/success', async (req, res) => {
     const isFreeSession = req.session.sessionType === 'free' || req.query.type === 'free';
     const sessionDuration = req.session.sessionDuration || (isFreeSession ? 1800 : 86400);
 
-    // Fetch active ads for success page
-    const ads = await getAdsForPage('success');
+    // Fetch active ads for success page (including square GIF ad)
+    const ads = await getAdsForPage('success', req.query.router_id);
 
     res.render('success', {
         title: 'Connected!',
