@@ -118,26 +118,24 @@
                 const data = await response.json();
                 
                 if (response.ok && data.success) {
-                    showMessage('Registration successful! Connecting...', 'success');
+                    showMessage(data.message || 'Registration successful! Connecting...', 'success');
                     
                     // Store session info for the success page
                     sessionStorage.setItem('freeSession', JSON.stringify({
                         duration: data.sessionDuration || 1800,
                         startedAt: new Date().toISOString(),
-                        guestName: name
+                        guestName: name,
+                        successUrl: data.successUrl // Store success URL for later
                     }));
                     
-                    // If router provided a login URL, we need to redirect there to activate the connection
-                    // Otherwise go to our success page
+                    // Redirect to wherever the server tells us (could be router login or success page)
+                    const redirectUrl = data.redirect || '/success?type=free';
+                    console.log('Redirecting to:', redirectUrl);
+                    
+                    // Use location.replace to prevent back button issues
                     setTimeout(() => {
-                        if (data.routerLoginUrl) {
-                            // Redirect to router's login endpoint to activate WiFi
-                            console.log('Redirecting to router login:', data.routerLoginUrl);
-                            window.location.href = data.routerLoginUrl;
-                        } else {
-                            window.location.href = data.redirect || '/success?type=free';
-                        }
-                    }, 1000);
+                        window.location.replace(redirectUrl);
+                    }, 500);
                 } else {
                     showMessage(data.message || 'Registration failed. Please try again.', 'error');
                     setButtonLoading(submitBtn, false);

@@ -420,11 +420,32 @@ router.post('/register', async (req, res) => {
             }
         }
         
+        // If we have a CoovaChilli login URL, we need to redirect there first
+        // The router will then handle granting access
+        if (routerLoginUrl) {
+            console.log(`🔀 Redirecting client to CoovaChilli: ${routerLoginUrl}`);
+            // Return the router login URL - client MUST go there to activate WiFi
+            // After CoovaChilli grants access, user should be able to browse
+            const responseData = {
+                success: true,
+                message: 'Registration successful! Activating WiFi...',
+                // Tell client to go to router login first
+                redirect: routerLoginUrl,
+                // Also provide success page URL for after activation
+                successUrl: `/success?type=free&token=${successToken}`,
+                routerLoginUrl: routerLoginUrl,
+                sessionDuration: FREE_SESSION_DURATION
+            };
+            console.log(`📤 Sending response:`, JSON.stringify(responseData, null, 2));
+            return res.json(responseData);
+        }
+        
+        // No router login URL - go directly to success page
         const responseData = {
             success: true,
             message: 'Registration successful!',
             redirect: `/success?type=free&token=${successToken}`,
-            routerLoginUrl: routerLoginUrl, // If set, client should redirect here first
+            routerLoginUrl: null,
             sessionDuration: FREE_SESSION_DURATION
         };
         
