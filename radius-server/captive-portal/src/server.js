@@ -35,7 +35,9 @@ app.use(helmet({
             imgSrc: ["'self'", "data:", "https:"],
             scriptSrc: ["'self'", "'unsafe-inline'"]
         }
-    }
+    },
+    // Disable HSTS for HTTP-only connections (prevents browser from forcing HTTPS)
+    hsts: false
 }));
 
 app.use(cors({
