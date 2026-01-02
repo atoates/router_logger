@@ -28,14 +28,18 @@ const PORT = process.env.PORT || 3000;
 // ===========================================
 app.use(helmet({
     contentSecurityPolicy: {
+        useDefaults: false, // Disable defaults to prevent upgrade-insecure-requests
         directives: {
             defaultSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "https:"],
             scriptSrc: ["'self'", "'unsafe-inline'"],
-            // Disable upgrade-insecure-requests to allow HTTP connections
-            upgradeInsecureRequests: []
+            baseUri: ["'self'"],
+            formAction: ["'self'"],
+            frameAncestors: ["'self'"],
+            objectSrc: ["'none'"],
+            scriptSrcAttr: ["'none'"]
         }
     },
     // Disable HSTS for HTTP-only connections (prevents browser from forcing HTTPS)
