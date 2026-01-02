@@ -99,7 +99,7 @@ router.get('/', async (req, res) => {
     }
 
     // Extract query params that routers might send
-    // Teltonika sends: mac, ip, link-login, link-orig, error, etc.
+    // Teltonika/CoovaChilli sends: challenge, uamip, uamport, mac, etc.
     const {
         mac,              // Client MAC address
         ip,               // Client IP
@@ -114,26 +114,46 @@ router.get('/', async (req, res) => {
         'link-login': linkLogin,       // Teltonika login URL
         'link-orig': linkOrig,         // Original URL user tried to access
         'link-login-only': linkLoginOnly, // Login URL without orig redirect
-        error             // Error message from router
+        error,            // Error message from router
+        // CoovaChilli/UAM parameters
+        challenge,        // CHAP challenge from CoovaChilli
+        uamip,            // UAM server IP (router IP)
+        uamport,          // UAM port (usually 3990)
+        called,           // Called-Station-Id (AP MAC)
+        nasid,            // NAS Identifier
+        userurl,          // Original URL user was trying to access
+        md               // Message digest (optional)
     } = req.query;
     
     // Log all query params for debugging
     console.log('📥 Portal request params:', JSON.stringify(req.query, null, 2));
+    
+    // Build the CoovaChilli login URL if we have the required params
+    let chilliLoginUrl = null;
+    if (uamip && uamport) {
+        chilliLoginUrl = `http://${uamip}:${uamport}/logon`;
+        console.log('🔗 CoovaChilli login URL:', chilliLoginUrl);
+    }
 
     // Fetch active ads for this page
     const ads = await getAdsForPage('portal', router_id);
 
     res.render('portal', {
         title: 'Guest WiFi Login',
-        clientMac: mac,
+        clientMac: mac || called,
         clientIp: ip,
-        apMac: ap_mac,
+        apMac: ap_mac || called,
         apName: ap_name,
         ssid: ssid || 'Guest WiFi',
-        originalUrl: url || linkOrig,
-        routerId: router_id,
+        originalUrl: url || linkOrig || userurl,
+        routerId: router_id || nasid,
         // Router login URL for post-auth redirect
         loginUrl: login_url || linkLogin || linkLoginOnly,
+        // CoovaChilli/UAM parameters
+        challenge: challenge || '',
+        uamip: uamip || '',
+        uamport: uamport || '',
+        chilliLoginUrl: chilliLoginUrl || '',
         // Feature flags - simplified: only free access with email
         enableEmail: false,
         enableSms: false,

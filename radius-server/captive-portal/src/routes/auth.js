@@ -231,9 +231,45 @@ async function notifyRouterLogger(eventData) {
  * POST /api/auth/register
  * Register and grant free 30-minute access
  */
+// UAM secret for CoovaChilli CHAP response calculation
+const UAM_SECRET = process.env.UAM_SECRET || 'ChqPlbGB0RjyiM2c';
+
+/**
+ * Calculate CoovaChilli CHAP response
+ * The response is: MD5(ident + password + challenge)
+ * Where ident is 0x00 for initial login
+ */
+function calculateChapResponse(password, challenge) {
+    // Convert hex challenge to buffer
+    const challengeBuffer = Buffer.from(challenge, 'hex');
+    // Create MD5 hash of: 0x00 + password + challenge
+    const md5 = crypto.createHash('md5');
+    md5.update(Buffer.from([0])); // ident = 0
+    md5.update(password);
+    md5.update(challengeBuffer);
+    return md5.digest('hex');
+}
+
+/**
+ * Calculate CoovaChilli UAM response using UAM secret
+ * For PAP: response = hexmd5(challenge + uamsecret)
+ */
+function calculateUamResponse(challenge, uamSecret) {
+    const md5 = crypto.createHash('md5');
+    // Challenge is already hex, convert to buffer
+    const challengeBuffer = Buffer.from(challenge, 'hex');
+    md5.update(challengeBuffer);
+    md5.update(uamSecret);
+    return md5.digest('hex');
+}
+
 router.post('/register', async (req, res) => {
     try {
-        const { name, phone, email, newsletter, client_mac, router_mac, router_id, login_url, original_url } = req.body;
+        const { 
+            name, phone, email, newsletter, client_mac, router_mac, router_id, login_url, original_url,
+            // CoovaChilli parameters
+            chilli_challenge, chilli_uamip, chilli_uamport, chilli_login_url
+        } = req.body;
         
         // Validation
         if (!name || name.trim().length < 2) {
@@ -340,21 +376,33 @@ router.post('/register', async (req, res) => {
         
         console.log(`✅ Registration successful for ${email} (token: ${successToken.substring(0, 8)}...)`);
         console.log(`📍 Login URL from router: ${login_url || 'none'}`);
+        console.log(`📍 CoovaChilli challenge: ${chilli_challenge || 'none'}`);
+        console.log(`📍 CoovaChilli login URL: ${chilli_login_url || 'none'}`);
         
-        // Build the router login URL if provided
-        // For Teltonika, we need to pass username/password to the router's login endpoint
+        // Build the router login URL
         let routerLoginUrl = null;
-        if (login_url) {
+        
+        // Check for CoovaChilli/UAM authentication (Teltonika)
+        if (chilli_challenge && chilli_uamip && chilli_uamport) {
+            // Calculate the UAM response for CoovaChilli
+            // For PAP mode with UAM: response = hex(md5(challenge + uamsecret))
+            const uamResponse = calculateUamResponse(chilli_challenge, UAM_SECRET);
+            
+            // Build the CoovaChilli login URL
+            // Format: http://uamip:uamport/logon?username=xxx&response=xxx
+            routerLoginUrl = `http://${chilli_uamip}:${chilli_uamport}/logon?username=${encodeURIComponent(guestId)}&response=${uamResponse}`;
+            
+            console.log(`🔗 CoovaChilli login URL: ${routerLoginUrl}`);
+        } else if (login_url) {
+            // Fallback to regular login URL
             try {
-                // Parse and add credentials to the login URL
                 const url = new URL(login_url);
                 url.searchParams.set('username', guestId);
-                url.searchParams.set('password', guestId); // Use guestId as both for auto-login
+                url.searchParams.set('password', guestId);
                 routerLoginUrl = url.toString();
                 console.log(`🔗 Router login URL: ${routerLoginUrl}`);
             } catch (e) {
                 console.warn('Failed to parse login URL:', e.message);
-                // Try using it as-is
                 routerLoginUrl = `${login_url}?username=${encodeURIComponent(guestId)}&password=${encodeURIComponent(guestId)}`;
             }
         }

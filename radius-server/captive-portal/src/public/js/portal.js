@@ -33,12 +33,19 @@
     const routerId = document.getElementById('router-id')?.value || '';
     const loginUrl = document.getElementById('login-url')?.value || '';
     const originalUrl = document.getElementById('original-url')?.value || '';
+    
+    // CoovaChilli/UAM parameters
+    const chilliChallenge = document.getElementById('chilli-challenge')?.value || '';
+    const chilliUamip = document.getElementById('chilli-uamip')?.value || '';
+    const chilliUamport = document.getElementById('chilli-uamport')?.value || '';
+    const chilliLoginUrl = document.getElementById('chilli-login-url')?.value || '';
 
     // State
     let currentEmail = '';
     let isSubmitting = false;
     
     console.log('Portal config:', { clientMac, routerMac, routerId, loginUrl, originalUrl });
+    console.log('CoovaChilli config:', { chilliChallenge, chilliUamip, chilliUamport, chilliLoginUrl });
 
     // ============================================
     // Registration Form Handler
@@ -99,7 +106,12 @@
                         router_mac: routerMac,
                         router_id: routerId,
                         login_url: loginUrl,
-                        original_url: originalUrl
+                        original_url: originalUrl,
+                        // CoovaChilli/UAM parameters
+                        chilli_challenge: chilliChallenge,
+                        chilli_uamip: chilliUamip,
+                        chilli_uamport: chilliUamport,
+                        chilli_login_url: chilliLoginUrl
                     })
                 });
                 

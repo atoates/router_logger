@@ -101,6 +101,8 @@ services:
       # Session settings
       SESSION_SECRET: ${SESSION_SECRET:-change-this-in-production}
       SESSION_TIMEOUT_HOURS: 24
+      # UAM secret for CoovaChilli/Teltonika authentication
+      UAM_SECRET: ${UAM_SECRET:-testing123}
       # Company name
       COMPANY_NAME: ${COMPANY_NAME:-RouterLogger}
     depends_on:
