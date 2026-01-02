@@ -91,12 +91,20 @@ async function processCaptivePortalEvent(event) {
   // Find router by MAC or ID
   let routerId = router_id;
   if (!routerId && apMac) {
-    const routerResult = await pool.query(
-      'SELECT router_id FROM routers WHERE mac_address = $1 OR LEFT(mac_address, 14) = $2',
-      [apMac, apMac?.slice(0, 14)]
-    );
+    // Normalize MAC for comparison: lowercase, colons as separators
+    // Compare normalized versions to handle format differences
+    // CoovaChilli sends: "20-97-27-88-d5-5b", RMS stores: "20:97:27:88:D5:5B"
+    const routerResult = await pool.query(`
+      SELECT router_id FROM routers 
+      WHERE LOWER(REPLACE(mac_address, '-', ':')) = $1
+         OR LOWER(REPLACE(mac_address, ':', '-')) = REPLACE($1, ':', '-')
+         OR LOWER(REPLACE(mac_address, ':', '')) = REPLACE($1, ':', '')
+    `, [apMac]);
     if (routerResult.rows.length > 0) {
       routerId = routerResult.rows[0].router_id;
+      logger.info(`Matched router by MAC: ${apMac} -> ${routerId}`);
+    } else {
+      logger.warn(`No router found matching MAC: ${apMac}`);
     }
   }
 
