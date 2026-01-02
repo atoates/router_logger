@@ -1,6 +1,7 @@
 /* RouterLogger Captive Portal - Premium Glassmorphism Design */
 
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Note: Google Fonts loaded via HTML <link> tags for better performance
+   Fallback to system fonts if external fonts can't load */
 
 :root {
     /* VacatAd Brand Colors - Lime Green Theme */
