@@ -65,6 +65,8 @@ initRadiusDb();
 
 /**
  * Create a temporary RADIUS user for guest access
+ * Uses Auth-Type := Accept to bypass password verification
+ * This is needed because CoovaChilli encrypts passwords before sending to RADIUS
  */
 async function createRadiusUser(username, password, sessionTimeout = 1800) {
     if (!radiusDb) {
@@ -78,10 +80,11 @@ async function createRadiusUser(username, password, sessionTimeout = 1800) {
         await radiusDb.execute('DELETE FROM radreply WHERE username = ?', [username]);
         await radiusDb.execute('DELETE FROM radusergroup WHERE username = ?', [username]);
         
-        // Create the user with Cleartext-Password
+        // Set Auth-Type := Accept to skip password verification
+        // This allows CoovaChilli's encrypted password to work
         await radiusDb.execute(
             'INSERT INTO radcheck (username, attribute, op, value) VALUES (?, ?, ?, ?)',
-            [username, 'Cleartext-Password', ':=', password]
+            [username, 'Auth-Type', ':=', 'Accept']
         );
         
         // Add session timeout
@@ -96,7 +99,7 @@ async function createRadiusUser(username, password, sessionTimeout = 1800) {
             [username, 'free-tier', 1]
         );
         
-        console.log(`✅ Created RADIUS user: ${username} (timeout: ${sessionTimeout}s)`);
+        console.log(`✅ Created RADIUS user: ${username} (timeout: ${sessionTimeout}s, Auth-Type: Accept)`);
         return true;
     } catch (error) {
         console.error('Error creating RADIUS user:', error);
