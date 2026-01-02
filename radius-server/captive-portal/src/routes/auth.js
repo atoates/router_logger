@@ -233,7 +233,7 @@ async function notifyRouterLogger(eventData) {
  */
 router.post('/register', async (req, res) => {
     try {
-        const { name, phone, email, newsletter, client_mac, router_mac, router_id } = req.body;
+        const { name, phone, email, newsletter, client_mac, router_mac, router_id, login_url, original_url } = req.body;
         
         // Validation
         if (!name || name.trim().length < 2) {
@@ -339,11 +339,31 @@ router.post('/register', async (req, res) => {
         }
         
         console.log(`✅ Registration successful for ${email} (token: ${successToken.substring(0, 8)}...)`);
+        console.log(`📍 Login URL from router: ${login_url || 'none'}`);
+        
+        // Build the router login URL if provided
+        // For Teltonika, we need to pass username/password to the router's login endpoint
+        let routerLoginUrl = null;
+        if (login_url) {
+            try {
+                // Parse and add credentials to the login URL
+                const url = new URL(login_url);
+                url.searchParams.set('username', guestId);
+                url.searchParams.set('password', guestId); // Use guestId as both for auto-login
+                routerLoginUrl = url.toString();
+                console.log(`🔗 Router login URL: ${routerLoginUrl}`);
+            } catch (e) {
+                console.warn('Failed to parse login URL:', e.message);
+                // Try using it as-is
+                routerLoginUrl = `${login_url}?username=${encodeURIComponent(guestId)}&password=${encodeURIComponent(guestId)}`;
+            }
+        }
         
         res.json({
             success: true,
             message: 'Registration successful!',
             redirect: `/success?type=free&token=${successToken}`,
+            routerLoginUrl: routerLoginUrl, // If set, client should redirect here first
             sessionDuration: FREE_SESSION_DURATION
         });
     } catch (error) {

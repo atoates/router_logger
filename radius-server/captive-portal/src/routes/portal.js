@@ -99,17 +99,26 @@ router.get('/', async (req, res) => {
     }
 
     // Extract query params that routers might send
+    // Teltonika sends: mac, ip, link-login, link-orig, error, etc.
     const {
-        mac,           // Client MAC address
-        ip,            // Client IP
-        ap_mac,        // Access point MAC
-        ap_name,       // Access point name
-        ssid,          // Network SSID
-        url,           // Original URL the user was trying to access
-        login_url,     // URL to redirect after login
-        logout_url,    // URL for logout
-        router_id      // RouterLogger router ID
+        mac,              // Client MAC address
+        ip,               // Client IP
+        ap_mac,           // Access point MAC
+        ap_name,          // Access point name
+        ssid,             // Network SSID
+        url,              // Original URL the user was trying to access
+        login_url,        // URL to redirect after login (generic)
+        logout_url,       // URL for logout
+        router_id,        // RouterLogger router ID
+        // Teltonika-specific parameters
+        'link-login': linkLogin,       // Teltonika login URL
+        'link-orig': linkOrig,         // Original URL user tried to access
+        'link-login-only': linkLoginOnly, // Login URL without orig redirect
+        error             // Error message from router
     } = req.query;
+    
+    // Log all query params for debugging
+    console.log('📥 Portal request params:', JSON.stringify(req.query, null, 2));
 
     // Fetch active ads for this page
     const ads = await getAdsForPage('portal', router_id);
@@ -121,14 +130,18 @@ router.get('/', async (req, res) => {
         apMac: ap_mac,
         apName: ap_name,
         ssid: ssid || 'Guest WiFi',
-        originalUrl: url,
+        originalUrl: url || linkOrig,
         routerId: router_id,
+        // Router login URL for post-auth redirect
+        loginUrl: login_url || linkLogin || linkLoginOnly,
         // Feature flags - simplified: only free access with email
         enableEmail: false,
         enableSms: false,
         enableVoucher: false,
         enableSocial: false,
         enableFreeAccess: true, // Always enabled
+        // Error from router
+        routerError: error,
         // Ads
         ads
     });

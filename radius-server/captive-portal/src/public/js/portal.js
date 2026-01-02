@@ -31,10 +31,14 @@
     const clientMac = document.getElementById('client-mac')?.value || '';
     const routerMac = document.getElementById('router-mac')?.value || '';
     const routerId = document.getElementById('router-id')?.value || '';
+    const loginUrl = document.getElementById('login-url')?.value || '';
+    const originalUrl = document.getElementById('original-url')?.value || '';
 
     // State
     let currentEmail = '';
     let isSubmitting = false;
+    
+    console.log('Portal config:', { clientMac, routerMac, routerId, loginUrl, originalUrl });
 
     // ============================================
     // Registration Form Handler
@@ -93,7 +97,9 @@
                         newsletter: newsletter,
                         client_mac: clientMac,
                         router_mac: routerMac,
-                        router_id: routerId
+                        router_id: routerId,
+                        login_url: loginUrl,
+                        original_url: originalUrl
                     })
                 });
                 
@@ -109,8 +115,16 @@
                         guestName: name
                     }));
                     
+                    // If router provided a login URL, we need to redirect there to activate the connection
+                    // Otherwise go to our success page
                     setTimeout(() => {
-                        window.location.href = data.redirect || '/success?type=free';
+                        if (data.routerLoginUrl) {
+                            // Redirect to router's login endpoint to activate WiFi
+                            console.log('Redirecting to router login:', data.routerLoginUrl);
+                            window.location.href = data.routerLoginUrl;
+                        } else {
+                            window.location.href = data.redirect || '/success?type=free';
+                        }
                     }, 1000);
                 } else {
                     showMessage(data.message || 'Registration failed. Please try again.', 'error');
