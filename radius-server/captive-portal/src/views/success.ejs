@@ -131,6 +131,42 @@
                 Disconnect
             </button>
             <% } %>
+
+            <!-- Emergency Services Section -->
+            <div class="emergency-services">
+                <h3 class="emergency-header">Find nearby emergency services</h3>
+                <div class="emergency-buttons">
+                    <button class="emergency-btn" data-service="defibrillator" onclick="findEmergencyService('defibrillator')">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                            <path d="M12 8v4" stroke="white" stroke-width="2"/>
+                            <path d="M12 16h.01" stroke="white" stroke-width="2"/>
+                        </svg>
+                        <span>Defibrillator</span>
+                    </button>
+                    <button class="emergency-btn" data-service="ae" onclick="findEmergencyService('ae')">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/>
+                            <path d="M12 8v4" stroke="white" stroke-width="2"/>
+                            <path d="M12 16h.01" stroke="white" stroke-width="2"/>
+                        </svg>
+                        <span>A&E</span>
+                    </button>
+                    <button class="emergency-btn" data-service="police" onclick="findEmergencyService('police')">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            <circle cx="12" cy="12" r="3" fill="white" stroke="white" stroke-width="1"/>
+                        </svg>
+                        <span>Police</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="contact-info">
+                <p>Need help or want to learn more about our advertisers?</p>
+                <p>See our <a href="/contact" class="contact-link">contact links</a>.</p>
+            </div>
         </div>
 
         <!-- Background decoration -->
@@ -277,6 +313,68 @@
         // Auto-redirect after a short delay to let user see the success
         // Uncomment if you want automatic redirect:
         // setTimeout(() => { window.location.href = 'https://www.google.com'; }, 3000);
+        
+        // Emergency services handler
+        function findEmergencyService(service) {
+            // Get user's location if available
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        
+                        // Open maps with emergency service search
+                        let searchQuery = '';
+                        
+                        switch(service) {
+                            case 'defibrillator':
+                                searchQuery = 'defibrillator';
+                                break;
+                            case 'ae':
+                                searchQuery = 'hospital emergency';
+                                break;
+                            case 'police':
+                                searchQuery = 'police station';
+                                break;
+                        }
+                        
+                        // Open Google Maps with search
+                        window.open(`https://www.google.com/maps/search/${searchQuery}/@${lat},${lng},15z`, '_blank');
+                    },
+                    () => {
+                        // Fallback if location not available
+                        let searchQuery = '';
+                        switch(service) {
+                            case 'defibrillator':
+                                searchQuery = 'defibrillator';
+                                break;
+                            case 'ae':
+                                searchQuery = 'hospital emergency';
+                                break;
+                            case 'police':
+                                searchQuery = 'police station';
+                                break;
+                        }
+                        window.open(`https://www.google.com/maps/search/${searchQuery}`, '_blank');
+                    }
+                );
+            } else {
+                // No geolocation support
+                let searchQuery = '';
+                switch(service) {
+                    case 'defibrillator':
+                        searchQuery = 'defibrillator';
+                        break;
+                    case 'ae':
+                        searchQuery = 'hospital emergency';
+                        break;
+                    case 'police':
+                        searchQuery = 'police station';
+                        break;
+                }
+                window.open(`https://www.google.com/maps/search/${searchQuery}`, '_blank');
+            }
+        }
     </script>
 </body>
 </html>

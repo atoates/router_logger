@@ -186,5 +186,24 @@ router.get('/privacy', (req, res) => {
     });
 });
 
+/**
+ * GET /contact
+ * Contact information page
+ */
+router.get('/contact', (req, res) => {
+    res.render('terms', {
+        title: 'Contact Information',
+        companyName: process.env.COMPANY_NAME || 'VacatAd',
+        content: `
+            <h2>Contact Us</h2>
+            <p>Need help or want to learn more about our advertisers?</p>
+            <p>For support with VacatAd Wi-Fi, please contact us at:</p>
+            <p><strong>Email:</strong> support@vacatad.com</p>
+            <p><strong>Phone:</strong> +44 333 090 3594</p>
+            <p>For advertising inquiries, please reach out to our advertising team.</p>
+        `
+    });
+});
+
 module.exports = router;
 
