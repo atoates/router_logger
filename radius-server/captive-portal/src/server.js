@@ -33,7 +33,9 @@ app.use(helmet({
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "https:"],
-            scriptSrc: ["'self'", "'unsafe-inline'"]
+            scriptSrc: ["'self'", "'unsafe-inline'"],
+            // Disable upgrade-insecure-requests to allow HTTP connections
+            upgradeInsecureRequests: []
         }
     },
     // Disable HSTS for HTTP-only connections (prevents browser from forcing HTTPS)
