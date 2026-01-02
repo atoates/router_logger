@@ -20,7 +20,7 @@ const axios = require('axios');
 let storeSuccessToken = null;
 router.setSuccessTokenStore = (fn) => { storeSuccessToken = fn; };
 
-// Database connection (if using shared Railway database)
+// Database connection (if using shared Railway database - PostgreSQL)
 let dbPool = null;
 const USE_DATABASE = process.env.USE_DATABASE === 'true';
 
@@ -31,6 +31,77 @@ if (USE_DATABASE) {
         ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false
     });
     console.log('📦 Using PostgreSQL database for verification codes and free tier tracking');
+}
+
+// MariaDB connection for RADIUS user management
+let radiusDb = null;
+const RADIUS_DB_HOST = process.env.RADIUS_DB_HOST || 'radius-db';
+const RADIUS_DB_USER = process.env.RADIUS_DB_USER || 'radius';
+const RADIUS_DB_PASSWORD = process.env.RADIUS_DB_PASSWORD || 'radiuspass123';
+const RADIUS_DB_NAME = process.env.RADIUS_DB_NAME || 'radius';
+
+// Initialize MariaDB connection
+async function initRadiusDb() {
+    try {
+        const mysql = require('mysql2/promise');
+        radiusDb = await mysql.createPool({
+            host: RADIUS_DB_HOST,
+            user: RADIUS_DB_USER,
+            password: RADIUS_DB_PASSWORD,
+            database: RADIUS_DB_NAME,
+            waitForConnections: true,
+            connectionLimit: 5,
+            queueLimit: 0
+        });
+        console.log('📦 Connected to RADIUS MariaDB database');
+    } catch (error) {
+        console.warn('⚠️ Could not connect to RADIUS database:', error.message);
+        console.warn('   RADIUS user creation will be skipped');
+    }
+}
+
+// Try to initialize RADIUS DB connection
+initRadiusDb();
+
+/**
+ * Create a temporary RADIUS user for guest access
+ */
+async function createRadiusUser(username, password, sessionTimeout = 1800) {
+    if (!radiusDb) {
+        console.warn('⚠️ RADIUS database not available, skipping user creation');
+        return false;
+    }
+    
+    try {
+        // Delete any existing entries for this user
+        await radiusDb.execute('DELETE FROM radcheck WHERE username = ?', [username]);
+        await radiusDb.execute('DELETE FROM radreply WHERE username = ?', [username]);
+        await radiusDb.execute('DELETE FROM radusergroup WHERE username = ?', [username]);
+        
+        // Create the user with Cleartext-Password
+        await radiusDb.execute(
+            'INSERT INTO radcheck (username, attribute, op, value) VALUES (?, ?, ?, ?)',
+            [username, 'Cleartext-Password', ':=', password]
+        );
+        
+        // Add session timeout
+        await radiusDb.execute(
+            'INSERT INTO radreply (username, attribute, op, value) VALUES (?, ?, ?, ?)',
+            [username, 'Session-Timeout', ':=', sessionTimeout.toString()]
+        );
+        
+        // Add to free-tier group
+        await radiusDb.execute(
+            'INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, ?)',
+            [username, 'free-tier', 1]
+        );
+        
+        console.log(`✅ Created RADIUS user: ${username} (timeout: ${sessionTimeout}s)`);
+        return true;
+    } catch (error) {
+        console.error('Error creating RADIUS user:', error);
+        return false;
+    }
 }
 
 // Fallback in-memory store (used when database is not configured)
@@ -251,23 +322,60 @@ function calculateChapResponse(password, challenge) {
 }
 
 /**
- * Calculate CoovaChilli UAM response using UAM secret
- * For PAP: response = hexmd5(challenge + uamsecret)
+ * Calculate CoovaChilli CHAP password for PAP mode
+ * For CoovaChilli PAP with UAM:
+ * 1. Calculate nt_response = MD5(challenge (binary) + uamsecret)
+ * 2. XOR the password with nt_response
+ * 3. Return as hex string
+ * 
+ * Actually for Teltonika with UAM, simpler approach:
+ * The response should be: MD5(0 + password + challenge)
+ * But we're using PAP mode, so we just need username/password
  */
-function calculateUamResponse(challenge, uamSecret) {
+function calculateChilliPassword(password, challenge, uamSecret) {
     try {
         if (!challenge || challenge.length < 2) {
-            console.warn('Invalid challenge for UAM response:', challenge);
+            console.warn('Invalid challenge:', challenge);
             return null;
         }
+        
+        // Convert hex challenge to bytes
+        const challengeBytes = Buffer.from(challenge, 'hex');
+        
+        // Create the password hash: MD5(challenge + uamsecret)
         const md5 = crypto.createHash('md5');
-        // Challenge is already hex, convert to buffer
-        const challengeBuffer = Buffer.from(challenge, 'hex');
-        md5.update(challengeBuffer);
+        md5.update(challengeBytes);
         md5.update(uamSecret);
+        const hashBytes = md5.digest();
+        
+        // XOR the password with the hash to create encrypted password
+        const passwordBytes = Buffer.from(password, 'utf8');
+        const encryptedBytes = Buffer.alloc(passwordBytes.length);
+        
+        for (let i = 0; i < passwordBytes.length; i++) {
+            encryptedBytes[i] = passwordBytes[i] ^ hashBytes[i % hashBytes.length];
+        }
+        
+        return encryptedBytes.toString('hex');
+    } catch (error) {
+        console.error('Error calculating Chilli password:', error);
+        return null;
+    }
+}
+
+/**
+ * Simple CHAP response for CoovaChilli
+ * response = MD5(ident + password + challenge)
+ */
+function calculateChapResponse(ident, password, challenge) {
+    try {
+        const md5 = crypto.createHash('md5');
+        md5.update(Buffer.from([ident])); // ident byte
+        md5.update(password);
+        md5.update(Buffer.from(challenge, 'hex'));
         return md5.digest('hex');
     } catch (error) {
-        console.error('Error calculating UAM response:', error);
+        console.error('Error calculating CHAP response:', error);
         return null;
     }
 }
@@ -320,9 +428,18 @@ router.post('/register', async (req, res) => {
             }
         }
         
-        // Generate a temporary guest username
+        // Generate a temporary guest username and password
         const guestId = `free-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+        const guestPassword = guestId; // Use same as username for simplicity
         const sessionId = uuidv4();
+        
+        // Create RADIUS user so the router can authenticate this guest
+        const radiusUserCreated = await createRadiusUser(guestId, guestPassword, FREE_SESSION_DURATION);
+        if (radiusUserCreated) {
+            console.log(`✅ RADIUS user created for guest: ${guestId}`);
+        } else {
+            console.warn(`⚠️ Could not create RADIUS user, WiFi auth may fail`);
+        }
         
         // Record free access usage (database or in-memory) - using email as identifier
         await recordFreeUsage(identifier, guestId);
@@ -393,18 +510,28 @@ router.post('/register', async (req, res) => {
         
         // Check for CoovaChilli/UAM authentication (Teltonika)
         if (chilli_challenge && chilli_uamip && chilli_uamport) {
-            // Calculate the UAM response for CoovaChilli
-            // For PAP mode with UAM: response = hex(md5(challenge + uamsecret))
-            const uamResponse = calculateUamResponse(chilli_challenge, UAM_SECRET);
+            // For CoovaChilli with PAP mode, we need to:
+            // 1. Calculate encrypted password using XOR with MD5(challenge + uamsecret)
+            // 2. Send as password parameter
             
-            if (uamResponse) {
-                // Build the CoovaChilli login URL
-                // Format: http://uamip:uamport/logon?username=xxx&response=xxx
-                routerLoginUrl = `http://${chilli_uamip}:${chilli_uamport}/logon?username=${encodeURIComponent(guestId)}&response=${uamResponse}`;
+            // Use the guestId as the password (we use same for username/password)
+            const password = guestId;
+            const encryptedPassword = calculateChilliPassword(password, chilli_challenge, UAM_SECRET);
+            
+            if (encryptedPassword) {
+                // Build the CoovaChilli login URL with encrypted password
+                // Format: http://uamip:uamport/logon?username=xxx&password=xxx
+                routerLoginUrl = `http://${chilli_uamip}:${chilli_uamport}/logon?username=${encodeURIComponent(guestId)}&password=${encryptedPassword}`;
                 
                 console.log(`🔗 CoovaChilli login URL: ${routerLoginUrl}`);
+                console.log(`   Username: ${guestId}`);
+                console.log(`   Challenge: ${chilli_challenge}`);
+                console.log(`   Encrypted password: ${encryptedPassword}`);
             } else {
-                console.warn('⚠️ Failed to calculate UAM response, skipping CoovaChilli login');
+                // Fallback: try with plain password (some configs allow this)
+                console.warn('⚠️ Failed to encrypt password, trying plain password');
+                routerLoginUrl = `http://${chilli_uamip}:${chilli_uamport}/logon?username=${encodeURIComponent(guestId)}&password=${encodeURIComponent(guestId)}`;
+                console.log(`🔗 CoovaChilli login URL (plain): ${routerLoginUrl}`);
             }
         } else if (login_url) {
             // Fallback to regular login URL

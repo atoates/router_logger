@@ -92,6 +92,11 @@ services:
       RADIUS_HOST: freeradius
       RADIUS_AUTH_PORT: 1812
       RADIUS_SECRET: ${RADIUS_SECRET:-testing123}
+      # RADIUS MariaDB connection (for creating guest users)
+      RADIUS_DB_HOST: radius-db
+      RADIUS_DB_USER: radius
+      RADIUS_DB_PASSWORD: ${RADIUS_DB_PASSWORD:-radiuspass123}
+      RADIUS_DB_NAME: radius
       # RouterLogger API
       ROUTERLOGGER_API_URL: ${ROUTERLOGGER_API_URL:-http://host.docker.internal:3001}
       # Database Configuration (Railway PostgreSQL)
