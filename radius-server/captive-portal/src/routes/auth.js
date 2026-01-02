@@ -223,6 +223,118 @@ async function notifyRouterLogger(eventData) {
 }
 
 /**
+ * POST /api/auth/register
+ * Register and grant free 30-minute access
+ */
+router.post('/register', async (req, res) => {
+    try {
+        const { name, phone, email, newsletter, client_mac, router_mac, router_id } = req.body;
+        
+        // Validation
+        if (!name || name.trim().length < 2) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please enter your name'
+            });
+        }
+        
+        if (!phone || phone.trim().length < 10) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please enter a valid phone number'
+            });
+        }
+        
+        if (!email || !validator.isEmail(email)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please enter a valid email address'
+            });
+        }
+        
+        // Use email as identifier for cooldown tracking
+        const identifier = email.toLowerCase().trim();
+        
+        // Check if this email has used free access recently
+        const existingUsage = await checkFreeUsage(identifier);
+        if (existingUsage && existingUsage.nextFreeAvailable) {
+            const cooldownEnd = new Date(existingUsage.nextFreeAvailable);
+            
+            if (new Date() < cooldownEnd) {
+                const hoursRemaining = Math.ceil((cooldownEnd - new Date()) / (1000 * 60 * 60));
+                return res.status(429).json({
+                    success: false,
+                    message: `You've already used your free 30 minutes today. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
+                    nextFreeAccess: cooldownEnd.toISOString()
+                });
+            }
+        }
+        
+        // Generate a temporary guest username
+        const guestId = `free-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+        const sessionId = uuidv4();
+        
+        // Record free access usage (database or in-memory) - using email as identifier
+        await recordFreeUsage(identifier, guestId);
+        
+        // Store session
+        req.session.authenticated = true;
+        req.session.username = guestId;
+        req.session.sessionId = sessionId;
+        req.session.macAddress = client_mac;
+        req.session.authenticatedAt = new Date().toISOString();
+        req.session.sessionType = 'free';
+        req.session.sessionDuration = FREE_SESSION_DURATION;
+        req.session.expiresAt = new Date(Date.now() + FREE_SESSION_DURATION * 1000).toISOString();
+        req.session.guestName = name.trim();
+        req.session.guestEmail = email.trim();
+        req.session.guestPhone = phone.trim();
+        req.session.newsletter = newsletter || false;
+        
+        // Send accounting start with 30-minute limit
+        try {
+            await radiusClient.accountingStart(sessionId, guestId, {
+                callingStationId: client_mac,
+                calledStationId: router_mac,
+                sessionTimeout: FREE_SESSION_DURATION
+            });
+        } catch (e) {
+            console.warn('Accounting start failed (non-fatal):', e.message);
+        }
+        
+        // Notify RouterLogger
+        await notifyRouterLogger({
+            type: 'registration_completed',
+            guest_id: guestId,
+            username: email,
+            name: name.trim(),
+            phone: phone.trim(),
+            email: email.trim(),
+            newsletter: newsletter || false,
+            mac_address: client_mac,
+            router_mac,
+            router_id,
+            session_id: sessionId,
+            session_duration: FREE_SESSION_DURATION,
+            timestamp: new Date().toISOString()
+        });
+        
+        res.json({
+            success: true,
+            message: 'Registration successful!',
+            redirect: '/success?type=free',
+            sessionDuration: FREE_SESSION_DURATION
+        });
+    } catch (error) {
+        console.error('Registration error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Registration failed. Please try again.'
+        });
+    }
+});
+
+/**
  * POST /api/auth/free
  * Grant free 30-minute access (email required for cooldown tracking)
  */

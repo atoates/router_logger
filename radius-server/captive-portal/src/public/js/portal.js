@@ -16,7 +16,6 @@
     // Email form elements
     const emailForm = document.getElementById('email-form');
     const emailVerifyForm = document.getElementById('email-verify-form');
-    const emailInput = document.getElementById('email');
     const nameInput = document.getElementById('name');
     const verifyEmailSpan = document.getElementById('verify-email');
     const codeInputs = document.querySelectorAll('.code-input');
@@ -38,35 +37,60 @@
     let isSubmitting = false;
 
     // ============================================
-    // Free Access Form Handler (Simplified - Email Only)
+    // Registration Form Handler
     // ============================================
-    const freeForm = document.getElementById('free-form');
-    const emailInput = document.getElementById('email');
+    const registerForm = document.getElementById('register-form');
     
-    if (freeForm) {
-        freeForm.addEventListener('submit', async (e) => {
+    if (registerForm) {
+        registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (isSubmitting) return;
             
-            const email = emailInput.value.trim();
+            const name = document.getElementById('name')?.value.trim();
+            const phone = document.getElementById('phone')?.value.trim();
+            const email = document.getElementById('email')?.value.trim();
+            const terms = document.getElementById('terms')?.checked;
+            const newsletter = document.getElementById('newsletter')?.checked;
+            
+            // Validation
+            if (!name) {
+                showMessage('Please enter your name', 'error');
+                document.getElementById('name')?.focus();
+                return;
+            }
+            
+            if (!phone) {
+                showMessage('Please enter your phone number', 'error');
+                document.getElementById('phone')?.focus();
+                return;
+            }
             
             if (!email || !isValidEmail(email)) {
                 showMessage('Please enter a valid email address', 'error');
-                emailInput.focus();
+                document.getElementById('email')?.focus();
+                return;
+            }
+            
+            if (!terms) {
+                showMessage('You must agree to the Terms of service', 'error');
+                document.getElementById('terms')?.focus();
                 return;
             }
             
             isSubmitting = true;
-            const submitBtn = document.getElementById('free-submit');
+            const submitBtn = document.getElementById('register-submit');
             setButtonLoading(submitBtn, true);
             hideMessage();
             
             try {
-                const response = await fetch('/api/auth/free', {
+                const response = await fetch('/api/auth/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        name: name,
+                        phone: phone,
                         email: email,
+                        newsletter: newsletter,
                         client_mac: clientMac,
                         router_mac: routerMac,
                         router_id: routerId
@@ -76,23 +100,24 @@
                 const data = await response.json();
                 
                 if (response.ok && data.success) {
-                    showMessage('Connected! Redirecting...', 'success');
+                    showMessage('Registration successful! Connecting...', 'success');
                     
                     // Store session info for the success page
                     sessionStorage.setItem('freeSession', JSON.stringify({
                         duration: data.sessionDuration || 1800,
-                        startedAt: new Date().toISOString()
+                        startedAt: new Date().toISOString(),
+                        guestName: name
                     }));
                     
                     setTimeout(() => {
                         window.location.href = data.redirect || '/success?type=free';
                     }, 1000);
                 } else {
-                    showMessage(data.message || 'Unable to connect. Please try again.', 'error');
+                    showMessage(data.message || 'Registration failed. Please try again.', 'error');
                     setButtonLoading(submitBtn, false);
                 }
             } catch (err) {
-                console.error('Free access error:', err);
+                console.error('Registration error:', err);
                 showMessage('Network error. Please try again.', 'error');
                 setButtonLoading(submitBtn, false);
             } finally {
