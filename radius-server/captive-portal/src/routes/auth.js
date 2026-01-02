@@ -255,12 +255,21 @@ function calculateChapResponse(password, challenge) {
  * For PAP: response = hexmd5(challenge + uamsecret)
  */
 function calculateUamResponse(challenge, uamSecret) {
-    const md5 = crypto.createHash('md5');
-    // Challenge is already hex, convert to buffer
-    const challengeBuffer = Buffer.from(challenge, 'hex');
-    md5.update(challengeBuffer);
-    md5.update(uamSecret);
-    return md5.digest('hex');
+    try {
+        if (!challenge || challenge.length < 2) {
+            console.warn('Invalid challenge for UAM response:', challenge);
+            return null;
+        }
+        const md5 = crypto.createHash('md5');
+        // Challenge is already hex, convert to buffer
+        const challengeBuffer = Buffer.from(challenge, 'hex');
+        md5.update(challengeBuffer);
+        md5.update(uamSecret);
+        return md5.digest('hex');
+    } catch (error) {
+        console.error('Error calculating UAM response:', error);
+        return null;
+    }
 }
 
 router.post('/register', async (req, res) => {
@@ -388,11 +397,15 @@ router.post('/register', async (req, res) => {
             // For PAP mode with UAM: response = hex(md5(challenge + uamsecret))
             const uamResponse = calculateUamResponse(chilli_challenge, UAM_SECRET);
             
-            // Build the CoovaChilli login URL
-            // Format: http://uamip:uamport/logon?username=xxx&response=xxx
-            routerLoginUrl = `http://${chilli_uamip}:${chilli_uamport}/logon?username=${encodeURIComponent(guestId)}&response=${uamResponse}`;
-            
-            console.log(`🔗 CoovaChilli login URL: ${routerLoginUrl}`);
+            if (uamResponse) {
+                // Build the CoovaChilli login URL
+                // Format: http://uamip:uamport/logon?username=xxx&response=xxx
+                routerLoginUrl = `http://${chilli_uamip}:${chilli_uamport}/logon?username=${encodeURIComponent(guestId)}&response=${uamResponse}`;
+                
+                console.log(`🔗 CoovaChilli login URL: ${routerLoginUrl}`);
+            } else {
+                console.warn('⚠️ Failed to calculate UAM response, skipping CoovaChilli login');
+            }
         } else if (login_url) {
             // Fallback to regular login URL
             try {
@@ -407,13 +420,17 @@ router.post('/register', async (req, res) => {
             }
         }
         
-        res.json({
+        const responseData = {
             success: true,
             message: 'Registration successful!',
             redirect: `/success?type=free&token=${successToken}`,
             routerLoginUrl: routerLoginUrl, // If set, client should redirect here first
             sessionDuration: FREE_SESSION_DURATION
-        });
+        };
+        
+        console.log(`📤 Sending response:`, JSON.stringify(responseData, null, 2));
+        
+        res.json(responseData);
     } catch (error) {
         console.error('Registration error:', error);
         res.status(500).json({
