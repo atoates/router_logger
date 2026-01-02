@@ -102,7 +102,7 @@
             </div>
             <% } %>
 
-            <a href="https://www.google.com" class="btn btn-primary" id="start-browsing">
+            <a href="https://www.google.com" class="btn btn-primary" id="start-browsing" target="_blank">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="10"/>
                     <path d="M12 16v-4"/>
@@ -110,6 +110,22 @@
                 </svg>
                 Start Browsing
             </a>
+            
+            <!-- WiFi Activation Button - shown if WiFi not yet active -->
+            <div id="wifi-activation" style="display: none; margin-top: 1rem;">
+                <p style="color: var(--color-warning); margin-bottom: 0.5rem; font-size: 0.9rem;">
+                    ⚠️ WiFi not yet activated. Click below to complete activation:
+                </p>
+                <a href="#" id="activate-wifi-btn" class="btn btn-secondary">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+                        <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                        <circle cx="12" cy="20" r="1"/>
+                    </svg>
+                    Activate WiFi Now
+                </a>
+            </div>
 
             <% if (typeof isFreeSession !== 'undefined' && isFreeSession) { %>
             <a href="/" class="btn btn-secondary" id="upgrade-btn">
@@ -312,6 +328,56 @@
         // Auto-redirect after a short delay to let user see the success
         // Uncomment if you want automatic redirect:
         // setTimeout(() => { window.location.href = 'https://www.google.com'; }, 3000);
+        
+        // Check if WiFi is actually working by trying to fetch an external resource
+        async function checkInternetConnection() {
+            try {
+                // Try to fetch a lightweight resource
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+                
+                await fetch('https://www.google.com/generate_204', {
+                    mode: 'no-cors',
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                
+                console.log('✅ Internet connection working');
+                document.getElementById('wifi-activation').style.display = 'none';
+                return true;
+            } catch (e) {
+                console.log('⚠️ Internet not working yet:', e.message);
+                
+                // Check if we have CoovaChilli activation URL in session storage
+                const freeSession = sessionStorage.getItem('freeSession');
+                if (freeSession) {
+                    try {
+                        const session = JSON.parse(freeSession);
+                        if (session.successUrl || session.routerLoginUrl) {
+                            // We may have the activation URL
+                            console.log('Found session data:', session);
+                        }
+                    } catch (e) {}
+                }
+                
+                // Show the activation section
+                document.getElementById('wifi-activation').style.display = 'block';
+                
+                // Build activation URL from URL params if available
+                const urlParams = new URLSearchParams(window.location.search);
+                const activationUrl = urlParams.get('activate');
+                if (activationUrl) {
+                    const activateBtn = document.getElementById('activate-wifi-btn');
+                    activateBtn.href = decodeURIComponent(activationUrl);
+                    activateBtn.target = '_self';
+                }
+                
+                return false;
+            }
+        }
+        
+        // Check connection after a short delay
+        setTimeout(checkInternetConnection, 1500);
         
         // Emergency services handler
         function findEmergencyService(service) {

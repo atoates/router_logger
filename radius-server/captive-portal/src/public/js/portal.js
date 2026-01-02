@@ -125,12 +125,25 @@
                         duration: data.sessionDuration || 1800,
                         startedAt: new Date().toISOString(),
                         guestName: name,
-                        successUrl: data.successUrl // Store success URL for later
+                        successUrl: data.successUrl,
+                        routerLoginUrl: data.routerLoginUrl
                     }));
                     
-                    // Redirect to wherever the server tells us (could be router login or success page)
+                    // Redirect to wherever the server tells us
                     const redirectUrl = data.redirect || '/success?type=free';
-                    console.log('Redirecting to:', redirectUrl);
+                    console.log('Primary redirect to:', redirectUrl);
+                    console.log('Fallback success URL:', data.successUrl);
+                    
+                    // If redirecting to router (CoovaChilli), set a fallback
+                    if (data.routerLoginUrl && redirectUrl === data.routerLoginUrl) {
+                        // Set a timeout to redirect to success page if router redirect fails
+                        setTimeout(() => {
+                            console.log('Fallback: redirecting to success page');
+                            if (data.successUrl) {
+                                window.location.href = data.successUrl;
+                            }
+                        }, 5000); // 5 second fallback
+                    }
                     
                     // Use location.replace to prevent back button issues
                     setTimeout(() => {
