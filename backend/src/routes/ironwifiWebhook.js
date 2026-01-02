@@ -57,6 +57,8 @@ router.post('/captive-portal/event', async (req, res) => {
     processCaptivePortalEvent(event).catch(error => {
       logger.error('Error processing captive portal event:', error);
     });
+    
+    logger.info('Captive portal event acknowledged, processing async');
 
   } catch (error) {
     logger.error('Error handling captive portal event:', error);
@@ -121,10 +123,11 @@ async function processCaptivePortalEvent(event) {
       });
       break;
 
+    case 'registration_completed':  // From self-hosted captive portal (free 30-min)
     case 'guest_registration':
     case 'guest_login':
       await handleGuestLogin({
-        username: username || email,
+        username: username || email || guest_id,
         email,
         phone,
         name,
@@ -134,7 +137,7 @@ async function processCaptivePortalEvent(event) {
         sessionId: session_id,
         sessionDuration: session_duration,
         timestamp,
-        isFreeAccess: false
+        isFreeAccess: type === 'registration_completed' || type === 'free_access_granted'
       });
       break;
 
@@ -203,11 +206,13 @@ async function handleFreeAccessGranted({ guestId, userMac, apMac, routerId, sess
  * Handle guest login/registration event
  */
 async function handleGuestLogin({ username, email, phone, name, userMac, apMac, routerId, sessionId, sessionDuration, timestamp, isFreeAccess }) {
-  logger.info(`Guest login: ${username} on router ${routerId}`);
+  logger.info(`Guest login: ${username} on router ${routerId}`, {
+    email, phone, name, userMac, apMac, sessionId, sessionDuration, isFreeAccess
+  });
   
   try {
     // Insert/update guest record
-    await pool.query(`
+    const result = await pool.query(`
       INSERT INTO ironwifi_sessions (
         session_id, username, email, phone, guest_name, user_mac, ap_mac, router_id,
         session_start, session_duration, session_type, source
@@ -218,19 +223,33 @@ async function handleGuestLogin({ username, email, phone, name, userMac, apMac, 
         guest_name = COALESCE(EXCLUDED.guest_name, ironwifi_sessions.guest_name),
         session_duration = EXCLUDED.session_duration,
         updated_at = NOW()
+      RETURNING id, session_id
     `, [
       sessionId, username, email, phone, name, userMac, apMac, routerId,
       timestamp, sessionDuration, isFreeAccess ? 'free' : 'registered'
     ]);
+    
+    logger.info(`✅ Session stored in ironwifi_sessions`, {
+      id: result.rows[0]?.id,
+      sessionId: result.rows[0]?.session_id,
+      routerId
+    });
 
     // Update router's guest count
     if (routerId) {
-      await pool.query(`
+      const updateResult = await pool.query(`
         UPDATE routers SET 
           guest_count = COALESCE(guest_count, 0) + 1,
           last_guest_activity = NOW()
         WHERE router_id = $1
+        RETURNING router_id, guest_count
       `, [routerId]);
+      
+      if (updateResult.rows.length > 0) {
+        logger.info(`✅ Router guest count updated`, updateResult.rows[0]);
+      } else {
+        logger.warn(`⚠️ Router not found for update: ${routerId}`);
+      }
     }
   } catch (error) {
     logger.error('Error storing guest login:', error);
@@ -3258,15 +3277,23 @@ router.get('/guests/search', async (req, res) => {
 /**
  * GET /api/ironwifi/guests/by-router/:routerId
  * Get all guests that have connected to a specific router
+ * 
+ * Queries BOTH:
+ * - ironwifi_guests: Data from IronWifi API/webhooks
+ * - ironwifi_sessions: Data from self-hosted captive portal
  */
 router.get('/guests/by-router/:routerId', async (req, res) => {
   try {
     const { routerId } = req.params;
     const { limit = 100, offset = 0 } = req.query;
     
+    // Query both tables and union the results
+    // ironwifi_guests = IronWifi API data
+    // ironwifi_sessions = Self-hosted captive portal data
     const result = await pool.query(`
+      -- IronWifi guests (legacy)
       SELECT 
-        g.id, 
+        g.id::text as id, 
         g.username, 
         g.email, 
         g.fullname, 
@@ -3274,21 +3301,43 @@ router.get('/guests/by-router/:routerId', async (req, res) => {
         g.client_mac,
         g.creation_date,
         g.auth_date,
-        g.auth_count
+        g.auth_count,
+        'ironwifi' as source
       FROM ironwifi_guests g
       WHERE g.router_id = $1
-      ORDER BY g.creation_date DESC NULLS LAST
+      
+      UNION ALL
+      
+      -- Self-hosted captive portal sessions
+      SELECT 
+        s.id::text as id,
+        COALESCE(s.username, s.email) as username,
+        s.email,
+        s.guest_name as fullname,
+        s.phone,
+        COALESCE(s.user_mac, s.user_device_mac) as client_mac,
+        s.session_start as creation_date,
+        s.session_start as auth_date,
+        1 as auth_count,
+        COALESCE(s.source, 'self-hosted') as source
+      FROM ironwifi_sessions s
+      WHERE s.router_id = $1
+      
+      ORDER BY creation_date DESC NULLS LAST
       LIMIT $2 OFFSET $3
     `, [routerId, parseInt(limit), parseInt(offset)]);
     
+    // Count from both tables
     const countResult = await pool.query(`
-      SELECT COUNT(*) FROM ironwifi_guests WHERE router_id = $1
+      SELECT 
+        (SELECT COUNT(*) FROM ironwifi_guests WHERE router_id = $1) +
+        (SELECT COUNT(*) FROM ironwifi_sessions WHERE router_id = $1) as total
     `, [routerId]);
     
     res.json({
       success: true,
       guests: result.rows,
-      total: parseInt(countResult.rows[0].count),
+      total: parseInt(countResult.rows[0].total || 0),
       routerId
     });
   } catch (error) {
