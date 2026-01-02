@@ -29,6 +29,14 @@
             <% } %>
             <span class="ad-label">Sponsored</span>
         </div>
+        <% } else { %>
+        <!-- Static Banner Ad Fallback -->
+        <div class="ad-slot ad-slot-top" data-ad-position="top-banner">
+            <a href="https://vacatad.com" target="_blank" rel="noopener sponsored" class="ad-link" data-ad-id="static-banner-1">
+                <img src="/images/banner-ad-1.gif" alt="VacatAd Advertisement" class="ad-image">
+            </a>
+            <span class="ad-label">Sponsored</span>
+        </div>
         <% } %>
 
         <div class="portal-card">

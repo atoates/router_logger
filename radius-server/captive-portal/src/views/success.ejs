@@ -93,16 +93,12 @@
                 <span class="ad-label">Sponsored</span>
             </div>
             <% } else { %>
-            <!-- Placeholder for square GIF ad -->
-            <div class="ad-slot ad-slot-square ad-placeholder" data-ad-position="success-square">
-                <div class="ad-placeholder-content">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                        <line x1="9" y1="3" x2="9" y2="21"/>
-                        <line x1="3" y1="9" x2="21" y2="9"/>
-                    </svg>
-                    <span>Ad Space</span>
-                </div>
+            <!-- Static Square GIF Ad Fallback -->
+            <div class="ad-slot ad-slot-square" data-ad-position="success-square">
+                <a href="https://vacatad.com" target="_blank" rel="noopener sponsored" class="ad-link" data-ad-id="static-square-1">
+                    <img src="/images/Ad1.gif" alt="VacatAd Advertisement" class="ad-image-square">
+                </a>
+                <span class="ad-label">Sponsored</span>
             </div>
             <% } %>
 
