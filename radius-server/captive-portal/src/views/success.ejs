@@ -180,7 +180,7 @@
             <!-- Contact Information -->
             <div class="contact-info">
                 <p>Need help or want to learn more about our advertisers?</p>
-                <p>See our <a href="/contact" class="contact-link">contact links</a>.</p>
+                <p>See our <a href="https://linktr.ee/vacatad" target="_blank" rel="noopener" class="contact-link">contact links</a>.</p>
             </div>
         </div>
 
@@ -379,65 +379,21 @@
         // Check connection after a short delay
         setTimeout(checkInternetConnection, 1500);
         
-        // Emergency services handler
+        // Emergency services handler - opens dedicated UK services
         function findEmergencyService(service) {
-            // Get user's location if available
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const lat = position.coords.latitude;
-                        const lng = position.coords.longitude;
-                        
-                        // Open maps with emergency service search
-                        let searchQuery = '';
-                        
-                        switch(service) {
-                            case 'defibrillator':
-                                searchQuery = 'defibrillator';
-                                break;
-                            case 'ae':
-                                searchQuery = 'hospital emergency';
-                                break;
-                            case 'police':
-                                searchQuery = 'police station';
-                                break;
-                        }
-                        
-                        // Open Google Maps with search
-                        window.open(`https://www.google.com/maps/search/${searchQuery}/@${lat},${lng},15z`, '_blank');
-                    },
-                    () => {
-                        // Fallback if location not available
-                        let searchQuery = '';
-                        switch(service) {
-                            case 'defibrillator':
-                                searchQuery = 'defibrillator';
-                                break;
-                            case 'ae':
-                                searchQuery = 'hospital emergency';
-                                break;
-                            case 'police':
-                                searchQuery = 'police station';
-                                break;
-                        }
-                        window.open(`https://www.google.com/maps/search/${searchQuery}`, '_blank');
-                    }
-                );
-            } else {
-                // No geolocation support
-                let searchQuery = '';
-                switch(service) {
-                    case 'defibrillator':
-                        searchQuery = 'defibrillator';
-                        break;
-                    case 'ae':
-                        searchQuery = 'hospital emergency';
-                        break;
-                    case 'police':
-                        searchQuery = 'police station';
-                        break;
-                }
-                window.open(`https://www.google.com/maps/search/${searchQuery}`, '_blank');
+            switch(service) {
+                case 'defibrillator':
+                    // DefibFinder UK - official NHS-partnered defibrillator locator
+                    window.open('https://www.defibfinder.uk/', '_blank');
+                    break;
+                case 'ae':
+                    // NHS A&E finder
+                    window.open('https://www.nhs.uk/service-search/find-an-accident-and-emergency-service/', '_blank');
+                    break;
+                case 'police':
+                    // Met Police station finder
+                    window.open('https://www.met.police.uk/contact/find-a-police-station/', '_blank');
+                    break;
             }
         }
     </script>
