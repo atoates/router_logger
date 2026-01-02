@@ -1,0 +1,167 @@
+# FreeRADIUS Default Virtual Server
+# Handles authentication and accounting for captive portal
+
+server default {
+    # =====================================================
+    # Listen for Authentication (port 1812)
+    # =====================================================
+    listen {
+        type = auth
+        ipaddr = *
+        port = 1812
+        limit {
+            max_connections = 256
+            lifetime = 0
+            idle_timeout = 30
+        }
+    }
+
+    # =====================================================
+    # Listen for Accounting (port 1813)
+    # =====================================================
+    listen {
+        type = acct
+        ipaddr = *
+        port = 1813
+        limit {
+            max_connections = 256
+            lifetime = 0
+            idle_timeout = 30
+        }
+    }
+
+    # =====================================================
+    # Authorization Section
+    # Determines if user is allowed to authenticate
+    # =====================================================
+    authorize {
+        # Log the request
+        # linelog
+
+        # Preprocess - clean up attributes
+        preprocess
+
+        # Check for MAC address authentication (bypass)
+        # If MAC is in whitelist, allow without password
+        # chap
+        # mschap
+
+        # Suffix handling for realms
+        suffix
+
+        # Read user from SQL database
+        sql
+
+        # Check if user is in captive portal guests table
+        # update control {
+        #     &Auth-Type := sql
+        # }
+
+        # Set password auth type
+        pap
+
+        # Expiration check
+        expiration
+        logintime
+    }
+
+    # =====================================================
+    # Authentication Section
+    # Verifies user credentials
+    # =====================================================
+    authenticate {
+        # PAP - Password Authentication Protocol
+        Auth-Type PAP {
+            pap
+        }
+
+        # CHAP - Challenge Handshake Authentication Protocol
+        Auth-Type CHAP {
+            chap
+        }
+
+        # MS-CHAP - Microsoft CHAP
+        # Auth-Type MS-CHAP {
+        #     mschap
+        # }
+    }
+
+    # =====================================================
+    # Pre-Accounting Section
+    # =====================================================
+    preacct {
+        preprocess
+        acct_unique
+        suffix
+    }
+
+    # =====================================================
+    # Accounting Section
+    # Records session data
+    # =====================================================
+    accounting {
+        # Log to SQL database
+        sql
+
+        # Send to RouterLogger webhook
+        rest
+
+        # Add custom accounting logic here
+        # e.g., check data limits, session limits
+    }
+
+    # =====================================================
+    # Session Section
+    # Checks for simultaneous sessions
+    # =====================================================
+    session {
+        sql
+    }
+
+    # =====================================================
+    # Post-Auth Section
+    # Actions after successful authentication
+    # =====================================================
+    post-auth {
+        # Log successful auth
+        sql
+
+        # Notify RouterLogger
+        rest
+
+        # Add reply attributes
+        update reply {
+            # Welcome message
+            Reply-Message := "Welcome to Guest WiFi"
+            
+            # Session timeout (24 hours)
+            Session-Timeout := 86400
+            
+            # Idle timeout (30 minutes)
+            Idle-Timeout := 1800
+        }
+
+        # Handle failed auth
+        Post-Auth-Type REJECT {
+            sql
+            # Log rejection
+            # rest
+            update reply {
+                Reply-Message := "Authentication failed. Please check your credentials."
+            }
+        }
+    }
+
+    # =====================================================
+    # Pre-Proxy Section (for proxied requests)
+    # =====================================================
+    pre-proxy {
+    }
+
+    # =====================================================
+    # Post-Proxy Section
+    # =====================================================
+    post-proxy {
+    }
+}
+

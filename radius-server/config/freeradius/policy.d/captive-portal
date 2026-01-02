@@ -1,0 +1,87 @@
+# FreeRADIUS Captive Portal Policies
+# Custom policies for guest WiFi authentication
+
+# =====================================================
+# MAC Address Authentication Policy
+# Allows pre-authorized devices to bypass captive portal
+# =====================================================
+policy mac_auth {
+    # Check if MAC is in whitelist
+    if (&Calling-Station-Id) {
+        # Normalize MAC address format (lowercase, colons)
+        update request {
+            &Tmp-String-0 := "%{tolower:%{Calling-Station-Id}}"
+        }
+        
+        # Look up MAC in whitelist
+        # If found, set Auth-Type to Accept
+        # sql_mac_whitelist
+    }
+}
+
+# =====================================================
+# Guest Session Limits Policy
+# Enforces bandwidth and data limits
+# =====================================================
+policy guest_limits {
+    # Check if user is in guests group
+    if (&control:SQL-Group == "guests") {
+        # Apply default guest limits
+        update reply {
+            # Session timeout: 24 hours
+            &Session-Timeout := 86400
+            
+            # Idle timeout: 30 minutes
+            &Idle-Timeout := 1800
+            
+            # Bandwidth limits (if supported by NAS)
+            # WISPr attributes for Teltonika
+            # &WISPr-Bandwidth-Max-Down := 10000000  # 10 Mbps
+            # &WISPr-Bandwidth-Max-Up := 5000000    # 5 Mbps
+        }
+    }
+}
+
+# =====================================================
+# Voucher Authentication Policy
+# Validates voucher codes for guest access
+# =====================================================
+policy voucher_auth {
+    # Check if username looks like a voucher code
+    if (&User-Name =~ /^[A-Z0-9]{6,10}$/) {
+        # This is likely a voucher code
+        # SQL will validate it in authorize section
+        update control {
+            &Auth-Type := "voucher"
+        }
+    }
+}
+
+# =====================================================
+# Rate Limiting Policy
+# Prevents brute force attacks
+# =====================================================
+policy rate_limit {
+    # Track failed attempts by IP
+    # If too many failures, reject immediately
+    # Requires external cache (redis/memcached)
+}
+
+# =====================================================
+# RouterLogger Integration Policy
+# Adds custom attributes for tracking
+# =====================================================
+policy routerlogger_tracking {
+    # Add router identification to accounting
+    update request {
+        # Extract router ID from Called-Station-Id (AP MAC)
+        &Tmp-String-1 := "%{Called-Station-Id}"
+    }
+    
+    # Add to accounting record
+    update reply {
+        # Custom attributes for RouterLogger
+        &Class := "routerlogger:%{Called-Station-Id}"
+    }
+}
+

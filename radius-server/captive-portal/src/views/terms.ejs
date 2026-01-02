@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#030712">
+    <title><%= title %></title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>">
+</head>
+<body>
+    <div class="portal-container">
+        <div class="portal-card legal-card">
+            <a href="/" class="back-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m12 19-7-7 7-7"/>
+                    <path d="M19 12H5"/>
+                </svg>
+                Back to Login
+            </a>
+            
+            <div class="portal-header" style="margin-bottom: var(--space-6);">
+                <h1 style="font-size: 1.5rem;">Terms of Service</h1>
+                <p class="subtitle">Guest WiFi Network Usage Agreement</p>
+            </div>
+            
+            <div class="legal-content">
+                <h2>1. Acceptance of Terms</h2>
+                <p>By accessing and using this guest WiFi network provided by <strong><%= companyName %></strong>, you agree to be bound by these Terms of Service. If you do not agree to these terms, please disconnect from the network.</p>
+
+                <h2>2. Acceptable Use</h2>
+                <p>You agree to use this network only for lawful purposes. The following activities are strictly prohibited:</p>
+                <ul>
+                    <li>Illegal file sharing or downloading copyrighted material</li>
+                    <li>Accessing inappropriate, harmful, or illegal content</li>
+                    <li>Attempting to hack, probe, or compromise network security</li>
+                    <li>Sending spam, phishing attempts, or malicious content</li>
+                    <li>Using excessive bandwidth that negatively impacts other users</li>
+                    <li>Running servers, peer-to-peer applications, or automated scripts</li>
+                </ul>
+
+                <h2>3. Network Monitoring</h2>
+                <p>For security and network management purposes, we may monitor network traffic. This includes logging connection times, data usage, device information, and websites visited. This data is used solely for network security and troubleshooting purposes.</p>
+
+                <h2>4. Session Limits</h2>
+                <p>Guest sessions are limited to <strong>24 hours</strong>. Bandwidth may be limited to ensure fair usage for all guests. You may reconnect after your session expires.</p>
+
+                <h2>5. No Warranty</h2>
+                <p>This network is provided <strong>"as is"</strong> without any warranty of any kind. We do not guarantee availability, speed, security, or reliability of the connection.</p>
+
+                <h2>6. Limitation of Liability</h2>
+                <p><%= companyName %> shall not be liable for any direct, indirect, incidental, or consequential damages arising from the use of this network, including but not limited to data loss, security breaches, service interruptions, or any unauthorized access to your device.</p>
+
+                <h2>7. Your Responsibility</h2>
+                <p>You are responsible for maintaining the security of your own device. We recommend using a VPN and ensuring your device's firewall is enabled when using any public WiFi network.</p>
+
+                <h2>8. Termination</h2>
+                <p>We reserve the right to terminate your access to this network at any time without notice for any violation of these terms or for any other reason at our sole discretion.</p>
+
+                <h2>9. Changes to Terms</h2>
+                <p>We may modify these terms at any time without prior notice. Continued use of the network after any changes constitutes your acceptance of the new terms.</p>
+
+                <p class="last-updated">Last updated: January 2026</p>
+            </div>
+        </div>
+
+        <!-- Background decoration -->
+        <div class="bg-decoration" aria-hidden="true">
+            <div class="circle circle-1"></div>
+            <div class="circle circle-2"></div>
+            <div class="circle circle-3"></div>
+        </div>
+    </div>
+</body>
+</html>

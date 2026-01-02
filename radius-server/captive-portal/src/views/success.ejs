@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#030712">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title><%= title %></title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✅</text></svg>">
+</head>
+<body>
+    <div class="portal-container">
+        <div class="portal-card success-card">
+            <!-- Success Icon with animated checkmark -->
+            <div class="success-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 6 9 17l-5-5" class="checkmark-path"/>
+                </svg>
+            </div>
+
+            <h1>You're Connected!</h1>
+            
+            <% if (typeof isFreeSession !== 'undefined' && isFreeSession) { %>
+            <p class="welcome-name free-session-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                Free 30-minute session
+            </p>
+            <% } else if (guestName) { %>
+            <p class="welcome-name">Welcome back, <%= guestName %> 👋</p>
+            <% } else { %>
+            <p class="welcome-name">Enjoy your browsing</p>
+            <% } %>
+
+            <div class="connection-info">
+                <div class="info-item">
+                    <span class="label">Status</span>
+                    <span class="value status-online">
+                        <span class="status-dot"></span>
+                        Online
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Connected at</span>
+                    <span class="value" id="connect-time"><%= new Date(authenticatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) %></span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Session expires in</span>
+                    <span class="value session-timer" id="session-timer">24:00:00</span>
+                </div>
+            </div>
+
+            <% if (typeof isFreeSession !== 'undefined' && isFreeSession) { %>
+            <p class="enjoy-message">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px; opacity: 0.7;">
+                    <path d="M12 2v4"/>
+                    <path d="m4.93 4.93 2.83 2.83"/>
+                    <path d="M2 12h4"/>
+                    <path d="m4.93 19.07 2.83-2.83"/>
+                    <path d="M12 18v4"/>
+                    <path d="m19.07 19.07-2.83-2.83"/>
+                    <path d="M22 12h-4"/>
+                    <path d="m19.07 4.93-2.83 2.83"/>
+                </svg>
+                Need more time? Sign in with email for 24-hour access
+            </p>
+            <% } else { %>
+            <p class="enjoy-message">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px; opacity: 0.7;">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 16v-4"/>
+                    <path d="M12 8h.01"/>
+                </svg>
+                Your session will automatically renew while you're active
+            </p>
+            <% } %>
+
+            <!-- Success Page Ad Slot -->
+            <% if (typeof ads !== 'undefined' && ads.inCard) { %>
+            <div class="ad-slot ad-slot-success" data-ad-position="success-page">
+                <% if (ads.inCard.type === 'image') { %>
+                <a href="<%= ads.inCard.link %>" target="_blank" rel="noopener sponsored" class="ad-link" data-ad-id="<%= ads.inCard.id %>">
+                    <img src="<%= ads.inCard.image %>" alt="<%= ads.inCard.alt || 'Advertisement' %>" class="ad-image">
+                </a>
+                <% } else if (ads.inCard.type === 'promo') { %>
+                <div class="ad-promo">
+                    <% if (ads.inCard.icon) { %>
+                    <img src="<%= ads.inCard.icon %>" alt="" class="ad-promo-icon">
+                    <% } %>
+                    <div class="ad-promo-content">
+                        <strong><%= ads.inCard.title %></strong>
+                        <span><%= ads.inCard.description %></span>
+                    </div>
+                    <a href="<%= ads.inCard.link %>" target="_blank" rel="noopener sponsored" class="btn btn-ad" data-ad-id="<%= ads.inCard.id %>">
+                        <%= ads.inCard.cta || 'Learn More' %>
+                    </a>
+                </div>
+                <% } else if (ads.inCard.type === 'html') { %>
+                <div class="ad-html"><%- ads.inCard.html %></div>
+                <% } %>
+                <span class="ad-label">Sponsored</span>
+            </div>
+            <% } %>
+
+            <a href="https://www.google.com" class="btn btn-primary" id="start-browsing">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 16v-4"/>
+                    <path d="M8 12h8"/>
+                </svg>
+                Start Browsing
+            </a>
+
+            <% if (typeof isFreeSession !== 'undefined' && isFreeSession) { %>
+            <a href="/" class="btn btn-secondary" id="upgrade-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m6 9 6-6 6 6"/>
+                    <path d="M12 3v14"/>
+                    <path d="M6 21h12"/>
+                </svg>
+                Upgrade to 24 Hours
+            </a>
+            <% } else { %>
+            <button id="logout-btn" class="btn btn-secondary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" x2="9" y1="12" y2="12"/>
+                </svg>
+                Disconnect
+            </button>
+            <% } %>
+        </div>
+
+        <!-- Background decoration -->
+        <div class="bg-decoration success-bg" aria-hidden="true">
+            <div class="circle circle-1"></div>
+            <div class="circle circle-2"></div>
+            <div class="circle circle-3"></div>
+        </div>
+    </div>
+
+    <style>
+        /* Animated checkmark */
+        .checkmark-path {
+            stroke-dasharray: 30;
+            stroke-dashoffset: 30;
+            animation: drawCheck 0.5s ease-out 0.3s forwards;
+        }
+        
+        @keyframes drawCheck {
+            to { stroke-dashoffset: 0; }
+        }
+        
+        /* Start browsing button special styling */
+        #start-browsing {
+            background: linear-gradient(135deg, var(--color-success) 0%, #10b981 100%);
+            box-shadow: var(--shadow-md), 0 0 30px rgba(52, 211, 153, 0.3);
+        }
+        
+        #start-browsing:hover {
+            box-shadow: var(--shadow-lg), 0 0 40px rgba(52, 211, 153, 0.5);
+        }
+        
+        .enjoy-message {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+        }
+        
+        /* Free session badge */
+        .free-session-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, rgba(34, 211, 238, 0.2) 0%, rgba(99, 102, 241, 0.1) 100%);
+            border: 1px solid rgba(34, 211, 238, 0.3);
+            border-radius: 20px;
+            color: var(--color-accent) !important;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .free-session-badge svg {
+            animation: clockTick 1s ease-in-out infinite;
+        }
+        
+        @keyframes clockTick {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Upgrade button styling */
+        #upgrade-btn {
+            background: linear-gradient(135deg, rgba(34, 211, 238, 0.2) 0%, rgba(99, 102, 241, 0.2) 100%);
+            border: 1px solid rgba(34, 211, 238, 0.3);
+            color: var(--color-accent);
+        }
+        
+        #upgrade-btn:hover {
+            background: linear-gradient(135deg, rgba(34, 211, 238, 0.3) 0%, rgba(99, 102, 241, 0.3) 100%);
+            border-color: rgba(34, 211, 238, 0.5);
+        }
+    </style>
+
+    <script>
+        // Session timer with smooth countdown
+        const sessionStart = new Date('<%= authenticatedAt %>');
+        const sessionDuration = <%= typeof sessionDuration !== 'undefined' ? sessionDuration : 86400 %> * 1000; // in milliseconds
+        const isFreeSession = <%= typeof isFreeSession !== 'undefined' ? isFreeSession : false %>;
+        const timerElement = document.getElementById('session-timer');
+        
+        function updateTimer() {
+            const now = new Date();
+            const elapsed = now - sessionStart;
+            const remaining = Math.max(0, sessionDuration - elapsed);
+            
+            if (remaining <= 0) {
+                timerElement.textContent = 'Expired';
+                timerElement.style.color = 'var(--color-error)';
+                return;
+            }
+            
+            const hours = Math.floor(remaining / (60 * 60 * 1000));
+            const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+            const seconds = Math.floor((remaining % (60 * 1000)) / 1000);
+            
+            timerElement.textContent = 
+                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Change color when time is low
+            if (remaining < 60 * 60 * 1000) { // Less than 1 hour
+                timerElement.style.color = 'var(--color-warning)';
+            }
+            if (remaining < 10 * 60 * 1000) { // Less than 10 minutes
+                timerElement.style.color = 'var(--color-error)';
+            }
+            
+            requestAnimationFrame(updateTimer);
+        }
+        
+        // Start the timer
+        requestAnimationFrame(updateTimer);
+
+        // Logout handler
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('logout-btn');
+            btn.disabled = true;
+            btn.innerHTML = `
+                <svg class="spinner" viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="10"/></svg>
+                Disconnecting...
+            `;
+            
+            try {
+                await fetch('/api/auth/logout', { 
+                    method: 'POST',
+                    credentials: 'same-origin'
+                });
+                window.location.href = '/';
+            } catch (e) {
+                console.error('Logout failed:', e);
+                btn.disabled = false;
+                btn.innerHTML = `
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" x2="9" y1="12" y2="12"/>
+                    </svg>
+                    Disconnect
+                `;
+            }
+        });
+        
+        // Auto-redirect after a short delay to let user see the success
+        // Uncomment if you want automatic redirect:
+        // setTimeout(() => { window.location.href = 'https://www.google.com'; }, 3000);
+    </script>
+</body>
+</html>

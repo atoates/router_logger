@@ -1,0 +1,96 @@
+# FreeRADIUS REST Module Configuration
+# Used to send accounting data to RouterLogger webhook
+
+rest {
+    # Connection settings
+    connect_uri = "${ROUTERLOGGER_WEBHOOK_URL:-http://localhost:3001/api/ironwifi/webhook}"
+    connect_timeout = 4.0
+    
+    # TLS settings (for HTTPS)
+    tls {
+        # Verify server certificate
+        check_cert = no
+        check_cert_cn = no
+    }
+
+    # Pool settings
+    pool {
+        start = 5
+        min = 3
+        max = 32
+        spare = 3
+        uses = 0
+        lifetime = 0
+        idle_timeout = 60
+    }
+
+    # =====================================================
+    # Accounting - POST to RouterLogger
+    # =====================================================
+    accounting {
+        uri = "${rest.connect_uri}"
+        method = 'post'
+        body = 'json'
+        
+        # Map RADIUS attributes to JSON fields
+        # This matches the IronWifi webhook format for compatibility
+        data = '{
+            "type": "radius_accounting",
+            "acct_status_type": "%{Acct-Status-Type}",
+            "acctsessionid": "%{Acct-Session-Id}",
+            "username": "%{User-Name}",
+            "calledstationid": "%{Called-Station-Id}",
+            "callingstationid": "%{Calling-Station-Id}",
+            "nasipaddress": "%{NAS-IP-Address}",
+            "nasportid": "%{NAS-Port-Id}",
+            "framedipaddress": "%{Framed-IP-Address}",
+            "acctstarttime": "%{Event-Timestamp}",
+            "acctsessiontime": "%{Acct-Session-Time}",
+            "acctinputoctets": "%{Acct-Input-Octets}",
+            "acctoutputoctets": "%{Acct-Output-Octets}",
+            "acctterminatecause": "%{Acct-Terminate-Cause}",
+            "timestamp": "%{Event-Timestamp}"
+        }'
+        
+        # Timeout for the request
+        timeout = 5.0
+    }
+
+    # =====================================================
+    # Authorization - Check with RouterLogger (optional)
+    # =====================================================
+    # Uncomment to enable external authorization
+    # authorize {
+    #     uri = "${rest.connect_uri}/authorize"
+    #     method = 'post'
+    #     body = 'json'
+    #     data = '{
+    #         "username": "%{User-Name}",
+    #         "mac_address": "%{Calling-Station-Id}",
+    #         "nas_ip": "%{NAS-IP-Address}"
+    #     }'
+    # }
+
+    # =====================================================
+    # Post-Auth - Notify RouterLogger of successful auth
+    # =====================================================
+    post-auth {
+        uri = "${rest.connect_uri}"
+        method = 'post'
+        body = 'json'
+        
+        data = '{
+            "type": "radius_auth",
+            "status": "success",
+            "username": "%{User-Name}",
+            "calledstationid": "%{Called-Station-Id}",
+            "callingstationid": "%{Calling-Station-Id}",
+            "nasipaddress": "%{NAS-IP-Address}",
+            "framedipaddress": "%{Framed-IP-Address}",
+            "timestamp": "%{Event-Timestamp}"
+        }'
+        
+        timeout = 5.0
+    }
+}
+

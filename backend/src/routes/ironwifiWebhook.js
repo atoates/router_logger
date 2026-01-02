@@ -1,11 +1,12 @@
 /**
- * IronWifi Integration Routes
+ * Guest WiFi Integration Routes
  * 
- * Supports two data ingestion methods:
- * 1. Webhook - Receives scheduled reports from IronWifi Report Scheduler
- * 2. API Polling - Fetches data from IronWifi REST API
+ * Supports multiple data sources:
+ * 1. IronWifi - Webhook reports from IronWifi Report Scheduler
+ * 2. Self-Hosted RADIUS - Webhooks from our own captive portal
+ * 3. API Polling - Fetches data from IronWifi REST API
  * 
- * Both methods store session data in ironwifi_sessions table.
+ * All methods store session data in ironwifi_sessions table.
  */
 
 const express = require('express');
@@ -15,6 +16,262 @@ const { validateIronwifiWebhookPayload } = require('../utils/validation');
 const ironwifiSync = require('../services/ironwifiSync');
 const ironwifiClient = require('../services/ironwifiClient');
 const guestDeduplication = require('../services/guestDeduplication');
+
+// =============================================================================
+// SELF-HOSTED RADIUS / CAPTIVE PORTAL WEBHOOKS
+// =============================================================================
+
+/**
+ * POST /api/ironwifi/captive-portal/event
+ * Receive events from our self-hosted captive portal
+ * 
+ * Event types:
+ * - free_access_granted: Guest connected with free 30-min access
+ * - guest_registration: Guest registered with email/phone
+ * - guest_login: Guest logged in
+ * - guest_logout: Guest disconnected
+ * - voucher_redemption: Voucher code used
+ * - session_expired: Session timed out
+ */
+router.post('/captive-portal/event', async (req, res) => {
+  try {
+    const event = req.body;
+    const receivedAt = new Date().toISOString();
+    
+    logger.info('Captive portal event received', {
+      type: event.type,
+      username: event.username || event.guest_id,
+      mac: event.mac_address,
+      routerId: event.router_id,
+      receivedAt
+    });
+
+    // Acknowledge immediately
+    res.status(200).json({
+      success: true,
+      message: 'Event received',
+      timestamp: receivedAt
+    });
+
+    // Process event asynchronously
+    processCaptivePortalEvent(event).catch(error => {
+      logger.error('Error processing captive portal event:', error);
+    });
+
+  } catch (error) {
+    logger.error('Error handling captive portal event:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * Process events from self-hosted captive portal
+ */
+async function processCaptivePortalEvent(event) {
+  const {
+    type,
+    username,
+    guest_id,
+    email,
+    phone,
+    name,
+    mac_address,
+    router_mac,
+    router_id,
+    session_id,
+    session_duration,
+    voucher_code,
+    timestamp
+  } = event;
+
+  // Normalize MAC addresses
+  const userMac = normalizeMac(mac_address);
+  const apMac = normalizeMac(router_mac);
+
+  // Find router by MAC or ID
+  let routerId = router_id;
+  if (!routerId && apMac) {
+    const routerResult = await pool.query(
+      'SELECT router_id FROM routers WHERE mac_address = $1 OR LEFT(mac_address, 14) = $2',
+      [apMac, apMac?.slice(0, 14)]
+    );
+    if (routerResult.rows.length > 0) {
+      routerId = routerResult.rows[0].router_id;
+    }
+  }
+
+  switch (type) {
+    case 'free_access_granted':
+      await handleFreeAccessGranted({
+        guestId: guest_id,
+        userMac,
+        apMac,
+        routerId,
+        sessionId: session_id,
+        sessionDuration: session_duration,
+        timestamp
+      });
+      break;
+
+    case 'guest_registration':
+    case 'guest_login':
+      await handleGuestLogin({
+        username: username || email,
+        email,
+        phone,
+        name,
+        userMac,
+        apMac,
+        routerId,
+        sessionId: session_id,
+        sessionDuration: session_duration,
+        timestamp,
+        isFreeAccess: false
+      });
+      break;
+
+    case 'guest_logout':
+    case 'session_expired':
+      await handleGuestLogout({
+        username: username || guest_id,
+        userMac,
+        routerId,
+        sessionId: session_id,
+        timestamp,
+        reason: type === 'session_expired' ? 'Session-Timeout' : 'User-Request'
+      });
+      break;
+
+    case 'voucher_redemption':
+      await handleVoucherRedemption({
+        voucherCode: voucher_code,
+        name,
+        userMac,
+        apMac,
+        routerId,
+        sessionId: session_id,
+        timestamp
+      });
+      break;
+
+    default:
+      logger.warn('Unknown captive portal event type:', type);
+  }
+}
+
+/**
+ * Handle free access granted event
+ */
+async function handleFreeAccessGranted({ guestId, userMac, apMac, routerId, sessionId, sessionDuration, timestamp }) {
+  logger.info(`Free access granted: ${guestId} on router ${routerId}`);
+  
+  try {
+    // Insert into ironwifi_sessions table (reusing existing schema)
+    await pool.query(`
+      INSERT INTO ironwifi_sessions (
+        session_id, username, user_mac, ap_mac, router_id,
+        session_start, session_duration, session_type, source
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'free', 'self-hosted')
+      ON CONFLICT (session_id) DO UPDATE SET
+        session_duration = EXCLUDED.session_duration,
+        updated_at = NOW()
+    `, [sessionId, guestId, userMac, apMac, routerId, timestamp, sessionDuration]);
+
+    // Update router's guest count
+    if (routerId) {
+      await pool.query(`
+        UPDATE routers SET 
+          guest_count = COALESCE(guest_count, 0) + 1,
+          last_guest_activity = NOW()
+        WHERE router_id = $1
+      `, [routerId]);
+    }
+  } catch (error) {
+    logger.error('Error storing free access session:', error);
+  }
+}
+
+/**
+ * Handle guest login/registration event
+ */
+async function handleGuestLogin({ username, email, phone, name, userMac, apMac, routerId, sessionId, sessionDuration, timestamp, isFreeAccess }) {
+  logger.info(`Guest login: ${username} on router ${routerId}`);
+  
+  try {
+    // Insert/update guest record
+    await pool.query(`
+      INSERT INTO ironwifi_sessions (
+        session_id, username, email, phone, guest_name, user_mac, ap_mac, router_id,
+        session_start, session_duration, session_type, source
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'self-hosted')
+      ON CONFLICT (session_id) DO UPDATE SET
+        email = COALESCE(EXCLUDED.email, ironwifi_sessions.email),
+        phone = COALESCE(EXCLUDED.phone, ironwifi_sessions.phone),
+        guest_name = COALESCE(EXCLUDED.guest_name, ironwifi_sessions.guest_name),
+        session_duration = EXCLUDED.session_duration,
+        updated_at = NOW()
+    `, [
+      sessionId, username, email, phone, name, userMac, apMac, routerId,
+      timestamp, sessionDuration, isFreeAccess ? 'free' : 'registered'
+    ]);
+
+    // Update router's guest count
+    if (routerId) {
+      await pool.query(`
+        UPDATE routers SET 
+          guest_count = COALESCE(guest_count, 0) + 1,
+          last_guest_activity = NOW()
+        WHERE router_id = $1
+      `, [routerId]);
+    }
+  } catch (error) {
+    logger.error('Error storing guest login:', error);
+  }
+}
+
+/**
+ * Handle guest logout event
+ */
+async function handleGuestLogout({ username, userMac, routerId, sessionId, timestamp, reason }) {
+  logger.info(`Guest logout: ${username} (${reason})`);
+  
+  try {
+    await pool.query(`
+      UPDATE ironwifi_sessions SET
+        session_end = $1,
+        terminate_cause = $2,
+        updated_at = NOW()
+      WHERE session_id = $3
+    `, [timestamp, reason, sessionId]);
+  } catch (error) {
+    logger.error('Error updating guest logout:', error);
+  }
+}
+
+/**
+ * Handle voucher redemption event
+ */
+async function handleVoucherRedemption({ voucherCode, name, userMac, apMac, routerId, sessionId, timestamp }) {
+  logger.info(`Voucher redeemed: ${voucherCode} on router ${routerId}`);
+  
+  try {
+    await pool.query(`
+      INSERT INTO ironwifi_sessions (
+        session_id, username, guest_name, user_mac, ap_mac, router_id,
+        session_start, session_type, voucher_code, source
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'voucher', $8, 'self-hosted')
+      ON CONFLICT (session_id) DO UPDATE SET
+        voucher_code = EXCLUDED.voucher_code,
+        updated_at = NOW()
+    `, [sessionId, `voucher:${voucherCode}`, name, userMac, apMac, routerId, timestamp, voucherCode]);
+  } catch (error) {
+    logger.error('Error storing voucher redemption:', error);
+  }
+}
+
+// =============================================================================
+// ORIGINAL IRONWIFI WEBHOOKS (kept for backwards compatibility)
+// =============================================================================
 
 /**
  * POST /api/ironwifi/webhook

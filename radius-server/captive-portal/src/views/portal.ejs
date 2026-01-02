@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#030712">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title><%= title %></title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📶</text></svg>">
+</head>
+<body>
+    <div class="portal-container">
+        <!-- Top Banner Ad Slot -->
+        <% if (typeof ads !== 'undefined' && ads.topBanner) { %>
+        <div class="ad-slot ad-slot-top" data-ad-position="top-banner">
+            <% if (ads.topBanner.type === 'image') { %>
+            <a href="<%= ads.topBanner.link %>" target="_blank" rel="noopener sponsored" class="ad-link" data-ad-id="<%= ads.topBanner.id %>">
+                <img src="<%= ads.topBanner.image %>" alt="<%= ads.topBanner.alt || 'Advertisement' %>" class="ad-image">
+            </a>
+            <% } else if (ads.topBanner.type === 'html') { %>
+            <div class="ad-html"><%- ads.topBanner.html %></div>
+            <% } %>
+            <span class="ad-label">Sponsored</span>
+        </div>
+        <% } %>
+
+        <div class="portal-card">
+            <!-- Header -->
+            <div class="portal-header">
+                <div class="wifi-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 20h.01"/>
+                        <path d="M2 8.82a15 15 0 0 1 20 0"/>
+                        <path d="M5 12.859a10 10 0 0 1 14 0"/>
+                        <path d="M8.5 16.429a5 5 0 0 1 7 0"/>
+                    </svg>
+                </div>
+                <h1>Welcome to <%= ssid %></h1>
+                <p class="subtitle">Sign in to access the network</p>
+            </div>
+
+            <!-- Free Access Form (Simplified - Email Only) -->
+            <div class="free-access-form">
+                <div class="free-badge-large">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2v4"/>
+                        <path d="m4.93 4.93 2.83 2.83"/>
+                        <path d="M2 12h4"/>
+                        <path d="m4.93 19.07 2.83-2.83"/>
+                        <path d="M12 18v4"/>
+                        <path d="m19.07 19.07-2.83-2.83"/>
+                        <path d="M22 12h-4"/>
+                        <path d="m19.07 4.93-2.83 2.83"/>
+                    </svg>
+                    <span>30 Minutes Free WiFi</span>
+                </div>
+                
+                <p class="free-description">
+                    Enter your email to get 30 minutes of free WiFi. 
+                    <br>One free session per email per day.
+                </p>
+
+                <form id="free-form" class="auth-form" novalidate>
+                    <div class="form-group">
+                        <label for="email">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect width="20" height="16" x="2" y="4" rx="2"/>
+                                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                            </svg>
+                            Email Address
+                        </label>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            placeholder="you@example.com" 
+                            autocomplete="email"
+                            inputmode="email"
+                            required
+                        >
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-large" id="free-submit">
+                        <span class="btn-text">Connect Free</span>
+                        <span class="btn-loading" style="display:none">
+                            <svg class="spinner" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>
+                            Connecting...
+                        </span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Error/Success Messages -->
+            <div id="message" class="message" style="display:none" role="alert" aria-live="polite"></div>
+
+            <!-- In-Card Ad Slot (above footer) -->
+            <% if (typeof ads !== 'undefined' && ads.inCard) { %>
+            <div class="ad-slot ad-slot-inline" data-ad-position="in-card">
+                <% if (ads.inCard.type === 'image') { %>
+                <a href="<%= ads.inCard.link %>" target="_blank" rel="noopener sponsored" class="ad-link" data-ad-id="<%= ads.inCard.id %>">
+                    <img src="<%= ads.inCard.image %>" alt="<%= ads.inCard.alt || 'Advertisement' %>" class="ad-image">
+                </a>
+                <% } else if (ads.inCard.type === 'html') { %>
+                <div class="ad-html"><%- ads.inCard.html %></div>
+                <% } else if (ads.inCard.type === 'promo') { %>
+                <div class="ad-promo">
+                    <% if (ads.inCard.icon) { %>
+                    <img src="<%= ads.inCard.icon %>" alt="" class="ad-promo-icon">
+                    <% } %>
+                    <div class="ad-promo-content">
+                        <strong><%= ads.inCard.title %></strong>
+                        <span><%= ads.inCard.description %></span>
+                    </div>
+                    <a href="<%= ads.inCard.link %>" target="_blank" rel="noopener sponsored" class="btn btn-ad">
+                        <%= ads.inCard.cta || 'Learn More' %>
+                    </a>
+                </div>
+                <% } %>
+                <span class="ad-label">Sponsored</span>
+            </div>
+            <% } %>
+
+            <!-- Footer -->
+            <div class="portal-footer">
+                <p>
+                    By connecting, you agree to our<br>
+                    <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a>
+                </p>
+            </div>
+        </div>
+
+        <!-- Bottom Banner Ad Slot -->
+        <% if (typeof ads !== 'undefined' && ads.bottomBanner) { %>
+        <div class="ad-slot ad-slot-bottom" data-ad-position="bottom-banner">
+            <% if (ads.bottomBanner.type === 'image') { %>
+            <a href="<%= ads.bottomBanner.link %>" target="_blank" rel="noopener sponsored" class="ad-link" data-ad-id="<%= ads.bottomBanner.id %>">
+                <img src="<%= ads.bottomBanner.image %>" alt="<%= ads.bottomBanner.alt || 'Advertisement' %>" class="ad-image">
+            </a>
+            <% } else if (ads.bottomBanner.type === 'html') { %>
+            <div class="ad-html"><%- ads.bottomBanner.html %></div>
+            <% } %>
+            <span class="ad-label">Sponsored</span>
+        </div>
+        <% } %>
+
+        <!-- Background decoration -->
+        <div class="bg-decoration" aria-hidden="true">
+            <div class="circle circle-1"></div>
+            <div class="circle circle-2"></div>
+            <div class="circle circle-3"></div>
+        </div>
+    </div>
+
+    <!-- Hidden fields for router info -->
+    <input type="hidden" id="client-mac" value="<%= clientMac || '' %>">
+    <input type="hidden" id="router-mac" value="<%= apMac || '' %>">
+    <input type="hidden" id="router-id" value="<%= routerId || '' %>">
+
+    <script src="/js/portal.js"></script>
+    
+    <!-- Ad Tracking -->
+    <script>
+    (function() {
+        // Track ad impressions
+        document.querySelectorAll('.ad-slot').forEach(slot => {
+            const position = slot.dataset.adPosition;
+            const adLink = slot.querySelector('.ad-link');
+            const adId = adLink?.dataset.adId;
+            
+            // Log impression
+            if (adId) {
+                fetch('/api/ads/impression', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adId, position, page: 'portal' })
+                }).catch(() => {});
+            }
+            
+            // Track clicks
+            if (adLink) {
+                adLink.addEventListener('click', () => {
+                    fetch('/api/ads/click', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ adId, position, page: 'portal' })
+                    }).catch(() => {});
+                });
+            }
+        });
+    })();
+    </script>
+</body>
+</html>
+

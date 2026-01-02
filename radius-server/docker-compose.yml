@@ -1,0 +1,117 @@
+# RouterLogger RADIUS Server Stack
+# Self-hosted replacement for IronWifi
+#
+# Components:
+# - FreeRADIUS: Core RADIUS authentication & accounting server
+# - daloRADIUS: Web-based management interface
+# - MariaDB: Database for users, accounting, and configuration
+#
+# Ports:
+# - 1812/udp: RADIUS Authentication
+# - 1813/udp: RADIUS Accounting
+# - 8080: daloRADIUS Web UI
+#
+# Usage:
+#   docker-compose up -d
+#   Access daloRADIUS at http://localhost:8080
+#   Default login: administrator / radius
+
+services:
+  # ===========================================
+  # MariaDB Database
+  # ===========================================
+  radius-db:
+    image: mariadb:10.11
+    container_name: radius-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${RADIUS_DB_ROOT_PASSWORD:-radiusroot123}
+      MYSQL_DATABASE: radius
+      MYSQL_USER: radius
+      MYSQL_PASSWORD: ${RADIUS_DB_PASSWORD:-radiuspass123}
+    volumes:
+      - radius-db-data:/var/lib/mysql
+      - ./config/mysql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    networks:
+      - radius-network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # FreeRADIUS Server
+  # ===========================================
+  freeradius:
+    image: freeradius/freeradius-server:latest
+    container_name: freeradius
+    restart: unless-stopped
+    ports:
+      - "1812:1812/udp"  # Authentication
+      - "1813:1813/udp"  # Accounting
+    environment:
+      # Database connection
+      RADIUS_DB_HOST: radius-db
+      RADIUS_DB_PORT: 3306
+      RADIUS_DB_NAME: radius
+      RADIUS_DB_USER: radius
+      RADIUS_DB_PASSWORD: ${RADIUS_DB_PASSWORD:-radiuspass123}
+      # RouterLogger integration
+      ROUTERLOGGER_WEBHOOK_URL: ${ROUTERLOGGER_WEBHOOK_URL:-http://host.docker.internal:3001/api/ironwifi/webhook}
+    volumes:
+      # Essential configuration files
+      - ./config/freeradius/clients.conf:/etc/raddb/clients.conf:ro
+      # SQL module (for database authentication)
+      - ./config/freeradius/mods-enabled/sql:/etc/raddb/mods-enabled/sql:ro
+    depends_on:
+      radius-db:
+        condition: service_healthy
+    networks:
+      - radius-network
+    # Run in debug mode initially, change to -f for production
+    command: ["freeradius", "-X"]
+
+  # daloRADIUS removed - using custom captive portal instead
+
+  # ===========================================
+  # Captive Portal (Custom)
+  # ===========================================
+  captive-portal:
+    build:
+      context: ./captive-portal
+      dockerfile: Dockerfile
+    container_name: captive-portal
+    restart: unless-stopped
+    ports:
+      - "8081:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # RADIUS connection
+      RADIUS_HOST: freeradius
+      RADIUS_AUTH_PORT: 1812
+      RADIUS_SECRET: ${RADIUS_SECRET:-testing123}
+      # RouterLogger API
+      ROUTERLOGGER_API_URL: ${ROUTERLOGGER_API_URL:-http://host.docker.internal:3001}
+      # Database Configuration (Railway PostgreSQL)
+      USE_DATABASE: ${USE_DATABASE:-false}
+      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_SSL: ${DATABASE_SSL:-false}
+      # Session settings
+      SESSION_SECRET: ${SESSION_SECRET:-change-this-in-production}
+      SESSION_TIMEOUT_HOURS: 24
+      # Company name
+      COMPANY_NAME: ${COMPANY_NAME:-RouterLogger}
+    depends_on:
+      - freeradius
+    networks:
+      - radius-network
+
+networks:
+  radius-network:
+    driver: bridge
+
+volumes:
+  radius-db-data:
+

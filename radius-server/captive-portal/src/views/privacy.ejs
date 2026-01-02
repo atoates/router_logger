@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#030712">
+    <title><%= title %></title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔒</text></svg>">
+</head>
+<body>
+    <div class="portal-container">
+        <div class="portal-card legal-card">
+            <a href="/" class="back-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m12 19-7-7 7-7"/>
+                    <path d="M19 12H5"/>
+                </svg>
+                Back to Login
+            </a>
+            
+            <div class="portal-header" style="margin-bottom: var(--space-6);">
+                <h1 style="font-size: 1.5rem;">Privacy Policy</h1>
+                <p class="subtitle">How we handle your data</p>
+            </div>
+            
+            <div class="legal-content">
+                <h2>Information We Collect</h2>
+                <p>When you use our guest WiFi network, we collect the following information:</p>
+                <ul>
+                    <li><strong>Contact Information:</strong> Email address or phone number used for authentication</li>
+                    <li><strong>Personal Details:</strong> Name (if provided)</li>
+                    <li><strong>Device Information:</strong> MAC address, device type, operating system, browser information</li>
+                    <li><strong>Usage Data:</strong> Connection times, data usage, session duration</li>
+                    <li><strong>Network Data:</strong> IP addresses assigned, websites visited (for security monitoring)</li>
+                </ul>
+
+                <h2>How We Use Your Information</h2>
+                <p>We use the collected information for the following purposes:</p>
+                <ul>
+                    <li>Provide, maintain, and improve the WiFi service</li>
+                    <li>Authenticate users and prevent unauthorized access</li>
+                    <li>Monitor network security, detect threats, and prevent abuse</li>
+                    <li>Analyze network performance and troubleshoot issues</li>
+                    <li>Comply with legal and regulatory requirements</li>
+                    <li>Communicate important service updates if necessary</li>
+                </ul>
+
+                <h2>Data Retention</h2>
+                <p>We retain different types of data for different periods:</p>
+                <ul>
+                    <li><strong>Connection logs:</strong> 90 days (for security and troubleshooting)</li>
+                    <li><strong>Personal information:</strong> 12 months (unless deletion requested)</li>
+                    <li><strong>Aggregated analytics:</strong> Indefinitely (anonymized data)</li>
+                </ul>
+
+                <h2>Data Sharing</h2>
+                <p>We do not sell, rent, or trade your personal information. We may share data with:</p>
+                <ul>
+                    <li><strong>Service providers:</strong> Third parties who assist in operating our network infrastructure</li>
+                    <li><strong>Legal authorities:</strong> When required by law, court order, or legal process</li>
+                    <li><strong>Property management:</strong> For security purposes and incident investigation</li>
+                    <li><strong>Emergency services:</strong> In case of safety concerns</li>
+                </ul>
+
+                <h2>Your Rights</h2>
+                <p>Under applicable data protection laws, you have the right to:</p>
+                <ul>
+                    <li><strong>Access:</strong> Request a copy of your personal data</li>
+                    <li><strong>Rectification:</strong> Request correction of inaccurate data</li>
+                    <li><strong>Erasure:</strong> Request deletion of your data ("right to be forgotten")</li>
+                    <li><strong>Restriction:</strong> Request limitation of processing</li>
+                    <li><strong>Portability:</strong> Receive your data in a structured format</li>
+                    <li><strong>Objection:</strong> Object to processing of your data</li>
+                </ul>
+
+                <h2>Security Measures</h2>
+                <p>We implement appropriate technical and organizational measures to protect your personal information, including:</p>
+                <ul>
+                    <li>Encryption of data in transit and at rest</li>
+                    <li>Regular security assessments and updates</li>
+                    <li>Access controls and authentication</li>
+                    <li>Staff training on data protection</li>
+                </ul>
+
+                <h2>Cookies and Tracking</h2>
+                <p>Our captive portal uses essential cookies to maintain your session. We do not use tracking cookies or third-party analytics on the portal itself.</p>
+
+                <h2>Children's Privacy</h2>
+                <p>Our service is not directed to children under 13. We do not knowingly collect personal information from children.</p>
+
+                <h2>Changes to This Policy</h2>
+                <p>We may update this privacy policy from time to time. We will notify users of any material changes by posting the new policy on this page.</p>
+
+                <h2>Contact Us</h2>
+                <p>For privacy-related inquiries, data access requests, or to exercise your rights, please contact <strong><%= companyName %></strong>.</p>
+
+                <p class="last-updated">Last updated: January 2026</p>
+            </div>
+        </div>
+
+        <!-- Background decoration -->
+        <div class="bg-decoration" aria-hidden="true">
+            <div class="circle circle-1"></div>
+            <div class="circle circle-2"></div>
+            <div class="circle circle-3"></div>
+        </div>
+    </div>
+</body>
+</html>

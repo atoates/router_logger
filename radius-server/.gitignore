@@ -1,0 +1,16 @@
+# Environment files
+.env
+.env.local
+*.env
+
+# Docker volumes
+data/
+*.log
+
+# Node modules (if any)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+

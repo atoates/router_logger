@@ -1,0 +1,83 @@
+# FreeRADIUS Inner Tunnel Virtual Server
+# Handles EAP inner authentication (for WPA2-Enterprise)
+
+server inner-tunnel {
+    # =====================================================
+    # Listen on internal socket only
+    # =====================================================
+    listen {
+        ipaddr = 127.0.0.1
+        port = 18120
+        type = auth
+    }
+
+    # =====================================================
+    # Authorization
+    # =====================================================
+    authorize {
+        # Preprocess
+        preprocess
+
+        # Suffix for realms
+        suffix
+
+        # Update inner request
+        update control {
+            &Proxy-To-Realm := LOCAL
+        }
+
+        # SQL lookup
+        sql
+
+        # PAP auth
+        pap
+
+        # Expiration
+        expiration
+        logintime
+    }
+
+    # =====================================================
+    # Authentication
+    # =====================================================
+    authenticate {
+        Auth-Type PAP {
+            pap
+        }
+
+        Auth-Type CHAP {
+            chap
+        }
+
+        # Auth-Type MS-CHAP {
+        #     mschap
+        # }
+    }
+
+    # =====================================================
+    # Session
+    # =====================================================
+    session {
+        sql
+    }
+
+    # =====================================================
+    # Post-Auth
+    # =====================================================
+    post-auth {
+        sql
+
+        # Reply attributes for inner tunnel
+        update reply {
+            Reply-Message := "Inner authentication successful"
+        }
+
+        Post-Auth-Type REJECT {
+            sql
+            update reply {
+                Reply-Message := "Inner authentication failed"
+            }
+        }
+    }
+}
+
