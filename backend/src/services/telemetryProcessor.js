@@ -7,11 +7,6 @@ const clickupClient = require('./clickupClient');
 const lastGeoLookup = new Map();
 const GEO_LOOKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-// Track pending offline notifications (router_id -> { timestamp, clickupTaskId, scheduled })
-// Offline comments are delayed by 2 hours to avoid noise from brief disconnections
-const pendingOfflineNotifications = new Map();
-const OFFLINE_NOTIFICATION_DELAY_MS = 2 * 60 * 60 * 1000; // 2 hours
-
 // Distance threshold for "significant" location change (in meters)
 const LOCATION_CHANGE_THRESHOLD_METERS = 500;
 
@@ -335,20 +330,7 @@ async function processRouterTelemetry(data) {
           const routerId = data.device_id;
           
           if (newStatusNormalized === 'online') {
-            // Router came back online - cancel any pending offline notification
-            if (pendingOfflineNotifications.has(routerId)) {
-              const pending = pendingOfflineNotifications.get(routerId);
-              if (pending.timeoutId) {
-                clearTimeout(pending.timeoutId);
-              }
-              pendingOfflineNotifications.delete(routerId);
-              logger.info('Cancelled pending offline notification - router came back online', {
-                routerId,
-                wasOfflineFor: Date.now() - pending.timestamp
-              });
-            }
-            
-            // Post online comment immediately
+            // Router came back online - post notification immediately
             const commentText = `🟢 **System:** Router status changed\n\n` +
               `**Previous:** Offline\n` +
               `**Current:** Online\n\n` +
@@ -367,76 +349,22 @@ async function processRouterTelemetry(data) {
             });
             
           } else {
-            // Router went offline - schedule delayed notification (2 hours)
-            // Don't post immediately to avoid noise from brief disconnections
+            // Router went offline - post notification immediately
+            const commentText = `🔴 **System:** Router status changed\n\n` +
+              `**Previous:** Online\n` +
+              `**Current:** Offline\n\n` +
+              `🕐 Changed at: ${new Date(logData.timestamp).toLocaleString()}`;
             
-            // Cancel any existing pending notification first
-            if (pendingOfflineNotifications.has(routerId)) {
-              const existing = pendingOfflineNotifications.get(routerId);
-              if (existing.timeoutId) {
-                clearTimeout(existing.timeoutId);
-              }
-            }
-            
-            const offlineTimestamp = logData.timestamp;
-            
-            const timeoutId = setTimeout(async () => {
-              try {
-                // Check if router is still offline before posting
-                const currentStatusResult = await pool.query(
-                  'SELECT current_status FROM routers WHERE router_id = $1',
-                  [routerId]
-                );
-                
-                const currentStatus = currentStatusResult.rows[0]?.current_status;
-                const isStillOffline = currentStatus && currentStatus.toLowerCase() !== 'online';
-                
-                if (isStillOffline) {
-                  const commentText = `🔴 **System:** Router offline for extended period\n\n` +
-                    `**Previous:** Online\n` +
-                    `**Current:** Offline\n\n` +
-                    `🕐 Went offline at: ${new Date(offlineTimestamp).toLocaleString()}\n` +
-                    `⏱️ Offline duration: 2+ hours`;
-                  
-                  await clickupClient.createTaskComment(
-                    clickupTaskId,
-                    commentText,
-                    { notifyAll: false },
-                    'default'
-                  );
-                  
-                  logger.info('Posted delayed offline notification to ClickUp (2hr threshold)', {
-                    routerId,
-                    clickupTaskId,
-                    offlineSince: offlineTimestamp
-                  });
-                } else {
-                  logger.info('Skipped offline notification - router came back online', {
-                    routerId,
-                    currentStatus
-                  });
-                }
-              } catch (delayedError) {
-                logger.warn('Failed to post delayed offline notification', {
-                  routerId,
-                  error: delayedError.message
-                });
-              } finally {
-                pendingOfflineNotifications.delete(routerId);
-              }
-            }, OFFLINE_NOTIFICATION_DELAY_MS);
-            
-            pendingOfflineNotifications.set(routerId, {
-              timestamp: Date.now(),
-              offlineTimestamp,
+            await clickupClient.createTaskComment(
               clickupTaskId,
-              timeoutId
-            });
+              commentText,
+              { notifyAll: false },
+              'default'
+            );
             
-            logger.info('Scheduled offline notification for 2 hours from now', {
+            logger.info('Added offline status comment to router task', {
               routerId,
-              clickupTaskId,
-              scheduledFor: new Date(Date.now() + OFFLINE_NOTIFICATION_DELAY_MS).toISOString()
+              clickupTaskId
             });
           }
           

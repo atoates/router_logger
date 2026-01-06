@@ -96,16 +96,12 @@ export const getRouterLocationHistory = (routerId, params = {}) => api.get(`/rou
 export const getRMSUsage = () => api.get('/monitoring/rms-usage');
 export const getClickUpUsage = () => api.get('/monitoring/clickup-usage');
 
-// IronWifi Integration
-export const getIronwifiStatus = () => api.get('/ironwifi/status');
-export const getIronwifiWebhookStats = () => api.get('/ironwifi/webhook/stats');
-export const uploadIronwifiCSV = (csvData) => api.post('/ironwifi/upload-csv', { csvData });
-export const getIronwifiUploadStats = () => api.get('/ironwifi/upload-stats');
-export const getIronwifiGuestDetail = (guestId) => api.get(`/ironwifi/guest/${guestId}`);
-export const searchIronwifiGuests = (query, limit = 50, offset = 0) => 
-  api.get('/ironwifi/guests/search', { params: { q: query, limit, offset } });
-export const getGuestsByRouter = (routerId, limit = 100, offset = 0) =>
-  api.get(`/ironwifi/guests/by-router/${routerId}`, { params: { limit, offset } });
+// Guest WiFi (Captive Portal)
+export const getGuestWifiStats = (days = 30) => api.get('/guests/stats', { params: { days } });
+export const getGuestWifiRecent = (limit = 20) => api.get('/guests/recent', { params: { limit } });
+export const getGuestsByRouter = (routerId, limit = 50, days = 7) => 
+  api.get(`/guests/router/${routerId}`, { params: { limit, days } });
+export const getAllGuests = (params = {}) => api.get('/guests', { params });
 
 // ClickUp Integration
 export const getClickUpAuthStatus = () => api.get('/clickup/auth/status');

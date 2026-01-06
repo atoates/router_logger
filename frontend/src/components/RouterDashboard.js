@@ -617,7 +617,7 @@ export default function RouterDashboard({ router }) {
                 <div className="wifi-users-empty">
                   <p>No WiFi user logins recorded for this router in the selected time range.</p>
                   <p className="muted" style={{ fontSize: '12px', marginTop: '8px' }}>
-                    WiFi guest data comes from IronWifi integration. Make sure the router MAC address is configured and matching.
+                    WiFi guest data comes from the captive portal. Make sure the router MAC address is configured and matching.
                   </p>
                 </div>
               ) : (

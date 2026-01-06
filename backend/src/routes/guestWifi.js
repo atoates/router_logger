@@ -1,0 +1,455 @@
+/**
+ * Guest WiFi Routes
+ * 
+ * Handles webhooks from the self-hosted captive portal
+ * and provides API endpoints for guest session data.
+ */
+
+const express = require('express');
+const router = express.Router();
+const { pool, logger } = require('../config/database');
+
+// =============================================================================
+// CAPTIVE PORTAL WEBHOOK
+// =============================================================================
+
+/**
+ * POST /api/guests/captive-portal/event
+ * Receive events from our self-hosted captive portal
+ * 
+ * Event types:
+ * - registration_completed: Guest registered and connected
+ * - free_access_granted: Guest connected with free access
+ * - guest_login: Guest logged in
+ * - guest_logout: Guest disconnected
+ * - session_expired: Session timed out
+ */
+router.post('/captive-portal/event', async (req, res) => {
+  try {
+    const event = req.body;
+    const receivedAt = new Date().toISOString();
+    
+    logger.info('Captive portal event received', {
+      type: event.type,
+      username: event.username || event.guest_id,
+      mac: event.mac_address,
+      routerMac: event.router_mac,
+      receivedAt
+    });
+
+    // Acknowledge immediately
+    res.status(200).json({
+      success: true,
+      message: 'Event received',
+      timestamp: receivedAt
+    });
+
+    // Process event asynchronously
+    processGuestEvent(event).catch(error => {
+      logger.error('Error processing guest event:', error);
+    });
+
+  } catch (error) {
+    logger.error('Error handling captive portal event:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * Normalize MAC address to lowercase with colons
+ */
+function normalizeMac(mac) {
+  if (!mac) return null;
+  return mac.toLowerCase().replace(/-/g, ':');
+}
+
+/**
+ * Find router by MAC address
+ */
+async function findRouterByMac(mac) {
+  if (!mac) return null;
+  
+  const normalizedMac = normalizeMac(mac);
+  
+  // Try multiple MAC formats for matching
+  const result = await pool.query(`
+    SELECT router_id, name FROM routers 
+    WHERE LOWER(REPLACE(mac_address, '-', ':')) = $1
+       OR LOWER(REPLACE(mac_address, ':', '-')) = REPLACE($1, ':', '-')
+       OR LOWER(REPLACE(mac_address, ':', '')) = REPLACE($1, ':', '')
+  `, [normalizedMac]);
+  
+  if (result.rows.length > 0) {
+    return result.rows[0];
+  }
+  return null;
+}
+
+/**
+ * Process events from captive portal
+ */
+async function processGuestEvent(event) {
+  const {
+    type,
+    username,
+    guest_id,
+    email,
+    phone,
+    name,
+    mac_address,
+    router_mac,
+    router_id,
+    session_id,
+    session_duration,
+    timestamp
+  } = event;
+
+  // Normalize MAC addresses
+  const userMac = normalizeMac(mac_address);
+  const apMac = normalizeMac(router_mac);
+
+  // Find router by MAC or use provided router_id
+  let routerId = router_id;
+  let routerName = null;
+  
+  if (!routerId && apMac) {
+    const router = await findRouterByMac(apMac);
+    if (router) {
+      routerId = router.router_id;
+      routerName = router.name;
+      logger.info(`Matched router by MAC: ${apMac} -> ${routerId} (${routerName})`);
+    } else {
+      logger.warn(`No router found matching MAC: ${apMac}`);
+    }
+  }
+
+  // Handle different event types
+  switch (type) {
+    case 'registration_completed':
+    case 'free_access_granted':
+    case 'guest_registration':
+    case 'guest_login':
+      await upsertGuestSession({
+        sessionId: session_id,
+        username: username || email || guest_id,
+        email,
+        phone,
+        name,
+        userMac,
+        apMac,
+        routerId,
+        sessionDuration: session_duration,
+        timestamp,
+        eventType: type
+      });
+      break;
+
+    case 'guest_logout':
+    case 'session_expired':
+      await endGuestSession({
+        sessionId: session_id,
+        username: username || guest_id,
+        userMac,
+        routerId,
+        timestamp,
+        reason: type === 'session_expired' ? 'timeout' : 'logout'
+      });
+      break;
+
+    default:
+      logger.warn('Unknown guest event type:', type);
+  }
+}
+
+/**
+ * Insert or update a guest session
+ */
+async function upsertGuestSession({ sessionId, username, email, phone, name, userMac, apMac, routerId, sessionDuration, timestamp, eventType }) {
+  try {
+    // Insert into wifi_guest_sessions table
+    await pool.query(`
+      INSERT INTO wifi_guest_sessions (
+        session_id, username, email, phone, guest_name, 
+        user_mac, router_mac, router_id,
+        session_start, session_duration_seconds, event_type,
+        created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+      ON CONFLICT (session_id) DO UPDATE SET
+        session_duration_seconds = COALESCE(EXCLUDED.session_duration_seconds, wifi_guest_sessions.session_duration_seconds),
+        updated_at = NOW()
+    `, [
+      sessionId, 
+      username, 
+      email, 
+      phone, 
+      name, 
+      userMac, 
+      apMac, 
+      routerId,
+      timestamp || new Date().toISOString(),
+      sessionDuration,
+      eventType
+    ]);
+
+    // Update router's guest activity
+    if (routerId) {
+      await pool.query(`
+        UPDATE routers SET 
+          last_guest_activity = NOW()
+        WHERE router_id = $1
+      `, [routerId]);
+    }
+
+    logger.info(`Guest session recorded: ${username} on router ${routerId || 'unknown'}`);
+
+  } catch (error) {
+    logger.error('Error recording guest session:', error);
+    throw error;
+  }
+}
+
+/**
+ * End a guest session
+ */
+async function endGuestSession({ sessionId, username, userMac, routerId, timestamp, reason }) {
+  try {
+    await pool.query(`
+      UPDATE wifi_guest_sessions 
+      SET session_end = $1,
+          end_reason = $2,
+          updated_at = NOW()
+      WHERE session_id = $3
+    `, [timestamp || new Date().toISOString(), reason, sessionId]);
+
+    logger.info(`Guest session ended: ${username} (${reason})`);
+
+  } catch (error) {
+    logger.error('Error ending guest session:', error);
+    throw error;
+  }
+}
+
+// =============================================================================
+// API ENDPOINTS
+// =============================================================================
+
+/**
+ * GET /api/guests
+ * Get all guest sessions with optional filtering
+ */
+router.get('/', async (req, res) => {
+  try {
+    const { router_id, limit = 100, offset = 0, active_only } = req.query;
+    
+    let query = `
+      SELECT 
+        s.*,
+        r.name as router_name
+      FROM wifi_guest_sessions s
+      LEFT JOIN routers r ON s.router_id = r.router_id
+      WHERE 1=1
+    `;
+    const params = [];
+    let paramIndex = 1;
+    
+    if (router_id) {
+      query += ` AND s.router_id = $${paramIndex++}`;
+      params.push(router_id);
+    }
+    
+    if (active_only === 'true') {
+      query += ` AND s.session_end IS NULL`;
+    }
+    
+    query += ` ORDER BY s.session_start DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+    params.push(parseInt(limit), parseInt(offset));
+    
+    const result = await pool.query(query, params);
+    
+    // Get total count
+    let countQuery = `SELECT COUNT(*) FROM wifi_guest_sessions WHERE 1=1`;
+    const countParams = [];
+    let countParamIndex = 1;
+    
+    if (router_id) {
+      countQuery += ` AND router_id = $${countParamIndex++}`;
+      countParams.push(router_id);
+    }
+    if (active_only === 'true') {
+      countQuery += ` AND session_end IS NULL`;
+    }
+    
+    const countResult = await pool.query(countQuery, countParams);
+    
+    res.json({
+      guests: result.rows,
+      total: parseInt(countResult.rows[0].count),
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+    
+  } catch (error) {
+    logger.error('Error fetching guests:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/guests/stats
+ * Get guest statistics
+ */
+router.get('/stats', async (req, res) => {
+  try {
+    const { router_id, days = 30 } = req.query;
+    
+    let whereClause = `WHERE session_start > NOW() - INTERVAL '${parseInt(days)} days'`;
+    const params = [];
+    
+    if (router_id) {
+      whereClause += ` AND router_id = $1`;
+      params.push(router_id);
+    }
+    
+    // Overall stats
+    const statsQuery = `
+      SELECT 
+        COUNT(*) as total_sessions,
+        COUNT(DISTINCT username) as unique_guests,
+        COUNT(DISTINCT router_id) as routers_used,
+        COUNT(DISTINCT user_mac) as unique_devices,
+        AVG(session_duration_seconds) as avg_session_duration,
+        COUNT(*) FILTER (WHERE session_end IS NULL) as active_sessions
+      FROM wifi_guest_sessions
+      ${whereClause}
+    `;
+    
+    const statsResult = await pool.query(statsQuery, params);
+    
+    // Sessions by router
+    const byRouterQuery = `
+      SELECT 
+        s.router_id,
+        r.name as router_name,
+        COUNT(*) as session_count,
+        COUNT(DISTINCT s.username) as unique_guests
+      FROM wifi_guest_sessions s
+      LEFT JOIN routers r ON s.router_id = r.router_id
+      ${whereClause}
+      GROUP BY s.router_id, r.name
+      ORDER BY session_count DESC
+      LIMIT 10
+    `;
+    
+    const byRouterResult = await pool.query(byRouterQuery, params);
+    
+    // Sessions over time (daily)
+    const timelineQuery = `
+      SELECT 
+        DATE(session_start) as date,
+        COUNT(*) as sessions,
+        COUNT(DISTINCT username) as unique_guests
+      FROM wifi_guest_sessions
+      ${whereClause}
+      GROUP BY DATE(session_start)
+      ORDER BY date DESC
+      LIMIT 30
+    `;
+    
+    const timelineResult = await pool.query(timelineQuery, params);
+    
+    res.json({
+      summary: statsResult.rows[0],
+      byRouter: byRouterResult.rows,
+      timeline: timelineResult.rows,
+      period: `${days} days`
+    });
+    
+  } catch (error) {
+    logger.error('Error fetching guest stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/guests/router/:routerId
+ * Get guests for a specific router
+ */
+router.get('/router/:routerId', async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const { limit = 50, days = 7 } = req.query;
+    
+    const result = await pool.query(`
+      SELECT 
+        session_id,
+        username,
+        email,
+        phone,
+        guest_name,
+        user_mac,
+        session_start,
+        session_end,
+        session_duration_seconds,
+        event_type
+      FROM wifi_guest_sessions
+      WHERE router_id = $1
+        AND session_start > NOW() - INTERVAL '${parseInt(days)} days'
+      ORDER BY session_start DESC
+      LIMIT $2
+    `, [routerId, parseInt(limit)]);
+    
+    // Get summary stats for this router
+    const statsResult = await pool.query(`
+      SELECT 
+        COUNT(*) as total_sessions,
+        COUNT(DISTINCT username) as unique_guests,
+        COUNT(*) FILTER (WHERE session_end IS NULL) as active_sessions
+      FROM wifi_guest_sessions
+      WHERE router_id = $1
+        AND session_start > NOW() - INTERVAL '${parseInt(days)} days'
+    `, [routerId]);
+    
+    res.json({
+      routerId,
+      guests: result.rows,
+      stats: statsResult.rows[0],
+      period: `${days} days`
+    });
+    
+  } catch (error) {
+    logger.error('Error fetching router guests:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/guests/recent
+ * Get most recent guest sessions across all routers
+ */
+router.get('/recent', async (req, res) => {
+  try {
+    const { limit = 20 } = req.query;
+    
+    const result = await pool.query(`
+      SELECT 
+        s.*,
+        r.name as router_name
+      FROM wifi_guest_sessions s
+      LEFT JOIN routers r ON s.router_id = r.router_id
+      ORDER BY s.session_start DESC
+      LIMIT $1
+    `, [parseInt(limit)]);
+    
+    res.json({
+      guests: result.rows,
+      count: result.rows.length
+    });
+    
+  } catch (error) {
+    logger.error('Error fetching recent guests:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+module.exports = router;
+

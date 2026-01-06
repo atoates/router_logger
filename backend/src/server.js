@@ -1,5 +1,4 @@
 require('dotenv').config();
-// Force redeploy: 2025-11-07 18:50 UTC
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -11,8 +10,6 @@ const { initializeDatabase, runMigrations } = require('./database/migrate');
 const { initMQTT, closeMQTT } = require('./services/mqttService');
 const { startRMSSync } = require('./services/rmsSync');
 const { startClickUpSync } = require('./services/clickupSync');
-const { startSyncScheduler: startIronWifiSync } = require('./services/ironwifiSync');
-const { startDailyDeduplication } = require('./services/guestDeduplication');
 const distributedLockService = require('./services/distributedLockService');
 const oauthService = require('./services/oauthService');
 const routerRoutes = require('./routes/router');
@@ -21,114 +18,11 @@ const authRoutes = require('./routes/auth');
 const clickupRoutes = require('./routes/clickup');
 const sessionRoutes = require('./routes/session');
 const userRoutes = require('./routes/users');
-const ironwifiWebhookRoutes = require('./routes/ironwifiWebhook');
+const guestWifiRoutes = require('./routes/guestWifi');
 const { router: monitoringRoutes } = require('./routes/monitoring');
-
-// Async error handler utility available at: ./utils/asyncHandler.js
-// Usage: router.get('/path', asyncHandler(async (req, res) => { ... }));
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// IronWifi MAC address diagnostic - runs on startup to help debug router matching
-async function runIronWifiMacDiagnostic() {
-  const { pool } = require('./config/database');
-
-  try {
-    logger.info('=== IronWifi MAC Address Diagnostic ===');
-
-    // Check routers MAC status
-    const routerStats = await pool.query(`
-      SELECT
-        COUNT(*) as total_routers,
-        COUNT(mac_address) FILTER (WHERE mac_address IS NOT NULL AND mac_address != '') as with_mac,
-        COUNT(*) FILTER (WHERE mac_address IS NULL OR mac_address = '') as without_mac
-      FROM routers
-    `);
-    const rs = routerStats.rows[0];
-    logger.info(`Routers: ${rs.total_routers} total, ${rs.with_mac} with MAC, ${rs.without_mac} without MAC`);
-
-    // Sample routers with MAC (to see format)
-    const sampleWithMac = await pool.query(`
-      SELECT router_id, name, mac_address
-      FROM routers
-      WHERE mac_address IS NOT NULL AND mac_address != ''
-      LIMIT 5
-    `);
-    if (sampleWithMac.rows.length > 0) {
-      logger.info('Sample routers with MAC:');
-      sampleWithMac.rows.forEach(r => logger.info(`  ${r.router_id}: ${r.name} -> ${r.mac_address}`));
-    }
-
-    // Check ironwifi_guests linking status
-    const guestStats = await pool.query(`
-      SELECT
-        COUNT(*) as total_guests,
-        COUNT(ap_mac) as with_ap_mac,
-        COUNT(router_id) as linked_to_router,
-        COUNT(DISTINCT ap_mac) as unique_ap_macs
-      FROM ironwifi_guests
-    `);
-    const gs = guestStats.rows[0];
-    logger.info(`Guests: ${gs.total_guests} total, ${gs.with_ap_mac} with ap_mac, ${gs.linked_to_router} linked to router`);
-    logger.info(`Unique ap_mac values: ${gs.unique_ap_macs}`);
-
-    // List unique ap_mac values that AREN'T matching any router
-    const unmatchedAps = await pool.query(`
-      SELECT g.ap_mac, COUNT(*) as guest_count
-      FROM ironwifi_guests g
-      LEFT JOIN routers r ON LOWER(REPLACE(REPLACE(r.mac_address, '-', ':'), ' ', '')) = LOWER(REPLACE(g.ap_mac, '-', ':'))
-      WHERE g.ap_mac IS NOT NULL AND r.router_id IS NULL
-      GROUP BY g.ap_mac
-      ORDER BY guest_count DESC
-      LIMIT 20
-    `);
-    if (unmatchedAps.rows.length > 0) {
-      logger.info(`Unmatched ap_mac values (${unmatchedAps.rows.length} shown):`);
-      unmatchedAps.rows.forEach(r => logger.info(`  ${r.ap_mac} -> ${r.guest_count} guests`));
-    } else {
-      logger.info('All ap_mac values are matched to routers!');
-    }
-
-    // Check guests that ARE linked to routers (via router_id column)
-    const linkedGuests = await pool.query(`
-      SELECT g.router_id, r.name as router_name, COUNT(*) as guest_count
-      FROM ironwifi_guests g
-      LEFT JOIN routers r ON g.router_id = r.router_id
-      WHERE g.router_id IS NOT NULL
-      GROUP BY g.router_id, r.name
-      ORDER BY guest_count DESC
-      LIMIT 10
-    `);
-    if (linkedGuests.rows.length > 0) {
-      logger.info(`Guests linked to routers via router_id (top 10):`);
-      linkedGuests.rows.forEach(r => logger.info(`  router_id=${r.router_id}: ${r.router_name || 'NO ROUTER MATCH!'} -> ${r.guest_count} guests`));
-    } else {
-      logger.info('NO guests have router_id set!');
-    }
-
-    // Sample a specific router to debug the query
-    const sampleRouter = await pool.query(`
-      SELECT router_id, name, mac_address FROM routers
-      WHERE mac_address IS NOT NULL AND mac_address != '' LIMIT 1
-    `);
-    if (sampleRouter.rows.length > 0) {
-      const sr = sampleRouter.rows[0];
-      logger.info(`Sample router: ${sr.router_id} (${sr.name}) MAC: ${sr.mac_address}`);
-
-      // Check if any guests are linked to this router
-      const guestsForRouter = await pool.query(
-        'SELECT COUNT(*) FROM ironwifi_guests WHERE router_id = $1',
-        [sr.router_id]
-      );
-      logger.info(`  Guests with router_id=${sr.router_id}: ${guestsForRouter.rows[0].count}`);
-    }
-
-    logger.info('=== End IronWifi Diagnostic ===');
-  } catch (error) {
-    logger.warn('IronWifi MAC diagnostic failed (non-fatal):', error.message);
-  }
-}
 
 // Validate critical environment variables
 function validateEnvironment() {
@@ -156,18 +50,13 @@ validateEnvironment();
 app.set('trust proxy', 1);
 
 // CORS configuration - secure by default
-// In production: require FRONTEND_URL (fail if missing)
-// Supports multiple origins: FRONTEND_URL (desktop) + MOBILE_FRONTEND_URL (mobile)
-// In development: allow wildcard for local testing
 const corsOrigin = (() => {
   if (process.env.NODE_ENV === 'production') {
-    // Production: require explicit FRONTEND_URL
     if (!process.env.FRONTEND_URL) {
       logger.warn('⚠️  FRONTEND_URL not set in production - CORS will reject all origins');
-      return false; // Reject all origins if not configured
+      return false;
     }
     
-    // Support multiple origins: desktop + mobile
     const origins = [process.env.FRONTEND_URL];
     if (process.env.MOBILE_FRONTEND_URL) {
       origins.push(process.env.MOBILE_FRONTEND_URL);
@@ -176,10 +65,8 @@ const corsOrigin = (() => {
       logger.info(`✅ CORS configured for desktop: ${process.env.FRONTEND_URL}`);
     }
     
-    // Return array of allowed origins (cors library handles this natively)
     return origins;
   } else {
-    // Development: allow wildcard for local testing
     return process.env.FRONTEND_URL || '*';
   }
 })();
@@ -204,7 +91,6 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // Health check endpoint (for Railway health checks)
-// Returns 503 until server is fully initialized, then 200
 let isServerReady = false;
 app.get('/health', (req, res) => {
   if (!isServerReady) {
@@ -217,7 +103,7 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({ 
     message: 'RUT200 Router Logger API',
-    version: '1.0.1', // Updated with OAuth support
+    version: '2.0.0',
     endpoints: {
       routers: '/api/routers',
       logs: '/api/logs',
@@ -231,13 +117,18 @@ app.get('/', (req, res) => {
       operatorDistribution: '/api/stats/operators',
       oauthLogin: '/api/auth/rms/login',
       oauthStatus: '/api/auth/rms/status',
-      rmsUsageMonitoring: '/api/monitoring/rms-usage'
+      rmsUsageMonitoring: '/api/monitoring/rms-usage',
+      guestWifi: '/api/guests'
     }
   });
 });
 
-// IronWifi routes FIRST - webhook must be public for IronWifi to POST data
-app.use('/api/ironwifi', ironwifiWebhookRoutes);
+// Guest WiFi routes (captive portal webhooks)
+app.use('/api/guests', guestWifiRoutes);
+
+// Keep legacy endpoint for backwards compatibility with deployed captive portal
+// This routes /api/ironwifi/captive-portal/event to the new guest wifi handler
+app.use('/api/ironwifi', guestWifiRoutes);
 
 // Other API routes
 app.use('/api/rms', rmsRoutes);
@@ -245,12 +136,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/clickup', clickupRoutes);
 app.use('/api/session', sessionRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api', routerRoutes); // General API routes - last because it's the most general
+app.use('/api', routerRoutes);
 app.use(monitoringRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  // Log full error details (always log for debugging)
   logger.error('Error caught by middleware:', {
     message: err.message,
     stack: err.stack,
@@ -258,8 +148,6 @@ app.use((err, req, res, next) => {
     method: req.method
   });
   
-  // In production, don't expose stack traces to clients
-  // In development, include more details for debugging
   const isProduction = process.env.NODE_ENV === 'production';
   
   res.status(err.status || 500).json({
@@ -277,15 +165,11 @@ async function startServer() {
     // Run all pending migrations automatically
     await runMigrations();
     
-    // Admin users are now managed through the Users Management page
-    // Migration 008 creates initial admin users via seed_admins.js
-    // No need to update passwords on every server restart
-    
     // Initialize MQTT if configured
     initMQTT();
     
     // Start RMS sync if PAT or OAuth token is available
-  const rmsSyncInterval = process.env.RMS_SYNC_INTERVAL_MINUTES || 5;
+    const rmsSyncInterval = process.env.RMS_SYNC_INTERVAL_MINUTES || 5;
     let canSync = false;
     if (process.env.RMS_ACCESS_TOKEN) {
       canSync = true;
@@ -305,32 +189,12 @@ async function startServer() {
     }
     
     // Start ClickUp sync (every 30 minutes by default)
-    // Don't run on startup - all data is persistent in database
-    // This avoids delaying deployments by 3+ minutes
     const clickupSyncInterval = process.env.CLICKUP_SYNC_INTERVAL_MINUTES || 30;
-    startClickUpSync(parseInt(clickupSyncInterval), false); // lock-gated
+    startClickUpSync(parseInt(clickupSyncInterval), false);
     logger.info(`ClickUp sync scheduler startup attempted (every ${clickupSyncInterval} minutes, no startup sync)`);
     
-    // IronWifi: Supports both Webhook and API polling
-    // Webhook: Configure in IronWifi Console → Reports → Report Scheduler
-    // API Polling: Set IRONWIFI_API_KEY environment variable
-    // Default: Sync once per hour to avoid API rate limits
-    const ironwifiSyncInterval = parseInt(process.env.IRONWIFI_SYNC_INTERVAL_MINUTES || '60', 10);
-    if (process.env.IRONWIFI_API_KEY) {
-      startIronWifiSync(ironwifiSyncInterval);
-      logger.info(`IronWifi sync scheduler started (every ${ironwifiSyncInterval} minutes)`);
-      
-      // Start daily deduplication at 3 AM (configurable via env var)
-      const deduplicationHour = parseInt(process.env.IRONWIFI_DEDUPLICATION_HOUR || '3', 10);
-      startDailyDeduplication(deduplicationHour);
-      logger.info(`IronWifi guest deduplication scheduled daily at ${deduplicationHour}:00`);
-    } else {
-      logger.info('IronWifi API sync not started (IRONWIFI_API_KEY not set)');
-    }
-    logger.info('IronWifi webhook endpoint ready at /api/ironwifi/webhook');
-
-    // Run IronWifi MAC address diagnostic on startup
-    await runIronWifiMacDiagnostic();
+    // Guest WiFi webhook endpoint ready
+    logger.info('Guest WiFi webhook endpoint ready at /api/guests/captive-portal/event');
 
     // Cleanup expired OAuth states every hour
     setInterval(async () => {
@@ -344,18 +208,17 @@ async function startServer() {
       } catch (error) {
         logger.warn('Failed to cleanup expired OAuth states:', { error: error.message });
       }
-    }, 60 * 60 * 1000); // 1 hour
+    }, 60 * 60 * 1000);
     
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
       logger.info(`🚀 Server is running on http://localhost:${PORT}`);
-      // Mark server as ready for health checks
       isServerReady = true;
       logger.info(`📊 Ready to receive RUT200 telemetry via:`);
       logger.info(`   - MQTT (if configured)`);
       logger.info(`   - HTTPS POST to /api/log`);
       logger.info(`   - RMS API Sync (if configured)`);
-      logger.info(`   - IronWifi Session Sync (if configured)`);
+      logger.info(`📶 Guest WiFi captive portal webhook ready`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

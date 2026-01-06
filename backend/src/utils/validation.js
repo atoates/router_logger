@@ -44,48 +44,29 @@ function validateTelemetryPayload(body) {
   return { ok: errors.length === 0, errors };
 }
 
-function validateIronwifiWebhookPayload(body) {
-  // IronWifi may send:
-  // - Array of records (JSON)
-  // - Wrapper object with {records|data|rows: [...]}
-  // - String (CSV/text) (only works if body parsing supports it)
+/**
+ * Validate guest WiFi event payload from captive portal
+ */
+function validateGuestWifiPayload(body) {
   const errors = [];
 
-  if (body == null) {
-    return { ok: false, errors: ['body is required'] };
+  if (!isPlainObject(body)) {
+    return { ok: false, errors: ['body must be a JSON object'] };
   }
 
-  if (Array.isArray(body)) {
-    return { ok: true, errors: [] };
+  if (!isNonEmptyString(body.type)) {
+    errors.push('type is required');
   }
 
-  if (typeof body === 'string') {
-    // Avoid processing extremely large bodies (safety)
-    if (body.length > 5 * 1024 * 1024) {
-      return { ok: false, errors: ['body is too large'] };
-    }
-    return { ok: true, errors: [] };
+  // At least one identifier is required
+  if (!body.username && !body.email && !body.guest_id && !body.mac_address) {
+    errors.push('at least one identifier (username, email, guest_id, or mac_address) is required');
   }
 
-  if (isPlainObject(body)) {
-    const records = body.records || body.data || body.rows;
-    if (records == null) {
-      // We can still accept it (unknown shape) but won’t process
-      return { ok: false, errors: ['unrecognized webhook object shape (expected records/data/rows)'] };
-    }
-    if (!Array.isArray(records)) {
-      errors.push('records/data/rows must be an array');
-    }
-    return { ok: errors.length === 0, errors };
-  }
-
-  return { ok: false, errors: ['unsupported body type'] };
+  return { ok: errors.length === 0, errors };
 }
 
 module.exports = {
   validateTelemetryPayload,
-  validateIronwifiWebhookPayload
+  validateGuestWifiPayload
 };
-
-
-

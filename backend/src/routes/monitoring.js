@@ -692,7 +692,6 @@ router.get('/api/monitoring/config', async (req, res) => {
     // Current sync intervals
     const rmsSyncInterval = parseInt(process.env.RMS_SYNC_INTERVAL_MINUTES || '5', 10);
     const clickupSyncInterval = parseInt(process.env.CLICKUP_SYNC_INTERVAL_MINUTES || '30', 10);
-    const ironwifiSyncInterval = parseInt(process.env.IRONWIFI_SYNC_INTERVAL_MINUTES || '15', 10);
     
     // Database pool settings
     const dbPoolMax = parseInt(process.env.DB_POOL_MAX || '20', 10);
@@ -780,8 +779,7 @@ router.get('/api/monitoring/config', async (req, res) => {
       current: {
         syncIntervals: {
           rms: `${rmsSyncInterval} minutes`,
-          clickup: `${clickupSyncInterval} minutes`,
-          ironwifi: `${ironwifiSyncInterval} minutes`
+          clickup: `${clickupSyncInterval} minutes`
         },
         database: {
           poolMax: dbPoolMax,
