@@ -631,6 +631,10 @@ export default function RouterDashboard({ router }) {
                       <span className="wifi-stat-value">{[...new Set(filteredGuests.map(g => g.username || g.email))].length}</span>
                       <span className="wifi-stat-label">Unique Users</span>
                     </div>
+                    <div className="wifi-stat">
+                      <span className="wifi-stat-value">{formatBytes(filteredGuests.reduce((sum, g) => sum + (Number(g.bytes_total) || 0), 0))}</span>
+                      <span className="wifi-stat-label">Total Data</span>
+                    </div>
                   </div>
                   <div className="table-wrap" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                     <table className="wifi-users-table">
@@ -638,14 +642,19 @@ export default function RouterDashboard({ router }) {
                         <tr>
                           <th>User</th>
                           <th>Login Time</th>
-                          <th>Device MAC</th>
-                          <th>Auth Count</th>
+                          <th>Duration</th>
+                          <th>Data Used</th>
+                          <th>Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filteredGuests.map((guest, idx) => {
                           const userName = guest.username || guest.email || 'Unknown';
                           const userColor = userColors[userName];
+                          const isActive = !guest.session_end;
+                          const duration = guest.session_duration_seconds 
+                            ? `${Math.floor(guest.session_duration_seconds / 60)}m`
+                            : isActive ? 'Active' : '—';
                           return (
                             <tr 
                               key={guest.id || idx} 
@@ -667,25 +676,36 @@ export default function RouterDashboard({ router }) {
                                   />
                                   <div>
                                     <div style={{ fontWeight: 500 }}>{userName}</div>
-                                    {guest.fullname && guest.fullname !== userName && (
-                                      <div className="muted" style={{ fontSize: '11px' }}>{guest.fullname}</div>
+                                    {guest.guest_name && guest.guest_name !== userName && (
+                                      <div className="muted" style={{ fontSize: '11px' }}>{guest.guest_name}</div>
                                     )}
                                   </div>
                                 </div>
                               </td>
                               <td>
-                                <div>{new Date(guest.creation_date || guest.auth_date).toLocaleDateString()}</div>
+                                <div>{new Date(guest.session_start || guest.creation_date || guest.auth_date).toLocaleDateString()}</div>
                                 <div className="muted" style={{ fontSize: '11px' }}>
-                                  {new Date(guest.creation_date || guest.auth_date).toLocaleTimeString()}
+                                  {new Date(guest.session_start || guest.creation_date || guest.auth_date).toLocaleTimeString()}
                                 </div>
                               </td>
-                              <td>
-                                <code style={{ fontSize: '11px', backgroundColor: '#f3f4f6', padding: '2px 6px', borderRadius: '4px' }}>
-                                  {guest.client_mac || '—'}
-                                </code>
+                              <td style={{ textAlign: 'center' }}>
+                                {duration}
+                              </td>
+                              <td style={{ textAlign: 'right' }}>
+                                {guest.bytes_total ? formatBytes(guest.bytes_total) : '—'}
                               </td>
                               <td style={{ textAlign: 'center' }}>
-                                {guest.auth_count || 1}
+                                <span style={{ 
+                                  display: 'inline-block',
+                                  padding: '2px 8px',
+                                  borderRadius: '12px',
+                                  fontSize: '11px',
+                                  fontWeight: 500,
+                                  backgroundColor: isActive ? '#dcfce7' : '#f3f4f6',
+                                  color: isActive ? '#166534' : '#6b7280'
+                                }}>
+                                  {isActive ? '● Active' : 'Ended'}
+                                </span>
                               </td>
                             </tr>
                           );

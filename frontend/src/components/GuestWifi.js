@@ -63,6 +63,15 @@ const GuestWifi = () => {
     return `${hours}h ${remainingMins}m`;
   };
 
+  const formatDataUsage = (bytes) => {
+    if (!bytes) return '—';
+    const n = Number(bytes) || 0;
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + ' GB';
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + ' MB';
+    if (n >= 1e3) return (n / 1e3).toFixed(2) + ' KB';
+    return n + ' B';
+  };
+
   if (loading) {
     return (
       <div className="guest-wifi-container">
@@ -155,6 +164,7 @@ const GuestWifi = () => {
                     <th>Email</th>
                     <th>Connected</th>
                     <th>Duration</th>
+                    <th>Data Used</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -165,6 +175,7 @@ const GuestWifi = () => {
                       <td>{guest.email || '-'}</td>
                       <td>{formatDate(guest.session_start)}</td>
                       <td>{formatDuration(guest.session_duration_seconds)}</td>
+                      <td>{formatDataUsage(guest.bytes_total)}</td>
                       <td>
                         <span className={`status-badge ${guest.session_end ? 'ended' : 'active'}`}>
                           {guest.session_end ? 'Ended' : 'Active'}
@@ -190,7 +201,7 @@ const GuestWifi = () => {
                 <th>Email</th>
                 <th>Router</th>
                 <th>Connected</th>
-                <th>Type</th>
+                <th>Data Used</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -201,13 +212,7 @@ const GuestWifi = () => {
                   <td>{guest.email || '-'}</td>
                   <td>{guest.router_name || guest.router_id || 'Unknown'}</td>
                   <td>{formatDate(guest.session_start)}</td>
-                  <td>
-                    <span className={`type-badge ${guest.event_type}`}>
-                      {guest.event_type === 'registration_completed' ? 'Free' : 
-                       guest.event_type === 'free_access_granted' ? 'Free' :
-                       guest.event_type || 'Unknown'}
-                    </span>
-                  </td>
+                  <td>{formatDataUsage(guest.bytes_total)}</td>
                   <td>
                     <span className={`status-badge ${guest.session_end ? 'ended' : 'active'}`}>
                       {guest.session_end ? 'Ended' : 'Active'}

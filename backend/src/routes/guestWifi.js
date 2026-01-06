@@ -14,7 +14,7 @@ const { pool, logger } = require('../config/database');
 // =============================================================================
 
 /**
- * POST /api/guests/captive-portal/event
+ * POST /api/guests/captive-portal/event (or /api/ironwifi/webhook for legacy compatibility)
  * Receive events from self-hosted captive portal (RADIUS server)
  *
  * Event types:
@@ -24,7 +24,7 @@ const { pool, logger } = require('../config/database');
  * - guest_logout: Guest disconnected
  * - session_expired: Session timed out
  */
-router.post('/captive-portal/event', async (req, res) => {
+const captivePortalEventHandler = async (req, res) => {
   try {
     const event = req.body;
     const receivedAt = new Date().toISOString();
@@ -53,7 +53,11 @@ router.post('/captive-portal/event', async (req, res) => {
     logger.error('Error handling captive portal event:', error);
     res.status(500).json({ success: false, error: error.message });
   }
-});
+};
+
+// Register the handler on multiple paths for compatibility
+router.post('/captive-portal/event', captivePortalEventHandler);
+router.post('/webhook', captivePortalEventHandler);  // Legacy path for RADIUS server
 
 /**
  * Normalize MAC address to lowercase with colons
@@ -86,7 +90,7 @@ async function findRouterByMac(mac) {
 }
 
 /**
- * Process events from captive portal
+ * Process events from captive portal and RADIUS accounting
  */
 async function processGuestEvent(event) {
   const {
@@ -101,12 +105,33 @@ async function processGuestEvent(event) {
     router_id,
     session_id,
     session_duration,
-    timestamp
+    timestamp,
+    // Data consumption fields (from RADIUS accounting)
+    bytes_uploaded,
+    bytes_downloaded,
+    input_octets,
+    output_octets,
+    // RADIUS accounting specific fields
+    acct_status_type,
+    acctsessionid,
+    calledstationid,
+    callingstationid,
+    acctsessiontime,
+    acctinputoctets,
+    acctoutputoctets,
+    acctterminatecause
   } = event;
 
+  // For RADIUS accounting, map fields to standard names
+  const effectiveSessionId = session_id || acctsessionid;
+  const effectiveUsername = username || guest_id;
+  const effectiveRouterMac = router_mac || calledstationid;
+  const effectiveMacAddress = mac_address || callingstationid;
+  const effectiveSessionDuration = session_duration || acctsessiontime;
+
   // Normalize MAC addresses
-  const userMac = normalizeMac(mac_address);
-  const apMac = normalizeMac(router_mac);
+  const userMac = normalizeMac(effectiveMacAddress);
+  const apMac = normalizeMac(effectiveRouterMac);
 
   // Find router by MAC or use provided router_id
   let routerId = router_id;
@@ -123,36 +148,71 @@ async function processGuestEvent(event) {
     }
   }
 
+  // Calculate bytes (support RADIUS accounting field names)
+  const bytesUp = bytes_uploaded || output_octets || parseInt(acctoutputoctets) || 0;
+  const bytesDown = bytes_downloaded || input_octets || parseInt(acctinputoctets) || 0;
+
   // Handle different event types
   switch (type) {
     case 'registration_completed':
     case 'free_access_granted':
     case 'guest_registration':
     case 'guest_login':
+    case 'radius_auth':
       await upsertGuestSession({
-        sessionId: session_id,
-        username: username || email || guest_id,
+        sessionId: effectiveSessionId,
+        username: effectiveUsername || email,
         email,
         phone,
         name,
         userMac,
         apMac,
         routerId,
-        sessionDuration: session_duration,
+        sessionDuration: effectiveSessionDuration,
         timestamp,
         eventType: type
+      });
+      break;
+
+    case 'radius_accounting':
+      // Handle RADIUS accounting packets (Start, Interim-Update, Stop)
+      await handleRadiusAccounting({
+        statusType: acct_status_type,
+        sessionId: effectiveSessionId,
+        username: effectiveUsername,
+        userMac,
+        apMac,
+        routerId,
+        sessionDuration: parseInt(acctsessiontime) || 0,
+        bytesUploaded: bytesUp,
+        bytesDownloaded: bytesDown,
+        terminateCause: acctterminatecause,
+        timestamp
+      });
+      break;
+
+    case 'accounting_update':
+    case 'session_update':
+      await updateSessionAccounting({
+        sessionId: effectiveSessionId,
+        username: effectiveUsername,
+        bytesUploaded: bytesUp,
+        bytesDownloaded: bytesDown,
+        sessionDuration: effectiveSessionDuration
       });
       break;
 
     case 'guest_logout':
     case 'session_expired':
       await endGuestSession({
-        sessionId: session_id,
-        username: username || guest_id,
+        sessionId: effectiveSessionId,
+        username: effectiveUsername,
         userMac,
         routerId,
         timestamp,
-        reason: type === 'session_expired' ? 'timeout' : 'logout'
+        reason: type === 'session_expired' ? 'timeout' : 'logout',
+        bytesUploaded: bytesUp,
+        bytesDownloaded: bytesDown
       });
       break;
 
@@ -211,22 +271,115 @@ async function upsertGuestSession({ sessionId, username, email, phone, name, use
 /**
  * End a guest session
  */
-async function endGuestSession({ sessionId, username, userMac, routerId, timestamp, reason }) {
+async function endGuestSession({ sessionId, username, userMac, routerId, timestamp, reason, bytesUploaded = 0, bytesDownloaded = 0 }) {
   try {
+    const bytesTotal = (bytesUploaded || 0) + (bytesDownloaded || 0);
+    
     await pool.query(`
       UPDATE wifi_guest_sessions
       SET session_end = $1,
           end_reason = $2,
+          bytes_uploaded = COALESCE($4, bytes_uploaded, 0),
+          bytes_downloaded = COALESCE($5, bytes_downloaded, 0),
+          bytes_total = COALESCE($6, bytes_total, 0),
+          last_accounting_update = NOW(),
           updated_at = NOW()
       WHERE session_id = $3
-    `, [timestamp || new Date().toISOString(), reason, sessionId]);
+    `, [timestamp || new Date().toISOString(), reason, sessionId, bytesUploaded || null, bytesDownloaded || null, bytesTotal || null]);
 
-    logger.info(`Guest session ended: ${username} (${reason})`);
-
+    logger.info(`Guest session ended: ${username} (${reason}), data: ${formatBytes(bytesTotal)}`);
   } catch (error) {
     logger.error('Error ending guest session:', error);
     throw error;
   }
+}
+
+/**
+ * Update session accounting (data consumption)
+ */
+async function updateSessionAccounting({ sessionId, username, bytesUploaded = 0, bytesDownloaded = 0, sessionDuration }) {
+  try {
+    const bytesTotal = (bytesUploaded || 0) + (bytesDownloaded || 0);
+    
+    await pool.query(`
+      UPDATE wifi_guest_sessions
+      SET bytes_uploaded = $2,
+          bytes_downloaded = $3,
+          bytes_total = $4,
+          session_duration_seconds = COALESCE($5, session_duration_seconds),
+          last_accounting_update = NOW(),
+          updated_at = NOW()
+      WHERE session_id = $1
+    `, [sessionId, bytesUploaded, bytesDownloaded, bytesTotal, sessionDuration]);
+
+    logger.debug(`Session accounting updated: ${username}, data: ${formatBytes(bytesTotal)}`);
+  } catch (error) {
+    logger.error('Error updating session accounting:', error);
+    throw error;
+  }
+}
+
+/**
+ * Handle RADIUS accounting packets
+ * Status types: Start, Interim-Update, Stop
+ */
+async function handleRadiusAccounting({ statusType, sessionId, username, userMac, apMac, routerId, sessionDuration, bytesUploaded, bytesDownloaded, terminateCause, timestamp }) {
+  const bytesTotal = (bytesUploaded || 0) + (bytesDownloaded || 0);
+  
+  switch (statusType) {
+    case 'Start':
+      // Session starting - create or update the session record
+      logger.info(`RADIUS Start: ${username} on router ${routerId || apMac}`);
+      // The session should already exist from captive portal auth
+      // Just ensure we have the session_id linked
+      await pool.query(`
+        UPDATE wifi_guest_sessions
+        SET updated_at = NOW()
+        WHERE session_id = $1 OR (username = $2 AND session_end IS NULL)
+      `, [sessionId, username]);
+      break;
+
+    case 'Interim-Update':
+      // Periodic update with current usage
+      logger.debug(`RADIUS Interim: ${username}, ${formatBytes(bytesTotal)}`);
+      await updateSessionAccounting({
+        sessionId,
+        username,
+        bytesUploaded,
+        bytesDownloaded,
+        sessionDuration
+      });
+      break;
+
+    case 'Stop':
+      // Session ended
+      logger.info(`RADIUS Stop: ${username}, duration: ${sessionDuration}s, data: ${formatBytes(bytesTotal)}, cause: ${terminateCause}`);
+      await endGuestSession({
+        sessionId,
+        username,
+        userMac,
+        routerId,
+        timestamp,
+        reason: terminateCause || 'session_end',
+        bytesUploaded,
+        bytesDownloaded
+      });
+      break;
+
+    default:
+      logger.warn(`Unknown RADIUS accounting status: ${statusType}`);
+  }
+}
+
+/**
+ * Format bytes for logging
+ */
+function formatBytes(bytes) {
+  const n = Number(bytes) || 0;
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + ' GB';
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + ' MB';
+  if (n >= 1e3) return (n / 1e3).toFixed(2) + ' KB';
+  return n + ' B';
 }
 
 // =============================================================================
@@ -390,7 +543,10 @@ router.get('/router/:routerId', async (req, res) => {
         session_start,
         session_end,
         session_duration_seconds,
-        event_type
+        event_type,
+        bytes_uploaded,
+        bytes_downloaded,
+        bytes_total
       FROM wifi_guest_sessions
       WHERE router_id = $1
         AND session_start > NOW() - INTERVAL '${parseInt(days)} days'
@@ -403,7 +559,10 @@ router.get('/router/:routerId', async (req, res) => {
       SELECT 
         COUNT(*) as total_sessions,
         COUNT(DISTINCT username) as unique_guests,
-        COUNT(*) FILTER (WHERE session_end IS NULL) as active_sessions
+        COUNT(*) FILTER (WHERE session_end IS NULL) as active_sessions,
+        COALESCE(SUM(bytes_uploaded), 0) as total_bytes_uploaded,
+        COALESCE(SUM(bytes_downloaded), 0) as total_bytes_downloaded,
+        COALESCE(SUM(bytes_total), 0) as total_bytes
       FROM wifi_guest_sessions
       WHERE router_id = $1
         AND session_start > NOW() - INTERVAL '${parseInt(days)} days'
