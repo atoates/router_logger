@@ -82,6 +82,25 @@ async function initializeDatabase() {
       ON CONFLICT (key) DO NOTHING;
     `);
 
+    // Safeguard: ensure router_current_status exists even if migrations are skipped on this instance
+    try {
+      const check = await client.query(`SELECT to_regclass('public.router_current_status') AS rel`);
+      const exists = !!check.rows?.[0]?.rel;
+      if (!exists) {
+        logger.info('router_current_status table not found during init; applying migration 028 to create it');
+        const migrationPath = path.join(__dirname, 'migrations', '028_add_router_current_status_table.sql');
+        // Reuse migration runner to apply and record it atomically
+        await runSQLMigration(migrationPath, '028_add_router_current_status_table.sql');
+        logger.info('router_current_status table created via migration 028');
+      }
+    } catch (ensureErr) {
+      // Do not fail startup if this best-effort step fails; runMigrations() will try again
+      logger.warn('Best-effort ensure of router_current_status failed; will rely on runMigrations()', {
+        message: ensureErr.message,
+        code: ensureErr.code
+      });
+    }
+
     logger.info('Database tables created successfully');
   } catch (error) {
     logger.error('Error initializing database:', error);
