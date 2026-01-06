@@ -47,9 +47,41 @@ await runMyDiagnostic();
 - `router_logs` - Telemetry logs (partitioned by month)
 - `router_current_status` - Denormalized latest status for fast dashboard queries
 
-### Guest WiFi (Legacy)
-- `wifi_guest_sessions` - Guest session data (current table)
+### Guest WiFi
+- `wifi_guest_sessions` - Guest session data from self-hosted captive portal
 - `ironwifi_guests`, `ironwifi_sessions` - Legacy tables (see Historical Notes)
+
+## Self-Hosted Captive Portal Integration
+
+The system receives guest WiFi events from the self-hosted RADIUS server/captive portal.
+
+**Webhook Endpoint:** `POST /api/guests/captive-portal/event`
+
+**Expected Payload:**
+```json
+{
+  "type": "guest_login",
+  "session_id": "unique-session-id",
+  "username": "guest@email.com",
+  "email": "guest@email.com",
+  "phone": "+1234567890",
+  "name": "Guest Name",
+  "mac_address": "aa:bb:cc:dd:ee:ff",
+  "router_mac": "20:97:27:xx:xx:xx",
+  "router_id": "optional-router-id",
+  "session_duration": 3600,
+  "timestamp": "2024-01-15T12:00:00Z"
+}
+```
+
+**Event Types:**
+- `registration_completed` - Guest registered and connected
+- `free_access_granted` - Guest connected with free access
+- `guest_login` - Guest logged in
+- `guest_logout` - Guest disconnected
+- `session_expired` - Session timed out
+
+**Router Matching:** If `router_id` is not provided, the system matches by `router_mac` against `routers.mac_address`.
 
 ## File Locations
 
@@ -57,7 +89,7 @@ await runMyDiagnostic();
 - `backend/src/server.js` - Main server, startup logic
 - `backend/src/services/rmsSync.js` - RMS telemetry sync
 - `backend/src/models/router.js` - Router database operations
-- `backend/src/routes/guestWifi.js` - Guest WiFi session queries (read-only)
+- `backend/src/routes/guestWifi.js` - Guest WiFi webhook + session queries
 
 ### Frontend
 - `frontend/src/` - React components
