@@ -118,13 +118,18 @@ app.get('/', (req, res) => {
       oauthLogin: '/api/auth/rms/login',
       oauthStatus: '/api/auth/rms/status',
       rmsUsageMonitoring: '/api/monitoring/rms-usage',
-      guestWifi: '/api/guests'
+      guestWifi: '/api/guests',
+      captivePortalWebhook: 'POST /api/guests/captive-portal/event'
     }
   });
 });
 
-// Guest WiFi routes (read-only API for session queries)
+// Guest WiFi routes (webhook + API for session queries)
 app.use('/api/guests', guestWifiRoutes);
+
+// Backwards compatibility: RADIUS server sends to /api/ironwifi/* endpoints
+// Route these to the new /api/guests/* handlers
+app.use('/api/ironwifi', guestWifiRoutes);
 
 // Other API routes
 app.use('/api/rms', rmsRoutes);
