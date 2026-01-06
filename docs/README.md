@@ -21,8 +21,6 @@ This folder contains the up-to-date operational docs and guides.
 - **RMS OAuth setup**: `RMS-OAUTH-SETUP.md`
 - **RMS configuration guide**: `RMS-CONFIGURATION-GUIDE.md`
 - **RMS API integration**: `RMS-API-INTEGRATION.md`
-- **IronWifi webhook setup**: `IRONWIFI-WEBHOOK-SETUP.md`
-- **IronWifi integration**: `IRONWIFI-INTEGRATION.md`
 - **MQTT setup**: `MQTT-SETUP-GUIDE.md`
 - **MAC address sync**: `MAC-ADDRESS-SYNC.md`
 

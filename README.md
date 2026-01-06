@@ -10,7 +10,6 @@ See `docs/README.md` for the documentation index.
 
 - **Real-time Telemetry Collection**: MQTT and HTTPS endpoints for RUT200 data ingestion
 - **RMS API Integration**: Automatically pull device data directly from Teltonika RMS (no router config needed!)
-- **IronWifi Session Tracking**: Monitor user sessions and bandwidth via webhook integration
 - **Cell Tower Geolocation**: Approximate GPS coordinates from cell tower information
 - **Data Usage Tracking**: Monitor data sent/received with delta calculations
 - **Signal Quality Monitoring**: Track RSRP, RSRQ, RSSI, and SINR metrics
@@ -223,35 +222,6 @@ If using MQTT, routers should publish to:
 ```
 vacatad/rut200/<site_id>/<device_id>/telemetry
 ```
-
-## 👥 IronWifi User Session Tracking
-
-Track WiFi users connecting through your routers with **webhook integration** (no API polling needed!).
-
-### Setup IronWifi Webhook
-
-1. **Login to IronWifi Console**: https://console.ironwifi.com/
-2. **Navigate to Reports** → **Report Scheduler**
-3. **Create New Report**:
-   - **Report Type**: RADIUS Accounting
-   - **Delivery Method**: Webhook
-   - **Webhook URL**: `https://your-backend.railway.app/api/ironwifi/webhook`
-   - **Frequency**: Hourly (recommended)
-   - **Format**: CSV or JSON
-
-4. **Done!** Session data flows automatically:
-   - User logins/logouts
-   - Session duration
-   - Bandwidth usage (upload/download)
-   - Device information
-
-**Dashboard Features**:
-- Active users per router
-- Session history and analytics
-- Bandwidth tracking
-- User connection patterns
-
-See [IRONWIFI-WEBHOOK-SETUP.md](docs/IRONWIFI-WEBHOOK-SETUP.md) for detailed instructions.
 
 ## 📈 Dashboard Features
 

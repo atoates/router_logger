@@ -123,12 +123,8 @@ app.get('/', (req, res) => {
   });
 });
 
-// Guest WiFi routes (captive portal webhooks)
+// Guest WiFi routes (read-only API for session queries)
 app.use('/api/guests', guestWifiRoutes);
-
-// Keep legacy endpoint for backwards compatibility with deployed captive portal
-// This routes /api/ironwifi/captive-portal/event to the new guest wifi handler
-app.use('/api/ironwifi', guestWifiRoutes);
 
 // Other API routes
 app.use('/api/rms', rmsRoutes);
@@ -193,8 +189,6 @@ async function startServer() {
     startClickUpSync(parseInt(clickupSyncInterval), false);
     logger.info(`ClickUp sync scheduler startup attempted (every ${clickupSyncInterval} minutes, no startup sync)`);
     
-    // Guest WiFi webhook endpoint ready
-    logger.info('Guest WiFi webhook endpoint ready at /api/guests/captive-portal/event');
 
     // Cleanup expired OAuth states every hour
     setInterval(async () => {

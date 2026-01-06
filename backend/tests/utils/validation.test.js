@@ -2,7 +2,7 @@
  * Tests for validation utilities
  */
 
-const { validateTelemetryPayload, validateGuestWifiPayload } = require('../../src/utils/validation');
+const { validateTelemetryPayload } = require('../../src/utils/validation');
 
 describe('validateTelemetryPayload', () => {
   describe('valid payloads', () => {
@@ -107,92 +107,3 @@ describe('validateTelemetryPayload', () => {
   });
 });
 
-describe('validateGuestWifiPayload', () => {
-  describe('valid payloads', () => {
-    it('should accept payload with type and username', () => {
-      const payload = {
-        type: 'registration_completed',
-        username: 'guest@example.com'
-      };
-      
-      const result = validateGuestWifiPayload(payload);
-      
-      expect(result.ok).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
-
-    it('should accept payload with type and email', () => {
-      const payload = {
-        type: 'guest_login',
-        email: 'guest@example.com'
-      };
-      
-      const result = validateGuestWifiPayload(payload);
-      
-      expect(result.ok).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
-
-    it('should accept payload with type and guest_id', () => {
-      const payload = {
-        type: 'free_access_granted',
-        guest_id: 'free-123456-abc'
-      };
-      
-      const result = validateGuestWifiPayload(payload);
-      
-      expect(result.ok).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
-
-    it('should accept payload with type and mac_address', () => {
-      const payload = {
-        type: 'guest_logout',
-        mac_address: 'AA:BB:CC:DD:EE:FF'
-      };
-      
-      const result = validateGuestWifiPayload(payload);
-      
-      expect(result.ok).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
-  });
-
-  describe('invalid payloads', () => {
-    it('should reject null payload', () => {
-      const result = validateGuestWifiPayload(null);
-      
-      expect(result.ok).toBe(false);
-      expect(result.errors).toContain('body must be a JSON object');
-    });
-
-    it('should reject undefined payload', () => {
-      const result = validateGuestWifiPayload(undefined);
-      
-      expect(result.ok).toBe(false);
-      expect(result.errors).toContain('body must be a JSON object');
-    });
-
-    it('should reject payload without type', () => {
-      const payload = {
-        username: 'guest@example.com'
-      };
-      
-      const result = validateGuestWifiPayload(payload);
-      
-      expect(result.ok).toBe(false);
-      expect(result.errors).toContain('type is required');
-    });
-
-    it('should reject payload without any identifier', () => {
-      const payload = {
-        type: 'guest_login'
-      };
-      
-      const result = validateGuestWifiPayload(payload);
-      
-      expect(result.ok).toBe(false);
-      expect(result.errors).toContain('at least one identifier (username, email, guest_id, or mac_address) is required');
-    });
-  });
-});
