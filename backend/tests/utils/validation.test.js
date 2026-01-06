@@ -2,10 +2,7 @@
  * Tests for validation utilities
  */
 
-const { validateTelemetryPayload, validateIronwifiWebhookPayload } = require('../../src/utils/validation');
-
-// Alias for consistency with previous test code if needed, or just use the imported name
-const validateIronWifiWebhookPayload = validateIronwifiWebhookPayload;
+const { validateTelemetryPayload, validateGuestWifiPayload } = require('../../src/utils/validation');
 
 describe('validateTelemetryPayload', () => {
   describe('valid payloads', () => {
@@ -110,54 +107,51 @@ describe('validateTelemetryPayload', () => {
   });
 });
 
-describe('validateIronWifiWebhookPayload', () => {
+describe('validateGuestWifiPayload', () => {
   describe('valid payloads', () => {
-    it('should accept array payload', () => {
-      const payload = [
-        { username: 'user1', session_time: 3600 },
-        { username: 'user2', session_time: 7200 }
-      ];
+    it('should accept payload with type and username', () => {
+      const payload = {
+        type: 'registration_completed',
+        username: 'guest@example.com'
+      };
       
-      const result = validateIronWifiWebhookPayload(payload);
+      const result = validateGuestWifiPayload(payload);
       
       expect(result.ok).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should accept payload with records property', () => {
+    it('should accept payload with type and email', () => {
       const payload = {
-        records: [
-          { username: 'user1', session_time: 3600 }
-        ]
+        type: 'guest_login',
+        email: 'guest@example.com'
       };
       
-      const result = validateIronWifiWebhookPayload(payload);
+      const result = validateGuestWifiPayload(payload);
       
       expect(result.ok).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should accept payload with data property', () => {
+    it('should accept payload with type and guest_id', () => {
       const payload = {
-        data: [
-          { username: 'user1', session_time: 3600 }
-        ]
+        type: 'free_access_granted',
+        guest_id: 'free-123456-abc'
       };
       
-      const result = validateIronWifiWebhookPayload(payload);
+      const result = validateGuestWifiPayload(payload);
       
       expect(result.ok).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should accept payload with rows property', () => {
+    it('should accept payload with type and mac_address', () => {
       const payload = {
-        rows: [
-          { username: 'user1', session_time: 3600 }
-        ]
+        type: 'guest_logout',
+        mac_address: 'AA:BB:CC:DD:EE:FF'
       };
       
-      const result = validateIronWifiWebhookPayload(payload);
+      const result = validateGuestWifiPayload(payload);
       
       expect(result.ok).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -166,28 +160,39 @@ describe('validateIronWifiWebhookPayload', () => {
 
   describe('invalid payloads', () => {
     it('should reject null payload', () => {
-      const result = validateIronWifiWebhookPayload(null);
+      const result = validateGuestWifiPayload(null);
       
       expect(result.ok).toBe(false);
-      expect(result.errors).toContain('body is required');
+      expect(result.errors).toContain('body must be a JSON object');
     });
 
     it('should reject undefined payload', () => {
-      const result = validateIronWifiWebhookPayload(undefined);
+      const result = validateGuestWifiPayload(undefined);
       
       expect(result.ok).toBe(false);
-      expect(result.errors).toContain('body is required');
+      expect(result.errors).toContain('body must be a JSON object');
     });
 
-    it('should reject object without expected properties', () => {
+    it('should reject payload without type', () => {
       const payload = {
-        something: 'else'
+        username: 'guest@example.com'
       };
       
-      const result = validateIronWifiWebhookPayload(payload);
+      const result = validateGuestWifiPayload(payload);
       
       expect(result.ok).toBe(false);
-      expect(result.errors).toContain('unrecognized webhook object shape (expected records/data/rows)');
+      expect(result.errors).toContain('type is required');
+    });
+
+    it('should reject payload without any identifier', () => {
+      const payload = {
+        type: 'guest_login'
+      };
+      
+      const result = validateGuestWifiPayload(payload);
+      
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContain('at least one identifier (username, email, guest_id, or mac_address) is required');
     });
   });
 });
