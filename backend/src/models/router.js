@@ -263,32 +263,47 @@ async function getAllRouters() {
   `;
   
   // Fallback query if router_current_status doesn't exist
+  // Uses LATERAL joins to get latest data from router_logs (slower but works without the new table)
   const fallbackQuery = `
     SELECT 
       r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id, 
-      r.created_at, r.last_seen,
+      r.created_at, 
+      COALESCE(ll.timestamp, r.last_seen) as last_seen,
       r.rms_created_at, r.notes,
       r.clickup_task_id, r.clickup_task_url, r.clickup_list_id, 
       r.clickup_location_task_id, r.clickup_location_task_name, 
       r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
       r.clickup_assignees, r.clickup_task_status, r.mac_address,
-      0 as log_count,
-      NULL as current_status,
-      NULL as wan_ip,
-      NULL as operator,
-      NULL as latitude,
-      NULL as longitude,
-      NULL as location_accuracy,
-      NULL as cell_id,
-      NULL as tac,
-      NULL as mcc,
-      NULL as mnc,
-      NULL as earfcn,
-      NULL as pc_id,
-      r.imei,
-      r.firmware_version
+      COALESCE(lc.log_count, 0) as log_count,
+      ll.status as current_status,
+      ll.wan_ip,
+      ll.operator,
+      lloc.latitude,
+      lloc.longitude,
+      lloc.location_accuracy,
+      ll.cell_id,
+      ll.tac,
+      ll.mcc,
+      ll.mnc,
+      ll.earfcn,
+      ll.pc_id,
+      COALESCE(ll.imei, r.imei) as imei,
+      COALESCE(ll.firmware_version, r.firmware_version) as firmware_version
     FROM routers r
-    ORDER BY r.last_seen DESC NULLS LAST;
+    LEFT JOIN LATERAL (
+      SELECT status, timestamp, wan_ip, operator, cell_id, tac, mcc, mnc, earfcn, pc_id, imei, firmware_version
+      FROM router_logs WHERE router_id = r.router_id
+      ORDER BY timestamp DESC LIMIT 1
+    ) ll ON true
+    LEFT JOIN LATERAL (
+      SELECT latitude, longitude, location_accuracy
+      FROM router_logs WHERE router_id = r.router_id AND latitude IS NOT NULL
+      ORDER BY timestamp DESC LIMIT 1
+    ) lloc ON true
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*) as log_count FROM router_logs WHERE router_id = r.router_id
+    ) lc ON true
+    ORDER BY COALESCE(ll.timestamp, r.last_seen) DESC NULLS LAST;
   `;
   
   try {
@@ -344,36 +359,51 @@ async function getRoutersForUser(userId) {
     ORDER BY COALESCE(s.last_online, s.last_seen, r.last_seen) DESC NULLS LAST;
   `;
 
+  // Fallback query uses LATERAL joins (slower but works without the new table)
   const fallbackQuery = `
     SELECT 
       r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id, 
-      r.created_at, r.last_seen,
+      r.created_at, 
+      COALESCE(ll.timestamp, r.last_seen) as last_seen,
       r.rms_created_at, r.notes,
       r.clickup_task_id, r.clickup_task_url, r.clickup_list_id, 
       r.clickup_location_task_id, r.clickup_location_task_name, 
       r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
       r.clickup_assignees, r.clickup_task_status, r.mac_address,
-      0 as log_count,
-      NULL as current_status,
-      NULL as wan_ip,
-      NULL as operator,
-      NULL as latitude,
-      NULL as longitude,
-      NULL as location_accuracy,
-      NULL as cell_id,
-      NULL as tac,
-      NULL as mcc,
-      NULL as mnc,
-      NULL as earfcn,
-      NULL as pc_id,
-      r.imei,
-      r.firmware_version,
+      COALESCE(lc.log_count, 0) as log_count,
+      ll.status as current_status,
+      ll.wan_ip,
+      ll.operator,
+      lloc.latitude,
+      lloc.longitude,
+      lloc.location_accuracy,
+      ll.cell_id,
+      ll.tac,
+      ll.mcc,
+      ll.mnc,
+      ll.earfcn,
+      ll.pc_id,
+      COALESCE(ll.imei, r.imei) as imei,
+      COALESCE(ll.firmware_version, r.firmware_version) as firmware_version,
       ura.assigned_at,
       ura.notes as assignment_notes
     FROM user_router_assignments ura
     JOIN routers r ON r.router_id = ura.router_id
+    LEFT JOIN LATERAL (
+      SELECT status, timestamp, wan_ip, operator, cell_id, tac, mcc, mnc, earfcn, pc_id, imei, firmware_version
+      FROM router_logs WHERE router_id = r.router_id
+      ORDER BY timestamp DESC LIMIT 1
+    ) ll ON true
+    LEFT JOIN LATERAL (
+      SELECT latitude, longitude, location_accuracy
+      FROM router_logs WHERE router_id = r.router_id AND latitude IS NOT NULL
+      ORDER BY timestamp DESC LIMIT 1
+    ) lloc ON true
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*) as log_count FROM router_logs WHERE router_id = r.router_id
+    ) lc ON true
     WHERE ura.user_id = $1
-    ORDER BY r.last_seen DESC NULLS LAST;
+    ORDER BY COALESCE(ll.timestamp, r.last_seen) DESC NULLS LAST;
   `;
 
   try {
