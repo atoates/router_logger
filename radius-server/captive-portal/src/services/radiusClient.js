@@ -22,9 +22,17 @@ const TIMEOUT_MS = 5000;
 async function sendPacket(packet, port) {
     return new Promise((resolve, reject) => {
         const client = dgram.createSocket('udp4');
+        let closed = false;
+        
+        const safeClose = () => {
+            if (!closed) {
+                closed = true;
+                try { client.close(); } catch (e) { /* ignore */ }
+            }
+        };
         
         const timeout = setTimeout(() => {
-            client.close();
+            safeClose();
             reject(new Error('RADIUS request timed out'));
         }, TIMEOUT_MS);
 
@@ -35,17 +43,17 @@ async function sendPacket(packet, port) {
                     packet: msg,
                     secret: RADIUS_SECRET
                 });
-                client.close();
+                safeClose();
                 resolve(response);
             } catch (error) {
-                client.close();
+                safeClose();
                 reject(error);
             }
         });
 
         client.on('error', (err) => {
             clearTimeout(timeout);
-            client.close();
+            safeClose();
             reject(err);
         });
 
