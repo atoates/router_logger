@@ -144,6 +144,10 @@ async function insertLog(logData) {
   
   try {
     const result = await pool.query(query, values);
+    
+    // Update the denormalized current status table for fast dashboard queries
+    await updateRouterCurrentStatus(logData);
+    
     return result.rows[0];
   } catch (error) {
     logger.error('Error inserting log:', error);
@@ -151,100 +155,100 @@ async function insertLog(logData) {
   }
 }
 
-// Get all routers
-// Optimized to avoid N+1 query problem by using CTEs and aggregations instead of correlated subqueries
+/**
+ * Update the router_current_status table with latest telemetry data
+ * This enables O(1) dashboard queries instead of scanning all logs
+ */
+async function updateRouterCurrentStatus(logData) {
+  const isOnline = ['online', '1', 'true'].includes(String(logData.status).toLowerCase().trim());
+  
+  const query = `
+    INSERT INTO router_current_status (
+      router_id, current_status, last_seen, last_online,
+      wan_ip, operator, cell_id, tac, mcc, mnc, earfcn, pc_id,
+      latitude, longitude, location_accuracy,
+      imei, firmware_version, log_count, updated_at
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 1, NOW()
+    )
+    ON CONFLICT (router_id) DO UPDATE SET
+      current_status = EXCLUDED.current_status,
+      last_seen = EXCLUDED.last_seen,
+      last_online = CASE WHEN $4 IS NOT NULL THEN $4 ELSE router_current_status.last_online END,
+      wan_ip = COALESCE(EXCLUDED.wan_ip, router_current_status.wan_ip),
+      operator = COALESCE(EXCLUDED.operator, router_current_status.operator),
+      cell_id = COALESCE(EXCLUDED.cell_id, router_current_status.cell_id),
+      tac = COALESCE(EXCLUDED.tac, router_current_status.tac),
+      mcc = COALESCE(EXCLUDED.mcc, router_current_status.mcc),
+      mnc = COALESCE(EXCLUDED.mnc, router_current_status.mnc),
+      earfcn = COALESCE(EXCLUDED.earfcn, router_current_status.earfcn),
+      pc_id = COALESCE(EXCLUDED.pc_id, router_current_status.pc_id),
+      latitude = COALESCE(EXCLUDED.latitude, router_current_status.latitude),
+      longitude = COALESCE(EXCLUDED.longitude, router_current_status.longitude),
+      location_accuracy = COALESCE(EXCLUDED.location_accuracy, router_current_status.location_accuracy),
+      imei = COALESCE(EXCLUDED.imei, router_current_status.imei),
+      firmware_version = COALESCE(EXCLUDED.firmware_version, router_current_status.firmware_version),
+      log_count = router_current_status.log_count + 1,
+      updated_at = NOW()
+  `;
+  
+  try {
+    await pool.query(query, [
+      logData.router_id,
+      logData.status || 'online',
+      logData.timestamp || new Date(),
+      isOnline ? (logData.timestamp || new Date()) : null,
+      logData.wan_ip,
+      logData.operator,
+      logData.cell_id,
+      logData.tac,
+      logData.mcc,
+      logData.mnc,
+      logData.earfcn,
+      logData.pc_id,
+      logData.latitude,
+      logData.longitude,
+      logData.location_accuracy,
+      logData.imei,
+      logData.firmware_version
+    ]);
+  } catch (error) {
+    // Don't fail the main insert if status update fails
+    logger.warn('Failed to update router_current_status (non-fatal):', error.message);
+  }
+}
+
+// Get all routers - OPTIMIZED using denormalized router_current_status table
+// This is O(n routers) instead of O(n logs) - dramatically faster for large databases
 async function getAllRouters() {
   const query = `
-    WITH latest_logs AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        status as current_status,
-        timestamp,
-        wan_ip,
-        operator,
-        cell_id,
-        tac,
-        mcc,
-        mnc,
-        earfcn,
-        pc_id
-      FROM router_logs
-      ORDER BY router_id, timestamp DESC
-    ),
-    latest_location AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        latitude,
-        longitude,
-        location_accuracy,
-        timestamp as location_timestamp
-      FROM router_logs
-      WHERE latitude IS NOT NULL AND longitude IS NOT NULL
-      ORDER BY router_id, timestamp DESC
-    ),
-    last_online AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        timestamp as last_online_time
-      FROM router_logs
-      WHERE LOWER(TRIM(status)) IN ('online', '1', 'true')
-      ORDER BY router_id, timestamp DESC
-    ),
-    latest_imei AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        imei
-      FROM router_logs
-      WHERE imei IS NOT NULL
-      ORDER BY router_id, timestamp DESC
-    ),
-    latest_firmware AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        firmware_version
-      FROM router_logs
-      WHERE firmware_version IS NOT NULL
-      ORDER BY router_id, timestamp DESC
-    ),
-    log_counts AS (
-      SELECT 
-        router_id,
-        COUNT(*) as log_count
-      FROM router_logs
-      GROUP BY router_id
-    )
     SELECT 
       r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id, 
       r.created_at, 
-      COALESCE(lo.last_online_time, r.last_seen) as last_seen,
+      COALESCE(s.last_online, s.last_seen, r.last_seen) as last_seen,
       r.rms_created_at, r.notes,
       r.clickup_task_id, r.clickup_task_url, r.clickup_list_id, 
       r.clickup_location_task_id, r.clickup_location_task_name, 
       r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
       r.clickup_assignees, r.clickup_task_status, r.mac_address,
-      COALESCE(lc.log_count, 0) as log_count,
-      ll.current_status,
-      ll.wan_ip,
-      ll.operator,
-      lloc.latitude,
-      lloc.longitude,
-      lloc.location_accuracy,
-      ll.cell_id,
-      ll.tac,
-      ll.mcc,
-      ll.mnc,
-      ll.earfcn,
-      ll.pc_id,
-      COALESCE(li.imei, r.imei) as imei,
-      COALESCE(lf.firmware_version, r.firmware_version) as firmware_version
+      COALESCE(s.log_count, 0) as log_count,
+      s.current_status,
+      s.wan_ip,
+      s.operator,
+      s.latitude,
+      s.longitude,
+      s.location_accuracy,
+      s.cell_id,
+      s.tac,
+      s.mcc,
+      s.mnc,
+      s.earfcn,
+      s.pc_id,
+      COALESCE(s.imei, r.imei) as imei,
+      COALESCE(s.firmware_version, r.firmware_version) as firmware_version
     FROM routers r
-    LEFT JOIN latest_logs ll ON ll.router_id = r.router_id
-    LEFT JOIN latest_location lloc ON lloc.router_id = r.router_id
-    LEFT JOIN last_online lo ON lo.router_id = r.router_id
-    LEFT JOIN latest_imei li ON li.router_id = r.router_id
-    LEFT JOIN latest_firmware lf ON lf.router_id = r.router_id
-    LEFT JOIN log_counts lc ON lc.router_id = r.router_id
-    ORDER BY COALESCE(lo.last_online_time, r.last_seen) DESC NULLS LAST;
+    LEFT JOIN router_current_status s ON s.router_id = r.router_id
+    ORDER BY COALESCE(s.last_online, s.last_seen, r.last_seen) DESC NULLS LAST;
   `;
   
   try {
@@ -257,102 +261,40 @@ async function getAllRouters() {
 }
 
 // Get routers visible to a given user (guests only see assigned routers; admins should use getAllRouters)
+// OPTIMIZED using denormalized router_current_status table
 async function getRoutersForUser(userId) {
   const query = `
-    WITH latest_logs AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        status as current_status,
-        timestamp,
-        wan_ip,
-        operator,
-        cell_id,
-        tac,
-        mcc,
-        mnc,
-        earfcn,
-        pc_id
-      FROM router_logs
-      ORDER BY router_id, timestamp DESC
-    ),
-    latest_location AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        latitude,
-        longitude,
-        location_accuracy,
-        timestamp as location_timestamp
-      FROM router_logs
-      WHERE latitude IS NOT NULL AND longitude IS NOT NULL
-      ORDER BY router_id, timestamp DESC
-    ),
-    last_online AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        timestamp as last_online_time
-      FROM router_logs
-      WHERE LOWER(TRIM(status)) IN ('online', '1', 'true')
-      ORDER BY router_id, timestamp DESC
-    ),
-    latest_imei AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        imei
-      FROM router_logs
-      WHERE imei IS NOT NULL
-      ORDER BY router_id, timestamp DESC
-    ),
-    latest_firmware AS (
-      SELECT DISTINCT ON (router_id)
-        router_id,
-        firmware_version
-      FROM router_logs
-      WHERE firmware_version IS NOT NULL
-      ORDER BY router_id, timestamp DESC
-    ),
-    log_counts AS (
-      SELECT 
-        router_id,
-        COUNT(*) as log_count
-      FROM router_logs
-      GROUP BY router_id
-    )
     SELECT 
       r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id, 
       r.created_at, 
-      COALESCE(lo.last_online_time, r.last_seen) as last_seen,
+      COALESCE(s.last_online, s.last_seen, r.last_seen) as last_seen,
       r.rms_created_at, r.notes,
       r.clickup_task_id, r.clickup_task_url, r.clickup_list_id, 
       r.clickup_location_task_id, r.clickup_location_task_name, 
       r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
       r.clickup_assignees, r.clickup_task_status, r.mac_address,
-      COALESCE(lc.log_count, 0) as log_count,
-      ll.current_status,
-      ll.wan_ip,
-      ll.operator,
-      lloc.latitude,
-      lloc.longitude,
-      lloc.location_accuracy,
-      ll.cell_id,
-      ll.tac,
-      ll.mcc,
-      ll.mnc,
-      ll.earfcn,
-      ll.pc_id,
-      COALESCE(li.imei, r.imei) as imei,
-      COALESCE(lf.firmware_version, r.firmware_version) as firmware_version,
+      COALESCE(s.log_count, 0) as log_count,
+      s.current_status,
+      s.wan_ip,
+      s.operator,
+      s.latitude,
+      s.longitude,
+      s.location_accuracy,
+      s.cell_id,
+      s.tac,
+      s.mcc,
+      s.mnc,
+      s.earfcn,
+      s.pc_id,
+      COALESCE(s.imei, r.imei) as imei,
+      COALESCE(s.firmware_version, r.firmware_version) as firmware_version,
       ura.assigned_at,
       ura.notes as assignment_notes
     FROM user_router_assignments ura
     JOIN routers r ON r.router_id = ura.router_id
-    LEFT JOIN latest_location lloc ON lloc.router_id = r.router_id
-    LEFT JOIN latest_logs ll ON ll.router_id = r.router_id
-    LEFT JOIN last_online lo ON lo.router_id = r.router_id
-    LEFT JOIN latest_imei li ON li.router_id = r.router_id
-    LEFT JOIN latest_firmware lf ON lf.router_id = r.router_id
-    LEFT JOIN log_counts lc ON lc.router_id = r.router_id
+    LEFT JOIN router_current_status s ON s.router_id = r.router_id
     WHERE ura.user_id = $1
-    ORDER BY COALESCE(lo.last_online_time, r.last_seen) DESC NULLS LAST;
+    ORDER BY COALESCE(s.last_online, s.last_seen, r.last_seen) DESC NULLS LAST;
   `;
 
   try {
