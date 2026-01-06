@@ -155,6 +155,9 @@ async function insertLog(logData) {
   }
 }
 
+// Track if we've already warned about missing table to avoid log spam
+let hasWarnedAboutMissingStatusTable = false;
+
 /**
  * Update the router_current_status table with latest telemetry data
  * This enables O(1) dashboard queries instead of scanning all logs
@@ -214,14 +217,22 @@ async function updateRouterCurrentStatus(logData) {
     ]);
   } catch (error) {
     // Don't fail the main insert if status update fails
-    logger.warn('Failed to update router_current_status (non-fatal):', error.message);
+    // Only warn once about missing table to avoid log spam
+    if (error.code === '42P01' && !hasWarnedAboutMissingStatusTable) {
+      logger.warn('router_current_status table not found - run migration 028. Telemetry will still be recorded.');
+      hasWarnedAboutMissingStatusTable = true;
+    } else if (error.code !== '42P01') {
+      logger.warn('Failed to update router_current_status (non-fatal):', error.message);
+    }
   }
 }
 
 // Get all routers - OPTIMIZED using denormalized router_current_status table
 // This is O(n routers) instead of O(n logs) - dramatically faster for large databases
+// Falls back to basic query if router_current_status table doesn't exist yet
 async function getAllRouters() {
-  const query = `
+  // First, try the optimized query with the denormalized table
+  const optimizedQuery = `
     SELECT 
       r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id, 
       r.created_at, 
@@ -251,10 +262,45 @@ async function getAllRouters() {
     ORDER BY COALESCE(s.last_online, s.last_seen, r.last_seen) DESC NULLS LAST;
   `;
   
+  // Fallback query if router_current_status doesn't exist
+  const fallbackQuery = `
+    SELECT 
+      r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id, 
+      r.created_at, r.last_seen,
+      r.rms_created_at, r.notes,
+      r.clickup_task_id, r.clickup_task_url, r.clickup_list_id, 
+      r.clickup_location_task_id, r.clickup_location_task_name, 
+      r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
+      r.clickup_assignees, r.clickup_task_status, r.mac_address,
+      0 as log_count,
+      NULL as current_status,
+      NULL as wan_ip,
+      NULL as operator,
+      NULL as latitude,
+      NULL as longitude,
+      NULL as location_accuracy,
+      NULL as cell_id,
+      NULL as tac,
+      NULL as mcc,
+      NULL as mnc,
+      NULL as earfcn,
+      NULL as pc_id,
+      r.imei,
+      r.firmware_version
+    FROM routers r
+    ORDER BY r.last_seen DESC NULLS LAST;
+  `;
+  
   try {
-    const result = await pool.query(query);
+    const result = await pool.query(optimizedQuery);
     return result.rows;
   } catch (error) {
+    // If the error is because router_current_status doesn't exist, use fallback
+    if (error.code === '42P01') { // relation does not exist
+      logger.warn('router_current_status table not found, using fallback query');
+      const fallbackResult = await pool.query(fallbackQuery);
+      return fallbackResult.rows;
+    }
     logger.error('Error fetching routers:', error);
     throw error;
   }
@@ -262,8 +308,9 @@ async function getAllRouters() {
 
 // Get routers visible to a given user (guests only see assigned routers; admins should use getAllRouters)
 // OPTIMIZED using denormalized router_current_status table
+// Falls back to basic query if router_current_status table doesn't exist yet
 async function getRoutersForUser(userId) {
-  const query = `
+  const optimizedQuery = `
     SELECT 
       r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id, 
       r.created_at, 
@@ -297,10 +344,48 @@ async function getRoutersForUser(userId) {
     ORDER BY COALESCE(s.last_online, s.last_seen, r.last_seen) DESC NULLS LAST;
   `;
 
+  const fallbackQuery = `
+    SELECT 
+      r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id, 
+      r.created_at, r.last_seen,
+      r.rms_created_at, r.notes,
+      r.clickup_task_id, r.clickup_task_url, r.clickup_list_id, 
+      r.clickup_location_task_id, r.clickup_location_task_name, 
+      r.location_linked_at, r.date_installed, r.last_clickup_sync_hash,
+      r.clickup_assignees, r.clickup_task_status, r.mac_address,
+      0 as log_count,
+      NULL as current_status,
+      NULL as wan_ip,
+      NULL as operator,
+      NULL as latitude,
+      NULL as longitude,
+      NULL as location_accuracy,
+      NULL as cell_id,
+      NULL as tac,
+      NULL as mcc,
+      NULL as mnc,
+      NULL as earfcn,
+      NULL as pc_id,
+      r.imei,
+      r.firmware_version,
+      ura.assigned_at,
+      ura.notes as assignment_notes
+    FROM user_router_assignments ura
+    JOIN routers r ON r.router_id = ura.router_id
+    WHERE ura.user_id = $1
+    ORDER BY r.last_seen DESC NULLS LAST;
+  `;
+
   try {
-    const result = await pool.query(query, [userId]);
+    const result = await pool.query(optimizedQuery, [userId]);
     return result.rows;
   } catch (error) {
+    // If the error is because router_current_status doesn't exist, use fallback
+    if (error.code === '42P01') { // relation does not exist
+      logger.warn('router_current_status table not found, using fallback query for user');
+      const fallbackResult = await pool.query(fallbackQuery, [userId]);
+      return fallbackResult.rows;
+    }
     logger.error('Error fetching routers for user:', error);
     throw error;
   }
