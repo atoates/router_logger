@@ -12,6 +12,28 @@ const { pool, logger } = require('../config/database');
 const routerStats = require('./routerStats');
 const routerMaintenance = require('./routerMaintenance');
 
+// Cached detection of router_current_status availability to prevent 42P01 spam
+let hasCurrentStatusTable = null; // null = unknown, boolean once checked
+let lastStatusTableCheckAt = 0;
+const STATUS_TABLE_CHECK_INTERVAL_MS = 60 * 1000; // re-check at most once per minute
+
+async function isStatusTableAvailable(force = false) {
+  const now = Date.now();
+  if (!force && hasCurrentStatusTable !== null && (now - lastStatusTableCheckAt) < STATUS_TABLE_CHECK_INTERVAL_MS) {
+    return hasCurrentStatusTable;
+  }
+  try {
+    const res = await pool.query(`SELECT to_regclass('public.router_current_status') AS rel`);
+    hasCurrentStatusTable = !!res.rows?.[0]?.rel;
+  } catch (e) {
+    // If metadata query fails for any reason, behave as if unavailable but don't spam
+    hasCurrentStatusTable = false;
+  } finally {
+    lastStatusTableCheckAt = now;
+  }
+  return hasCurrentStatusTable;
+}
+
 // Insert or update router information
 async function upsertRouter(routerData) {
   const query = `
@@ -163,6 +185,10 @@ let hasWarnedAboutMissingStatusTable = false;
  * This enables O(1) dashboard queries instead of scanning all logs
  */
 async function updateRouterCurrentStatus(logData) {
+  // If the denormalized table isn't available, skip quietly
+  if (!(await isStatusTableAvailable())) {
+    return;
+  }
   const isOnline = ['online', '1', 'true'].includes(String(logData.status).toLowerCase().trim());
   
   const query = `
@@ -231,6 +257,8 @@ async function updateRouterCurrentStatus(logData) {
 // This is O(n routers) instead of O(n logs) - dramatically faster for large databases
 // Falls back to basic query if router_current_status table doesn't exist yet
 async function getAllRouters() {
+  // Prefer not to issue a query against a missing relation; check first
+  const tableAvailable = await isStatusTableAvailable();
   // First, try the optimized query with the denormalized table
   const optimizedQuery = `
     SELECT 
@@ -307,8 +335,13 @@ async function getAllRouters() {
   `;
   
   try {
-    const result = await pool.query(optimizedQuery);
-    return result.rows;
+    if (tableAvailable) {
+      const result = await pool.query(optimizedQuery);
+      return result.rows;
+    }
+    // No table yet - go straight to fallback without triggering 42P01
+    const fallbackResult = await pool.query(fallbackQuery);
+    return fallbackResult.rows;
   } catch (error) {
     // If the error is because router_current_status doesn't exist, use fallback
     if (error.code === '42P01') { // relation does not exist
@@ -325,6 +358,7 @@ async function getAllRouters() {
 // OPTIMIZED using denormalized router_current_status table
 // Falls back to basic query if router_current_status table doesn't exist yet
 async function getRoutersForUser(userId) {
+  const tableAvailable = await isStatusTableAvailable();
   const optimizedQuery = `
     SELECT 
       r.id, r.router_id, r.device_serial, r.name, r.location, r.site_id, 
@@ -407,8 +441,12 @@ async function getRoutersForUser(userId) {
   `;
 
   try {
-    const result = await pool.query(optimizedQuery, [userId]);
-    return result.rows;
+    if (tableAvailable) {
+      const result = await pool.query(optimizedQuery, [userId]);
+      return result.rows;
+    }
+    const fallbackResult = await pool.query(fallbackQuery, [userId]);
+    return fallbackResult.rows;
   } catch (error) {
     // If the error is because router_current_status doesn't exist, use fallback
     if (error.code === '42P01') { // relation does not exist
