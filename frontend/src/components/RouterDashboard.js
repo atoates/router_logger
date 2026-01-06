@@ -349,7 +349,9 @@ export default function RouterDashboard({ router }) {
         <div className="metric" style={{ borderLeftColor:'#6366f1' }}>
           <div className="label">Data Transfer</div>
           <div className="value">{formatBytes(totalBytes)}</div>
-          <div className="sub">{label}</div>
+          <div className="sub">
+            £{((totalBytes / 1e6) * 0.0022).toFixed(2)} cost · {label}
+          </div>
         </div>
         <div className="metric" style={{ borderLeftColor:'#10b981' }}>
           <div className="label">Uptime</div>
