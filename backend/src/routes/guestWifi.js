@@ -164,6 +164,14 @@ async function processGuestEvent(event) {
   const effectiveMacAddress = mac_address || callingstationid;
   const effectiveSessionDuration = session_duration || acctsessiontime;
 
+  // Debug logging for MAC address tracking
+  logger.info(`Processing ${type} event - MAC debug`, {
+    mac_address,
+    callingstationid,
+    effectiveMacAddress,
+    type
+  });
+
   // Normalize MAC addresses
   const userMac = normalizeMac(effectiveMacAddress);
   const apMac = normalizeMac(effectiveRouterMac);
@@ -262,6 +270,8 @@ async function processGuestEvent(event) {
  */
 async function upsertGuestSession({ sessionId, username, email, phone, name, userMac, apMac, routerId, sessionDuration, timestamp, eventType }) {
   try {
+    logger.info(`Upserting guest session`, { sessionId, username, email, userMac, routerId, eventType });
+    
     // Insert into wifi_guest_sessions table
     await pool.query(`
       INSERT INTO wifi_guest_sessions (
