@@ -3,16 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#030712">
+    <meta name="theme-color" content="#1a1a1a">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title><%= title || 'Data Usage' %> - <%= companyName %></title>
-    <!-- Load CSS first (critical) -->
-    <link rel="stylesheet" href="/css/portal.css">
-    <!-- Google Fonts - loaded async to prevent blocking if unavailable -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
     <style>
         * {
@@ -22,286 +18,359 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f0f0f;
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+            padding: 0;
+            margin: 0;
+            color: #fff;
+        }
+
+        .header {
+            background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .logo {
+            height: 32px;
+            width: auto;
+            display: block;
         }
 
         .container {
-            background: white;
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .usage-hero {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
             border-radius: 20px;
-            padding: 40px;
-            max-width: 500px;
-            width: 100%;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 32px 24px;
+            margin-bottom: 16px;
+            position: relative;
+            overflow: hidden;
         }
 
-        h1 {
-            color: #667eea;
-            margin-bottom: 10px;
-            font-size: 28px;
-            text-align: center;
+        .usage-hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            pointer-events: none;
         }
 
-        .subtitle {
-            color: #666;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-
-        .usage-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 20px;
-        }
-
-        .usage-header {
-            font-size: 14px;
+        .usage-label {
+            font-size: 13px;
+            font-weight: 500;
             opacity: 0.9;
-            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
         }
 
         .usage-amount {
-            font-size: 48px;
-            font-weight: bold;
-            margin-bottom: 5px;
+            font-size: 56px;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
         }
 
         .usage-limit {
             font-size: 14px;
-            opacity: 0.8;
-        }
-
-        .progress-bar {
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 10px;
-            height: 10px;
-            margin-top: 15px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            background: white;
-            height: 100%;
-            border-radius: 10px;
-            transition: width 0.3s ease;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
+            opacity: 0.85;
             margin-bottom: 20px;
         }
 
-        .stat-box {
-            background: #f7f9fc;
-            border-radius: 10px;
-            padding: 20px;
+        .progress-track {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            height: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            background: #fff;
+            height: 100%;
+            border-radius: 12px;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 12px rgba(255,255,255,0.5);
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat-card {
+            background: #1a1a1a;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 20px 16px;
             text-align: center;
         }
 
-        .stat-label {
-            color: #666;
-            font-size: 12px;
+        .stat-icon {
+            font-size: 20px;
             margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            font-weight: 500;
+            color: #888;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            margin-bottom: 6px;
         }
 
         .stat-value {
-            color: #333;
             font-size: 24px;
-            font-weight: bold;
+            font-weight: 700;
+            color: #fff;
         }
 
-        .info-box {
-            background: #f7f9fc;
-            border-radius: 10px;
-            padding: 20px;
-            margin-top: 20px;
+        .info-card {
+            background: #1a1a1a;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 4px;
+            margin-bottom: 16px;
         }
 
-        .info-row {
+        .info-item {
             display: flex;
             justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px solid #e0e0e0;
+            align-items: center;
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
 
-        .info-row:last-child {
+        .info-item:last-child {
             border-bottom: none;
         }
 
         .info-label {
-            color: #666;
             font-size: 14px;
+            color: #888;
+            font-weight: 500;
         }
 
         .info-value {
-            color: #333;
-            font-weight: 600;
             font-size: 14px;
+            font-weight: 600;
+            color: #fff;
         }
 
-        .refresh-btn {
+        .alert {
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-success {
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #4ade80;
+        }
+
+        .alert-warning {
+            background: rgba(251, 191, 36, 0.15);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            color: #fbbf24;
+        }
+
+        .alert-error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+        }
+
+        .btn-refresh {
             width: 100%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
             border: none;
-            padding: 15px;
-            border-radius: 10px;
-            font-size: 16px;
+            border-radius: 12px;
+            padding: 16px;
+            font-size: 15px;
             font-weight: 600;
+            color: #fff;
             cursor: pointer;
-            margin-top: 20px;
-            transition: transform 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
         }
 
-        .refresh-btn:hover {
-            transform: translateY(-2px);
+        .btn-refresh:active {
+            transform: scale(0.98);
         }
 
-        .refresh-btn:active {
-            transform: translateY(0);
+        .footer {
+            text-align: center;
+            padding: 24px 20px;
+            font-size: 12px;
+            color: #666;
         }
 
-        .warning {
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 15px;
-            border-radius: 5px;
-            margin-top: 20px;
-            font-size: 14px;
-            color: #856404;
+        .footer a {
+            color: #888;
+            text-decoration: none;
         }
 
-        .error {
-            background: #f8d7da;
-            border-left: 4px solid #dc3545;
-            padding: 15px;
-            border-radius: 5px;
-            margin-top: 20px;
-            font-size: 14px;
-            color: #721c24;
+        .ad-banner {
+            margin: 20px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.08);
         }
 
-        .success {
-            background: #d4edda;
-            border-left: 4px solid #28a745;
-            padding: 15px;
-            border-radius: 5px;
-            margin-top: 20px;
-            font-size: 14px;
-            color: #155724;
+        .ad-banner img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .error-state {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .error-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .error-message {
+            color: #888;
+            font-size: 15px;
+        }
+
+        @media (max-width: 480px) {
+            .usage-amount {
+                font-size: 48px;
+            }
+            
+            .stat-value {
+                font-size: 20px;
+            }
+            
+            .container {
+                padding: 16px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="portal-container">
-        <!-- Top Banner Ad -->
-        <div class="ad-container top-banner">
-            <span class="ad-label">SPONSORED</span>
-            <img src="/images/banner-ad-1.gif" alt="Advertisement" class="banner-ad">
-        </div>
+    <div class="header">
+        <img src="/images/Logo.png" alt="<%= companyName %>" class="logo">
+    </div>
 
-        <div class="portal-card">
-            <!-- Logo -->
-            <div class="logo-container">
-                <img src="/images/Logo.png" alt="<%= companyName %>" class="logo">
+    <div class="ad-banner">
+        <img src="/images/banner-ad-1.gif" alt="Advertisement">
+    </div>
+
+    <div class="container">
+        <% if (session) { %>
+            <div class="usage-hero">
+                <div class="usage-label">Total Data Used</div>
+                <div class="usage-amount"><%= usedMB %> MB</div>
+                <div class="usage-limit"><%= limitMB %> MB per session</div>
+                <div class="progress-track">
+                    <div class="progress-fill" style="width: <%= Math.min(usagePercent, 100) %>%"></div>
+                </div>
             </div>
 
-            <h1>📊 Data Usage</h1>
-            <p class="subtitle">Track your free WiFi usage</p>
-
-            <% if (session) { %>
-                <div class="usage-card">
-                    <div class="usage-header">Total Data Used (All Sessions)</div>
-                    <div class="usage-amount"><%= usedMB %> MB</div>
-                    <div class="usage-limit">of <%= limitMB %> MB per session</div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: <%= usagePercent %>%"></div>
-                    </div>
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon">⬇️</div>
+                    <div class="stat-label">Downloaded</div>
+                    <div class="stat-value"><%= downloadMB %></div>
                 </div>
-
-                <div class="stats-grid">
-                    <div class="stat-box">
-                        <div class="stat-label">Downloaded</div>
-                        <div class="stat-value"><%= downloadMB %> MB</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-label">Uploaded</div>
-                        <div class="stat-value"><%= uploadMB %> MB</div>
-                    </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⬆️</div>
+                    <div class="stat-label">Uploaded</div>
+                    <div class="stat-value"><%= uploadMB %></div>
                 </div>
+            </div>
 
-                <div class="info-box">
-                    <div class="info-row">
-                        <span class="info-label">Session Duration</span>
-                        <span class="info-value"><%= sessionDuration %></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Remaining Time</span>
-                        <span class="info-value"><%= remainingTime %></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Remaining Data</span>
-                        <span class="info-value"><%= remainingMB %> MB</span>
-                    </div>
-                    <% if (nextFreeAvailable) { %>
-                    <div class="info-row">
-                        <span class="info-label">Next Free Session</span>
-                        <span class="info-value">
-                            <script>
-                                const nextTime = new Date('<%= nextFreeAvailable %>');
-                                const now = new Date();
-                                const diff = nextTime - now;
-                                if (diff > 0) {
-                                    const hours = Math.floor(diff / (1000 * 60 * 60));
-                                    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                                    document.write(hours > 0 ? hours + 'h ' + mins + 'm' : mins + 'm');
-                                } else {
-                                    document.write('Available now');
-                                }
-                            </script>
-                        </span>
-                    </div>
-                    <% } %>
+            <div class="info-card">
+                <div class="info-item">
+                    <span class="info-label">Session Duration</span>
+                    <span class="info-value"><%= sessionDuration %></span>
                 </div>
-
-                <% if (usagePercent >= 90) { %>
-                    <div class="error">
-                        ⚠️ You've used <%= usagePercent.toFixed(0) %>% of your data. You will be disconnected soon!
-                    </div>
-                <% } else if (usagePercent >= 75) { %>
-                    <div class="warning">
-                        ⚠️ You've used <%= usagePercent.toFixed(0) %>% of your data allowance.
-                    </div>
-                <% } else { %>
-                    <div class="success">
-                        ✓ You have <%= remainingMB %> MB remaining
-                    </div>
+                <div class="info-item">
+                    <span class="info-label">Remaining Time</span>
+                    <span class="info-value"><%= remainingTime %></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Remaining Data</span>
+                    <span class="info-value"><%= remainingMB %> MB</span>
+                </div>
+                <% if (nextFreeAvailable) { %>
+                <div class="info-item">
+                    <span class="info-label">Next Session</span>
+                    <span class="info-value">
+                        <script>
+                            const nextTime = new Date('<%= nextFreeAvailable %>');
+                            const now = new Date();
+                            const diff = nextTime - now;
+                            if (diff > 0) {
+                                const hours = Math.floor(diff / (1000 * 60 * 60));
+                                const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                                document.write(hours > 0 ? hours + 'h ' + mins + 'm' : mins + 'm');
+                            } else {
+                                document.write('Now');
+                            }
+                        </script>
+                    </span>
+                </div>
                 <% } %>
+            </div>
 
-                <button class="refresh-btn" onclick="location.reload()">🔄 Refresh Usage</button>
+            <% if (usagePercent >= 90) { %>
+                <div class="alert alert-error">
+                    <span>⚠️</span>
+                    <span>You've used <%= usagePercent.toFixed(0) %>% of your data. Disconnection imminent!</span>
+                </div>
+            <% } else if (usagePercent >= 75) { %>
+                <div class="alert alert-warning">
+                    <span>⚠️</span>
+                    <span>You've used <%= usagePercent.toFixed(0) %>% of your allowance</span>
+                </div>
             <% } else { %>
-                <div class="error">
-                    ❌ <%= error || 'No active session found. Please connect to WiFi and log in.' %>
+                <div class="alert alert-success">
+                    <span>✓</span>
+                    <span><%= remainingMB %> MB remaining</span>
                 </div>
             <% } %>
-        </div>
 
-        <!-- Footer -->
-        <div class="footer">
-            <p>By connecting, you agree to our <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a></p>
-        </div>
+            <button class="btn-refresh" onclick="location.reload()">🔄 Refresh Usage</button>
+        <% } else { %>
+            <div class="error-state">
+                <div class="error-icon">📊</div>
+                <div class="error-message"><%= error || 'No active session found. Please connect to WiFi and log in.' %></div>
+            </div>
+        <% } %>
+    </div>
+
+    <div class="footer">
+        <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>
     </div>
 
     <script>
