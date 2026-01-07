@@ -69,14 +69,16 @@ function normalizeMac(mac) {
 
 /**
  * Find router by MAC address
+ * Teltonika routers have different MACs for LAN/WAN/WiFi interfaces
+ * that typically only differ in the last octet, so we do fuzzy matching
  */
 async function findRouterByMac(mac) {
   if (!mac) return null;
 
   const normalizedMac = normalizeMac(mac);
 
-  // Try multiple MAC formats for matching
-  const result = await pool.query(`
+  // Try exact match first with multiple MAC formats
+  let result = await pool.query(`
     SELECT router_id, name FROM routers
     WHERE LOWER(REPLACE(mac_address, '-', ':')) = $1
        OR LOWER(REPLACE(mac_address, ':', '-')) = REPLACE($1, ':', '-')
@@ -86,6 +88,22 @@ async function findRouterByMac(mac) {
   if (result.rows.length > 0) {
     return result.rows[0];
   }
+
+  // Fuzzy match: match on first 5 octets (first 14 chars like "20:97:27:88:d5")
+  // This handles Teltonika routers where LAN/WAN/WiFi MACs differ only in last octet
+  const macPrefix = normalizedMac.substring(0, 14); // "xx:xx:xx:xx:xx"
+  if (macPrefix.length === 14) {
+    result = await pool.query(`
+      SELECT router_id, name FROM routers
+      WHERE LOWER(SUBSTRING(REPLACE(mac_address, '-', ':'), 1, 14)) = $1
+    `, [macPrefix]);
+
+    if (result.rows.length > 0) {
+      logger.info(`Fuzzy MAC match: ${mac} -> ${result.rows[0].name} (${result.rows[0].router_id})`);
+      return result.rows[0];
+    }
+  }
+
   return null;
 }
 
