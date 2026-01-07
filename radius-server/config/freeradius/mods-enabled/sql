@@ -1,4 +1,4 @@
-# FreeRADIUS SQL Module Configuration
+# FreeRADIUS SQL Module Configuration  
 # Connects to MariaDB for user authentication and accounting
 
 sql {
@@ -12,6 +12,19 @@ sql {
     login = "${RADIUS_DB_USER:-radius}"
     password = "${RADIUS_DB_PASSWORD:-radiuspass123}"
     radius_db = "${RADIUS_DB_NAME:-radius}"
+
+    # Table names - MUST be defined BEFORE queries that reference them
+    authcheck_table = "radcheck"
+    authreply_table = "radreply"
+    groupcheck_table = "radgroupcheck"
+    groupreply_table = "radgroupreply"
+    usergroup_table = "radusergroup"
+    acct_table1 = "radacct"
+    acct_table2 = "radacct"
+    postauth_table = "radpostauth"
+
+    # Group attribute
+    group_attribute = "SQL-Group"
 
     # Connection pool settings
     pool {
@@ -28,41 +41,24 @@ sql {
     read_clients = yes
     client_table = "nas"
 
+    # Safe characters for SQL
+    safe_characters = "@abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_: /+*"
+
     # =====================================================
     # SQL Queries for Authentication
     # =====================================================
     
     # Check if user exists and get password
-    authorize_check_query = "\
-        SELECT id, username, attribute, value, op \
-        FROM ${authcheck_table} \
-        WHERE username = '%{SQL-User-Name}' \
-        ORDER BY id"
+    authorize_check_query = "SELECT id, username, attribute, value, op FROM radcheck WHERE username = '%{SQL-User-Name}' ORDER BY id"
 
-    authorize_reply_query = "\
-        SELECT id, username, attribute, value, op \
-        FROM ${authreply_table} \
-        WHERE username = '%{SQL-User-Name}' \
-        ORDER BY id"
+    authorize_reply_query = "SELECT id, username, attribute, value, op FROM radreply WHERE username = '%{SQL-User-Name}' ORDER BY id"
 
     # Group membership queries
-    authorize_group_check_query = "\
-        SELECT id, groupname, attribute, value, op \
-        FROM ${groupcheck_table} \
-        WHERE groupname = '%{${group_attribute}}' \
-        ORDER BY id"
+    authorize_group_check_query = "SELECT id, groupname, attribute, value, op FROM radgroupcheck WHERE groupname = '%{SQL-Group}' ORDER BY id"
 
-    authorize_group_reply_query = "\
-        SELECT id, groupname, attribute, value, op \
-        FROM ${groupreply_table} \
-        WHERE groupname = '%{${group_attribute}}' \
-        ORDER BY id"
+    authorize_group_reply_query = "SELECT id, groupname, attribute, value, op FROM radgroupreply WHERE groupname = '%{SQL-Group}' ORDER BY id"
 
-    group_membership_query = "\
-        SELECT groupname \
-        FROM ${usergroup_table} \
-        WHERE username = '%{SQL-User-Name}' \
-        ORDER BY priority"
+    group_membership_query = "SELECT groupname FROM radusergroup WHERE username = '%{SQL-User-Name}' ORDER BY priority"
 
     # =====================================================
     # SQL Queries for Accounting
@@ -70,82 +66,17 @@ sql {
     
     accounting {
         # Start accounting
-        start_query = "\
-            INSERT INTO ${acct_table1} \
-                (acctsessionid, acctuniqueid, username, realm, \
-                nasipaddress, nasportid, nasporttype, \
-                acctstarttime, acctupdatetime, \
-                calledstationid, callingstationid, \
-                servicetype, framedprotocol, framedipaddress) \
-            VALUES \
-                ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', \
-                '%{SQL-User-Name}', '%{Realm}', \
-                '%{NAS-IP-Address}', '%{NAS-Port-Id}', '%{NAS-Port-Type}', \
-                FROM_UNIXTIME(%{integer:Event-Timestamp}), \
-                FROM_UNIXTIME(%{integer:Event-Timestamp}), \
-                '%{Called-Station-Id}', '%{Calling-Station-Id}', \
-                '%{Service-Type}', '%{Framed-Protocol}', '%{Framed-IP-Address}')"
+        start_query = "INSERT INTO radacct (acctsessionid, acctuniqueid, username, realm, nasipaddress, nasportid, nasporttype, acctstarttime, acctupdatetime, calledstationid, callingstationid, servicetype, framedprotocol, framedipaddress) VALUES ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{SQL-User-Name}', '%{Realm}', '%{NAS-IP-Address}', '%{NAS-Port-Id}', '%{NAS-Port-Type}', FROM_UNIXTIME(%{integer:Event-Timestamp}), FROM_UNIXTIME(%{integer:Event-Timestamp}), '%{Called-Station-Id}', '%{Calling-Station-Id}', '%{Service-Type}', '%{Framed-Protocol}', '%{Framed-IP-Address}')"
 
         # Interim update
-        interim_query = "\
-            UPDATE ${acct_table1} \
-            SET \
-                acctupdatetime = FROM_UNIXTIME(%{integer:Event-Timestamp}), \
-                acctinterval = %{Acct-Delay-Time:-0} + %{integer:Acct-Session-Time:-0}, \
-                framedipaddress = '%{Framed-IP-Address}', \
-                acctsessiontime = %{integer:Acct-Session-Time:-0}, \
-                acctinputoctets = %{integer:Acct-Input-Octets:-0} + \
-                    (%{integer:Acct-Input-Gigawords:-0} * 4294967296), \
-                acctoutputoctets = %{integer:Acct-Output-Octets:-0} + \
-                    (%{integer:Acct-Output-Gigawords:-0} * 4294967296) \
-            WHERE acctsessionid = '%{Acct-Session-Id}' \
-                AND username = '%{SQL-User-Name}' \
-                AND nasipaddress = '%{NAS-IP-Address}'"
+        interim_query = "UPDATE radacct SET acctupdatetime = FROM_UNIXTIME(%{integer:Event-Timestamp}), acctinterval = %{Acct-Delay-Time:-0} + %{integer:Acct-Session-Time:-0}, framedipaddress = '%{Framed-IP-Address}', acctsessiontime = %{integer:Acct-Session-Time:-0}, acctinputoctets = %{integer:Acct-Input-Octets:-0} + (%{integer:Acct-Input-Gigawords:-0} * 4294967296), acctoutputoctets = %{integer:Acct-Output-Octets:-0} + (%{integer:Acct-Output-Gigawords:-0} * 4294967296) WHERE acctsessionid = '%{Acct-Session-Id}' AND username = '%{SQL-User-Name}' AND nasipaddress = '%{NAS-IP-Address}'"
 
         # Stop accounting
-        stop_query = "\
-            UPDATE ${acct_table1} \
-            SET \
-                acctstoptime = FROM_UNIXTIME(%{integer:Event-Timestamp}), \
-                acctsessiontime = %{integer:Acct-Session-Time:-0}, \
-                acctinputoctets = %{integer:Acct-Input-Octets:-0} + \
-                    (%{integer:Acct-Input-Gigawords:-0} * 4294967296), \
-                acctoutputoctets = %{integer:Acct-Output-Octets:-0} + \
-                    (%{integer:Acct-Output-Gigawords:-0} * 4294967296), \
-                acctterminatecause = '%{Acct-Terminate-Cause}', \
-                connectinfo_stop = '%{Connect-Info}' \
-            WHERE acctsessionid = '%{Acct-Session-Id}' \
-                AND username = '%{SQL-User-Name}' \
-                AND nasipaddress = '%{NAS-IP-Address}'"
+        stop_query = "UPDATE radacct SET acctstoptime = FROM_UNIXTIME(%{integer:Event-Timestamp}), acctsessiontime = %{integer:Acct-Session-Time:-0}, acctinputoctets = %{integer:Acct-Input-Octets:-0} + (%{integer:Acct-Input-Gigawords:-0} * 4294967296), acctoutputoctets = %{integer:Acct-Output-Octets:-0} + (%{integer:Acct-Output-Gigawords:-0} * 4294967296), acctterminatecause = '%{Acct-Terminate-Cause}', connectinfo_stop = '%{Connect-Info}' WHERE acctsessionid = '%{Acct-Session-Id}' AND username = '%{SQL-User-Name}' AND nasipaddress = '%{NAS-IP-Address}'"
     }
 
     # Post-auth logging
     post-auth {
-        query = "\
-            INSERT INTO ${postauth_table} \
-                (username, pass, reply, authdate, class) \
-            VALUES \
-                ('%{SQL-User-Name}', \
-                '%{%{User-Password}:-%{Chap-Password}}', \
-                '%{reply:Packet-Type}', \
-                NOW(), \
-                '%{reply:Class}')"
+        query = "INSERT INTO radpostauth (username, pass, reply, authdate, class) VALUES ('%{SQL-User-Name}', '%{%{User-Password}:-%{Chap-Password}}', '%{reply:Packet-Type}', NOW(), '%{reply:Class}')"
     }
-
-    # Table names
-    authcheck_table = "radcheck"
-    authreply_table = "radreply"
-    groupcheck_table = "radgroupcheck"
-    groupreply_table = "radgroupreply"
-    usergroup_table = "radusergroup"
-    acct_table1 = "radacct"
-    acct_table2 = "radacct"
-    postauth_table = "radpostauth"
-
-    # Group attribute
-    group_attribute = "SQL-Group"
-
-    # Safe characters for SQL
-    safe_characters = "@abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_: /+*"
 }
-
