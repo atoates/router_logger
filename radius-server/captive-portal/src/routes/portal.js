@@ -265,6 +265,76 @@ router.get('/terms', (req, res) => {
 });
 
 /**
+ * GET /usage
+ * Data usage dashboard
+ */
+router.get('/usage', async (req, res) => {
+    const { mac } = req.query;
+    
+    // Get session from query params or session
+    const macAddress = mac || req.session?.macAddress;
+    
+    if (!macAddress) {
+        return res.render('usage', {
+            title: 'Data Usage',
+            companyName: process.env.COMPANY_NAME || 'VacatAd',
+            session: null
+        });
+    }
+    
+    try {
+        // Query accounting data from RADIUS (if available)
+        // For now, show session data from session storage
+        const dataLimit = 500; // MB
+        const sessionDuration = req.session?.sessionDuration || 86400;
+        const authenticatedAt = new Date(req.session?.authenticatedAt || Date.now());
+        const now = new Date();
+        const elapsedSeconds = Math.floor((now - authenticatedAt) / 1000);
+        const remainingSeconds = Math.max(0, sessionDuration - elapsedSeconds);
+        
+        // Mock data for now - in production, query from RADIUS accounting
+        const downloadBytes = 50 * 1024 * 1024; // Example: 50 MB
+        const uploadBytes = 10 * 1024 * 1024;   // Example: 10 MB
+        const totalBytes = downloadBytes + uploadBytes;
+        
+        const downloadMB = (downloadBytes / 1024 / 1024).toFixed(1);
+        const uploadMB = (uploadBytes / 1024 / 1024).toFixed(1);
+        const usedMB = (totalBytes / 1024 / 1024).toFixed(1);
+        const remainingMB = Math.max(0, dataLimit - parseFloat(usedMB)).toFixed(1);
+        const usagePercent = Math.min(100, (parseFloat(usedMB) / dataLimit) * 100);
+        
+        const formatDuration = (seconds) => {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            return `${minutes}m`;
+        };
+        
+        res.render('usage', {
+            title: 'Data Usage',
+            companyName: process.env.COMPANY_NAME || 'VacatAd',
+            session: true,
+            usedMB,
+            limitMB: dataLimit,
+            remainingMB,
+            usagePercent: usagePercent.toFixed(1),
+            downloadMB,
+            uploadMB,
+            sessionDuration: formatDuration(elapsedSeconds),
+            remainingTime: formatDuration(remainingSeconds),
+            macAddress
+        });
+    } catch (error) {
+        console.error('Error fetching usage data:', error);
+        res.render('usage', {
+            title: 'Data Usage',
+            companyName: process.env.COMPANY_NAME || 'VacatAd',
+            session: null
+        });
+    }
+});
+
+/**
  * GET /privacy
  * Privacy policy page
  */

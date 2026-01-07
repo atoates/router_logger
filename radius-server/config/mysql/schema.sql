@@ -273,16 +273,17 @@ INSERT INTO radcheck (username, attribute, op, value) VALUES
 ('administrator', 'Cleartext-Password', ':=', 'radius')
 ON DUPLICATE KEY UPDATE value = value;
 
--- Free tier group (30 minutes)
+-- Free tier group (24 hours, 500MB data limit)
 INSERT INTO radgroupcheck (groupname, attribute, op, value) VALUES
 ('free-tier', 'Simultaneous-Use', ':=', '1'),
-('free-tier', 'Session-Timeout', ':=', '1800')  -- 30 minutes
+('free-tier', 'Session-Timeout', ':=', '86400')  -- 24 hours
 ON DUPLICATE KEY UPDATE value = value;
 
 INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES
-('free-tier', 'Reply-Message', '=', 'Welcome! You have 30 minutes of free WiFi.'),
-('free-tier', 'Session-Timeout', '=', '1800'),  -- 30 minutes
+('free-tier', 'Reply-Message', '=', 'Welcome! You have 500MB of free WiFi for 24 hours.'),
+('free-tier', 'Session-Timeout', '=', '86400'),  -- 24 hours
 ('free-tier', 'Idle-Timeout', '=', '300'),      -- 5 min idle timeout
+('free-tier', 'ChilliSpot-Max-Total-Octets', '=', '524288000'),  -- 500MB total data
 ('free-tier', 'WISPr-Bandwidth-Max-Down', '=', '5000000'),  -- 5 Mbps down
 ('free-tier', 'WISPr-Bandwidth-Max-Up', '=', '2000000')     -- 2 Mbps up
 ON DUPLICATE KEY UPDATE value = value;

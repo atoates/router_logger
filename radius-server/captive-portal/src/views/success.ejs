@@ -33,7 +33,7 @@
                     <circle cx="12" cy="12" r="10"/>
                     <polyline points="12 6 12 12 16 14"/>
                 </svg>
-                Free 30-minute session
+                Free 24-hour session (500MB limit)
             </p>
             <% } else if (guestName) { %>
             <p class="welcome-name">Welcome back, <%= guestName %> 👋</p>
@@ -62,16 +62,10 @@
             <% if (typeof isFreeSession !== 'undefined' && isFreeSession) { %>
             <p class="enjoy-message">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px; opacity: 0.7;">
-                    <path d="M12 2v4"/>
-                    <path d="m4.93 4.93 2.83 2.83"/>
-                    <path d="M2 12h4"/>
-                    <path d="m4.93 19.07 2.83-2.83"/>
-                    <path d="M12 18v4"/>
-                    <path d="m19.07 19.07-2.83-2.83"/>
-                    <path d="M22 12h-4"/>
-                    <path d="m19.07 4.93-2.83 2.83"/>
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
                 </svg>
-                Need more time? Sign in with email for 24-hour access
+                <a href="/usage" style="color: inherit; text-decoration: underline;">📊 Check your data usage</a> - You have 500MB for 24 hours
             </p>
             <% } else { %>
             <p class="enjoy-message">

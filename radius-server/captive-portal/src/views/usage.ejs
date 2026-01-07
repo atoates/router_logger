@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title || 'Data Usage' %> - <%= companyName %></title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .usage-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .usage-header {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .usage-amount {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .usage-limit {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .progress-bar {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            height: 10px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            background: white;
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: #f7f9fc;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            color: #333;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .info-box {
+            background: #f7f9fc;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .refresh-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.2s;
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .refresh-btn:active {
+            transform: translateY(0);
+        }
+
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #856404;
+        }
+
+        .error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #721c24;
+        }
+
+        .success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Data Usage</h1>
+        <p class="subtitle">Track your free WiFi usage</p>
+
+        <% if (session) { %>
+            <div class="usage-card">
+                <div class="usage-header">Total Data Used</div>
+                <div class="usage-amount"><%= usedMB %> MB</div>
+                <div class="usage-limit">of <%= limitMB %> MB (24 hours)</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: <%= usagePercent %>%"></div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Downloaded</div>
+                    <div class="stat-value"><%= downloadMB %> MB</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Uploaded</div>
+                    <div class="stat-value"><%= uploadMB %> MB</div>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <div class="info-row">
+                    <span class="info-label">Session Duration</span>
+                    <span class="info-value"><%= sessionDuration %></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Remaining Time</span>
+                    <span class="info-value"><%= remainingTime %></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Remaining Data</span>
+                    <span class="info-value"><%= remainingMB %> MB</span>
+                </div>
+            </div>
+
+            <% if (usagePercent >= 90) { %>
+                <div class="error">
+                    ⚠️ You've used <%= usagePercent.toFixed(0) %>% of your data. You will be disconnected soon!
+                </div>
+            <% } else if (usagePercent >= 75) { %>
+                <div class="warning">
+                    ⚠️ You've used <%= usagePercent.toFixed(0) %>% of your data allowance.
+                </div>
+            <% } else { %>
+                <div class="success">
+                    ✓ You have <%= remainingMB %> MB remaining
+                </div>
+            <% } %>
+
+            <button class="refresh-btn" onclick="location.reload()">🔄 Refresh Usage</button>
+        <% } else { %>
+            <div class="error">
+                ❌ No active session found. Please connect to WiFi and log in.
+            </div>
+        <% } %>
+    </div>
+
+    <script>
+        // Auto-refresh every 30 seconds
+        setTimeout(() => location.reload(), 30000);
+    </script>
+</body>
+</html>

@@ -68,7 +68,7 @@ initRadiusDb();
  * Uses Auth-Type := Accept to bypass password verification
  * This is needed because CoovaChilli encrypts passwords before sending to RADIUS
  */
-async function createRadiusUser(username, password, sessionTimeout = 1800, idleTimeout = 300) {
+async function createRadiusUser(username, password, sessionTimeout = 86400, idleTimeout = 300, dataLimitBytes = null) {
     if (!radiusDb) {
         console.warn('⚠️ RADIUS database not available, skipping user creation');
         return false;
@@ -99,13 +99,21 @@ async function createRadiusUser(username, password, sessionTimeout = 1800, idleT
             [username, 'Idle-Timeout', ':=', idleTimeout.toString()]
         );
         
+        // Add data limit if specified (ChilliSpot-Max-Total-Octets)
+        if (dataLimitBytes) {
+            await radiusDb.execute(
+                'INSERT INTO radreply (username, attribute, op, value) VALUES (?, ?, ?, ?)',
+                [username, 'ChilliSpot-Max-Total-Octets', ':=', dataLimitBytes.toString()]
+            );
+        }
+        
         // Add to free-tier group
         await radiusDb.execute(
             'INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, ?)',
             [username, 'free-tier', 1]
         );
         
-        console.log(`✅ Created RADIUS user: ${username} (session: ${sessionTimeout}s, idle: ${idleTimeout}s, Auth-Type: Accept)`);
+        console.log(`✅ Created RADIUS user: ${username} (session: ${sessionTimeout}s, idle: ${idleTimeout}s, data: ${dataLimitBytes ? (dataLimitBytes / 1024 / 1024).toFixed(0) + 'MB' : 'unlimited'}, Auth-Type: Accept)`);
         return true;
     } catch (error) {
         console.error('Error creating RADIUS user:', error);
@@ -118,7 +126,9 @@ const verificationCodes = new Map();
 const freeAccessUsage = new Map();
 
 const VERIFICATION_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
-const FREE_SESSION_DURATION = parseInt(process.env.FREE_SESSION_DURATION) || 30 * 60; // 30 minutes in seconds
+const FREE_SESSION_DURATION = parseInt(process.env.FREE_SESSION_DURATION) || 24 * 60 * 60; // 24 hours in seconds
+const FREE_DATA_LIMIT_MB = parseInt(process.env.FREE_DATA_LIMIT_MB) || 500; // MB per 24h period
+const FREE_DATA_LIMIT_BYTES = FREE_DATA_LIMIT_MB * 1024 * 1024; // Convert to bytes
 const FREE_COOLDOWN_HOURS = parseInt(process.env.FREE_COOLDOWN_HOURS) || 24; // Hours before same device can get free access again
 
 const ROUTERLOGGER_API_URL = process.env.ROUTERLOGGER_API_URL || 'http://localhost:3001';
@@ -454,7 +464,7 @@ router.post('/register', async (req, res) => {
         const sessionId = uuidv4();
         
         // Create RADIUS user so the router can authenticate this guest
-        const radiusUserCreated = await createRadiusUser(guestId, guestPassword, FREE_SESSION_DURATION);
+        const radiusUserCreated = await createRadiusUser(guestId, guestPassword, FREE_SESSION_DURATION, 300, FREE_DATA_LIMIT_BYTES);
         if (radiusUserCreated) {
             console.log(`✅ RADIUS user created for guest: ${guestId}`);
         } else {
