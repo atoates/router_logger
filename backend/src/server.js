@@ -208,6 +208,19 @@ async function startServer() {
         logger.warn('Failed to cleanup expired OAuth states:', { error: error.message });
       }
     }, 60 * 60 * 1000);
+
+    // RADIUS accounting sync every 2 minutes
+    const radiusSync = require('./services/radiusAccountingSync');
+    setInterval(async () => {
+      try {
+        const result = await radiusSync.syncAllActiveSessions();
+        if (result.synced > 0 || result.errors > 0) {
+          logger.info(`RADIUS accounting sync: ${result.synced} synced, ${result.errors} errors`);
+        }
+      } catch (error) {
+        logger.debug('RADIUS accounting sync skipped:', error.message);
+      }
+    }, 2 * 60 * 1000); // Every 2 minutes
     
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
@@ -218,6 +231,7 @@ async function startServer() {
       logger.info(`   - HTTPS POST to /api/log`);
       logger.info(`   - RMS API Sync (if configured)`);
       logger.info(`📶 Guest WiFi captive portal webhook ready`);
+      logger.info(`📡 RADIUS accounting auto-sync enabled (every 2 minutes)`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

@@ -692,5 +692,104 @@ router.get('/recent', async (req, res) => {
   }
 });
 
+// =============================================================================
+// RADIUS ACCOUNTING SYNC ENDPOINTS
+// =============================================================================
+
+const radiusSync = require('../services/radiusAccountingSync');
+
+/**
+ * POST /api/guests/sync-accounting
+ * Manually trigger accounting sync for all active sessions
+ */
+router.post('/sync-accounting', async (req, res) => {
+  try {
+    const result = await radiusSync.syncAllActiveSessions();
+    res.json({
+      success: true,
+      ...result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error syncing accounting:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/guests/:username/sync
+ * Sync accounting data for a specific user
+ */
+router.post('/:username/sync', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const result = await radiusSync.syncAccountingForUser(username);
+    
+    if (result) {
+      res.json({
+        success: true,
+        session: result,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        error: 'Session not found or no accounting data available'
+      });
+    }
+  } catch (error) {
+    logger.error(`Error syncing accounting for ${req.params.username}:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/guests/:username/reset-usage
+ * Reset data usage for a specific user (admin action)
+ */
+router.post('/:username/reset-usage', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const adminUser = req.user?.username || req.body.admin_user || 'api';
+    
+    const result = await radiusSync.resetUserDataUsage(username, adminUser);
+    
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    logger.error(`Error resetting usage for ${req.params.username}:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/guests/:username/usage
+ * Get real-time usage for a specific user from RADIUS
+ */
+router.get('/:username/usage', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const usage = await radiusSync.getRealTimeUsage(username);
+    
+    if (usage) {
+      res.json({
+        success: true,
+        usage,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        error: 'No active session found'
+      });
+    }
+  } catch (error) {
+    logger.error(`Error getting usage for ${req.params.username}:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
 

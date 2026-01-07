@@ -362,9 +362,10 @@ router.get('/usage', async (req, res) => {
                     uploadBytes = parseInt(rows[0].upload || 0);
                     authenticatedAt = new Date(rows[0].last_login || rows[0].first_login);
                     elapsedSeconds = parseInt(rows[0].total_time || 0);
-                    console.log('✅ Found session data - download:', downloadBytes, 'upload:', uploadBytes);
+                    console.log('✅ Found RADIUS accounting data - download:', downloadBytes, 'upload:', uploadBytes);
                 } else {
-                    console.log('❌ No session data found for', radiusUsername ? 'username: ' + radiusUsername : 'MAC: ' + macAddress);
+                    console.log('⚠️ No RADIUS accounting data yet for', radiusUsername ? 'username: ' + radiusUsername : 'MAC: ' + macAddress);
+                    console.log('📊 Will use session data as fallback');
                 }
                 
                 // Get next free session available time from guest tracking database
@@ -389,19 +390,21 @@ router.get('/usage', async (req, res) => {
         
         // If no RADIUS data found, check session
         if (!authenticatedAt && req.session?.authenticatedAt) {
+            console.log('📝 Using session fallback data');
             authenticatedAt = new Date(req.session.authenticatedAt);
             sessionDuration = req.session.sessionDuration || 86400;
             const now = new Date();
             elapsedSeconds = Math.floor((now - authenticatedAt) / 1000);
         }
         
-        // If still no data, show error
+        // If still no data, show "session starting" message
         if (!authenticatedAt) {
+            console.log('❌ No session data found - session:', req.session);
             return res.render('usage', {
                 title: 'Data Usage',
                 companyName: process.env.COMPANY_NAME || 'VacatAd',
                 session: null,
-                error: 'No active session found. Please connect to WiFi and log in.'
+                error: 'Session is starting... Please wait a moment and refresh this page. If this persists, you may need to reconnect to WiFi.'
             });
         }
         
