@@ -239,13 +239,20 @@ router.get('/success', async (req, res) => {
     // Fetch active ads for success page (including square GIF ad)
     const ads = await getAdsForPage('success', req.query.router_id);
 
+    // Get MAC address from query params (from CoovaChilli redirect) or session
+    let macAddress = req.query.mac || req.session.macAddress;
+    
+    console.log('🔍 Success page - MAC from query:', req.query.mac);
+    console.log('🔍 Success page - MAC from session:', req.session.macAddress);
+    console.log('🔍 Success page - Using MAC:', macAddress);
+
     res.render('success', {
         title: 'Connected!',
         username: sessionData.username,
         sessionId: sessionData.sessionId,
         authenticatedAt: sessionData.authenticatedAt,
         guestName: sessionData.guestName,
-        macAddress: req.session.macAddress,
+        macAddress: macAddress,
         // Session type info
         isFreeSession,
         sessionDuration,
