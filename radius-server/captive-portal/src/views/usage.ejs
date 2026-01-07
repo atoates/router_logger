@@ -2,8 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#030712">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title><%= title || 'Data Usage' %> - <%= companyName %></title>
+    <!-- Load CSS first (critical) -->
+    <link rel="stylesheet" href="/css/portal.css">
+    <!-- Google Fonts - loaded async to prevent blocking if unavailable -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
     <style>
         * {
             margin: 0;
@@ -195,66 +205,84 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>📊 Data Usage</h1>
-        <p class="subtitle">Track your free WiFi usage</p>
+    <div class="portal-container">
+        <!-- Top Banner Ad -->
+        <div class="ad-container top-banner">
+            <span class="ad-label">SPONSORED</span>
+            <img src="/images/banner-ad-1.gif" alt="Advertisement" class="banner-ad">
+        </div>
 
-        <% if (session) { %>
-            <div class="usage-card">
-                <div class="usage-header">Total Data Used</div>
-                <div class="usage-amount"><%= usedMB %> MB</div>
-                <div class="usage-limit">of <%= limitMB %> MB (24 hours)</div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: <%= usagePercent %>%"></div>
-                </div>
+        <div class="portal-card">
+            <!-- Logo -->
+            <div class="logo-container">
+                <img src="/images/Logo.png" alt="<%= companyName %>" class="logo">
             </div>
 
-            <div class="stats-grid">
-                <div class="stat-box">
-                    <div class="stat-label">Downloaded</div>
-                    <div class="stat-value"><%= downloadMB %> MB</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Uploaded</div>
-                    <div class="stat-value"><%= uploadMB %> MB</div>
-                </div>
-            </div>
+            <h1>📊 Data Usage</h1>
+            <p class="subtitle">Track your free WiFi usage</p>
 
-            <div class="info-box">
-                <div class="info-row">
-                    <span class="info-label">Session Duration</span>
-                    <span class="info-value"><%= sessionDuration %></span>
+            <% if (session) { %>
+                <div class="usage-card">
+                    <div class="usage-header">Total Data Used</div>
+                    <div class="usage-amount"><%= usedMB %> MB</div>
+                    <div class="usage-limit">of <%= limitMB %> MB (24 hours)</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: <%= usagePercent %>%"></div>
+                    </div>
                 </div>
-                <div class="info-row">
-                    <span class="info-label">Remaining Time</span>
-                    <span class="info-value"><%= remainingTime %></span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Remaining Data</span>
-                    <span class="info-value"><%= remainingMB %> MB</span>
-                </div>
-            </div>
 
-            <% if (usagePercent >= 90) { %>
-                <div class="error">
-                    ⚠️ You've used <%= usagePercent.toFixed(0) %>% of your data. You will be disconnected soon!
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-label">Downloaded</div>
+                        <div class="stat-value"><%= downloadMB %> MB</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Uploaded</div>
+                        <div class="stat-value"><%= uploadMB %> MB</div>
+                    </div>
                 </div>
-            <% } else if (usagePercent >= 75) { %>
-                <div class="warning">
-                    ⚠️ You've used <%= usagePercent.toFixed(0) %>% of your data allowance.
+
+                <div class="info-box">
+                    <div class="info-row">
+                        <span class="info-label">Session Duration</span>
+                        <span class="info-value"><%= sessionDuration %></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Remaining Time</span>
+                        <span class="info-value"><%= remainingTime %></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Remaining Data</span>
+                        <span class="info-value"><%= remainingMB %> MB</span>
+                    </div>
                 </div>
+
+                <% if (usagePercent >= 90) { %>
+                    <div class="error">
+                        ⚠️ You've used <%= usagePercent.toFixed(0) %>% of your data. You will be disconnected soon!
+                    </div>
+                <% } else if (usagePercent >= 75) { %>
+                    <div class="warning">
+                        ⚠️ You've used <%= usagePercent.toFixed(0) %>% of your data allowance.
+                    </div>
+                <% } else { %>
+                    <div class="success">
+                        ✓ You have <%= remainingMB %> MB remaining
+                    </div>
+                <% } %>
+
+                <button class="refresh-btn" onclick="location.reload()">🔄 Refresh Usage</button>
             <% } else { %>
-                <div class="success">
-                    ✓ You have <%= remainingMB %> MB remaining
+                <div class="error">
+                    ❌ <%= error || 'No active session found. Please connect to WiFi and log in.' %>
                 </div>
             <% } %>
+        </div>
 
-            <button class="refresh-btn" onclick="location.reload()">🔄 Refresh Usage</button>
-        <% } else { %>
-            <div class="error">
-                ❌ No active session found. Please connect to WiFi and log in.
-            </div>
-        <% } %>
+        <!-- Footer -->
+        <div class="footer">
+            <p>By connecting, you agree to our <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a></p>
+        </div>
     </div>
 
     <script>

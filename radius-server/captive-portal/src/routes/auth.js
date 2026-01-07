@@ -34,31 +34,7 @@ if (USE_DATABASE) {
 }
 
 // MariaDB connection for RADIUS user management
-let radiusDb = null;
-const RADIUS_DB_HOST = process.env.RADIUS_DB_HOST || 'radius-db';
-const RADIUS_DB_USER = process.env.RADIUS_DB_USER || 'radius';
-const RADIUS_DB_PASSWORD = process.env.RADIUS_DB_PASSWORD || 'radiuspass123';
-const RADIUS_DB_NAME = process.env.RADIUS_DB_NAME || 'radius';
-
-// Initialize MariaDB connection
-async function initRadiusDb() {
-    try {
-        const mysql = require('mysql2/promise');
-        radiusDb = await mysql.createPool({
-            host: RADIUS_DB_HOST,
-            user: RADIUS_DB_USER,
-            password: RADIUS_DB_PASSWORD,
-            database: RADIUS_DB_NAME,
-            waitForConnections: true,
-            connectionLimit: 5,
-            queueLimit: 0
-        });
-        console.log('📦 Connected to RADIUS MariaDB database');
-    } catch (error) {
-        console.warn('⚠️ Could not connect to RADIUS database:', error.message);
-        console.warn('   RADIUS user creation will be skipped');
-    }
-}
+const { initRadiusDb, getRadiusDb } = require('../config/radius-db');
 
 // Try to initialize RADIUS DB connection
 initRadiusDb();
@@ -69,6 +45,7 @@ initRadiusDb();
  * This is needed because CoovaChilli encrypts passwords before sending to RADIUS
  */
 async function createRadiusUser(username, password, sessionTimeout = 86400, idleTimeout = 300, dataLimitBytes = null) {
+    const radiusDb = getRadiusDb();
     if (!radiusDb) {
         console.warn('⚠️ RADIUS database not available, skipping user creation');
         return false;

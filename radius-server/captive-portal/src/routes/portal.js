@@ -6,6 +6,7 @@
 
 const express = require('express');
 const router = express.Router();
+const { getRadiusDb } = require('../config/radius-db');
 
 // Database connection for ads (if using shared Railway database)
 let dbPool = null;
@@ -297,6 +298,7 @@ router.get('/usage', async (req, res) => {
         let downloadBytes = 0;
         let uploadBytes = 0;
         
+        const radiusDb = getRadiusDb();
         if (radiusDb) {
             try {
                 // Normalize MAC address to match RADIUS format (XX-XX-XX-XX-XX-XX)
@@ -368,7 +370,7 @@ router.get('/usage', async (req, res) => {
             usedMB,
             limitMB: dataLimit,
             remainingMB,
-            usagePercent: usagePercent.toFixed(1),
+            usagePercent: parseFloat(usagePercent.toFixed(1)),
             downloadMB,
             uploadMB,
             sessionDuration: formatDuration(elapsedSeconds),
