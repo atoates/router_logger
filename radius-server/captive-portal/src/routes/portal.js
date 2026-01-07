@@ -259,6 +259,7 @@ router.get('/success', async (req, res) => {
         authenticatedAt: sessionData.authenticatedAt,
         guestName: sessionData.guestName,
         macAddress: macAddress,
+        radiusUsername: sessionData.username, // RADIUS username for dashboard lookup
         // Session type info
         isFreeSession,
         sessionDuration,
@@ -284,12 +285,15 @@ router.get('/terms', (req, res) => {
  * Data usage dashboard
  */
 router.get('/usage', async (req, res) => {
-    const { mac } = req.query;
+    const { mac, username } = req.query;
     
-    // Get MAC from query params or session
+    // Prefer username lookup over MAC (more reliable)
+    const radiusUsername = username || req.session?.username;
     const macAddress = mac || req.session?.macAddress;
     
-    if (!macAddress) {
+    console.log('🔍 Usage dashboard - username:', radiusUsername, 'mac:', macAddress);
+    
+    if (!radiusUsername && !macAddress) {
         return res.render('usage', {
             title: 'Data Usage',
             companyName: process.env.COMPANY_NAME || 'VacatAd',
@@ -315,33 +319,58 @@ router.get('/usage', async (req, res) => {
         const radiusDb = getRadiusDb();
         if (radiusDb) {
             try {
-                // Normalize MAC address to match RADIUS format (XX-XX-XX-XX-XX-XX)
-                const normalizedMac = macAddress.toUpperCase().replace(/[^A-F0-9]/g, '').match(/.{1,2}/g).join('-');
+                let rows;
                 
-                // Get most recent session and data totals
-                const [rows] = await radiusDb.execute(
-                    `SELECT 
-                        MIN(acctstarttime) as first_login,
-                        MAX(acctstarttime) as last_login,
-                        SUM(acctinputoctets) as download, 
-                        SUM(acctoutputoctets) as upload,
-                        SUM(acctsessiontime) as total_time
-                     FROM radacct 
-                     WHERE callingstationid = ? 
-                     AND acctstarttime >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`,
-                    [normalizedMac]
-                );
+                // Try username lookup first (most reliable)
+                if (radiusUsername) {
+                    console.log('🔍 Usage dashboard - Querying by username:', radiusUsername);
+                    [rows] = await radiusDb.execute(
+                        `SELECT 
+                            MIN(acctstarttime) as first_login,
+                            MAX(acctstarttime) as last_login,
+                            SUM(acctinputoctets) as download, 
+                            SUM(acctoutputoctets) as upload,
+                            SUM(acctsessiontime) as total_time
+                         FROM radacct 
+                         WHERE username = ? 
+                         AND acctstarttime >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`,
+                        [radiusUsername]
+                    );
+                } 
+                // Fallback to MAC address lookup
+                else if (macAddress) {
+                    const normalizedMac = macAddress.toUpperCase().replace(/[^A-F0-9]/g, '').match(/.{1,2}/g).join('-');
+                    console.log('🔍 Usage dashboard - Querying by MAC:', macAddress, '→ Normalized:', normalizedMac);
+                    [rows] = await radiusDb.execute(
+                        `SELECT 
+                            MIN(acctstarttime) as first_login,
+                            MAX(acctstarttime) as last_login,
+                            SUM(acctinputoctets) as download, 
+                            SUM(acctoutputoctets) as upload,
+                            SUM(acctsessiontime) as total_time
+                         FROM radacct 
+                         WHERE callingstationid = ? 
+                         AND acctstarttime >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`,
+                        [normalizedMac]
+                    );
+                }
+                
+                console.log('🔍 RADIUS query result - rows:', rows?.length, 'first row:', rows?.[0]);
                 
                 if (rows && rows.length > 0 && rows[0].first_login) {
                     downloadBytes = parseInt(rows[0].download || 0);
                     uploadBytes = parseInt(rows[0].upload || 0);
                     authenticatedAt = new Date(rows[0].last_login || rows[0].first_login);
                     elapsedSeconds = parseInt(rows[0].total_time || 0);
+                    console.log('✅ Found session data - download:', downloadBytes, 'upload:', uploadBytes);
+                } else {
+                    console.log('❌ No session data found for', radiusUsername ? 'username: ' + radiusUsername : 'MAC: ' + macAddress);
                 }
                 
                 // Get next free session available time from guest tracking database
-                if (dbPool) {
+                if (dbPool && macAddress) {
                     try {
+                        const normalizedMac = macAddress.toUpperCase().replace(/[^A-F0-9]/g, '').match(/.{1,2}/g).join('-');
                         const result = await dbPool.query(
                             'SELECT next_free_available FROM captive_free_usage WHERE identifier_type = $1 AND identifier_value = $2',
                             ['mac', normalizedMac]

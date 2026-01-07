@@ -201,11 +201,15 @@
         <!-- Main CTA: Data Usage Dashboard -->
         <% 
         let dashboardMac = '';
+        let dashboardUsername = '';
         if (typeof macAddress !== 'undefined' && macAddress) {
             dashboardMac = macAddress;
         }
+        if (typeof radiusUsername !== 'undefined' && radiusUsername) {
+            dashboardUsername = radiusUsername;
+        }
         %>
-        <a href="/usage?mac=<%= encodeURIComponent(dashboardMac) %>" class="main-button" target="_blank">
+        <a href="/usage?username=<%= encodeURIComponent(dashboardUsername) %>&mac=<%= encodeURIComponent(dashboardMac) %>" class="main-button" target="_blank">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M3 3v18h18"/>
                 <path d="m19 9-5 5-4-4-3 3"/>
