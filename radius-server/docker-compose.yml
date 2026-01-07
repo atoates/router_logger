@@ -79,7 +79,7 @@ services:
   # ===========================================
   captive-portal:
     build:
-      context: ./radius-server/captive-portal
+      context: ./captive-portal
       dockerfile: Dockerfile
     container_name: captive-portal
     restart: unless-stopped
