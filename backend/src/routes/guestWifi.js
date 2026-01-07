@@ -143,6 +143,8 @@ async function processGuestEvent(event) {
   // For RADIUS accounting, map fields to standard names
   const effectiveSessionId = session_id || acctsessionid;
   const effectiveUsername = username || guest_id;
+  // RADIUS username (guest_id) is different from display username (email)
+  const radiusUsername = guest_id || username;
   const effectiveRouterMac = router_mac || calledstationid;
   const effectiveMacAddress = mac_address || callingstationid;
   const effectiveSessionDuration = session_duration || acctsessiontime;
@@ -180,6 +182,7 @@ async function processGuestEvent(event) {
       await upsertGuestSession({
         sessionId: effectiveSessionId,
         username: effectiveUsername || email,
+        radiusUsername,  // Store RADIUS username separately for accounting match
         email,
         phone,
         name,
@@ -288,13 +291,13 @@ async function upsertGuestSession({ sessionId, username, email, phone, name, use
 
 /**
  * End a guest session
- * Match by username since RADIUS session_id differs from captive portal session_id
+ * Match by user MAC address - the most reliable identifier
  */
 async function endGuestSession({ sessionId, username, userMac, routerId, timestamp, reason, bytesUploaded = 0, bytesDownloaded = 0 }) {
   try {
     const bytesTotal = (bytesUploaded || 0) + (bytesDownloaded || 0);
     
-    // Match by username and find the active session (no session_end)
+    // Match by user MAC address (device) and find the active session
     const result = await pool.query(`
       UPDATE wifi_guest_sessions
       SET session_end = $1,
@@ -304,13 +307,13 @@ async function endGuestSession({ sessionId, username, userMac, routerId, timesta
           bytes_total = COALESCE($6, bytes_total, 0),
           last_accounting_update = NOW(),
           updated_at = NOW()
-      WHERE username = $3 AND session_end IS NULL
-    `, [timestamp || new Date().toISOString(), reason, username, bytesUploaded || null, bytesDownloaded || null, bytesTotal || null]);
+      WHERE user_mac = $3 AND session_end IS NULL
+    `, [timestamp || new Date().toISOString(), reason, userMac, bytesUploaded || null, bytesDownloaded || null, bytesTotal || null]);
 
     if (result.rowCount > 0) {
-      logger.info(`Guest session ended: ${username} (${reason}), data: ${formatBytes(bytesTotal)}`);
+      logger.info(`Guest session ended: ${userMac} (${username}) - ${reason}, data: ${formatBytes(bytesTotal)}`);
     } else {
-      logger.warn(`No active session found for ${username} to end`);
+      logger.warn(`No active session found for MAC ${userMac} to end`);
     }
   } catch (error) {
     logger.error('Error ending guest session:', error);
@@ -320,14 +323,14 @@ async function endGuestSession({ sessionId, username, userMac, routerId, timesta
 
 /**
  * Update session accounting (data consumption)
- * Match by username since RADIUS session_id differs from captive portal session_id
+ * Match by user MAC address - the most reliable identifier across systems
  */
-async function updateSessionAccounting({ sessionId, username, bytesUploaded = 0, bytesDownloaded = 0, sessionDuration }) {
+async function updateSessionAccounting({ sessionId, username, userMac, bytesUploaded = 0, bytesDownloaded = 0, sessionDuration }) {
   try {
     const bytesTotal = (bytesUploaded || 0) + (bytesDownloaded || 0);
     
-    // Match by username (which is consistent between captive portal and RADIUS)
-    // Look for the most recent active session for this user
+    // Match by user MAC address (device) - consistent across captive portal and RADIUS
+    // Look for the most recent active session for this device
     const result = await pool.query(`
       UPDATE wifi_guest_sessions
       SET bytes_uploaded = $2,
@@ -336,13 +339,13 @@ async function updateSessionAccounting({ sessionId, username, bytesUploaded = 0,
           session_duration_seconds = COALESCE($5, session_duration_seconds),
           last_accounting_update = NOW(),
           updated_at = NOW()
-      WHERE username = $1 AND session_end IS NULL
-    `, [username, bytesUploaded, bytesDownloaded, bytesTotal, sessionDuration]);
+      WHERE user_mac = $1 AND session_end IS NULL
+    `, [userMac, bytesUploaded, bytesDownloaded, bytesTotal, sessionDuration]);
 
     if (result.rowCount > 0) {
-      logger.debug(`Session accounting updated: ${username}, data: ${formatBytes(bytesTotal)}`);
+      logger.debug(`Session accounting updated: ${userMac} (${username}), data: ${formatBytes(bytesTotal)}`);
     } else {
-      logger.warn(`No active session found for ${username} to update accounting`);
+      logger.warn(`No active session found for MAC ${userMac} to update accounting`);
     }
   } catch (error) {
     logger.error('Error updating session accounting:', error);
@@ -372,10 +375,11 @@ async function handleRadiusAccounting({ statusType, sessionId, username, userMac
 
     case 'Interim-Update':
       // Periodic update with current usage
-      logger.debug(`RADIUS Interim: ${username}, ${formatBytes(bytesTotal)}`);
+      logger.debug(`RADIUS Interim: ${userMac} (${username}), ${formatBytes(bytesTotal)}`);
       await updateSessionAccounting({
         sessionId,
         username,
+        userMac,
         bytesUploaded,
         bytesDownloaded,
         sessionDuration
