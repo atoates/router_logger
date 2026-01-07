@@ -297,7 +297,7 @@ async function endGuestSession({ sessionId, username, userMac, routerId, timesta
   try {
     const bytesTotal = (bytesUploaded || 0) + (bytesDownloaded || 0);
     
-    // Match by user MAC address (device) and find the active session
+    // Match by user MAC address (device) - normalize both sides
     const result = await pool.query(`
       UPDATE wifi_guest_sessions
       SET session_end = $1,
@@ -307,7 +307,8 @@ async function endGuestSession({ sessionId, username, userMac, routerId, timesta
           bytes_total = COALESCE($6, bytes_total, 0),
           last_accounting_update = NOW(),
           updated_at = NOW()
-      WHERE user_mac = $3 AND session_end IS NULL
+      WHERE LOWER(REPLACE(user_mac, '-', ':')) = LOWER(REPLACE($3, '-', ':'))
+        AND session_end IS NULL
     `, [timestamp || new Date().toISOString(), reason, userMac, bytesUploaded || null, bytesDownloaded || null, bytesTotal || null]);
 
     if (result.rowCount > 0) {
@@ -329,7 +330,7 @@ async function updateSessionAccounting({ sessionId, username, userMac, bytesUplo
   try {
     const bytesTotal = (bytesUploaded || 0) + (bytesDownloaded || 0);
     
-    // Match by user MAC address (device) - consistent across captive portal and RADIUS
+    // Match by user MAC address (device) - normalize both sides for comparison
     // Look for the most recent active session for this device
     const result = await pool.query(`
       UPDATE wifi_guest_sessions
@@ -339,7 +340,8 @@ async function updateSessionAccounting({ sessionId, username, userMac, bytesUplo
           session_duration_seconds = COALESCE($5, session_duration_seconds),
           last_accounting_update = NOW(),
           updated_at = NOW()
-      WHERE user_mac = $1 AND session_end IS NULL
+      WHERE LOWER(REPLACE(user_mac, '-', ':')) = LOWER(REPLACE($1, '-', ':'))
+        AND session_end IS NULL
     `, [userMac, bytesUploaded, bytesDownloaded, bytesTotal, sessionDuration]);
 
     if (result.rowCount > 0) {
