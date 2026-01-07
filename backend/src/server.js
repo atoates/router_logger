@@ -157,6 +157,56 @@ app.use((err, req, res, next) => {
   });
 });
 
+/**
+ * Diagnostic: Check captive portal integration status on startup
+ */
+async function runCaptivePortalDiagnostic() {
+  const { pool } = require('./config/database');
+
+  try {
+    logger.info('🔍 Running captive portal diagnostic...');
+
+    // Check wifi_guest_sessions table
+    const sessionsResult = await pool.query(`
+      SELECT
+        COUNT(*) as total_sessions,
+        COUNT(*) FILTER (WHERE session_end IS NULL) as active_sessions,
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours') as last_24h_sessions
+      FROM wifi_guest_sessions
+    `);
+    const sessions = sessionsResult.rows[0];
+    logger.info(`📊 Guest WiFi Sessions - Total: ${sessions.total_sessions}, Active: ${sessions.active_sessions}, Last 24h: ${sessions.last_24h_sessions}`);
+
+    // Show recent sessions if any
+    const recentResult = await pool.query(`
+      SELECT username, email, user_mac, router_id, event_type, created_at
+      FROM wifi_guest_sessions
+      ORDER BY created_at DESC
+      LIMIT 5
+    `);
+    if (recentResult.rows.length > 0) {
+      logger.info('📋 Recent sessions:');
+      recentResult.rows.forEach(row => {
+        logger.info(`   - ${row.username || row.email || 'unknown'} (${row.event_type}) @ ${row.created_at}`);
+      });
+    } else {
+      logger.warn('⚠️  No guest sessions found - webhook may not be receiving events');
+      logger.info('   Expected webhook endpoint: POST /api/guests/captive-portal/event');
+      logger.info('   Or legacy endpoint: POST /api/ironwifi/captive-portal/event');
+    }
+
+    // Check if RADIUS sync is configured
+    if (process.env.RADIUS_DB_HOST || process.env.RADIUS_DB_PASS) {
+      logger.info('✅ RADIUS database configured - accounting sync enabled');
+    } else {
+      logger.info('ℹ️  RADIUS database not configured (expected if self-hosted)');
+    }
+
+  } catch (error) {
+    logger.warn('Diagnostic failed (non-fatal):', error.message);
+  }
+}
+
 // Initialize database and start server
 async function startServer() {
   try {
@@ -222,6 +272,9 @@ async function startServer() {
       }
     }, 2 * 60 * 1000); // Every 2 minutes
     
+    // Run startup diagnostic for captive portal integration
+    await runCaptivePortalDiagnostic();
+
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
       logger.info(`🚀 Server is running on http://localhost:${PORT}`);

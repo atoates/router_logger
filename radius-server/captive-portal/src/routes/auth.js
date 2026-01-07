@@ -303,7 +303,7 @@ async function notifyRouterLogger(eventData) {
  * Register and grant free 30-minute access
  */
 // UAM secret for CoovaChilli CHAP response calculation
-const UAM_SECRET = process.env.UAM_SECRET || 'ChqPlbGB0RjyiM2c';
+const UAM_SECRET = process.env.UAM_SECRET || 'ChqPIbGB0RjyiM2c';
 
 /**
  * Calculate CoovaChilli CHAP response
