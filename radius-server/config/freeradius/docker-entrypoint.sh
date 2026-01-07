@@ -1,0 +1,17 @@
+#!/bin/sh
+set -e
+
+# Substitute environment variables in SQL config template
+if [ -f /etc/raddb/mods-available/sql.template ]; then
+    echo "Configuring SQL module with environment variables..."
+    sed -e "s/\${RADIUS_DB_HOST}/${RADIUS_DB_HOST:-radius-db}/g" \
+        -e "s/\${RADIUS_DB_PORT}/${RADIUS_DB_PORT:-3306}/g" \
+        -e "s/\${RADIUS_DB_USER}/${RADIUS_DB_USER:-radius}/g" \
+        -e "s/\${RADIUS_DB_PASSWORD}/${RADIUS_DB_PASSWORD:-radiuspass123}/g" \
+        -e "s/\${RADIUS_DB_NAME}/${RADIUS_DB_NAME:-radius}/g" \
+        /etc/raddb/mods-available/sql.template > /etc/raddb/mods-enabled/sql
+    echo "SQL module configured successfully"
+fi
+
+# Execute the main command (freeradius)
+exec "$@"

@@ -62,8 +62,11 @@ services:
     volumes:
       # Essential configuration files
       - ./config/freeradius/clients.conf:/etc/raddb/clients.conf:ro
-      # SQL module (for database authentication)
-      - ./config/freeradius/mods-enabled/sql:/etc/raddb/mods-enabled/sql:ro
+      # SQL module template (will be processed by entrypoint)
+      - ./config/freeradius/mods-enabled/sql:/etc/raddb/mods-available/sql.template:ro
+      # Entrypoint script for environment variable substitution
+      - ./config/freeradius/docker-entrypoint.sh:/docker-entrypoint.sh:ro
+    entrypoint: ["/docker-entrypoint.sh"]
     depends_on:
       radius-db:
         condition: service_healthy
