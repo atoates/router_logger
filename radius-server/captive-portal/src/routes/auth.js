@@ -549,14 +549,18 @@ router.post('/register', async (req, res) => {
             const encryptedPassword = calculateChilliPassword(password, chilli_challenge, UAM_SECRET);
             
             if (encryptedPassword) {
+                // Build success URL for CoovaChilli to redirect to after auth
+                const successPageUrl = `${req.protocol}://${req.get('host')}/success?type=free&token=${successToken}`;
+                
                 // Build the CoovaChilli login URL with encrypted password
-                // Format: http://uamip:uamport/logon?username=xxx&password=xxx
-                routerLoginUrl = `http://${chilli_uamip}:${chilli_uamport}/logon?username=${encodeURIComponent(guestId)}&password=${encryptedPassword}`;
+                // Format: http://uamip:uamport/logon?username=xxx&password=xxx&userurl=xxx
+                routerLoginUrl = `http://${chilli_uamip}:${chilli_uamport}/logon?username=${encodeURIComponent(guestId)}&password=${encryptedPassword}&userurl=${encodeURIComponent(successPageUrl)}`;
                 
                 console.log(`🔗 CoovaChilli login URL: ${routerLoginUrl}`);
                 console.log(`   Username: ${guestId}`);
                 console.log(`   Challenge: ${chilli_challenge}`);
                 console.log(`   Encrypted password: ${encryptedPassword}`);
+                console.log(`   Redirect URL: ${successPageUrl}`);
             } else {
                 // Fallback: try with plain password (some configs allow this)
                 console.warn('⚠️ Failed to encrypt password, trying plain password');
