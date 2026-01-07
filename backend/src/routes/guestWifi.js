@@ -288,12 +288,14 @@ async function upsertGuestSession({ sessionId, username, email, phone, name, use
 
 /**
  * End a guest session
+ * Match by username since RADIUS session_id differs from captive portal session_id
  */
 async function endGuestSession({ sessionId, username, userMac, routerId, timestamp, reason, bytesUploaded = 0, bytesDownloaded = 0 }) {
   try {
     const bytesTotal = (bytesUploaded || 0) + (bytesDownloaded || 0);
     
-    await pool.query(`
+    // Match by username and find the active session (no session_end)
+    const result = await pool.query(`
       UPDATE wifi_guest_sessions
       SET session_end = $1,
           end_reason = $2,
@@ -302,10 +304,14 @@ async function endGuestSession({ sessionId, username, userMac, routerId, timesta
           bytes_total = COALESCE($6, bytes_total, 0),
           last_accounting_update = NOW(),
           updated_at = NOW()
-      WHERE session_id = $3
-    `, [timestamp || new Date().toISOString(), reason, sessionId, bytesUploaded || null, bytesDownloaded || null, bytesTotal || null]);
+      WHERE username = $3 AND session_end IS NULL
+    `, [timestamp || new Date().toISOString(), reason, username, bytesUploaded || null, bytesDownloaded || null, bytesTotal || null]);
 
-    logger.info(`Guest session ended: ${username} (${reason}), data: ${formatBytes(bytesTotal)}`);
+    if (result.rowCount > 0) {
+      logger.info(`Guest session ended: ${username} (${reason}), data: ${formatBytes(bytesTotal)}`);
+    } else {
+      logger.warn(`No active session found for ${username} to end`);
+    }
   } catch (error) {
     logger.error('Error ending guest session:', error);
     throw error;
@@ -314,12 +320,15 @@ async function endGuestSession({ sessionId, username, userMac, routerId, timesta
 
 /**
  * Update session accounting (data consumption)
+ * Match by username since RADIUS session_id differs from captive portal session_id
  */
 async function updateSessionAccounting({ sessionId, username, bytesUploaded = 0, bytesDownloaded = 0, sessionDuration }) {
   try {
     const bytesTotal = (bytesUploaded || 0) + (bytesDownloaded || 0);
     
-    await pool.query(`
+    // Match by username (which is consistent between captive portal and RADIUS)
+    // Look for the most recent active session for this user
+    const result = await pool.query(`
       UPDATE wifi_guest_sessions
       SET bytes_uploaded = $2,
           bytes_downloaded = $3,
@@ -327,10 +336,14 @@ async function updateSessionAccounting({ sessionId, username, bytesUploaded = 0,
           session_duration_seconds = COALESCE($5, session_duration_seconds),
           last_accounting_update = NOW(),
           updated_at = NOW()
-      WHERE session_id = $1
-    `, [sessionId, bytesUploaded, bytesDownloaded, bytesTotal, sessionDuration]);
+      WHERE username = $1 AND session_end IS NULL
+    `, [username, bytesUploaded, bytesDownloaded, bytesTotal, sessionDuration]);
 
-    logger.debug(`Session accounting updated: ${username}, data: ${formatBytes(bytesTotal)}`);
+    if (result.rowCount > 0) {
+      logger.debug(`Session accounting updated: ${username}, data: ${formatBytes(bytesTotal)}`);
+    } else {
+      logger.warn(`No active session found for ${username} to update accounting`);
+    }
   } catch (error) {
     logger.error('Error updating session accounting:', error);
     throw error;
