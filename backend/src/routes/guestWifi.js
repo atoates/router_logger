@@ -74,6 +74,26 @@ router.get('/debug/sessions', async (req, res) => {
   }
 });
 
+// Debug endpoint to fix MAC address for a session
+router.post('/debug/fix-mac', async (req, res) => {
+  try {
+    const { email, new_mac } = req.body;
+    if (!email || !new_mac) {
+      return res.status(400).json({ error: 'email and new_mac required' });
+    }
+    const normalizedMac = new_mac.toLowerCase().replace(/-/g, ':');
+    const result = await pool.query(`
+      UPDATE wifi_guest_sessions 
+      SET user_mac = $1, updated_at = NOW()
+      WHERE email = $2 AND session_end IS NULL
+      RETURNING id, email, user_mac
+    `, [normalizedMac, email]);
+    res.json({ updated: result.rows });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 /**
  * Normalize MAC address to lowercase with colons
  */
