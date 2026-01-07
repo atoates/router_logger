@@ -223,9 +223,9 @@
 
             <% if (session) { %>
                 <div class="usage-card">
-                    <div class="usage-header">Total Data Used</div>
+                    <div class="usage-header">Total Data Used (All Sessions)</div>
                     <div class="usage-amount"><%= usedMB %> MB</div>
-                    <div class="usage-limit">of <%= limitMB %> MB (24 hours)</div>
+                    <div class="usage-limit">of <%= limitMB %> MB per session</div>
                     <div class="progress-bar">
                         <div class="progress-fill" style="width: <%= usagePercent %>%"></div>
                     </div>
@@ -255,6 +255,25 @@
                         <span class="info-label">Remaining Data</span>
                         <span class="info-value"><%= remainingMB %> MB</span>
                     </div>
+                    <% if (nextFreeAvailable) { %>
+                    <div class="info-row">
+                        <span class="info-label">Next Free Session</span>
+                        <span class="info-value">
+                            <script>
+                                const nextTime = new Date('<%= nextFreeAvailable %>');
+                                const now = new Date();
+                                const diff = nextTime - now;
+                                if (diff > 0) {
+                                    const hours = Math.floor(diff / (1000 * 60 * 60));
+                                    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                                    document.write(hours > 0 ? hours + 'h ' + mins + 'm' : mins + 'm');
+                                } else {
+                                    document.write('Available now');
+                                }
+                            </script>
+                        </span>
+                    </div>
+                    <% } %>
                 </div>
 
                 <% if (usagePercent >= 90) { %>

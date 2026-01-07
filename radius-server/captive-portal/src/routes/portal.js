@@ -293,6 +293,7 @@ router.get('/usage', async (req, res) => {
         let authenticatedAt = null;
         let sessionDuration = 86400; // Default 24 hours
         let elapsedSeconds = 0;
+        let nextFreeAvailable = null;
         
         // Query real data from RADIUS accounting
         let downloadBytes = 0;
@@ -323,6 +324,21 @@ router.get('/usage', async (req, res) => {
                     uploadBytes = parseInt(rows[0].upload || 0);
                     authenticatedAt = new Date(rows[0].last_login || rows[0].first_login);
                     elapsedSeconds = parseInt(rows[0].total_time || 0);
+                }
+                
+                // Get next free session available time from guest tracking database
+                if (dbPool) {
+                    try {
+                        const result = await dbPool.query(
+                            'SELECT next_free_available FROM captive_free_usage WHERE identifier_type = $1 AND identifier_value = $2',
+                            ['mac', normalizedMac]
+                        );
+                        if (result.rows.length > 0 && result.rows[0].next_free_available) {
+                            nextFreeAvailable = new Date(result.rows[0].next_free_available);
+                        }
+                    } catch (err) {
+                        console.error('Error querying next free available:', err);
+                    }
                 }
             } catch (dbError) {
                 console.error('Error querying RADIUS accounting:', dbError);
@@ -375,7 +391,8 @@ router.get('/usage', async (req, res) => {
             uploadMB,
             sessionDuration: formatDuration(elapsedSeconds),
             remainingTime: formatDuration(remainingSeconds),
-            macAddress
+            macAddress,
+            nextFreeAvailable: nextFreeAvailable ? nextFreeAvailable.toISOString() : null
         });
     } catch (error) {
         console.error('Error fetching usage data:', error);

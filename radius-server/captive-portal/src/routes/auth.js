@@ -106,7 +106,7 @@ const VERIFICATION_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 const FREE_SESSION_DURATION = parseInt(process.env.FREE_SESSION_DURATION) || 24 * 60 * 60; // 24 hours in seconds
 const FREE_DATA_LIMIT_MB = parseInt(process.env.FREE_DATA_LIMIT_MB) || 500; // MB per 24h period
 const FREE_DATA_LIMIT_BYTES = FREE_DATA_LIMIT_MB * 1024 * 1024; // Convert to bytes
-const FREE_COOLDOWN_HOURS = parseInt(process.env.FREE_COOLDOWN_HOURS) || 24; // Hours before same device can get free access again
+const FREE_COOLDOWN_HOURS = parseInt(process.env.FREE_COOLDOWN_HOURS) || 3; // Hours before same device can get free access again
 
 const ROUTERLOGGER_API_URL = process.env.ROUTERLOGGER_API_URL || 'http://localhost:3001';
 
@@ -420,20 +420,20 @@ router.post('/register', async (req, res) => {
             });
         }
         
-        // TEMPORARILY DISABLED FOR TESTING - Check if this device (MAC) has used free access recently
-        // const existingUsage = await checkFreeUsage(normalizedMac);
-        // if (existingUsage && existingUsage.nextFreeAvailable) {
-        //     const cooldownEnd = new Date(existingUsage.nextFreeAvailable);
-        //     
-        //     if (new Date() < cooldownEnd) {
-        //         const hoursRemaining = Math.ceil((cooldownEnd - new Date()) / (1000 * 60 * 60));
-        //         return res.status(429).json({
-        //             success: false,
-        //             message: `This device has already used free WiFi today. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
-        //             nextFreeAccess: cooldownEnd.toISOString()
-        //         });
-        //     }
-        // }
+        // Check if this device (MAC) has used free access recently
+        const existingUsage = await checkFreeUsage(normalizedMac);
+        if (existingUsage && existingUsage.nextFreeAvailable) {
+            const cooldownEnd = new Date(existingUsage.nextFreeAvailable);
+            
+            if (new Date() < cooldownEnd) {
+                const hoursRemaining = Math.ceil((cooldownEnd - new Date()) / (1000 * 60 * 60));
+                return res.status(429).json({
+                    success: false,
+                    message: `This device has already used free WiFi. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
+                    nextFreeAccess: cooldownEnd.toISOString()
+                });
+            }
+        }
         
         // Generate a temporary guest username and password
         const guestId = `free-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
@@ -622,20 +622,20 @@ router.post('/free', async (req, res) => {
             });
         }
         
-        // TEMPORARILY DISABLED FOR TESTING - Check if this device (MAC) has used free access recently
-        // const existingUsage = await checkFreeUsage(normalizedMac);
-        // if (existingUsage && existingUsage.nextFreeAvailable) {
-        //     const cooldownEnd = new Date(existingUsage.nextFreeAvailable);
-        //     
-        //     if (new Date() < cooldownEnd) {
-        //         const hoursRemaining = Math.ceil((cooldownEnd - new Date()) / (1000 * 60 * 60));
-        //         return res.status(429).json({
-        //             success: false,
-        //             message: `This device has already used free WiFi today. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
-        //             nextFreeAccess: cooldownEnd.toISOString()
-        //         });
-        //     }
-        // }
+        // Check if this device (MAC) has used free access recently
+        const existingUsage = await checkFreeUsage(normalizedMac);
+        if (existingUsage && existingUsage.nextFreeAvailable) {
+            const cooldownEnd = new Date(existingUsage.nextFreeAvailable);
+            
+            if (new Date() < cooldownEnd) {
+                const hoursRemaining = Math.ceil((cooldownEnd - new Date()) / (1000 * 60 * 60));
+                return res.status(429).json({
+                    success: false,
+                    message: `This device has already used free WiFi. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
+                    nextFreeAccess: cooldownEnd.toISOString()
+                });
+            }
+        }
         
         // Generate a temporary guest username
         const guestId = `free-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
