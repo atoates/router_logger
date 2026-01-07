@@ -129,26 +129,33 @@
                         routerLoginUrl: data.routerLoginUrl
                     }));
                     
-                    // Redirect to wherever the server tells us
+                    // Handle CoovaChilli activation via hidden iframe
                     const redirectUrl = data.redirect || '/success?type=free';
-                    console.log('Primary redirect to:', redirectUrl);
-                    console.log('Fallback success URL:', data.successUrl);
+                    const successUrl = data.successUrl || '/success?type=free';
+                    console.log('🔗 Router login URL:', data.routerLoginUrl);
+                    console.log('📄 Success page URL:', successUrl);
                     
-                    // If redirecting to router (CoovaChilli), set a fallback
-                    if (data.routerLoginUrl && redirectUrl === data.routerLoginUrl) {
-                        // Set a timeout to redirect to success page if router redirect fails
+                    // If we have a CoovaChilli login URL, activate WiFi via iframe then redirect
+                    if (data.routerLoginUrl && data.routerLoginUrl.includes('192.168.')) {
+                        console.log('🔌 Activating WiFi via CoovaChilli iframe...');
+                        
+                        // Create hidden iframe to trigger CoovaChilli authentication
+                        const iframe = document.createElement('iframe');
+                        iframe.style.display = 'none';
+                        iframe.src = data.routerLoginUrl;
+                        document.body.appendChild(iframe);
+                        
+                        // Wait for iframe to load, then redirect to success page
                         setTimeout(() => {
-                            console.log('Fallback: redirecting to success page');
-                            if (data.successUrl) {
-                                window.location.href = data.successUrl;
-                            }
-                        }, 5000); // 5 second fallback
+                            console.log('✅ WiFi activation complete, redirecting to success page');
+                            window.location.replace(successUrl);
+                        }, 2000); // 2 second delay to let CoovaChilli authenticate
+                    } else {
+                        // No CoovaChilli URL, just redirect normally
+                        setTimeout(() => {
+                            window.location.replace(redirectUrl);
+                        }, 500);
                     }
-                    
-                    // Use location.replace to prevent back button issues
-                    setTimeout(() => {
-                        window.location.replace(redirectUrl);
-                    }, 500);
                 } else {
                     showMessage(data.message || 'Registration failed. Please try again.', 'error');
                     setButtonLoading(submitBtn, false);
