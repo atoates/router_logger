@@ -52,13 +52,11 @@ server default {
         # Read user from SQL database
         sql
 
-        # Check if user is in captive portal guests table
-        # update control {
-        #     &Auth-Type := sql
-        # }
-
-        # Set password auth type
-        pap
+        # Set password auth type only if Auth-Type not already set
+        # (SQL users with Auth-Type := Accept skip this)
+        if (!control:Auth-Type) {
+            pap
+        }
 
         # Expiration check
         expiration
@@ -70,6 +68,12 @@ server default {
     # Verifies user credentials
     # =====================================================
     authenticate {
+        # Accept - No password verification needed
+        # Used for guest users where Auth-Type := Accept in SQL
+        Auth-Type Accept {
+            # Always accept - no password check
+        }
+
         # PAP - Password Authentication Protocol
         Auth-Type PAP {
             pap
@@ -103,11 +107,8 @@ server default {
         # Log to SQL database
         sql
 
-        # Send to RouterLogger webhook
-        rest
-
-        # Add custom accounting logic here
-        # e.g., check data limits, session limits
+        # TODO: Send to RouterLogger webhook (rest module not configured)
+        # rest
     }
 
     # =====================================================
@@ -126,8 +127,8 @@ server default {
         # Log successful auth
         sql
 
-        # Notify RouterLogger
-        rest
+        # TODO: Notify RouterLogger (rest module not configured)
+        # rest
 
         # Add reply attributes
         update reply {

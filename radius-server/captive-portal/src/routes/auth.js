@@ -443,20 +443,20 @@ router.post('/register', async (req, res) => {
             });
         }
         
-        // Check if this device (MAC) has used free access recently
-        const existingUsage = await checkFreeUsage(normalizedMac);
-        if (existingUsage && existingUsage.nextFreeAvailable) {
-            const cooldownEnd = new Date(existingUsage.nextFreeAvailable);
-            
-            if (new Date() < cooldownEnd) {
-                const hoursRemaining = Math.ceil((cooldownEnd - new Date()) / (1000 * 60 * 60));
-                return res.status(429).json({
-                    success: false,
-                    message: `This device has already used free WiFi today. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
-                    nextFreeAccess: cooldownEnd.toISOString()
-                });
-            }
-        }
+        // TEMPORARILY DISABLED FOR TESTING - Check if this device (MAC) has used free access recently
+        // const existingUsage = await checkFreeUsage(normalizedMac);
+        // if (existingUsage && existingUsage.nextFreeAvailable) {
+        //     const cooldownEnd = new Date(existingUsage.nextFreeAvailable);
+        //     
+        //     if (new Date() < cooldownEnd) {
+        //         const hoursRemaining = Math.ceil((cooldownEnd - new Date()) / (1000 * 60 * 60));
+        //         return res.status(429).json({
+        //             success: false,
+        //             message: `This device has already used free WiFi today. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
+        //             nextFreeAccess: cooldownEnd.toISOString()
+        //         });
+        //     }
+        // }
         
         // Generate a temporary guest username and password
         const guestId = `free-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
@@ -645,20 +645,20 @@ router.post('/free', async (req, res) => {
             });
         }
         
-        // Check if this device (MAC) has used free access recently
-        const existingUsage = await checkFreeUsage(normalizedMac);
-        if (existingUsage && existingUsage.nextFreeAvailable) {
-            const cooldownEnd = new Date(existingUsage.nextFreeAvailable);
-            
-            if (new Date() < cooldownEnd) {
-                const hoursRemaining = Math.ceil((cooldownEnd - new Date()) / (1000 * 60 * 60));
-                return res.status(429).json({
-                    success: false,
-                    message: `This device has already used free WiFi today. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
-                    nextFreeAccess: cooldownEnd.toISOString()
-                });
-            }
-        }
+        // TEMPORARILY DISABLED FOR TESTING - Check if this device (MAC) has used free access recently
+        // const existingUsage = await checkFreeUsage(normalizedMac);
+        // if (existingUsage && existingUsage.nextFreeAvailable) {
+        //     const cooldownEnd = new Date(existingUsage.nextFreeAvailable);
+        //     
+        //     if (new Date() < cooldownEnd) {
+        //         const hoursRemaining = Math.ceil((cooldownEnd - new Date()) / (1000 * 60 * 60));
+        //         return res.status(429).json({
+        //             success: false,
+        //             message: `This device has already used free WiFi today. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
+        //             nextFreeAccess: cooldownEnd.toISOString()
+        //         });
+        //     }
+        // }
         
         // Generate a temporary guest username
         const guestId = `free-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
