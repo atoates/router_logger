@@ -291,11 +291,12 @@ async function recordFreeUsage(identifier, guestId) {
  */
 async function notifyRouterLogger(eventData) {
     try {
+        console.log(`📤 Sending ${eventData.type} to RouterLogger:`, JSON.stringify(eventData, null, 2));
         await axios.post(`${ROUTERLOGGER_API_URL}/api/ironwifi/captive-portal/event`, eventData, {
             timeout: 5000,
             headers: { 'Content-Type': 'application/json' }
         });
-        console.log(`📤 Sent ${eventData.type} event to RouterLogger`);
+        console.log(`✅ Sent ${eventData.type} event to RouterLogger`);
     } catch (error) {
         console.warn('Failed to notify RouterLogger:', error.message);
     }
