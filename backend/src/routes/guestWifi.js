@@ -59,6 +59,21 @@ const captivePortalEventHandler = async (req, res) => {
 router.post('/captive-portal/event', captivePortalEventHandler);
 router.post('/webhook', captivePortalEventHandler);  // Legacy path for RADIUS server
 
+// Debug endpoint to check session data
+router.get('/debug/sessions', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, email, username, user_mac, router_id, bytes_total, 
+             session_end IS NULL as active, created_at
+      FROM wifi_guest_sessions 
+      ORDER BY created_at DESC LIMIT 10
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 /**
  * Normalize MAC address to lowercase with colons
  */
