@@ -25,6 +25,9 @@ sql {
 
     # Group attribute
     group_attribute = "SQL-Group"
+    
+    # SQL User-Name mapping - use User-Name from request
+    sql_user_name = "%{User-Name}"
 
     # Connection pool settings
     pool {
@@ -49,16 +52,16 @@ sql {
     # =====================================================
     
     # Check if user exists and get password
-    authorize_check_query = "SELECT id, username, attribute, value, op FROM radcheck WHERE username = '%{SQL-User-Name}' ORDER BY id"
+    authorize_check_query = "SELECT id, username, attribute, value, op FROM radcheck WHERE username = '%{User-Name}' ORDER BY id"
 
-    authorize_reply_query = "SELECT id, username, attribute, value, op FROM radreply WHERE username = '%{SQL-User-Name}' ORDER BY id"
+    authorize_reply_query = "SELECT id, username, attribute, value, op FROM radreply WHERE username = '%{User-Name}' ORDER BY id"
 
     # Group membership queries
     authorize_group_check_query = "SELECT id, groupname, attribute, value, op FROM radgroupcheck WHERE groupname = '%{SQL-Group}' ORDER BY id"
 
     authorize_group_reply_query = "SELECT id, groupname, attribute, value, op FROM radgroupreply WHERE groupname = '%{SQL-Group}' ORDER BY id"
 
-    group_membership_query = "SELECT groupname FROM radusergroup WHERE username = '%{SQL-User-Name}' ORDER BY priority"
+    group_membership_query = "SELECT groupname FROM radusergroup WHERE username = '%{User-Name}' ORDER BY priority"
 
     # =====================================================
     # SQL Queries for Accounting
