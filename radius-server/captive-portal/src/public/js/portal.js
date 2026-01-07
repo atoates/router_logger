@@ -129,33 +129,15 @@
                         routerLoginUrl: data.routerLoginUrl
                     }));
                     
-                    // Handle CoovaChilli activation via hidden iframe
+                    // Redirect directly to CoovaChilli to activate WiFi
+                    // CoovaChilli will authenticate and grant internet access
                     const redirectUrl = data.redirect || '/success?type=free';
-                    const successUrl = data.successUrl || '/success?type=free';
-                    console.log('🔗 Router login URL:', data.routerLoginUrl);
-                    console.log('📄 Success page URL:', successUrl);
+                    console.log('🔗 Redirecting to:', redirectUrl);
                     
-                    // If we have a CoovaChilli login URL, activate WiFi via iframe then redirect
-                    if (data.routerLoginUrl && data.routerLoginUrl.includes('192.168.')) {
-                        console.log('🔌 Activating WiFi via CoovaChilli iframe...');
-                        
-                        // Create hidden iframe to trigger CoovaChilli authentication
-                        const iframe = document.createElement('iframe');
-                        iframe.style.display = 'none';
-                        iframe.src = data.routerLoginUrl;
-                        document.body.appendChild(iframe);
-                        
-                        // Wait for iframe to load, then redirect to success page
-                        setTimeout(() => {
-                            console.log('✅ WiFi activation complete, redirecting to success page');
-                            window.location.replace(successUrl);
-                        }, 2000); // 2 second delay to let CoovaChilli authenticate
-                    } else {
-                        // No CoovaChilli URL, just redirect normally
-                        setTimeout(() => {
-                            window.location.replace(redirectUrl);
-                        }, 500);
-                    }
+                    // Direct redirect - CoovaChilli will handle auth and may redirect back
+                    setTimeout(() => {
+                        window.location.href = redirectUrl;
+                    }, 800);
                 } else {
                     showMessage(data.message || 'Registration failed. Please try again.', 'error');
                     setButtonLoading(submitBtn, false);
