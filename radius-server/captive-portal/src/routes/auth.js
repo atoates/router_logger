@@ -68,7 +68,7 @@ initRadiusDb();
  * Uses Auth-Type := Accept to bypass password verification
  * This is needed because CoovaChilli encrypts passwords before sending to RADIUS
  */
-async function createRadiusUser(username, password, sessionTimeout = 1800) {
+async function createRadiusUser(username, password, sessionTimeout = 1800, idleTimeout = 300) {
     if (!radiusDb) {
         console.warn('⚠️ RADIUS database not available, skipping user creation');
         return false;
@@ -87,10 +87,16 @@ async function createRadiusUser(username, password, sessionTimeout = 1800) {
             [username, 'Auth-Type', ':=', 'Accept']
         );
         
-        // Add session timeout
+        // Add session timeout (max session duration)
         await radiusDb.execute(
             'INSERT INTO radreply (username, attribute, op, value) VALUES (?, ?, ?, ?)',
             [username, 'Session-Timeout', ':=', sessionTimeout.toString()]
+        );
+        
+        // Add idle timeout (disconnect after inactivity)
+        await radiusDb.execute(
+            'INSERT INTO radreply (username, attribute, op, value) VALUES (?, ?, ?, ?)',
+            [username, 'Idle-Timeout', ':=', idleTimeout.toString()]
         );
         
         // Add to free-tier group
@@ -99,7 +105,7 @@ async function createRadiusUser(username, password, sessionTimeout = 1800) {
             [username, 'free-tier', 1]
         );
         
-        console.log(`✅ Created RADIUS user: ${username} (timeout: ${sessionTimeout}s, Auth-Type: Accept)`);
+        console.log(`✅ Created RADIUS user: ${username} (session: ${sessionTimeout}s, idle: ${idleTimeout}s, Auth-Type: Accept)`);
         return true;
     } catch (error) {
         console.error('Error creating RADIUS user:', error);
@@ -223,15 +229,15 @@ async function markVerificationCodeUsed(identifier, codeId) {
 }
 
 /**
- * Check free tier usage
+ * Check free tier usage by MAC address
  */
-async function checkFreeUsage(identifier) {
+async function checkFreeUsage(macAddress) {
     if (USE_DATABASE && dbPool) {
         try {
             const result = await dbPool.query(`
                 SELECT * FROM captive_free_usage
-                WHERE identifier_type = 'email' AND identifier_value = $1
-            `, [identifier]);
+                WHERE identifier_type = 'mac' AND identifier_value = $1
+            `, [macAddress]);
             
             if (result.rows.length > 0) {
                 return {
@@ -246,13 +252,14 @@ async function checkFreeUsage(identifier) {
         }
     }
     
-    return freeAccessUsage.get(identifier) || null;
+    // In-memory fallback (use MAC as key)
+    return freeAccessUsage.get(macAddress) || null;
 }
 
 /**
- * Record free tier usage
+ * Record free tier usage by MAC address
  */
-async function recordFreeUsage(identifier, guestId) {
+async function recordFreeUsage(macAddress, guestId, email = null) {
     const nextFreeAvailable = new Date();
     nextFreeAvailable.setHours(nextFreeAvailable.getHours() + FREE_COOLDOWN_HOURS);
     
@@ -260,27 +267,29 @@ async function recordFreeUsage(identifier, guestId) {
         try {
             await dbPool.query(`
                 INSERT INTO captive_free_usage 
-                (identifier_type, identifier_value, last_session_start, last_guest_id, next_free_available)
-                VALUES ('email', $1, NOW(), $2, $3)
+                (identifier_type, identifier_value, last_session_start, last_guest_id, next_free_available, email)
+                VALUES ('mac', $1, NOW(), $2, $3, $4)
                 ON CONFLICT (identifier_type, identifier_value) DO UPDATE SET
                     sessions_used = captive_free_usage.sessions_used + 1,
                     last_session_start = NOW(),
                     last_guest_id = EXCLUDED.last_guest_id,
                     next_free_available = EXCLUDED.next_free_available,
+                    email = COALESCE(EXCLUDED.email, captive_free_usage.email),
                     updated_at = NOW()
-            `, [identifier, guestId, nextFreeAvailable]);
+            `, [macAddress, guestId, nextFreeAvailable, email]);
             return true;
         } catch (error) {
             console.error('Database error recording free usage:', error);
         }
     }
     
-    // In-memory fallback
-    const existing = freeAccessUsage.get(identifier);
-    freeAccessUsage.set(identifier, {
+    // In-memory fallback (use MAC as key)
+    const existing = freeAccessUsage.get(macAddress);
+    freeAccessUsage.set(macAddress, {
         lastUsed: new Date().toISOString(),
         sessionsUsed: (existing?.sessionsUsed || 0) + 1,
         guestId,
+        email,
         nextFreeAvailable: nextFreeAvailable.toISOString()
     });
     return true;
@@ -414,11 +423,18 @@ router.post('/register', async (req, res) => {
             });
         }
         
-        // Use email as identifier for cooldown tracking
-        const identifier = email.toLowerCase().trim();
+        // Normalize MAC address for tracking (device-level cooldown)
+        const normalizedMac = (client_mac || '').toUpperCase().replace(/[^A-F0-9]/g, '');
         
-        // Check if this email has used free access recently
-        const existingUsage = await checkFreeUsage(identifier);
+        if (!normalizedMac || normalizedMac.length < 12) {
+            return res.status(400).json({
+                success: false,
+                message: 'Device MAC address not detected. Please reconnect to WiFi.'
+            });
+        }
+        
+        // Check if this device (MAC) has used free access recently
+        const existingUsage = await checkFreeUsage(normalizedMac);
         if (existingUsage && existingUsage.nextFreeAvailable) {
             const cooldownEnd = new Date(existingUsage.nextFreeAvailable);
             
@@ -426,7 +442,7 @@ router.post('/register', async (req, res) => {
                 const hoursRemaining = Math.ceil((cooldownEnd - new Date()) / (1000 * 60 * 60));
                 return res.status(429).json({
                     success: false,
-                    message: `You've already used your free 30 minutes today. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
+                    message: `This device has already used free WiFi today. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
                     nextFreeAccess: cooldownEnd.toISOString()
                 });
             }
@@ -445,8 +461,8 @@ router.post('/register', async (req, res) => {
             console.warn(`⚠️ Could not create RADIUS user, WiFi auth may fail`);
         }
         
-        // Record free access usage (database or in-memory) - using email as identifier
-        await recordFreeUsage(identifier, guestId);
+        // Record free access usage (database or in-memory) - using MAC as identifier
+        await recordFreeUsage(normalizedMac, guestId, email.toLowerCase().trim());
         
         // Store session
         req.session.authenticated = true;
@@ -596,25 +612,27 @@ router.post('/register', async (req, res) => {
 
 /**
  * POST /api/auth/free
- * Grant free 30-minute access (email required for cooldown tracking)
+ * Grant free 30-minute access (MAC address for cooldown tracking)
  */
 router.post('/free', async (req, res) => {
     try {
         const { email, client_mac, router_mac, router_id } = req.body;
         
-        // Email is required for tracking cooldown
-        if (!email || !validator.isEmail(email)) {
+        // Email is optional but nice to have
+        const userEmail = email && validator.isEmail(email) ? email.toLowerCase().trim() : null;
+        
+        // Normalize MAC address for tracking (device-level cooldown)
+        const normalizedMac = (client_mac || '').toUpperCase().replace(/[^A-F0-9]/g, '');
+        
+        if (!normalizedMac || normalizedMac.length < 12) {
             return res.status(400).json({
                 success: false,
-                message: 'Please enter a valid email address'
+                message: 'Device MAC address not detected. Please reconnect to WiFi.'
             });
         }
         
-        // Use email as identifier for cooldown tracking
-        const identifier = email.toLowerCase().trim();
-        
-        // Check if this email has used free access recently
-        const existingUsage = await checkFreeUsage(identifier);
+        // Check if this device (MAC) has used free access recently
+        const existingUsage = await checkFreeUsage(normalizedMac);
         if (existingUsage && existingUsage.nextFreeAvailable) {
             const cooldownEnd = new Date(existingUsage.nextFreeAvailable);
             
@@ -622,7 +640,7 @@ router.post('/free', async (req, res) => {
                 const hoursRemaining = Math.ceil((cooldownEnd - new Date()) / (1000 * 60 * 60));
                 return res.status(429).json({
                     success: false,
-                    message: `You've already used your free 30 minutes today. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
+                    message: `This device has already used free WiFi today. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
                     nextFreeAccess: cooldownEnd.toISOString()
                 });
             }
@@ -632,8 +650,8 @@ router.post('/free', async (req, res) => {
         const guestId = `free-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
         const sessionId = uuidv4();
         
-        // Record free access usage (database or in-memory) - using email as identifier
-        await recordFreeUsage(identifier, guestId);
+        // Record free access usage (database or in-memory) - using MAC as identifier
+        await recordFreeUsage(normalizedMac, guestId, userEmail);
         
         // Store session
         req.session.authenticated = true;
@@ -660,8 +678,8 @@ router.post('/free', async (req, res) => {
         await notifyRouterLogger({
             type: 'free_access_granted',
             guest_id: guestId,
-            username: email,
-            email: email,
+            username: userEmail || normalizedMac,
+            email: userEmail,
             mac_address: client_mac,
             router_mac,
             router_id,
@@ -670,7 +688,7 @@ router.post('/free', async (req, res) => {
             timestamp: new Date().toISOString()
         });
         
-        console.log(`🆓 Free access granted to ${email} (session: ${sessionId})`);
+        console.log(`🆓 Free access granted to MAC ${normalizedMac} (session: ${sessionId})`);
         
         return res.json({
             success: true,

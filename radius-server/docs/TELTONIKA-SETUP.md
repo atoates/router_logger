@@ -44,10 +44,20 @@ This guide explains how to configure Teltonika RUT/RUTX series routers to use yo
 │ Landing Page:        [External ▼]                            │
 │ Landing Page URL:    [http://portal.yourdomain.com/]         │
 │                                                              │
-│ Session Timeout:     [86400] seconds (24 hours)              │
-│ Idle Timeout:        [1800] seconds (30 minutes)             │
+│ Session Timeout:     [1800] seconds (30 minutes)             │
+│ Idle Timeout:        [300] seconds (5 minutes)               │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+> **Note**: Set Session/Idle Timeout to `0` if you want RADIUS to fully control timeouts via Session-Timeout and Idle-Timeout attributes. The values above (1800/300) serve as fallback defaults if RADIUS doesn't return these attributes.
+>
+> To configure via CLI (SSH):
+> ```bash
+> uci set chilli.@chilli[0].defsessiontimeout='1800'
+> uci set chilli.@chilli[0].defidletimeout='300'
+> uci commit chilli
+> /etc/init.d/chilli restart
+> ```
 
 ## 📡 Step 3: Configure RADIUS Server
 
