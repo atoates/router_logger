@@ -584,7 +584,7 @@ router.post('/register', async (req, res) => {
         const responseData = {
             success: true,
             message: 'Registration successful!',
-            redirect: `/success?type=free&token=${successToken}`,
+            redirect: `/success?type=free&token=${successToken}&mac=${encodeURIComponent(client_mac)}`,
             routerLoginUrl: null,
             sessionDuration: FREE_SESSION_DURATION
         };
@@ -687,7 +687,7 @@ router.post('/free', async (req, res) => {
             sessionId,
             sessionDuration: FREE_SESSION_DURATION,
             expiresAt: req.session.expiresAt,
-            redirect: '/success?type=free'
+            redirect: `/success?type=free&mac=${encodeURIComponent(client_mac)}`
         });
     } catch (error) {
         console.error('Free access error:', error);
@@ -842,7 +842,7 @@ router.post('/email/verify', async (req, res) => {
             message: 'Verification successful. You are now connected.',
             sessionId,
             sessionDuration,
-            redirect: '/success'
+            redirect: `/success?mac=${encodeURIComponent(req.session.macAddress)}`
         });
     } catch (error) {
         console.error('Email verify error:', error);

@@ -102,7 +102,8 @@ router.get('/', async (req, res) => {
     // Extract query params that routers might send
     // Teltonika/CoovaChilli sends: challenge, uamip, uamport, mac, etc.
     const {
-        mac,              // Client MAC address
+        mac,              // Client MAC address (CoovaChilli format)
+        calling_station_id, // Alternative client MAC parameter
         ip,               // Client IP
         ap_mac,           // Access point MAC
         ap_name,          // Access point name
@@ -129,6 +130,11 @@ router.get('/', async (req, res) => {
     // Log all query params for debugging
     console.log('📥 Portal request params:', JSON.stringify(req.query, null, 2));
     
+    // Determine the actual client MAC address
+    // CoovaChilli uses 'mac' but we need to verify which one is correct
+    const actualClientMac = calling_station_id || mac;
+    console.log('🔍 Client MAC determination - calling_station_id:', calling_station_id, 'mac:', mac, 'using:', actualClientMac);
+    
     // Build the CoovaChilli login URL if we have the required params
     let chilliLoginUrl = null;
     if (uamip && uamport) {
@@ -141,7 +147,7 @@ router.get('/', async (req, res) => {
 
     res.render('portal', {
         title: 'Guest WiFi Login',
-        clientMac: mac || called,
+        clientMac: actualClientMac || called,
         clientIp: ip,
         apMac: ap_mac || called,
         apName: ap_name,
