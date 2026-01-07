@@ -244,6 +244,7 @@ router.get('/success', async (req, res) => {
         sessionId: sessionData.sessionId,
         authenticatedAt: sessionData.authenticatedAt,
         guestName: sessionData.guestName,
+        macAddress: req.session.macAddress,
         // Session type info
         isFreeSession,
         sessionDuration,

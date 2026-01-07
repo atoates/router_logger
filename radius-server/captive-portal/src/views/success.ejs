@@ -65,7 +65,7 @@
                     <circle cx="12" cy="12" r="10"/>
                     <polyline points="12 6 12 12 16 14"/>
                 </svg>
-                <a href="/usage" style="color: inherit; text-decoration: underline;">📊 Check your data usage</a> - You have 500MB for 24 hours
+                <a href="/usage<%= typeof macAddress !== 'undefined' && macAddress ? '?mac=' + encodeURIComponent(macAddress) : '' %>" style="color: inherit; text-decoration: underline;">📊 Check your data usage</a> - You have 500MB for 24 hours
             </p>
             <% } else { %>
             <p class="enjoy-message">
