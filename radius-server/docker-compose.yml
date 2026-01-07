@@ -61,9 +61,9 @@ services:
       ROUTERLOGGER_WEBHOOK_URL: ${ROUTERLOGGER_WEBHOOK_URL:-http://host.docker.internal:3001/api/ironwifi/webhook}
     volumes:
       # Essential configuration files
-      - ./config/freeradius/clients.conf:/etc/raddb/clients.conf:ro
+      - ./config/freeradius/clients.conf:/etc/freeradius/clients.conf:ro
       # SQL module template (will be processed by entrypoint)
-      - ./config/freeradius/mods-enabled/sql:/etc/raddb/mods-available/sql.template:ro
+      - ./config/freeradius/mods-enabled/sql:/etc/freeradius/mods-available/sql.template:ro
       # Entrypoint script for environment variable substitution
       - ./config/freeradius/docker-entrypoint.sh:/docker-entrypoint.sh:ro
     entrypoint: ["/docker-entrypoint.sh"]
