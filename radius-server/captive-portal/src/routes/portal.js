@@ -272,30 +272,80 @@ router.get('/terms', (req, res) => {
 router.get('/usage', async (req, res) => {
     const { mac } = req.query;
     
-    // Get session from query params or session
+    // Get MAC from query params or session
     const macAddress = mac || req.session?.macAddress;
     
     if (!macAddress) {
         return res.render('usage', {
             title: 'Data Usage',
             companyName: process.env.COMPANY_NAME || 'VacatAd',
-            session: null
+            session: null,
+            error: 'No active session found. Please connect to WiFi and log in.'
         });
     }
     
     try {
-        // Query accounting data from RADIUS (if available)
-        // For now, show session data from session storage
+        // Query accounting data from RADIUS database
         const dataLimit = 500; // MB
-        const sessionDuration = req.session?.sessionDuration || 86400;
-        const authenticatedAt = new Date(req.session?.authenticatedAt || Date.now());
-        const now = new Date();
-        const elapsedSeconds = Math.floor((now - authenticatedAt) / 1000);
-        const remainingSeconds = Math.max(0, sessionDuration - elapsedSeconds);
         
-        // Mock data for now - in production, query from RADIUS accounting
-        const downloadBytes = 50 * 1024 * 1024; // Example: 50 MB
-        const uploadBytes = 10 * 1024 * 1024;   // Example: 10 MB
+        // Get session timing from RADIUS data or session
+        let authenticatedAt = null;
+        let sessionDuration = 86400; // Default 24 hours
+        let elapsedSeconds = 0;
+        
+        // Query real data from RADIUS accounting
+        let downloadBytes = 0;
+        let uploadBytes = 0;
+        
+        if (radiusDb) {
+            try {
+                // Normalize MAC address to match RADIUS format (XX-XX-XX-XX-XX-XX)
+                const normalizedMac = macAddress.toUpperCase().replace(/[^A-F0-9]/g, '').match(/.{1,2}/g).join('-');
+                
+                // Get most recent session and data totals
+                const [rows] = await radiusDb.execute(
+                    `SELECT 
+                        MIN(acctstarttime) as first_login,
+                        MAX(acctstarttime) as last_login,
+                        SUM(acctinputoctets) as download, 
+                        SUM(acctoutputoctets) as upload,
+                        SUM(acctsessiontime) as total_time
+                     FROM radacct 
+                     WHERE callingstationid = ? 
+                     AND acctstarttime >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`,
+                    [normalizedMac]
+                );
+                
+                if (rows && rows.length > 0 && rows[0].first_login) {
+                    downloadBytes = parseInt(rows[0].download || 0);
+                    uploadBytes = parseInt(rows[0].upload || 0);
+                    authenticatedAt = new Date(rows[0].last_login || rows[0].first_login);
+                    elapsedSeconds = parseInt(rows[0].total_time || 0);
+                }
+            } catch (dbError) {
+                console.error('Error querying RADIUS accounting:', dbError);
+            }
+        }
+        
+        // If no RADIUS data found, check session
+        if (!authenticatedAt && req.session?.authenticatedAt) {
+            authenticatedAt = new Date(req.session.authenticatedAt);
+            sessionDuration = req.session.sessionDuration || 86400;
+            const now = new Date();
+            elapsedSeconds = Math.floor((now - authenticatedAt) / 1000);
+        }
+        
+        // If still no data, show error
+        if (!authenticatedAt) {
+            return res.render('usage', {
+                title: 'Data Usage',
+                companyName: process.env.COMPANY_NAME || 'VacatAd',
+                session: null,
+                error: 'No active session found. Please connect to WiFi and log in.'
+            });
+        }
+        
+        const remainingSeconds = Math.max(0, sessionDuration - elapsedSeconds);
         const totalBytes = downloadBytes + uploadBytes;
         
         const downloadMB = (downloadBytes / 1024 / 1024).toFixed(1);
