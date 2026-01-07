@@ -480,7 +480,7 @@ router.post('/register', async (req, res) => {
         await notifyRouterLogger({
             type: 'registration_completed',
             guest_id: guestId,
-            username: email,
+            username: guestId,  // Use RADIUS username for sync matching
             name: name.trim(),
             phone: phone.trim(),
             email: email.trim(),
@@ -669,7 +669,7 @@ router.post('/free', async (req, res) => {
         await notifyRouterLogger({
             type: 'free_access_granted',
             guest_id: guestId,
-            username: userEmail || normalizedMac,
+            username: guestId,  // Use RADIUS username for sync matching
             email: userEmail,
             mac_address: client_mac,
             router_mac,
