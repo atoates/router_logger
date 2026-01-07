@@ -3,21 +3,282 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#030712">
+    <meta name="theme-color" content="#1a1a1a">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title><%= title %></title>
-    <!-- Load CSS first (critical) -->
-    <link rel="stylesheet" href="/css/portal.css">
-    <!-- Google Fonts - loaded async to prevent blocking if unavailable -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✅</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f0f0f;
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .status-banner {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            padding: 16px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .status-banner h1 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .status-icon {
+            width: 24px;
+            height: 24px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .status-details {
+            font-size: 13px;
+            opacity: 0.95;
+            margin-top: 4px;
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 24px 20px;
+        }
+
+        .ad-container {
+            margin-bottom: 24px;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: #1a1a1a;
+        }
+
+        .ad-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .main-button {
+            display: block;
+            width: 100%;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: #fff;
+            text-decoration: none;
+            padding: 18px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 16px;
+        }
+
+        .main-button:active {
+            transform: scale(0.98);
+        }
+
+        .main-button svg {
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        .secondary-button {
+            display: block;
+            width: 100%;
+            background: #1a1a1a;
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #fff;
+            text-decoration: none;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            text-align: center;
+            margin-bottom: 12px;
+            transition: background 0.2s;
+        }
+
+        .secondary-button:active {
+            background: #222;
+        }
+
+        .info-card {
+            background: #1a1a1a;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+        }
+
+        .info-label {
+            color: #888;
+        }
+
+        .info-value {
+            font-weight: 600;
+        }
+
+        .session-timer {
+            color: #10b981;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 24px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .footer a {
+            color: #888;
+            text-decoration: none;
+        }
+
+        .checkmark-circle {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+    </style>
 </head>
 <body>
-    <div class="portal-container">
-        <div class="portal-card success-card">
+    <div class="status-banner">
+        <h1>
+            <span class="checkmark-circle">✓</span>
+            You're Connected!
+        </h1>
+        <div class="status-details">
+            <% if (typeof isFreeSession !== 'undefined' && isFreeSession) { %>
+                Free 24-hour session • 500MB limit
+            <% } else { %>
+                Connected at <%= new Date(authenticatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) %>
+            <% } %>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Centered Ad -->
+        <div class="ad-container">
+            <% if (typeof ads !== 'undefined' && ads.squareGif) { %>
+                <a href="<%= ads.squareGif.link %>" target="_blank" rel="noopener sponsored">
+                    <img src="<%= ads.squareGif.image %>" alt="<%= ads.squareGif.alt || 'Advertisement' %>">
+                </a>
+            <% } else { %>
+                <a href="https://vacatad.com" target="_blank" rel="noopener sponsored">
+                    <img src="/images/Ad1.gif" alt="VacatAd Advertisement">
+                </a>
+            <% } %>
+        </div>
+
+        <!-- Main CTA: Data Usage Dashboard -->
+        <a href="/usage?mac=<%= typeof macAddress !== 'undefined' && macAddress ? encodeURIComponent(macAddress) : '' %>" class="main-button" target="_blank">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 3v18h18"/>
+                <path d="m19 9-5 5-4-4-3 3"/>
+            </svg>
+            Open Data Usage Dashboard
+        </a>
+
+        <!-- Session Info -->
+        <div class="info-card">
+            <div class="info-row">
+                <span class="info-label">Session Duration</span>
+                <span class="info-value">24 hours</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Time Remaining</span>
+                <span class="info-value session-timer" id="session-timer">23:59:59</span>
+            </div>
+            <% if (typeof isFreeSession !== 'undefined' && isFreeSession) { %>
+            <div class="info-row">
+                <span class="info-label">Data Limit</span>
+                <span class="info-value">500 MB</span>
+            </div>
+            <% } %>
+        </div>
+
+        <!-- Secondary Actions -->
+        <a href="https://www.google.com" class="secondary-button" target="_blank">
+            🌐 Start Browsing
+        </a>
+
+        <a href="https://linktr.ee/vacatad" class="secondary-button" target="_blank">
+            💬 Contact Us
+        </a>
+    </div>
+
+    <div class="footer">
+        <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>
+    </div>
+
+    <script>
+        // Session timer
+        const sessionStart = new Date('<%= authenticatedAt %>');
+        const sessionDuration = <%= typeof sessionDuration !== 'undefined' ? sessionDuration : 86400 %> * 1000;
+        const timerElement = document.getElementById('session-timer');
+        
+        function updateTimer() {
+            const now = new Date();
+            const elapsed = now - sessionStart;
+            const remaining = Math.max(0, sessionDuration - elapsed);
+            
+            if (remaining <= 0) {
+                timerElement.textContent = 'Expired';
+                return;
+            }
+            
+            const hours = Math.floor(remaining / (60 * 60 * 1000));
+            const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+            const seconds = Math.floor((remaining % (60 * 1000)) / 1000);
+            
+            timerElement.textContent = 
+                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            requestAnimationFrame(updateTimer);
+        }
+        
+        requestAnimationFrame(updateTimer);
+    </script>
+</body>
+</html>
             <!-- Success Icon with animated checkmark -->
             <div class="success-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
