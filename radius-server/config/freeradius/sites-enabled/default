@@ -104,11 +104,11 @@ server default {
     # Records session data
     # =====================================================
     accounting {
-        # Log to SQL database
+        # Log to SQL database (local tracking)
         sql
 
-        # TODO: Send to RouterLogger webhook (rest module not configured)
-        # rest
+        # Send real-time updates to RouterLogger API
+        rest
     }
 
     # =====================================================
@@ -124,10 +124,11 @@ server default {
     # Actions after successful authentication
     # =====================================================
     post-auth {
-        # Log successful auth
+        # Log successful auth to SQL
         sql
 
-        # TODO: Notify RouterLogger (rest module not configured)
+        # Notify RouterLogger of successful auth
+        rest
         # rest
 
         # Add reply attributes

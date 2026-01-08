@@ -6,12 +6,14 @@ sql {
     driver = "rlm_sql_mysql"
     dialect = "mysql"
 
-    # Connection info from environment variables
-    server = "${RADIUS_DB_HOST:-localhost}"
-    port = ${RADIUS_DB_PORT:-3306}
-    login = "${RADIUS_DB_USER:-radius}"
-    password = "${RADIUS_DB_PASSWORD:-radiuspass123}"
-    radius_db = "${RADIUS_DB_NAME:-radius}"
+    # Connection info - hardcoded for Docker Compose deployment
+    # CRITICAL: FreeRADIUS doesn't support environment variable substitution
+    # These values MUST match docker-compose.yml service names and credentials
+    server = "radius-db"
+    port = 3306
+    login = "radius"
+    password = "lI5ST8a0WJ2GrvE5SSn1Vw"
+    radius_db = "radius"
 
     # Table names - MUST be defined BEFORE queries that reference them
     authcheck_table = "radcheck"

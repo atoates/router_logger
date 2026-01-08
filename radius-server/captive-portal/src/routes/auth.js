@@ -48,10 +48,13 @@ async function createRadiusUser(username, password, sessionTimeout = 86400, idle
     const radiusDb = getRadiusDb();
     if (!radiusDb) {
         console.warn('⚠️ RADIUS database not available, skipping user creation');
-        return false;
+        return { success: false, error: 'Database unavailable' };
     }
     
     try {
+        console.log(`🔧 Creating RADIUS user: ${username}`);
+        const startTime = Date.now();
+        
         // Delete any existing entries for this user
         await radiusDb.execute('DELETE FROM radcheck WHERE username = ?', [username]);
         await radiusDb.execute('DELETE FROM radreply WHERE username = ?', [username]);
@@ -90,11 +93,12 @@ async function createRadiusUser(username, password, sessionTimeout = 86400, idle
             [username, 'free-tier', 1]
         );
         
-        console.log(`✅ Created RADIUS user: ${username} (session: ${sessionTimeout}s, idle: ${idleTimeout}s, data: ${dataLimitBytes ? (dataLimitBytes / 1024 / 1024).toFixed(0) + 'MB' : 'unlimited'}, Auth-Type: Accept)`);
-        return true;
+        const duration = Date.now() - startTime;
+        console.log(`✅ Created RADIUS user: ${username} in ${duration}ms (session: ${sessionTimeout}s, idle: ${idleTimeout}s, data: ${dataLimitBytes ? (dataLimitBytes / 1024 / 1024).toFixed(0) + 'MB' : 'unlimited'}, Auth-Type: Accept)`);
+        return { success: true, duration };
     } catch (error) {
-        console.error('Error creating RADIUS user:', error);
-        return false;
+        console.error('❌ Error creating RADIUS user:', error);
+        return { success: false, error: error.message };
     }
 }
 
@@ -335,9 +339,18 @@ function calculateChapResponse(password, challenge) {
 function calculateChilliPassword(password, challenge, uamSecret) {
     try {
         if (!challenge || challenge.length < 2) {
-            console.warn('Invalid challenge:', challenge);
+            console.error('❌ Invalid challenge for password encryption:', challenge);
             return null;
         }
+        
+        if (!uamSecret) {
+            console.error('❌ UAM secret not configured');
+            return null;
+        }
+        
+        console.log(`🔐 Encrypting password...`);
+        console.log(`   Challenge: ${challenge.substring(0, 16)}... (${challenge.length} chars)`);
+        console.log(`   Password length: ${password.length} chars`);
         
         // Convert hex challenge to bytes
         const challengeBytes = Buffer.from(challenge, 'hex');
@@ -356,9 +369,11 @@ function calculateChilliPassword(password, challenge, uamSecret) {
             encryptedBytes[i] = passwordBytes[i] ^ hashBytes[i % hashBytes.length];
         }
         
-        return encryptedBytes.toString('hex');
+        const encryptedPassword = encryptedBytes.toString('hex');
+        console.log(`✅ Password encrypted successfully (${encryptedPassword.length} chars)`);
+        return encryptedPassword;
     } catch (error) {
-        console.error('Error calculating Chilli password:', error);
+        console.error('❌ Error calculating Chilli password:', error);
         return null;
     }
 }
@@ -420,20 +435,21 @@ router.post('/register', async (req, res) => {
             });
         }
         
+        // COOLDOWN DISABLED FOR TESTING
         // Check if this device (MAC) has used free access recently
-        const existingUsage = await checkFreeUsage(normalizedMac);
-        if (existingUsage && existingUsage.nextFreeAvailable) {
-            const cooldownEnd = new Date(existingUsage.nextFreeAvailable);
-            
-            if (new Date() < cooldownEnd) {
-                const hoursRemaining = Math.ceil((cooldownEnd - new Date()) / (1000 * 60 * 60));
-                return res.status(429).json({
-                    success: false,
-                    message: `This device has already used free WiFi. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
-                    nextFreeAccess: cooldownEnd.toISOString()
-                });
-            }
-        }
+        // const existingUsage = await checkFreeUsage(normalizedMac);
+        // if (existingUsage && existingUsage.nextFreeAvailable) {
+        //     const cooldownEnd = new Date(existingUsage.nextFreeAvailable);
+        //     
+        //     if (new Date() < cooldownEnd) {
+        //         const hoursRemaining = Math.ceil((cooldownEnd - new Date()) / (1000 * 60 * 60));
+        //         return res.status(429).json({
+        //             success: false,
+        //             message: `This device has already used free WiFi. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
+        //             nextFreeAccess: cooldownEnd.toISOString()
+        //         });
+        //     }
+        // }
         
         // Generate a temporary guest username and password
         const guestId = `free-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
@@ -441,12 +457,20 @@ router.post('/register', async (req, res) => {
         const sessionId = uuidv4();
         
         // Create RADIUS user so the router can authenticate this guest
-        const radiusUserCreated = await createRadiusUser(guestId, guestPassword, FREE_SESSION_DURATION, 300, FREE_DATA_LIMIT_BYTES);
-        if (radiusUserCreated) {
-            console.log(`✅ RADIUS user created for guest: ${guestId}`);
-        } else {
-            console.warn(`⚠️ Could not create RADIUS user, WiFi auth may fail`);
+        // CRITICAL: Wait for this to complete before proceeding
+        console.log(`⏳ Creating RADIUS user for: ${guestId}`);
+        const radiusResult = await createRadiusUser(guestId, guestPassword, FREE_SESSION_DURATION, 300, FREE_DATA_LIMIT_BYTES);
+        
+        if (!radiusResult.success) {
+            console.error(`❌ RADIUS user creation failed: ${radiusResult.error}`);
+            return res.status(500).json({
+                success: false,
+                message: 'WiFi authentication setup failed. Please try again.',
+                error: 'RADIUS_USER_CREATION_FAILED'
+            });
         }
+        
+        console.log(`✅ RADIUS user created in ${radiusResult.duration}ms`);
         
         // Record free access usage (database or in-memory) - using MAC as identifier
         await recordFreeUsage(normalizedMac, guestId, email.toLowerCase().trim());
@@ -465,19 +489,18 @@ router.post('/register', async (req, res) => {
         req.session.guestPhone = phone.trim();
         req.session.newsletter = newsletter || false;
         
-        // Send accounting start with 30-minute limit
-        try {
-            await radiusClient.accountingStart(sessionId, guestId, {
-                callingStationId: client_mac,
-                calledStationId: router_mac,
-                sessionTimeout: FREE_SESSION_DURATION
-            });
-        } catch (e) {
-            console.warn('Accounting start failed (non-fatal):', e.message);
-        }
+        // Send accounting start with 30-minute limit (non-blocking)
+        // Don't await - send in background to avoid delaying response
+        radiusClient.accountingStart(sessionId, guestId, {
+            callingStationId: client_mac,
+            calledStationId: router_mac,
+            sessionTimeout: FREE_SESSION_DURATION
+        }).catch(e => {
+            console.warn('⚠️ Accounting start failed (non-fatal):', e.message);
+        });
         
-        // Notify RouterLogger
-        await notifyRouterLogger({
+        // Notify RouterLogger (non-blocking - don't wait for response)
+        notifyRouterLogger({
             type: 'registration_completed',
             guest_id: guestId,
             username: guestId,  // Use RADIUS username for sync matching
@@ -491,7 +514,7 @@ router.post('/register', async (req, res) => {
             session_id: sessionId,
             session_duration: FREE_SESSION_DURATION,
             timestamp: new Date().toISOString()
-        });
+        }).catch(e => console.warn('⚠️ RouterLogger webhook failed (non-fatal):', e.message));
         
         // Generate a one-time token for success page (iOS captive portal workaround)
         const successToken = crypto.randomBytes(32).toString('hex');
@@ -514,6 +537,7 @@ router.post('/register', async (req, res) => {
         
         // Build the router login URL
         let routerLoginUrl = null;
+        let encryptedPassword = null; // Define outside block for logging
         
         // Check for CoovaChilli/UAM authentication (Teltonika)
         if (chilli_challenge && chilli_uamip && chilli_uamport) {
@@ -523,7 +547,7 @@ router.post('/register', async (req, res) => {
             
             // Use the guestId as the password (we use same for username/password)
             const password = guestId;
-            const encryptedPassword = calculateChilliPassword(password, chilli_challenge, UAM_SECRET);
+            encryptedPassword = calculateChilliPassword(password, chilli_challenge, UAM_SECRET);
             
             if (encryptedPassword) {
                 // Build success URL for CoovaChilli to redirect to after auth
@@ -562,9 +586,19 @@ router.post('/register', async (req, res) => {
         // The router will then handle granting access
         if (routerLoginUrl) {
             console.log(`🔀 Redirecting client to CoovaChilli: ${routerLoginUrl}`);
+            console.log(`📊 Auth Flow Debug:`);
+            console.log(`   - Guest ID: ${guestId}`);
+            console.log(`   - Session ID: ${sessionId}`);
+            console.log(`   - Client MAC: ${client_mac}`);
+            console.log(`   - Router IP: ${chilli_uamip}`);
+            console.log(`   - Router Port: ${chilli_uamport}`);
+            console.log(`   - Challenge: ${chilli_challenge ? 'Present' : 'Missing'}`);
+            console.log(`   - Password encrypted: ${encryptedPassword ? 'Yes' : 'No'}`);
+            console.log(`   - RADIUS user created: ${sessionId ? 'Yes' : 'No'}`);
+            
             // Return the router login URL - client MUST go there to activate WiFi
             // Also include it as a fallback in the success page URL
-            const successUrlWithActivation = `/success?type=free&token=${successToken}&activate=${encodeURIComponent(routerLoginUrl)}`;
+            const successUrlWithActivation = `/success?type=free&token=${successToken}&activate=${encodeURIComponent(routerLoginUrl)}&username=${encodeURIComponent(guestId)}`;
             
             const responseData = {
                 success: true,
@@ -574,7 +608,13 @@ router.post('/register', async (req, res) => {
                 // Also provide success page URL with activation fallback
                 successUrl: successUrlWithActivation,
                 routerLoginUrl: routerLoginUrl,
-                sessionDuration: FREE_SESSION_DURATION
+                sessionDuration: FREE_SESSION_DURATION,
+                debug: {
+                    guestId,
+                    sessionId,
+                    hasChallenge: !!chilli_challenge,
+                    hasEncryptedPassword: !!encryptedPassword
+                }
             };
             console.log(`📤 Sending response:`, JSON.stringify(responseData, null, 2));
             return res.json(responseData);
@@ -622,20 +662,21 @@ router.post('/free', async (req, res) => {
             });
         }
         
+        // COOLDOWN DISABLED FOR TESTING
         // Check if this device (MAC) has used free access recently
-        const existingUsage = await checkFreeUsage(normalizedMac);
-        if (existingUsage && existingUsage.nextFreeAvailable) {
-            const cooldownEnd = new Date(existingUsage.nextFreeAvailable);
-            
-            if (new Date() < cooldownEnd) {
-                const hoursRemaining = Math.ceil((cooldownEnd - new Date()) / (1000 * 60 * 60));
-                return res.status(429).json({
-                    success: false,
-                    message: `This device has already used free WiFi. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
-                    nextFreeAccess: cooldownEnd.toISOString()
-                });
-            }
-        }
+        // const existingUsage = await checkFreeUsage(normalizedMac);
+        // if (existingUsage && existingUsage.nextFreeAvailable) {
+        //     const cooldownEnd = new Date(existingUsage.nextFreeAvailable);
+        //     
+        //     if (new Date() < cooldownEnd) {
+        //         const hoursRemaining = Math.ceil((cooldownEnd - new Date()) / (1000 * 60 * 60));
+        //         return res.status(429).json({
+        //             success: false,
+        //             message: `This device has already used free WiFi. Available again in ${hoursRemaining} hour${hoursRemaining > 1 ? 's' : ''}.`,
+        //             nextFreeAccess: cooldownEnd.toISOString()
+        //         });
+        //     }
+        // }
         
         // Generate a temporary guest username
         const guestId = `free-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
@@ -1246,6 +1287,29 @@ router.get('/status', (req, res) => {
     return res.json({
         authenticated: false
     });
+});
+
+/**
+ * POST /api/auth/admin/clear-cooldown
+ * Admin endpoint to clear cooldown for a specific MAC or all
+ */
+router.post('/admin/clear-cooldown', (req, res) => {
+    const { mac, clearAll } = req.body;
+    
+    if (clearAll === true) {
+        freeAccessUsage.clear();
+        console.log('🧹 Admin: Cleared all cooldown data');
+        return res.json({ success: true, message: 'All cooldown data cleared', cleared: 'all' });
+    }
+    
+    if (mac) {
+        const normalizedMac = mac.toUpperCase().replace(/[^A-F0-9]/g, '');
+        const deleted = freeAccessUsage.delete(normalizedMac);
+        console.log(`🧹 Admin: Cleared cooldown for MAC ${normalizedMac}: ${deleted ? 'found and deleted' : 'not found'}`);
+        return res.json({ success: true, message: `Cooldown cleared for ${mac}`, found: deleted });
+    }
+    
+    return res.status(400).json({ success: false, message: 'Provide mac or clearAll=true' });
 });
 
 module.exports = router;

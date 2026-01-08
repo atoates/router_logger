@@ -95,8 +95,15 @@ app.use(express.urlencoded({ extended: true }));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Static files
-app.use(express.static(path.join(__dirname, 'public')));
+// Static files - serve with error handling to prevent blocking on permission errors
+app.use(express.static(path.join(__dirname, 'public'), {
+    dotfiles: 'ignore',
+    index: false,
+    setHeaders: (res, filePath) => {
+        // Don't let file errors block requests
+        res.on('error', () => {});
+    }
+}));
 
 // ===========================================
 // Routes

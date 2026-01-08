@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#030712">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title><%= title %></title>
@@ -44,7 +44,8 @@
             <!-- Header -->
             <div class="portal-header">
                 <div class="logo-container logo-large">
-                    <img src="/images/Logo.png" alt="VacatAd" />
+                    <img src="/images/Logo.png" alt="VacatAd" onerror="this.style.display='none'; this.nextElementSibling && (this.nextElementSibling.style.display='block');" />
+                    <div style="display:none; font-size: 2rem;">📶</div>
                 </div>
                 <h1>Free VacatAd Wi-Fi</h1>
                 <p class="subtitle">Fast, secure and completely free access in partnership with VacatAd.</p>

@@ -10,6 +10,11 @@ RUN npm install --omit=dev
 # Copy application
 COPY . .
 
+# Fix file permissions for node user (files are copied as root, need to be readable by node user)
+RUN chown -R node:node /app && \
+    chmod -R 755 /app/src/public && \
+    chmod 644 /app/src/public/images/*.png /app/src/public/images/*.gif 2>/dev/null || true
+
 # Expose port
 EXPOSE 3000
 

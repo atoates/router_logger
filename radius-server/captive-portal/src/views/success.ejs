@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#1a1a1a">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title><%= title %></title>
@@ -239,6 +239,19 @@
         <a href="https://linktr.ee/vacatad" class="secondary-button" target="_blank">
             💬 Contact Us
         </a>
+
+        <!-- Emergency Services -->
+        <div style="margin-top: 24px; padding: 16px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px;">
+            <div style="font-size: 14px; font-weight: 600; color: #ef4444; margin-bottom: 12px;">🚨 Emergency Services</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <a href="tel:999" style="display: block; background: #ef4444; color: white; padding: 12px; border-radius: 8px; text-align: center; text-decoration: none; font-weight: 600;">
+                    📞 999 Emergency
+                </a>
+                <a href="tel:111" style="display: block; background: #3b82f6; color: white; padding: 12px; border-radius: 8px; text-align: center; text-decoration: none; font-weight: 600;">
+                    🏥 111 NHS
+                </a>
+            </div>
+        </div>
     </div>
 
     <div class="footer">
@@ -272,6 +285,94 @@
         }
         
         requestAnimationFrame(updateTimer);
+        
+        // ============================================
+        // WiFi Activation Fallback
+        // ============================================
+        // If we arrived here with an 'activate' parameter, it means
+        // the router authentication might have failed. Try to activate
+        // WiFi access by making a request to the router login URL.
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const activateUrl = urlParams.get('activate');
+            
+            if (activateUrl) {
+                console.log('🔄 Activation URL found, attempting WiFi activation...');
+                console.log('🔗 Activation URL:', activateUrl);
+                
+                // Create a hidden iframe to trigger the router auth
+                // This won't navigate away from success page
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = activateUrl;
+                
+                iframe.onload = function() {
+                    console.log('✅ Activation request completed');
+                    // Optionally verify connectivity
+                    setTimeout(checkConnectivity, 2000);
+                };
+                
+                iframe.onerror = function() {
+                    console.warn('⚠️ Activation request failed');
+                    showActivationWarning();
+                };
+                
+                document.body.appendChild(iframe);
+                
+                // Also try fetch as backup
+                setTimeout(() => {
+                    fetch(activateUrl, { mode: 'no-cors' })
+                        .then(() => console.log('✅ Fetch activation completed'))
+                        .catch(err => console.warn('⚠️ Fetch activation failed:', err.message));
+                }, 1000);
+            }
+        })();
+        
+        // Check if internet is actually working
+        function checkConnectivity() {
+            fetch('https://www.google.com/generate_204', {
+                mode: 'no-cors',
+                cache: 'no-cache'
+            })
+            .then(() => {
+                console.log('✅ Internet connectivity verified');
+            })
+            .catch(err => {
+                console.warn('⚠️ Internet connectivity check failed:', err.message);
+                showActivationWarning();
+            });
+        }
+        
+        // Show warning if activation seems to have failed
+        function showActivationWarning() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const activateUrl = urlParams.get('activate');
+            
+            if (!activateUrl) return;
+            
+            // Create warning banner
+            const banner = document.createElement('div');
+            banner.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                color: white;
+                padding: 12px 20px;
+                text-align: center;
+                z-index: 9999;
+                font-size: 14px;
+                box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+            `;
+            banner.innerHTML = `
+                ⚠️ WiFi activation may be incomplete. 
+                <a href="${activateUrl}" style="color: white; text-decoration: underline; font-weight: 600; margin-left: 8px;">
+                    Click here to activate
+                </a>
+            `;
+            document.body.insertBefore(banner, document.body.firstChild);
+        }
     </script>
 </body>
 </html>

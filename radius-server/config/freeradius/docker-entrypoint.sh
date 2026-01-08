@@ -13,5 +13,13 @@ if [ -f /etc/freeradius/mods-available/sql.template ]; then
     echo "SQL module configured successfully"
 fi
 
+# Enable REST module
+if [ -f /etc/freeradius/mods-available/rest ]; then
+    echo "Enabling REST module..."
+    ln -sf ../mods-available/rest /etc/freeradius/mods-enabled/rest
+    echo "REST module enabled"
+fi
+
 # Execute the main command (freeradius)
 exec "$@"
+
