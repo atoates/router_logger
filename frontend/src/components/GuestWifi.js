@@ -245,7 +245,7 @@ const GuestWifi = () => {
               >
                 <div className="router-name">{router.router_name || `Router ${router.router_id}`}</div>
                 <div className="router-stats">
-                  <span>{router.session_count} sessions</span>
+                  <span>{formatDataUsage(router.total_bytes || 0)}</span>
                   <span>{router.unique_guests} guests</span>
                 </div>
               </div>
