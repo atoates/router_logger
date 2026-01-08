@@ -90,12 +90,37 @@ const GuestWifi = () => {
   };
 
   const formatDataUsage = (bytes) => {
-    if (!bytes) return '—';
+    if (!bytes || bytes === 0) return '0 B';
     const n = Number(bytes) || 0;
     if (n >= 1e9) return (n / 1e9).toFixed(2) + ' GB';
     if (n >= 1e6) return (n / 1e6).toFixed(2) + ' MB';
     if (n >= 1e3) return (n / 1e3).toFixed(2) + ' KB';
     return n + ' B';
+  };
+
+  // Component for live session timer
+  const SessionTimer = ({ startTime, isActive }) => {
+    const [elapsed, setElapsed] = useState(0);
+
+    useEffect(() => {
+      if (!isActive || !startTime) return;
+
+      const updateElapsed = () => {
+        const start = new Date(startTime);
+        const now = new Date();
+        const seconds = Math.floor((now - start) / 1000);
+        setElapsed(seconds);
+      };
+
+      updateElapsed();
+      const interval = setInterval(updateElapsed, 1000);
+
+      return () => clearInterval(interval);
+    }, [startTime, isActive]);
+
+    if (!isActive) return null;
+
+    return <span className="live-timer">{formatDuration(elapsed)}</span>;
   };
 
   if (loading) {
@@ -243,29 +268,36 @@ const GuestWifi = () => {
               </tr>
             </thead>
             <tbody>
-              {recentGuests.map((guest, idx) => (
-                <tr key={guest.session_id || idx}>
-                  <td>{guest.guest_name || guest.username || 'Anonymous'}</td>
-                  <td>{guest.email || '-'}</td>
-                  <td>{guest.router_name || guest.router_id || 'Unknown'}</td>
-                  <td>{formatDate(guest.session_start)}</td>
-                  <td>{formatDataUsage(guest.bytes_total)}</td>
-                  <td>
-                    <span className={`status-badge ${guest.session_end ? 'ended' : 'active'}`}>
-                      {guest.session_end ? 'Ended' : 'Active'}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      className="delete-btn"
-                      onClick={() => handleDeleteClick(guest)}
-                      title="Delete session"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {recentGuests.map((guest, idx) => {
+                const isActive = !guest.session_end;
+                return (
+                  <tr key={guest.session_id || idx}>
+                    <td>{guest.guest_name || guest.username || 'Anonymous'}</td>
+                    <td>{guest.email || '-'}</td>
+                    <td>{guest.router_name || guest.router_id || 'Unknown'}</td>
+                    <td>{formatDate(guest.session_start)}</td>
+                    <td>{formatDataUsage(guest.bytes_total)}</td>
+                    <td>
+                      <span className={`status-badge ${isActive ? 'active' : 'ended'}`}>
+                        {isActive ? (
+                          <>
+                            Active <SessionTimer startTime={guest.session_start} isActive={true} />
+                          </>
+                        ) : 'Ended'}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className="delete-btn"
+                        onClick={() => handleDeleteClick(guest)}
+                        title="Delete session"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         ) : (

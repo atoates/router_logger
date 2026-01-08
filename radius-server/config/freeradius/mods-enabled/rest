@@ -29,7 +29,7 @@ rest {
     # Accounting - POST to RouterLogger
     # =====================================================
     accounting {
-        uri = "/api/guests/captive-portal/event"
+        uri = "https://routerlogger-production.up.railway.app/api/guests/captive-portal/event"
         method = 'post'
         body = 'json'
         
@@ -60,7 +60,7 @@ rest {
     # Post-Auth - Notify RouterLogger of successful auth
     # =====================================================
     post-auth {
-        uri = "/api/guests/captive-portal/event"
+        uri = "https://routerlogger-production.up.railway.app/api/guests/captive-portal/event"
         method = 'post'
         body = 'json'
         

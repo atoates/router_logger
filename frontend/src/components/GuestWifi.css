@@ -182,7 +182,9 @@
 
 /* Status Badge */
 .status-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 10px;
   border-radius: 12px;
   font-size: 12px;
@@ -197,6 +199,11 @@
 .status-badge.ended {
   background: rgba(107, 114, 128, 0.2);
   color: #9ca3af;
+}
+
+.live-timer {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Type Badge */

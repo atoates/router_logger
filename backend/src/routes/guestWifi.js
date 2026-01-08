@@ -484,6 +484,50 @@ function formatBytes(bytes) {
   return n + ' B';
 }
 
+/**
+ * Auto-expire stale sessions
+ * Marks sessions as ended if they've been active for > 25 hours (24h timeout + 1h buffer)
+ * or if last accounting update was > 2 hours ago
+ */
+async function expireStaleSessionsTask() {
+  try {
+    // Expire sessions that have been active for more than 25 hours
+    const expireByDurationResult = await pool.query(`
+      UPDATE wifi_guest_sessions
+      SET 
+        session_end = session_start + INTERVAL '25 hours',
+        terminate_reason = 'timeout_auto_expired',
+        updated_at = NOW()
+      WHERE session_end IS NULL
+        AND session_start < NOW() - INTERVAL '25 hours'
+      RETURNING id, username, user_mac
+    `);
+
+    // Expire sessions with no accounting updates for 2+ hours
+    const expireByAccountingResult = await pool.query(`
+      UPDATE wifi_guest_sessions
+      SET 
+        session_end = last_accounting_update + INTERVAL '5 minutes',
+        terminate_reason = 'idle_auto_expired',
+        updated_at = NOW()
+      WHERE session_end IS NULL
+        AND last_accounting_update IS NOT NULL
+        AND last_accounting_update < NOW() - INTERVAL '2 hours'
+      RETURNING id, username, user_mac
+    `);
+
+    const totalExpired = expireByDurationResult.rowCount + expireByAccountingResult.rowCount;
+    if (totalExpired > 0) {
+      logger.info(`Auto-expired ${totalExpired} stale sessions (${expireByDurationResult.rowCount} by duration, ${expireByAccountingResult.rowCount} by idle)`);
+    }
+    
+    return totalExpired;
+  } catch (error) {
+    logger.error('Error expiring stale sessions:', error);
+    return 0;
+  }
+}
+
 // =============================================================================
 // API ENDPOINTS
 // =============================================================================
@@ -556,6 +600,9 @@ router.get('/', async (req, res) => {
 router.get('/stats', async (req, res) => {
   try {
     const { router_id, days = 30 } = req.query;
+    
+    // Auto-expire stale sessions before calculating stats
+    await expireStaleSessionsTask();
     
     let whereClause = `WHERE session_start > NOW() - INTERVAL '${parseInt(days)} days'`;
     const params = [];
@@ -690,6 +737,9 @@ router.get('/router/:routerId', async (req, res) => {
 router.get('/recent', async (req, res) => {
   try {
     const { limit = 20 } = req.query;
+    
+    // Auto-expire stale sessions before returning results
+    await expireStaleSessionsTask();
     
     const result = await pool.query(`
       SELECT 
