@@ -134,19 +134,17 @@
                     const redirectUrl = data.redirect || '/success?type=free';
                     console.log('🔗 Redirecting to:', redirectUrl);
                     
-                    // Direct redirect - CoovaChilli will handle auth and may redirect back
-                    setTimeout(() => {
-                        window.location.href = redirectUrl;
-                    }, 800);
+                    // Immediate redirect - don't wait
+                    window.location.href = redirectUrl;
                 } else {
                     showMessage(data.message || 'Registration failed. Please try again.', 'error');
                     setButtonLoading(submitBtn, false);
+                    isSubmitting = false;
                 }
             } catch (err) {
                 console.error('Registration error:', err);
                 showMessage('Network error. Please try again.', 'error');
                 setButtonLoading(submitBtn, false);
-            } finally {
                 isSubmitting = false;
             }
         });

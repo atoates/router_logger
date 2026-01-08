@@ -107,8 +107,8 @@ server default {
         # Log to SQL database (local tracking)
         sql
 
-        # Send real-time updates to RouterLogger API
-        rest
+        # Send real-time updates to RouterLogger API (non-blocking)
+        -rest
     }
 
     # =====================================================
@@ -127,8 +127,7 @@ server default {
         # Log successful auth to SQL
         sql
 
-        # Notify RouterLogger of successful auth
-        rest
+        # Notify RouterLogger of successful auth (DISABLED - causing auth failures)
         # rest
 
         # Add reply attributes
