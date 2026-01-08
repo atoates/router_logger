@@ -12,6 +12,8 @@ const GuestWifi = () => {
   const [days, setDays] = useState(7);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [expandedDevices, setExpandedDevices] = useState(new Set());
+  const [groupByDevice, setGroupByDevice] = useState(true);
 
   useEffect(() => {
     fetchData();
@@ -96,6 +98,52 @@ const GuestWifi = () => {
     if (n >= 1e6) return (n / 1e6).toFixed(2) + ' MB';
     if (n >= 1e3) return (n / 1e3).toFixed(2) + ' KB';
     return n + ' B';
+  };
+
+  // Group sessions by device (MAC address)
+  const groupSessionsByDevice = (sessions) => {
+    const deviceMap = new Map();
+    
+    sessions.forEach(session => {
+      const mac = session.user_mac || 'unknown';
+      if (!deviceMap.has(mac)) {
+        deviceMap.set(mac, {
+          mac,
+          sessions: [],
+          totalSessions: 0,
+          activeSessions: 0,
+          totalData: 0,
+          lastConnected: session.session_start,
+          mostRecentEmail: session.email
+        });
+      }
+      
+      const device = deviceMap.get(mac);
+      device.sessions.push(session);
+      device.totalSessions++;
+      if (!session.session_end) device.activeSessions++;
+      device.totalData += Number(session.bytes_total) || 0;
+      
+      // Keep the most recent connection time
+      if (new Date(session.session_start) > new Date(device.lastConnected)) {
+        device.lastConnected = session.session_start;
+        device.mostRecentEmail = session.email;
+      }
+    });
+    
+    return Array.from(deviceMap.values()).sort((a, b) => 
+      new Date(b.lastConnected) - new Date(a.lastConnected)
+    );
+  };
+
+  const toggleDevice = (mac) => {
+    const newExpanded = new Set(expandedDevices);
+    if (newExpanded.has(mac)) {
+      newExpanded.delete(mac);
+    } else {
+      newExpanded.add(mac);
+    }
+    setExpandedDevices(newExpanded);
   };
 
   // Component for live session timer
@@ -253,53 +301,144 @@ const GuestWifi = () => {
 
       {/* Recent Sessions */}
       <div className="section">
-        <h2>Recent Sessions</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h2 style={{ margin: 0 }}>Recent Sessions</h2>
+          <label className="group-toggle">
+            <input
+              type="checkbox"
+              checked={groupByDevice}
+              onChange={(e) => setGroupByDevice(e.target.checked)}
+            />
+            <span>Group by device</span>
+          </label>
+        </div>
+        
         {recentGuests.length > 0 ? (
-          <table className="guests-table">
-            <thead>
-              <tr>
-                <th>Guest</th>
-                <th>Email</th>
-                <th>Router</th>
-                <th>Connected</th>
-                <th>Data Used</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentGuests.map((guest, idx) => {
-                const isActive = !guest.session_end;
-                return (
-                  <tr key={guest.session_id || idx}>
-                    <td>{guest.guest_name || guest.username || 'Anonymous'}</td>
-                    <td>{guest.email || '-'}</td>
-                    <td>{guest.router_name || guest.router_id || 'Unknown'}</td>
-                    <td>{formatDate(guest.session_start)}</td>
-                    <td>{formatDataUsage(guest.bytes_total)}</td>
-                    <td>
-                      <span className={`status-badge ${isActive ? 'active' : 'ended'}`}>
-                        {isActive ? (
-                          <>
-                            Active <SessionTimer startTime={guest.session_start} isActive={true} />
-                          </>
-                        ) : 'Ended'}
+          groupByDevice ? (
+            // Grouped view by device
+            <div className="device-groups">
+              {groupSessionsByDevice(recentGuests).map((device) => (
+                <div key={device.mac} className="device-group">
+                  <div 
+                    className="device-header"
+                    onClick={() => toggleDevice(device.mac)}
+                  >
+                    <div className="device-expand">
+                      <span className={`expand-icon ${expandedDevices.has(device.mac) ? 'expanded' : ''}`}>
+                        ▶
                       </span>
-                    </td>
-                    <td>
-                      <button
-                        className="delete-btn"
-                        onClick={() => handleDeleteClick(guest)}
-                        title="Delete session"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </div>
+                    <div className="device-info">
+                      <div className="device-mac">{device.mac}</div>
+                      <div className="device-email">{device.mostRecentEmail || 'No email'}</div>
+                    </div>
+                    <div className="device-stats">
+                      <span className="device-stat">{device.totalSessions} session{device.totalSessions !== 1 ? 's' : ''}</span>
+                      <span className="device-stat">{formatDataUsage(device.totalData)}</span>
+                      {device.activeSessions > 0 && (
+                        <span className="status-badge active">
+                          {device.activeSessions} active
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {expandedDevices.has(device.mac) && (
+                    <div className="device-sessions">
+                      <table className="guests-table compact">
+                        <thead>
+                          <tr>
+                            <th>Guest</th>
+                            <th>Connected</th>
+                            <th>Data Used</th>
+                            <th>Status</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {device.sessions.map((guest, idx) => {
+                            const isActive = !guest.session_end;
+                            return (
+                              <tr key={guest.session_id || idx}>
+                                <td>{guest.guest_name || guest.username || 'Anonymous'}</td>
+                                <td>{formatDate(guest.session_start)}</td>
+                                <td>{formatDataUsage(guest.bytes_total)}</td>
+                                <td>
+                                  <span className={`status-badge ${isActive ? 'active' : 'ended'}`}>
+                                    {isActive ? (
+                                      <>
+                                        Active <SessionTimer startTime={guest.session_start} isActive={true} />
+                                      </>
+                                    ) : 'Ended'}
+                                  </span>
+                                </td>
+                                <td>
+                                  <button
+                                    className="delete-btn"
+                                    onClick={() => handleDeleteClick(guest)}
+                                    title="Delete session"
+                                  >
+                                    Delete
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Flat table view
+            <table className="guests-table">
+              <thead>
+                <tr>
+                  <th>Guest</th>
+                  <th>Email</th>
+                  <th>Router</th>
+                  <th>Connected</th>
+                  <th>Data Used</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentGuests.map((guest, idx) => {
+                  const isActive = !guest.session_end;
+                  return (
+                    <tr key={guest.session_id || idx}>
+                      <td>{guest.guest_name || guest.username || 'Anonymous'}</td>
+                      <td>{guest.email || '-'}</td>
+                      <td>{guest.router_name || guest.router_id || 'Unknown'}</td>
+                      <td>{formatDate(guest.session_start)}</td>
+                      <td>{formatDataUsage(guest.bytes_total)}</td>
+                      <td>
+                        <span className={`status-badge ${isActive ? 'active' : 'ended'}`}>
+                          {isActive ? (
+                            <>
+                              Active <SessionTimer startTime={guest.session_start} isActive={true} />
+                            </>
+                          ) : 'Ended'}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="delete-btn"
+                          onClick={() => handleDeleteClick(guest)}
+                          title="Delete session"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )
         ) : (
           <div className="empty-state">
             <p>No guest sessions recorded yet.</p>
