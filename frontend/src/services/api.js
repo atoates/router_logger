@@ -99,9 +99,10 @@ export const getClickUpUsage = () => api.get('/monitoring/clickup-usage');
 // Guest WiFi (Captive Portal)
 export const getGuestWifiStats = (days = 30) => api.get('/guests/stats', { params: { days } });
 export const getGuestWifiRecent = (limit = 20) => api.get('/guests/recent', { params: { limit } });
-export const getGuestsByRouter = (routerId, limit = 50, days = 7) => 
+export const getGuestsByRouter = (routerId, limit = 50, days = 7) =>
   api.get(`/guests/router/${routerId}`, { params: { limit, days } });
 export const getAllGuests = (params = {}) => api.get('/guests', { params });
+export const deleteGuestSession = (sessionId) => api.delete(`/guests/session/${sessionId}`);
 
 // ClickUp Integration
 export const getClickUpAuthStatus = () => api.get('/clickup/auth/status');

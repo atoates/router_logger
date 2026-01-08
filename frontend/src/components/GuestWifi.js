@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getGuestWifiStats, getGuestWifiRecent, getGuestsByRouter } from '../services/api';
+import { getGuestWifiStats, getGuestWifiRecent, getGuestsByRouter, deleteGuestSession } from '../services/api';
 import './GuestWifi.css';
 
 const GuestWifi = () => {
@@ -10,6 +10,8 @@ const GuestWifi = () => {
   const [selectedRouter, setSelectedRouter] = useState(null);
   const [routerGuests, setRouterGuests] = useState([]);
   const [days, setDays] = useState(7);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -39,13 +41,37 @@ const GuestWifi = () => {
       setRouterGuests([]);
       return;
     }
-    
+
     setSelectedRouter(routerId);
     try {
       const res = await getGuestsByRouter(routerId, 50, days);
       setRouterGuests(res.data.guests || []);
     } catch (err) {
       console.error('Error fetching router guests:', err);
+    }
+  };
+
+  const handleDeleteClick = (guest) => {
+    setDeleteConfirm(guest);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm) return;
+
+    setDeleting(true);
+    try {
+      await deleteGuestSession(deleteConfirm.id);
+      // Remove from local state
+      setRecentGuests(prev => prev.filter(g => g.id !== deleteConfirm.id));
+      setRouterGuests(prev => prev.filter(g => g.id !== deleteConfirm.id));
+      setDeleteConfirm(null);
+      // Refresh stats
+      fetchData();
+    } catch (err) {
+      console.error('Error deleting session:', err);
+      alert('Failed to delete session: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -166,6 +192,7 @@ const GuestWifi = () => {
                     <th>Duration</th>
                     <th>Data Used</th>
                     <th>Status</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -180,6 +207,15 @@ const GuestWifi = () => {
                         <span className={`status-badge ${guest.session_end ? 'ended' : 'active'}`}>
                           {guest.session_end ? 'Ended' : 'Active'}
                         </span>
+                      </td>
+                      <td>
+                        <button
+                          className="delete-btn"
+                          onClick={() => handleDeleteClick(guest)}
+                          title="Delete session"
+                        >
+                          Delete
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -203,6 +239,7 @@ const GuestWifi = () => {
                 <th>Connected</th>
                 <th>Data Used</th>
                 <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -217,6 +254,15 @@ const GuestWifi = () => {
                     <span className={`status-badge ${guest.session_end ? 'ended' : 'active'}`}>
                       {guest.session_end ? 'Ended' : 'Active'}
                     </span>
+                  </td>
+                  <td>
+                    <button
+                      className="delete-btn"
+                      onClick={() => handleDeleteClick(guest)}
+                      title="Delete session"
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -237,14 +283,44 @@ const GuestWifi = () => {
           <div className="timeline-chart">
             {stats.timeline.slice(0, 14).reverse().map((day) => (
               <div key={day.date} className="timeline-bar">
-                <div 
-                  className="bar" 
+                <div
+                  className="bar"
                   style={{ height: `${Math.min(100, (day.sessions / Math.max(...stats.timeline.map(d => d.sessions))) * 100)}%` }}
                   title={`${day.sessions} sessions, ${day.unique_guests} guests`}
                 />
                 <div className="bar-label">{new Date(day.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="modal-overlay" onClick={() => !deleting && setDeleteConfirm(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h3>Delete Session</h3>
+            <p>Are you sure you want to delete this session?</p>
+            <div className="modal-guest-info">
+              <strong>{deleteConfirm.guest_name || deleteConfirm.username || 'Anonymous'}</strong>
+              {deleteConfirm.email && <span>{deleteConfirm.email}</span>}
+            </div>
+            <div className="modal-actions">
+              <button
+                className="modal-btn cancel"
+                onClick={() => setDeleteConfirm(null)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                className="modal-btn delete"
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}

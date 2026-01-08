@@ -792,7 +792,7 @@ router.get('/:username/usage', async (req, res) => {
   try {
     const { username } = req.params;
     const usage = await radiusSync.getRealTimeUsage(username);
-    
+
     if (usage) {
       res.json({
         success: true,
@@ -807,6 +807,40 @@ router.get('/:username/usage', async (req, res) => {
     }
   } catch (error) {
     logger.error(`Error getting usage for ${req.params.username}:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/guests/session/:sessionId
+ * Delete a guest session by ID
+ */
+router.delete('/session/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Session ID is required' });
+    }
+
+    const result = await pool.query(
+      'DELETE FROM wifi_guest_sessions WHERE id = $1 RETURNING id, username, email',
+      [sessionId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    logger.info(`Guest session deleted: ${result.rows[0].email || result.rows[0].username} (ID: ${sessionId})`);
+
+    res.json({
+      success: true,
+      deleted: result.rows[0],
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error(`Error deleting session ${req.params.sessionId}:`, error);
     res.status(500).json({ error: error.message });
   }
 });
