@@ -676,7 +676,8 @@ router.get('/stats', async (req, res) => {
         s.router_id,
         r.name as router_name,
         COUNT(*) as session_count,
-        COUNT(DISTINCT s.username) as unique_guests
+        COUNT(DISTINCT s.username) as unique_guests,
+        COALESCE(SUM(s.bytes_total), 0) as total_bytes
       FROM wifi_guest_sessions s
       LEFT JOIN routers r ON s.router_id = r.router_id
       ${whereClause}
