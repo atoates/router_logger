@@ -187,7 +187,6 @@ export default function RouterDashboard({ router }) {
   }, [series, stats]);
   const onlinePct = useMemo(() => {
     if (!uptime || uptime.length === 0) {
-      console.log('RouterDashboard - No uptime data available');
       return null;
     }
     const on = uptime.filter(u => (u.status === 'online' || u.status === 1 || u.status === '1' || u.status === true)).length;
@@ -338,8 +337,7 @@ export default function RouterDashboard({ router }) {
           ref={propertyWidgetRef}
           router={router} 
           onAssigned={() => {
-            // Optionally reload data when location is assigned
-            console.log('Location assigned to router');
+            // Location assigned successfully
           }} 
         />
       </div>

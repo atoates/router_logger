@@ -44,11 +44,9 @@ function RMSAuthButton({ variant = 'panel' }) {
   }, []);
 
   const checkAuthStatus = async () => {
-    console.log('RMSAuthButton: Checking auth status...');
     try {
       const response = await api.get('/auth/rms/status');
       const data = response.data;
-      console.log('RMSAuthButton: Auth status data:', data);
       
       setAuthStatus({
         loading: false,
