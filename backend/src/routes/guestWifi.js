@@ -111,6 +111,7 @@ async function findRouterByMac(mac) {
   if (!mac) return null;
 
   const normalizedMac = normalizeMac(mac);
+  logger.info(`🔍 findRouterByMac: Looking up ${mac} -> normalized: ${normalizedMac}`);
 
   // Try exact match first with multiple MAC formats
   let result = await pool.query(`
@@ -121,21 +122,26 @@ async function findRouterByMac(mac) {
   `, [normalizedMac]);
 
   if (result.rows.length > 0) {
+    logger.info(`✅ Exact MAC match found: ${result.rows[0].router_id} (${result.rows[0].name})`);
     return result.rows[0];
   }
 
   // Fuzzy match: match on first 5 octets (first 14 chars like "20:97:27:88:d5")
   // This handles Teltonika routers where LAN/WAN/WiFi MACs differ only in last octet
   const macPrefix = normalizedMac.substring(0, 14); // "xx:xx:xx:xx:xx"
+  logger.info(`🔍 Trying fuzzy match with prefix: ${macPrefix}`);
+  
   if (macPrefix.length === 14) {
     result = await pool.query(`
-      SELECT router_id, name FROM routers
+      SELECT router_id, name, mac_address FROM routers
       WHERE LOWER(SUBSTRING(REPLACE(mac_address, '-', ':'), 1, 14)) = $1
     `, [macPrefix]);
 
     if (result.rows.length > 0) {
-      logger.info(`Fuzzy MAC match: ${mac} -> ${result.rows[0].name} (${result.rows[0].router_id})`);
+      logger.info(`✅ Fuzzy MAC match: ${mac} -> ${result.rows[0].name} (${result.rows[0].router_id}) with DB MAC ${result.rows[0].mac_address}`);
       return result.rows[0];
+    } else {
+      logger.warn(`❌ No fuzzy match for prefix ${macPrefix}`);
     }
   }
 
@@ -200,14 +206,28 @@ async function processGuestEvent(event) {
   let routerId = router_id;
   let routerName = null;
 
+  logger.info(`🔍 Router lookup - router_id: ${router_id}, apMac: ${apMac}`);
+
   if (!routerId && apMac) {
     const router = await findRouterByMac(apMac);
     if (router) {
       routerId = router.router_id;
       routerName = router.name;
-      logger.info(`Matched router by MAC: ${apMac} -> ${routerId} (${routerName})`);
+      logger.info(`✅ Matched router by MAC: ${apMac} -> ${routerId} (${routerName})`);
     } else {
-      logger.warn(`No router found matching MAC: ${apMac}`);
+      logger.warn(`❌ No router found matching MAC: ${apMac} - checking all routers in DB...`);
+      
+      // Debug: List all routers to help diagnose
+      const allRouters = await pool.query('SELECT router_id, name, mac_address FROM routers LIMIT 5');
+      logger.warn(`Available routers: ${JSON.stringify(allRouters.rows)}`);
+    }
+  } else if (routerId === 'guest') {
+    logger.warn(`⚠️ Router ID is "guest" (NAS ID) - attempting MAC lookup anyway with ${apMac}`);
+    const router = await findRouterByMac(apMac);
+    if (router) {
+      routerId = router.router_id;
+      routerName = router.name;
+      logger.info(`✅ Resolved "guest" to router: ${routerId} (${routerName}) via MAC`);
     }
   }
 
