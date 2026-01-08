@@ -310,22 +310,6 @@ async function notifyRouterLogger(eventData) {
 const UAM_SECRET = process.env.UAM_SECRET || 'ChqPIbGB0RjyiM2c';
 
 /**
- * Calculate CoovaChilli CHAP response
- * The response is: MD5(ident + password + challenge)
- * Where ident is 0x00 for initial login
- */
-function calculateChapResponse(password, challenge) {
-    // Convert hex challenge to buffer
-    const challengeBuffer = Buffer.from(challenge, 'hex');
-    // Create MD5 hash of: 0x00 + password + challenge
-    const md5 = crypto.createHash('md5');
-    md5.update(Buffer.from([0])); // ident = 0
-    md5.update(password);
-    md5.update(challengeBuffer);
-    return md5.digest('hex');
-}
-
-/**
  * Calculate CoovaChilli CHAP password for PAP mode
  * For CoovaChilli PAP with UAM:
  * 1. Calculate nt_response = MD5(challenge (binary) + uamsecret)
@@ -374,23 +358,6 @@ function calculateChilliPassword(password, challenge, uamSecret) {
         return encryptedPassword;
     } catch (error) {
         console.error('❌ Error calculating Chilli password:', error);
-        return null;
-    }
-}
-
-/**
- * Simple CHAP response for CoovaChilli
- * response = MD5(ident + password + challenge)
- */
-function calculateChapResponse(ident, password, challenge) {
-    try {
-        const md5 = crypto.createHash('md5');
-        md5.update(Buffer.from([ident])); // ident byte
-        md5.update(password);
-        md5.update(Buffer.from(challenge, 'hex'));
-        return md5.digest('hex');
-    } catch (error) {
-        console.error('Error calculating CHAP response:', error);
         return null;
     }
 }
