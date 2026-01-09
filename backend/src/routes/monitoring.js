@@ -53,6 +53,38 @@ let clickupMetrics = {
   retries: 0
 };
 
+// Auto-reset metrics daily at midnight UTC
+setInterval(() => {
+  const now = new Date();
+  const hoursSinceReset = (now - apiMetrics.lastReset) / (1000 * 60 * 60);
+  
+  // Reset if more than 24 hours have passed
+  if (hoursSinceReset >= 24) {
+    logger.info(`Auto-resetting API metrics after ${hoursSinceReset.toFixed(2)} hours`);
+    apiMetrics = {
+      rmsApiCalls: 0,
+      lastReset: new Date(),
+      callsByType: {},
+      rateLimitHits: 0,
+      lastRateLimit: null
+    };
+    clickupMetrics = {
+      apiCalls: 0,
+      lastReset: new Date(),
+      callsByType: {
+        updateTask: 0,
+        updateCustomField: 0,
+        getTask: 0,
+        createTask: 0,
+        other: 0
+      },
+      rateLimitHits: 0,
+      lastRateLimit: null,
+      retries: 0
+    };
+  }
+}, 60 * 60 * 1000); // Check every hour
+
 // Middleware to track RMS API calls (to be used in rmsClient)
 function trackRMSCall(endpoint, status) {
   apiMetrics.rmsApiCalls++;
@@ -137,9 +169,15 @@ router.get('/api/monitoring/rms-usage', async (req, res) => {
     // Calculate daily and monthly estimates
     const now = new Date();
     const hoursSinceReset = (now - apiMetrics.lastReset) / (1000 * 60 * 60);
-    const dailyEstimate = hoursSinceReset > 0 ? Math.round((apiMetrics.rmsApiCalls / hoursSinceReset) * 24) : 0;
+    
+    // Only calculate estimates if we have at least 1 hour of data
+    const dailyEstimate = hoursSinceReset >= 1 ? Math.round((apiMetrics.rmsApiCalls / hoursSinceReset) * 24) : 0;
     const monthlyEstimate = dailyEstimate * 30;
     const quotaLimit = 100000; // RMS API monthly limit
+    
+    // Calculate percentage, but show warning if sample size is too small
+    const percentOfQuota = monthlyEstimate > 0 ? ((monthlyEstimate / quotaLimit) * 100).toFixed(2) + '%' : '0%';
+    const lowDataWarning = hoursSinceReset < 1 ? 'Insufficient data (< 1 hour)' : null;
     
     // Get recent sync stats from logs
     const recentSyncs = await pool.query(`
@@ -175,12 +213,13 @@ router.get('/api/monitoring/rms-usage', async (req, res) => {
         rateLimitHits: apiMetrics.rateLimitHits,
         lastRateLimit: apiMetrics.lastRateLimit,
         quotaLimit,
+        lowDataWarning,
         estimates: {
-          hourlyRate: hoursSinceReset > 0 ? Math.round(apiMetrics.rmsApiCalls / hoursSinceReset) : 0,
+          hourlyRate: hoursSinceReset >= 1 ? Math.round(apiMetrics.rmsApiCalls / hoursSinceReset) : 0,
           dailyRate: dailyEstimate,
           monthlyRate: monthlyEstimate,
-          percentOfQuota: ((monthlyEstimate / quotaLimit) * 100).toFixed(2) + '%',
-          quotaRemaining: quotaLimit - monthlyEstimate
+          percentOfQuota,
+          quotaRemaining: Math.max(0, quotaLimit - monthlyEstimate)
         }
       },
       recentActivity: recentSyncs.rows,
