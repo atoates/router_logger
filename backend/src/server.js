@@ -96,7 +96,12 @@ app.get('/health', (req, res) => {
   if (!isServerReady) {
     return res.status(503).json({ status: 'starting', message: 'Server is initializing...' });
   }
-  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'healthy',
+    uptime: process.uptime(),
+    version: '2.0.0',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Routes
