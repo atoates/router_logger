@@ -36,8 +36,13 @@ COMMENT ON INDEX idx_wifi_sessions_email IS 'Fast lookup of guest sessions by em
 COMMENT ON INDEX idx_wifi_sessions_active IS 'Partial index for active sessions only - faster than full table scan';
 
 -- =====================================================
--- Add JSONB Index for Router Metadata
+-- Add JSONB Metadata Column and Index to Routers
 -- =====================================================
+
+-- Add metadata JSONB column if it doesn't exist
+ALTER TABLE routers ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}';
+
+COMMENT ON COLUMN routers.metadata IS 'Flexible JSONB storage for custom router metadata and extended properties';
 
 -- GIN index on metadata JSONB column for fast queries filtering by metadata fields
 -- This speeds up queries like: WHERE metadata @> '{"key": "value"}'
