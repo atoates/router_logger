@@ -4,28 +4,38 @@
 RouterLogger is a monitoring system for Teltonika RUT200 routers with integrations for:
 - **Teltonika RMS** (OAuth) - Router telemetry and status
 - **ClickUp** (OAuth) - Task management for router deployment
+- **Self-Hosted RADIUS/Captive Portal** - Guest WiFi authentication and tracking
 
 ## Tech Stack
-- **Backend**: Node.js/Express, PostgreSQL
-- **Frontend**: React
+- **Backend**: Node.js/Express, PostgreSQL (Railway)
+- **Frontend**: React (Railway)
+- **RADIUS Server**: FreeRADIUS, MariaDB, Node.js Captive Portal (DigitalOcean VPS @ 134.122.101.195)
 - **Deployment**: Railway (auto-deploys on git push to main)
 
-## Deployment & Testing Strategy (Preferred Method)
+## Deployment & Testing Strategy
 
 **The best way to verify changes is to deploy and check logs.**
 Local testing is limited because there is no local database access.
 
-### Verification Workflow:
-1. **Write Tests**: Create Jest unit tests in `backend/tests/`.
-2. **Commit & Push**: `git push` triggers Railway deployment.
-3. **Wait for Build**: Railway will run `npm test` during the build phase (configured in package.json).
-   - If tests fail, deployment halts (Safe!).
-4. **Check Logs**: For runtime verification, use the "Diagnostic on Startup" pattern below.
+### RouterLogger Deployment (Railway)
+```bash
+git push origin main  # Auto-deploys backend + frontend
+```
 
-### Running diagnostics on startup:
-Add diagnostic code to `backend/src/server.js` in the `startServer()` function. It runs on every deploy.
+### RADIUS Server Deployment (VPS)
+```bash
+# Full stack rebuild
+cd radius-server
+tar czf - . | ssh root@134.122.101.195 \
+  "cd /opt/radius-server/radius-server && tar xzf - && docker compose down && docker compose up -d --build"
 
-Example pattern:
+# Captive portal only
+tar czf - captive-portal/ | ssh root@134.122.101.195 \
+  "cd /opt/radius-server/radius-server && tar xzf - && docker compose build captive-portal && docker compose up -d captive-portal"
+```
+
+### Diagnostic Pattern
+Add diagnostic code to `backend/src/server.js` in `startServer()`:
 ```javascript
 async function runMyDiagnostic() {
   const { pool } = require('./config/database');
@@ -36,67 +46,124 @@ async function runMyDiagnostic() {
     logger.warn('Diagnostic failed (non-fatal):', error.message);
   }
 }
-// Call in startServer() before app.listen():
 await runMyDiagnostic();
 ```
 
 ## Key Database Tables
 
-### Router Data
+### Router Data (PostgreSQL - Railway)
 - `routers` - Router registry (router_id, name, mac_address, etc.)
 - `router_logs` - Telemetry logs (partitioned by month)
 - `router_current_status` - Denormalized latest status for fast dashboard queries
 
-### Guest WiFi
-- `wifi_guest_sessions` - Guest session data from self-hosted captive portal
-- `ironwifi_guests`, `ironwifi_sessions` - Legacy tables (see Historical Notes)
+### Guest WiFi (PostgreSQL - Railway)
+- `wifi_guest_sessions` - Guest session data from captive portal
+- `captive_free_usage` - Tracks free access cooldowns by MAC
 
-## Self-Hosted Captive Portal Integration
+### RADIUS Accounting (MariaDB - VPS)
+- `radcheck` - User credentials
+- `radacct` - Accounting data (bytes uploaded/downloaded, session time)
 
-The system receives guest WiFi events from the self-hosted RADIUS server/captive portal.
+## Guest WiFi / Captive Portal System
 
-**Webhook Endpoint:** `POST /api/guests/captive-portal/event`
+### Architecture
+```
+User Device → CoovaChilli Router → FreeRADIUS → MariaDB (radacct)
+                    ↓                              ↓
+              Captive Portal              RouterLogger Sync (2min)
+                    ↓                              ↓
+              wifi_guest_sessions ←──────── PostgreSQL
+```
 
-**Expected Payload:**
+### Webhook Endpoint
+`POST /api/guests/captive-portal/event`
+
 ```json
 {
-  "type": "guest_login",
+  "type": "registration_completed",
   "session_id": "unique-session-id",
-  "username": "guest@email.com",
+  "username": "free-1234567890-xyz",
   "email": "guest@email.com",
-  "phone": "+1234567890",
-  "name": "Guest Name",
   "mac_address": "aa:bb:cc:dd:ee:ff",
   "router_mac": "20:97:27:xx:xx:xx",
-  "router_id": "optional-router-id",
-  "session_duration": 3600,
   "timestamp": "2024-01-15T12:00:00Z"
 }
 ```
 
-**Event Types:**
+### Event Types
 - `registration_completed` - Guest registered and connected
 - `free_access_granted` - Guest connected with free access
-- `guest_login` - Guest logged in
-- `guest_logout` - Guest disconnected
-- `session_expired` - Session timed out
+- `guest_login` / `guest_logout` - Session start/end
+- `radius_accounting` - RADIUS accounting packet (Start/Interim-Update/Stop)
 
-**Router Matching:** If `router_id` is not provided, the system matches by `router_mac` against `routers.mac_address`.
+### Router Matching
+System matches routers by MAC address with fuzzy matching on first 5 octets (Teltonika routers have different MACs for LAN/WAN/WiFi interfaces).
 
 ## File Locations
 
 ### Backend
 - `backend/src/server.js` - Main server, startup logic
 - `backend/src/services/rmsSync.js` - RMS telemetry sync
-- `backend/src/models/router.js` - Router database operations
+- `backend/src/services/radiusAccountingSync.js` - RADIUS data sync
 - `backend/src/routes/guestWifi.js` - Guest WiFi webhook + session queries
 
 ### Frontend
-- `frontend/src/` - React components
+- `frontend/src/components/GuestWifi.js` - Guest WiFi dashboard
+
+### RADIUS Server
+- `radius-server/config/freeradius/` - FreeRADIUS configuration
+- `radius-server/config/freeradius/clients.conf` - **CRITICAL: Shared secret config**
+- `radius-server/captive-portal/` - Node.js captive portal app
+- `radius-server/docker-compose.yml` - Container orchestration
 
 ### Database
 - `backend/src/database/schema.sql` - Main schema
 - `backend/src/database/migrations/` - Migration files
+
+## Critical Configuration
+
+### RADIUS Shared Secret
+**MUST match between FreeRADIUS and router CoovaChilli config.**
+
+Current production: `lPvk2g6aQuMWpmAGnQrwQ`
+
+Files:
+- `radius-server/config/freeradius/clients.conf`
+- Router: `uci show chilli | grep radiussecret`
+
+If mismatched: Users register but get no WiFi access (stuck in "dnat" state).
+
+### FreeRADIUS SQL
+FreeRADIUS does NOT support `${ENV_VAR}` syntax. All values must be hardcoded in `mods-enabled/sql`.
+
+## Useful Commands
+
+### Check RADIUS logs
+```bash
+ssh root@134.122.101.195 "docker logs freeradius --tail=100"
+```
+
+### Check accounting data
+```bash
+ssh root@134.122.101.195 'docker exec radius-db mysql -u radius -p"lI5ST8a0WJ2GrvE5SSn1Vw" radius -e "SELECT username, acctinputoctets, acctoutputoctets FROM radacct ORDER BY acctstarttime DESC LIMIT 10;"'
+```
+
+### Check router CoovaChilli status
+```bash
+ssh admin@ROUTER_IP
+chilli_query list  # Look for "pass" state, not "dnat"
+```
+
+### Trigger manual RADIUS sync
+```bash
+curl -X POST https://routerlogger-production.up.railway.app/api/guests/sync-accounting
+```
+
+### View container status on VPS
+```bash
+ssh root@134.122.101.195 "docker ps"
+ssh root@134.122.101.195 "docker logs -f captive-portal"
+```
 
 ---
 
@@ -104,30 +171,12 @@ The system receives guest WiFi events from the self-hosted RADIUS server/captive
 
 ### IronWifi Integration (Deprecated - Dec 2024)
 
-The project originally integrated with IronWifi for guest WiFi tracking. This integration was removed because the webhook system never worked reliably in production.
+Previously used IronWifi for guest WiFi tracking. Removed because webhooks never worked reliably. Replaced with self-hosted RADIUS/captive portal.
 
-**What was IronWifi?**
-- Third-party captive portal service for guest WiFi authentication
-- Provided RADIUS accounting and guest registration data
-- Used webhooks to push session events to RouterLogger
+Legacy tables kept for historical data:
+- `ironwifi_guests`, `ironwifi_sessions`, `ironwifi_webhook_log`
 
-**Legacy database tables (kept for historical data):**
-- `ironwifi_guests` - Cached guest registration data from IronWifi API
-- `ironwifi_sessions` - RADIUS accounting sessions
-- `ironwifi_webhook_log` - Debug log for webhook receipts
-
-**MAC Address Matching (historical context):**
-- `ap_mac` = Called-Station-Id = Router's WiFi interface MAC
-- `client_mac` = Calling-Station-Id = User's device MAC
-- Matching attempted via `routers.mac_address` column
-
-**Why it was removed:**
-- Webhook endpoint never received data reliably
-- API rate limits made sync impractical
-- Replaced with simpler `wifi_guest_sessions` table for manual/CSV imports
-
-**Files removed:**
+Files removed:
 - `backend/src/services/ironwifiSync.js`
 - `backend/src/routes/ironwifiWebhook.js`
-- `backend/test-ironwifi-api.js`
-- `docs/IRONWIFI-*.md` (integration docs, webhook setup, API test results, rate limits)
+- `docs/IRONWIFI-*.md`

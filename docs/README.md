@@ -5,7 +5,15 @@ This folder contains the up-to-date operational docs and guides.
 ## Start here
 
 - **Quickstart**: `../QUICKSTART.md`
+- **Changelog**: `../CHANGELOG.md`
 - **Environment variables**: `ENVIRONMENT-VARIABLES.md`
+
+## RADIUS Server / Guest WiFi
+
+- **Setup guide**: `../radius-server/README.md`
+- **Shared secret config**: `../radius-server/docs/RADIUS-SHARED-SECRET.md`
+- **Teltonika router setup**: `../radius-server/docs/TELTONIKA-SETUP.md`
+- **Migration guide**: `../radius-server/docs/MIGRATION-GUIDE.md`
 
 ## Operations
 
@@ -14,7 +22,6 @@ This folder contains the up-to-date operational docs and guides.
 - **Selective deployments**: `ops/RAILWAY-SELECTIVE-DEPLOYMENT.md`
 - **Migration status**: `ops/MIGRATION-STATUS.md`
 - **Date sync automation**: `ops/DATE-SYNC-AUTOMATION.md`
-- **Sync dates quick start**: `ops/SYNC-DATES-QUICK-START.md`
 
 ## Integrations
 
@@ -22,7 +29,6 @@ This folder contains the up-to-date operational docs and guides.
 - **RMS configuration guide**: `RMS-CONFIGURATION-GUIDE.md`
 - **RMS API integration**: `RMS-API-INTEGRATION.md`
 - **MQTT setup**: `MQTT-SETUP-GUIDE.md`
-- **MAC address sync**: `MAC-ADDRESS-SYNC.md`
 
 ## ClickUp
 
@@ -40,7 +46,8 @@ This folder contains the up-to-date operational docs and guides.
 
 - **Location tracking architecture**: `architecture/LOCATION-TRACKING-ARCHITECTURE.md`
 - **Property search guide**: `guides/PROPERTY-SEARCH-GUIDE.md`
+- **User authentication**: `USER-AUTH-IMPLEMENTATION.md`
 
 ## Archive
 
-- Historical work notes moved from repo root: `archive/work-notes/`
+Completed setup guides and historical documentation: `archive/`
