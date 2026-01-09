@@ -86,7 +86,7 @@ setInterval(() => {
 }, 60 * 60 * 1000); // Check every hour
 
 // Middleware to track RMS API calls (to be used in rmsClient)
-function trackRMSCall(endpoint, status) {
+async function trackRMSCall(endpoint, status) {
   apiMetrics.rmsApiCalls++;
   
   // Track by endpoint type
@@ -101,10 +101,21 @@ function trackRMSCall(endpoint, status) {
     apiMetrics.rateLimitHits++;
     apiMetrics.lastRateLimit = new Date();
   }
+  
+  // Log to database for persistent tracking
+  try {
+    await pool.query(
+      'INSERT INTO api_call_log (service, call_type, status_code) VALUES ($1, $2, $3)',
+      ['rms', type, status]
+    );
+  } catch (err) {
+    // Don't fail the main request if logging fails
+    logger.warn('Failed to log RMS API call to database:', err.message);
+  }
 }
 
 // Middleware to track ClickUp API calls
-function trackClickUpCall(callType, status, isRetry = false) {
+async function trackClickUpCall(callType, status, isRetry = false) {
   clickupMetrics.apiCalls++;
   
   // Track by call type
@@ -124,6 +135,17 @@ function trackClickUpCall(callType, status, isRetry = false) {
   // Track retries
   if (isRetry) {
     clickupMetrics.retries++;
+  }
+  
+  // Log to database for persistent tracking
+  try {
+    await pool.query(
+      'INSERT INTO api_call_log (service, call_type, status_code, is_retry) VALUES ($1, $2, $3, $4)',
+      ['clickup', type, status, isRetry]
+    );
+  } catch (err) {
+    // Don't fail the main request if logging fails
+    logger.warn('Failed to log ClickUp API call to database:', err.message);
   }
 }
 
@@ -166,18 +188,30 @@ function getQuotaStatus() {
 // Get current API usage metrics
 router.get('/api/monitoring/rms-usage', async (req, res) => {
   try {
-    // Calculate daily and monthly estimates
-    const now = new Date();
-    const hoursSinceReset = (now - apiMetrics.lastReset) / (1000 * 60 * 60);
+    // Get actual API calls from database (last 24 hours)
+    const last24hCalls = await pool.query(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status_code = 429) as rate_limit_hits,
+        COUNT(DISTINCT call_type) as unique_types,
+        json_object_agg(call_type, count) as by_type
+      FROM (
+        SELECT call_type, status_code, COUNT(*) as count
+        FROM api_call_log
+        WHERE service = 'rms' 
+          AND timestamp >= NOW() - INTERVAL '24 hours'
+        GROUP BY call_type, status_code
+      ) subq
+    `);
     
-    // Only calculate estimates if we have at least 1 hour of data
-    const dailyEstimate = hoursSinceReset >= 1 ? Math.round((apiMetrics.rmsApiCalls / hoursSinceReset) * 24) : 0;
-    const monthlyEstimate = dailyEstimate * 30;
-    const quotaLimit = 100000; // RMS API monthly limit
+    const callStats = last24hCalls.rows[0];
+    const totalCalls = parseInt(callStats.total) || 0;
+    const quotaLimit = 100000; // RMS monthly limit (100k)
     
-    // Calculate percentage, but show warning if sample size is too small
+    // Calculate monthly projection from 24h average
+    const dailyAverage = totalCalls;
+    const monthlyEstimate = dailyAverage * 30;
     const percentOfQuota = monthlyEstimate > 0 ? ((monthlyEstimate / quotaLimit) * 100).toFixed(2) + '%' : '0%';
-    const lowDataWarning = hoursSinceReset < 1 ? 'Insufficient data (< 1 hour)' : null;
     
     // Get recent sync stats from logs
     const recentSyncs = await pool.query(`
@@ -206,18 +240,14 @@ router.get('/api/monitoring/rms-usage', async (req, res) => {
     
     res.json({
       apiUsage: {
-        total: apiMetrics.rmsApiCalls,
-        since: apiMetrics.lastReset,
-        hoursSinceReset: hoursSinceReset.toFixed(2),
-        callsByType: apiMetrics.callsByType,
-        rateLimitHits: apiMetrics.rateLimitHits,
-        lastRateLimit: apiMetrics.lastRateLimit,
+        total: totalCalls,
+        last24Hours: totalCalls,
+        rateLimitHits: parseInt(callStats.rate_limit_hits) || 0,
+        callsByType: callStats.by_type || {},
         quotaLimit,
-        lowDataWarning,
         estimates: {
-          hourlyRate: hoursSinceReset >= 1 ? Math.round(apiMetrics.rmsApiCalls / hoursSinceReset) : 0,
-          dailyRate: dailyEstimate,
-          monthlyRate: monthlyEstimate,
+          dailyAverage: dailyAverage,
+          monthlyProjection: monthlyEstimate,
           percentOfQuota,
           quotaRemaining: Math.max(0, quotaLimit - monthlyEstimate)
         }
@@ -234,34 +264,52 @@ router.get('/api/monitoring/rms-usage', async (req, res) => {
 // Get ClickUp API usage metrics
 router.get('/api/monitoring/clickup-usage', async (req, res) => {
   try {
-    const now = new Date();
-    const hoursSinceReset = (now - clickupMetrics.lastReset) / (1000 * 60 * 60);
-    const minutesSinceReset = (now - clickupMetrics.lastReset) / (1000 * 60);
-    const dailyEstimate = hoursSinceReset > 0 ? Math.round((clickupMetrics.apiCalls / hoursSinceReset) * 24) : 0;
-    const monthlyEstimate = dailyEstimate * 30;
-    const quotaLimit = 100; // ClickUp rate limit: 100 requests per minute
-    const currentRate = minutesSinceReset > 0 ? (clickupMetrics.apiCalls / minutesSinceReset) : 0;
+    // Get actual API calls from database (last 24 hours)
+    const last24hCalls = await pool.query(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status_code = 429) as rate_limit_hits,
+        COUNT(*) FILTER (WHERE is_retry = true) as retries,
+        json_object_agg(call_type, count) as by_type
+      FROM (
+        SELECT call_type, status_code, is_retry, COUNT(*) as count
+        FROM api_call_log
+        WHERE service = 'clickup' 
+          AND timestamp >= NOW() - INTERVAL '24 hours'
+        GROUP BY call_type, status_code, is_retry
+      ) subq
+    `);
+    
+    // Get calls in last hour for rate calculation
+    const lastHourCalls = await pool.query(`
+      SELECT COUNT(*) as count
+      FROM api_call_log
+      WHERE service = 'clickup' 
+        AND timestamp >= NOW() - INTERVAL '1 hour'
+    `);
+    
+    const callStats = last24hCalls.rows[0];
+    const totalCalls = parseInt(callStats.total) || 0;
+    const hourlyRate = parseInt(lastHourCalls.rows[0]?.count) || 0;
+    const currentRatePerMinute = (hourlyRate / 60).toFixed(2);
+    const quotaLimit = 100; // ClickUp: 100 requests per minute
     
     // Get ClickUp sync stats
     const syncStats = require('../services/clickupSync').getSyncStats();
     
     res.json({
       apiUsage: {
-        total: clickupMetrics.apiCalls,
-        since: clickupMetrics.lastReset,
-        hoursSinceReset: hoursSinceReset.toFixed(2),
-        minutesSinceReset: minutesSinceReset.toFixed(2),
-        callsByType: clickupMetrics.callsByType,
-        rateLimitHits: clickupMetrics.rateLimitHits,
-        lastRateLimit: clickupMetrics.lastRateLimit,
-        retries: clickupMetrics.retries,
-        quotaLimit, // Per minute limit
+        total: totalCalls,
+        last24Hours: totalCalls,
+        lastHour: hourlyRate,
+        rateLimitHits: parseInt(callStats.rate_limit_hits) || 0,
+        retries: parseInt(callStats.retries) || 0,
+        callsByType: callStats.by_type || {},
+        quotaLimit,
         estimates: {
-          currentRatePerMinute: currentRate.toFixed(2),
-          hourlyRate: hoursSinceReset > 0 ? Math.round(clickupMetrics.apiCalls / hoursSinceReset) : 0,
-          dailyRate: dailyEstimate,
-          monthlyRate: monthlyEstimate,
-          percentOfRateLimit: ((currentRate / quotaLimit) * 100).toFixed(2) + '%'
+          currentRatePerMinute: currentRatePerMinute,
+          hourlyRate: hourlyRate,
+          percentOfRateLimit: ((parseFloat(currentRatePerMinute) / quotaLimit) * 100).toFixed(2) + '%'
         }
       },
       syncStats: {

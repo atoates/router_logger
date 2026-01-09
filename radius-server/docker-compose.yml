@@ -25,10 +25,10 @@ services:
     container_name: radius-db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${RADIUS_DB_ROOT_PASSWORD:-radiusroot123}
+      MYSQL_ROOT_PASSWORD: ${RADIUS_DB_ROOT_PASSWORD:?Error: RADIUS_DB_ROOT_PASSWORD not set}
       MYSQL_DATABASE: radius
       MYSQL_USER: radius
-      MYSQL_PASSWORD: ${RADIUS_DB_PASSWORD:-radiuspass123}
+      MYSQL_PASSWORD: ${RADIUS_DB_PASSWORD:?Error: RADIUS_DB_PASSWORD not set}
     volumes:
       - radius-db-data:/var/lib/mysql
       - ./config/mysql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro

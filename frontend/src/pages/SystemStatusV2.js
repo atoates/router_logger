@@ -507,7 +507,7 @@ export default function SystemStatusV2() {
                 />
               </div>
               <div className="metric-sub">
-                {data.rmsUsage?.apiUsage?.total?.toLocaleString() || 0} total API calls
+                {data.rmsUsage?.apiUsage?.last24Hours?.toLocaleString() || 0} calls in last 24h
               </div>
             </div>
           </div>
@@ -533,7 +533,7 @@ export default function SystemStatusV2() {
                 />
               </div>
               <div className="metric-sub">
-                {data.clickupUsage?.apiUsage?.total?.toLocaleString() || 0} total API calls
+                {data.clickupUsage?.apiUsage?.last24Hours?.toLocaleString() || 0} calls in last 24h
               </div>
             </div>
           </div>
