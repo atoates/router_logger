@@ -103,6 +103,7 @@ export const getGuestsByRouter = (routerId, limit = 50, days = 7) =>
   api.get(`/guests/router/${routerId}`, { params: { limit, days } });
 export const getAllGuests = (params = {}) => api.get('/guests', { params });
 export const deleteGuestSession = (sessionId) => api.delete(`/guests/session/${sessionId}`);
+export const getRadiusStatus = () => api.get('/guests/radius-status');
 
 // ClickUp Integration
 export const getClickUpAuthStatus = () => api.get('/clickup/auth/status');

@@ -807,6 +807,108 @@ router.get('/recent', async (req, res) => {
 });
 
 // =============================================================================
+// RADIUS SERVER STATUS
+// =============================================================================
+
+/**
+ * GET /api/guests/radius-status
+ * Get RADIUS server and Guest WiFi system status for dashboard
+ */
+router.get('/radius-status', async (req, res) => {
+  try {
+    const mysql = require('mysql2/promise');
+
+    // Check RADIUS database connectivity
+    let radiusStatus = {
+      connected: false,
+      activeRadiusSessions: 0,
+      totalRadiusSessions: 0,
+      lastAccountingUpdate: null,
+      error: null
+    };
+
+    if (process.env.RADIUS_DB_PASS) {
+      try {
+        const radiusPool = mysql.createPool({
+          host: process.env.RADIUS_DB_HOST || 'radius-db',
+          port: parseInt(process.env.RADIUS_DB_PORT || '3306'),
+          user: process.env.RADIUS_DB_USER || 'radius',
+          password: process.env.RADIUS_DB_PASS,
+          database: process.env.RADIUS_DB_NAME || 'radius',
+          connectionLimit: 1
+        });
+
+        // Test connection and get stats
+        const [activeRows] = await radiusPool.execute(
+          'SELECT COUNT(*) as count FROM radacct WHERE acctstoptime IS NULL'
+        );
+        const [totalRows] = await radiusPool.execute(
+          'SELECT COUNT(*) as count FROM radacct'
+        );
+        const [lastUpdate] = await radiusPool.execute(
+          'SELECT MAX(acctupdatetime) as last_update FROM radacct'
+        );
+
+        radiusStatus = {
+          connected: true,
+          activeRadiusSessions: activeRows[0]?.count || 0,
+          totalRadiusSessions: totalRows[0]?.count || 0,
+          lastAccountingUpdate: lastUpdate[0]?.last_update || null,
+          error: null
+        };
+
+        await radiusPool.end();
+      } catch (radiusError) {
+        radiusStatus.error = radiusError.message;
+        logger.warn('RADIUS status check failed:', radiusError.message);
+      }
+    } else {
+      radiusStatus.error = 'RADIUS database not configured';
+    }
+
+    // Get Guest WiFi session stats from PostgreSQL
+    const guestStats = await pool.query(`
+      SELECT
+        COUNT(*) as total_sessions,
+        COUNT(*) FILTER (WHERE session_end IS NULL) as active_sessions,
+        COUNT(DISTINCT email) as unique_guests,
+        COALESCE(SUM(bytes_total), 0) as total_data,
+        MAX(created_at) as last_session
+      FROM wifi_guest_sessions
+      WHERE created_at >= NOW() - INTERVAL '24 hours'
+    `);
+
+    // Get sessions by router (last 24h)
+    const routerStats = await pool.query(`
+      SELECT
+        r.name as router_name,
+        r.router_id,
+        COUNT(s.id) as session_count,
+        COUNT(*) FILTER (WHERE s.session_end IS NULL) as active_count
+      FROM wifi_guest_sessions s
+      LEFT JOIN routers r ON s.router_id = r.router_id
+      WHERE s.created_at >= NOW() - INTERVAL '24 hours'
+      GROUP BY r.name, r.router_id
+      ORDER BY session_count DESC
+      LIMIT 5
+    `);
+
+    res.json({
+      radius: radiusStatus,
+      guestWifi: {
+        last24Hours: guestStats.rows[0],
+        byRouter: routerStats.rows
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    logger.error('Error fetching RADIUS status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =============================================================================
 // RADIUS ACCOUNTING SYNC ENDPOINTS
 // =============================================================================
 
