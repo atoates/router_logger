@@ -90,6 +90,17 @@ IRONWIFI_DEDUPLICATION_HOUR=3
 
 **Deduplication**: The system automatically removes duplicate guest records daily. Duplicates are identified by matching username or email. When duplicates are found, the most recent record is kept and data from others is merged (MAC addresses, auth counts, etc.).
 
+### Self-Hosted RADIUS Server Integration
+
+```bash
+# RADIUS database connection (for self-hosted FreeRADIUS)
+RADIUS_DB_HOST=134.122.101.195
+RADIUS_DB_PORT=3306
+RADIUS_DB_USER=radius
+RADIUS_DB_PASS=your-radius-db-password
+RADIUS_DB_NAME=radius
+```
+
 ### ClickUp Integration
 
 ```bash
