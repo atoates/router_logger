@@ -539,7 +539,7 @@ async function expireStaleSessionsTask() {
       UPDATE wifi_guest_sessions
       SET 
         session_end = session_start + INTERVAL '25 hours',
-        terminate_reason = 'timeout_auto_expired',
+        end_reason = 'timeout_auto_expired',
         updated_at = NOW()
       WHERE session_end IS NULL
         AND session_start < NOW() - INTERVAL '25 hours'
@@ -551,7 +551,7 @@ async function expireStaleSessionsTask() {
       UPDATE wifi_guest_sessions
       SET 
         session_end = last_accounting_update + INTERVAL '5 minutes',
-        terminate_reason = 'idle_auto_expired',
+        end_reason = 'idle_auto_expired',
         updated_at = NOW()
       WHERE session_end IS NULL
         AND last_accounting_update IS NOT NULL
