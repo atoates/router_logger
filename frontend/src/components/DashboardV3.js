@@ -267,7 +267,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
           {/* Metrics */}
           <div className="v3-metrics">
         <Metric label="Network Health" value={`${total ? Math.round(online/total*100) : 0}%`} sub={`${online}/${total} online`} color="#10b981" />
-        <Metric label={`${mode==='rolling'?value+'h':'Last '+value+'d'} Data`} value={formatBytes(totalNow)} sub={<>£{((totalNow / 1e9) * 0.0022).toFixed(2)} · <DeltaBadge current={totalNow} previous={totalPrev} /></>} color="#6366f1" />
+        <Metric label={`${mode==='rolling'?value+'h':'Last '+value+'d'} Data`} value={formatBytes(totalNow)} sub={<>£{((totalNow / 1e6) * 0.0022).toFixed(2)} · <DeltaBadge current={totalNow} previous={totalPrev} /></>} color="#6366f1" />
         <Metric 
           label="Router Status" 
           value={`${statusSummary?.current?.online || 0}/${statusSummary?.current?.offline || 0}`} 
