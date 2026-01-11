@@ -105,10 +105,18 @@ function transformRMSDeviceToTelemetry(device, monitoring) {
     }
   }
 
+  // Use RMS's last_connection/last_activity timestamp when router is online
+  // This ensures each router has its actual "last seen online" time, not the sync time
+  const isOnline = String(device.status || (monitoring?.online ? 'online' : 'offline')).toLowerCase() === 'online';
+  const rmsTimestamp = device.last_connection || device.last_activity || device.updated_at || device.last_seen;
+  const timestamp = isOnline && rmsTimestamp 
+    ? new Date(rmsTimestamp).toISOString() 
+    : new Date().toISOString();
+
   return {
   device_id: device.serial_number || device.serial || device.id,
   imei: device.imei || cellular.imei,
-    timestamp: new Date().toISOString(),
+    timestamp,
     name: device.name,
     location: device.location || device.group,
     site_id: device.group || device.company_id,

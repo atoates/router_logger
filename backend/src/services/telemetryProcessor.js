@@ -309,10 +309,11 @@ async function processRouterTelemetry(data) {
     // Insert log entry
     const log = await insertLog(logData);
     
-    // Always update router's last_seen with the log timestamp
-    // This tracks the last time we received ANY data from the router (online or offline)
-    // The current_status field already indicates whether it's online or offline
-    await updateRouterLastSeen(data.device_id, logData.timestamp);
+    // Update router's last_seen ONLY when status is online
+    // This ensures the "Last Online" field in ClickUp shows when router was actually functioning
+    if (newStatusNormalized === 'online') {
+      await updateRouterLastSeen(data.device_id, logData.timestamp);
+    }
     
     // Check if status changed between online and offline
     if (prevStatusNormalized && newStatusNormalized && prevStatusNormalized !== newStatusNormalized) {

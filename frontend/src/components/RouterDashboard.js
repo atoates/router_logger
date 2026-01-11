@@ -79,13 +79,15 @@ export default function RouterDashboard({ router }) {
     const timeout = setTimeout(async () => {
       if (!routerId) return;
       setLoading(true);
+      // Calculate days for guest query based on selected date range
+      const daysDiff = Math.max(1, Math.ceil((new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24)));
       try {
         const [logsRes, statsRes, upRes, inspRes, guestsRes] = await Promise.all([
           getLogs({ router_id: routerId, start_date: start, end_date: end, limit: 5000 }),
           getUsageStats({ router_id: routerId, start_date: start, end_date: end }),
           getUptimeData({ router_id: routerId, start_date: start, end_date: end }),
           getInspectionHistory(routerId),
-          getGuestsByRouter(routerId, 500, 0).catch(() => ({ data: { guests: [] } }))
+          getGuestsByRouter(routerId, 500, daysDiff).catch(() => ({ data: { guests: [] } }))
         ]);
         // Ignore if a newer load started or component unmounted
         if (!mounted || seq !== loadSeqRef.current) return;
