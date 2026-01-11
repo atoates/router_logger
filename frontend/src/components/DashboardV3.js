@@ -131,10 +131,12 @@ function DeltaBadge({ current, previous }) {
   const c = Number(current)||0, p = Number(previous)||0;
   if (p===0 && c===0) return <span className="delta neutral">0%</span>;
   const change = p===0 ? 100 : ((c-p)/p)*100;
-  const rounded = Math.round(change);
+  // Cap display at ±999% to indicate extreme changes without showing unrealistic numbers
+  const rounded = Math.round(Math.max(-999, Math.min(999, change)));
   const cls = change>0 ? 'up' : change<0 ? 'down' : 'neutral';
   const sym = change>0 ? '▲' : change<0 ? '▼' : '■';
-  return <span className={`delta ${cls}`}>{sym} {Math.abs(rounded)}%</span>;
+  const displayValue = Math.abs(change) > 999 ? '999+' : Math.abs(rounded);
+  return <span className={`delta ${cls}`}>{sym} {displayValue}%</span>;
 }
 
 export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page = 'network' }) {
@@ -191,19 +193,31 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
         if (mode==='rolling') {
           const prevRes = await getNetworkUsageRolling({ hours: (hrs||24)*2, bucket: 'hour' });
           const arr = prevRes.data || [];
-          // split into previous H and current H
-          const tail = arr.slice(-hrs);
-          const head = arr.slice(-2*hrs, -hrs);
-          setUsagePrev(head);
-          setUsage(tail);
+          // Ensure we have enough data before slicing
+          if (arr.length >= hrs) {
+            const tail = arr.slice(-hrs);
+            const head = arr.slice(-2*hrs, -hrs);
+            setUsagePrev(head.length > 0 ? head : tail); // Fallback to current if no previous data
+            setUsage(tail);
+          } else {
+            // Not enough historical data, use what we have
+            setUsage(arr);
+            setUsagePrev([]);
+          }
         } else {
           const prevRes = await getNetworkUsage({ days: (days||7)*2 });
-          // last D are current; previous D before that
           const arr = prevRes.data || [];
-          const tail = arr.slice(-days);
-          const head = arr.slice(-2*days, -days);
-          setUsagePrev(head);
-          setUsage(tail);
+          // Ensure we have enough data before slicing
+          if (arr.length >= days) {
+            const tail = arr.slice(-days);
+            const head = arr.slice(-2*days, -days);
+            setUsagePrev(head.length > 0 ? head : tail); // Fallback to current if no previous data
+            setUsage(tail);
+          } else {
+            // Not enough historical data, use what we have
+            setUsage(arr);
+            setUsagePrev([]);
+          }
         }
       } catch (e) {
         // eslint-disable-next-line no-console
@@ -253,7 +267,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
           {/* Metrics */}
           <div className="v3-metrics">
         <Metric label="Network Health" value={`${total ? Math.round(online/total*100) : 0}%`} sub={`${online}/${total} online`} color="#10b981" />
-        <Metric label={`${mode==='rolling'?value+'h':'Last '+value+'d'} Data`} value={formatBytes(totalNow)} sub={<>£{((totalNow / 1e6) * 0.0022).toFixed(2)} · <DeltaBadge current={totalNow} previous={totalPrev} /></>} color="#6366f1" />
+        <Metric label={`${mode==='rolling'?value+'h':'Last '+value+'d'} Data`} value={formatBytes(totalNow)} sub={<>£{((totalNow / 1e9) * 0.0022).toFixed(2)} · <DeltaBadge current={totalNow} previous={totalPrev} /></>} color="#6366f1" />
         <Metric 
           label="Router Status" 
           value={`${statusSummary?.current?.online || 0}/${statusSummary?.current?.offline || 0}`} 
