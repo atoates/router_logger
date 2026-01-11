@@ -286,6 +286,566 @@ body.dark-mode .muted{color:#64748b}
   margin-left: 8px;
 }
 
+/* ============================================
+   INFO CARDS GRID - AMAZING NEW DESIGN
+   ============================================ */
+
+.info-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.info-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.info-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.info-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.info-card-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.location-icon { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); }
+.device-icon { background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); }
+.uptime-icon { background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); }
+.inspections-icon { background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%); }
+.wifi-icon { background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%); }
+
+.info-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+  flex: 1;
+}
+
+/* Location Card */
+.location-card {
+  grid-column: span 1;
+}
+
+.location-map-container {
+  height: 200px;
+  position: relative;
+}
+
+/* Device Info Card */
+.device-card {
+  grid-column: span 1;
+}
+
+.device-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 16px;
+}
+
+.device-info-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s;
+}
+
+.device-info-item:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.device-info-icon {
+  font-size: 18px;
+  opacity: 0.8;
+}
+
+.device-info-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.device-info-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.device-info-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Uptime Card */
+.uptime-card {
+  grid-column: span 2;
+}
+
+.uptime-summary {
+  margin-left: auto;
+}
+
+.uptime-online-count {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.uptime-visual {
+  padding: 20px;
+}
+
+.uptime-timeline {
+  display: flex;
+  gap: 2px;
+  height: 60px;
+  align-items: flex-end;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.uptime-segment {
+  flex: 1;
+  min-width: 4px;
+  border-radius: 3px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.uptime-segment.online {
+  background: linear-gradient(to top, #10b981, #34d399);
+  height: 100%;
+}
+
+.uptime-segment.offline {
+  background: linear-gradient(to top, #ef4444, #f87171);
+  height: 40%;
+}
+
+.uptime-segment:hover {
+  transform: scaleY(1.1);
+  opacity: 0.9;
+}
+
+.uptime-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.uptime-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.legend-dot.online {
+  background: #10b981;
+}
+
+.legend-dot.offline {
+  background: #ef4444;
+}
+
+.uptime-legend-time {
+  margin-left: auto;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.uptime-empty {
+  text-align: center;
+  padding: 30px;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+/* Inspections Card */
+.inspections-card {
+  grid-column: span 1;
+}
+
+.inspection-add-btn {
+  margin-left: auto;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.inspection-add-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.inspections-content {
+  padding: 20px;
+}
+
+.inspection-status-display {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.inspection-countdown {
+  flex-shrink: 0;
+}
+
+.countdown-ring {
+  position: relative;
+  width: 100px;
+  height: 100px;
+}
+
+.countdown-ring svg {
+  transform: rotate(-90deg);
+  width: 100%;
+  height: 100%;
+}
+
+.countdown-ring path {
+  stroke: #e2e8f0;
+}
+
+.countdown-progress {
+  transition: stroke-dasharray 0.5s ease;
+}
+
+.inspection-countdown.ok .countdown-progress {
+  stroke: #10b981;
+}
+
+.inspection-countdown.warning .countdown-progress {
+  stroke: #f59e0b;
+}
+
+.inspection-countdown.overdue .countdown-progress {
+  stroke: #ef4444;
+}
+
+.countdown-value {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.countdown-number {
+  font-size: 24px;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1;
+}
+
+.countdown-label {
+  font-size: 10px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-top: 4px;
+}
+
+.inspection-dates {
+  flex: 1;
+}
+
+.inspection-date-item {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.inspection-date-item:last-child {
+  border-bottom: none;
+}
+
+.date-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.date-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-top: 4px;
+}
+
+.inspection-no-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 30px;
+  color: #94a3b8;
+}
+
+.inspection-no-icon {
+  font-size: 32px;
+  opacity: 0.5;
+}
+
+.inspection-history {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.inspection-history-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.inspection-history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  border-left: 3px solid #e2e8f0;
+}
+
+.inspection-history-item.latest {
+  background: #f0fdf4;
+  border-left-color: #10b981;
+}
+
+.history-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.history-by {
+  font-size: 11px;
+  color: #64748b;
+  margin-left: auto;
+}
+
+/* WiFi Users Card */
+.wifi-card {
+  grid-column: span 1;
+}
+
+.wifi-count-badge {
+  background: linear-gradient(135deg, #ec4899 0%, #f472b6 100%);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-left: auto;
+}
+
+.wifi-content {
+  padding: 16px;
+}
+
+.wifi-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 30px;
+  text-align: center;
+}
+
+.wifi-empty-icon {
+  font-size: 40px;
+  opacity: 0.4;
+}
+
+.wifi-empty-text {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.wifi-stats-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.wifi-stat-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 12px;
+  background: linear-gradient(135deg, #fdf4ff 0%, #fae8ff 100%);
+  border-radius: 12px;
+  border: 1px solid #f5d0fe;
+}
+
+.wifi-stat-number {
+  font-size: 20px;
+  font-weight: 800;
+  color: #a21caf;
+}
+
+.wifi-stat-text {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #c026d3;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.wifi-users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wifi-user-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.wifi-user-item:hover {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  transform: translateX(4px);
+}
+
+.wifi-user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.wifi-user-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.wifi-user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wifi-user-time {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.wifi-user-status {
+  font-size: 14px;
+}
+
+.wifi-user-status.active {
+  color: #10b981;
+}
+
+.wifi-user-status.ended {
+  color: #94a3b8;
+}
+
+.wifi-users-more {
+  text-align: center;
+  padding: 10px;
+  font-size: 12px;
+  color: #6366f1;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wifi-users-more:hover {
+  text-decoration: underline;
+}
+
 /* User login legend */
 .user-login-legend {
   border: 1px solid #e2e8f0;
@@ -296,52 +856,163 @@ body.dark-mode .user-login-legend {
   border-color: #334155;
 }
 
-body.dark-mode .wifi-stat {
+/* Dark mode styles for info cards */
+body.dark-mode .info-card {
   background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
   border-color: #334155;
 }
 
-body.dark-mode .wifi-stat-value {
+body.dark-mode .info-card-header {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  border-bottom-color: #334155;
+}
+
+body.dark-mode .info-card-title {
   color: #f1f5f9;
 }
 
-body.dark-mode .wifi-stat-label {
-  color: #94a3b8;
+body.dark-mode .location-icon { background: linear-gradient(135deg, #422006 0%, #78350f 100%); }
+body.dark-mode .device-icon { background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%); }
+body.dark-mode .uptime-icon { background: linear-gradient(135deg, #064e3b 0%, #047857 100%); }
+body.dark-mode .inspections-icon { background: linear-gradient(135deg, #3b0764 0%, #6b21a8 100%); }
+body.dark-mode .wifi-icon { background: linear-gradient(135deg, #831843 0%, #be185d 100%); }
+
+body.dark-mode .device-info-item {
+  background: #0f172a;
+  border-color: #334155;
 }
 
-body.dark-mode .wifi-users-table th {
+body.dark-mode .device-info-item:hover {
   background: #1e293b;
-  color: #e2e8f0;
-  border-bottom-color: #334155;
+  border-color: #475569;
 }
 
-body.dark-mode .wifi-users-table td {
-  color: #e2e8f0;
-  border-bottom-color: #334155;
-}
-
-body.dark-mode .wifi-user-row.clickable:hover,
-body.dark-mode .wifi-user-row.clickable:hover td {
-  background: #334155;
-}
-
-body.dark-mode .wifi-users-empty {
+body.dark-mode .device-info-label {
   color: #94a3b8;
 }
 
-body.dark-mode .accordion-title .badge {
-  background: #818cf8;
+body.dark-mode .device-info-value {
+  color: #f1f5f9;
 }
 
+body.dark-mode .uptime-timeline {
+  background: #0f172a;
+}
+
+body.dark-mode .uptime-legend {
+  border-top-color: #334155;
+}
+
+body.dark-mode .uptime-legend-item {
+  color: #94a3b8;
+}
+
+body.dark-mode .countdown-number {
+  color: #f1f5f9;
+}
+
+body.dark-mode .countdown-ring path {
+  stroke: #334155;
+}
+
+body.dark-mode .inspection-date-item {
+  border-bottom-color: #334155;
+}
+
+body.dark-mode .date-label {
+  color: #94a3b8;
+}
+
+body.dark-mode .date-value {
+  color: #f1f5f9;
+}
+
+body.dark-mode .inspection-history {
+  border-top-color: #334155;
+}
+
+body.dark-mode .inspection-history-item {
+  background: #0f172a;
+  border-left-color: #334155;
+}
+
+body.dark-mode .inspection-history-item.latest {
+  background: #064e3b;
+  border-left-color: #10b981;
+}
+
+body.dark-mode .history-date {
+  color: #f1f5f9;
+}
+
+body.dark-mode .wifi-stat-card {
+  background: linear-gradient(135deg, #581c87 0%, #6b21a8 100%);
+  border-color: #7e22ce;
+}
+
+body.dark-mode .wifi-stat-number {
+  color: #f5d0fe;
+}
+
+body.dark-mode .wifi-stat-text {
+  color: #e9d5ff;
+}
+
+body.dark-mode .wifi-user-item {
+  background: #0f172a;
+}
+
+body.dark-mode .wifi-user-item:hover {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+body.dark-mode .wifi-user-name {
+  color: #f1f5f9;
+}
+
+body.dark-mode .wifi-user-time {
+  color: #94a3b8;
+}
+
+/* Responsive adjustments */
 @media (max-width: 1200px) {
-  .rd-grid{grid-template-columns:1fr}
-  .rd-metrics{grid-template-columns:repeat(2,1fr)}
-  .widgets-row{grid-template-columns:1fr}
+  .info-cards-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .uptime-card {
+    grid-column: span 2;
+  }
 }
 
 @media (max-width: 768px) {
-  .rd-metrics{grid-template-columns:1fr}
-  .rd-header{flex-direction:column;align-items:stretch}
-  .rd-range{align-items:stretch}
-  .widgets-row{grid-template-columns:1fr}
+  .info-cards-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .uptime-card,
+  .location-card,
+  .device-card,
+  .inspections-card,
+  .wifi-card {
+    grid-column: span 1;
+  }
+  
+  .device-info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .inspection-status-display {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .wifi-stats-row {
+    flex-wrap: wrap;
+  }
+  
+  .wifi-stat-card {
+    min-width: calc(50% - 6px);
+  }
 }

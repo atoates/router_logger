@@ -430,295 +430,245 @@ export default function RouterDashboard({ router }) {
         </div>
       )}
 
-      {/* Accordion Sections */}
-      <div className="rd-accordion">
-        {/* Location Section - First and expanded by default */}
-        <div className={`accordion-item ${expandedSection === 'location' ? 'expanded' : ''}`}>
-          <div 
-            className="accordion-header" 
-            onClick={() => setExpandedSection(expandedSection === 'location' ? null : 'location')}
-          >
-            <span className="accordion-title">📍 Location</span>
-            <span className="accordion-icon">{expandedSection === 'location' ? '▼' : '▶'}</span>
+      {/* Info Cards Grid */}
+      <div className="info-cards-grid">
+        
+        {/* Location Card */}
+        <div className="info-card location-card">
+          <div className="info-card-header">
+            <div className="info-card-icon location-icon">📍</div>
+            <h3 className="info-card-title">Location</h3>
           </div>
-          {expandedSection === 'location' && (
-            <div className="accordion-content">
-              <LocationMap routerId={routerId} />
-            </div>
-          )}
+          <div className="location-map-container">
+            <LocationMap routerId={routerId} />
+          </div>
         </div>
 
-        {/* Uptime Samples Section */}
-        <div className={`accordion-item ${expandedSection === 'uptime' ? 'expanded' : ''}`}>
-          <div 
-            className="accordion-header" 
-            onClick={() => setExpandedSection(expandedSection === 'uptime' ? null : 'uptime')}
-          >
-            <span className="accordion-title">Uptime Samples</span>
-            <span className="accordion-icon">{expandedSection === 'uptime' ? '▼' : '▶'}</span>
+        {/* Device Info Card */}
+        <div className="info-card device-card">
+          <div className="info-card-header">
+            <div className="info-card-icon device-icon">📱</div>
+            <h3 className="info-card-title">Device Info</h3>
           </div>
-          {expandedSection === 'uptime' && (
-            <div className="accordion-content">
-              <div style={{ height: 180 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart 
-                    data={(uptime||[]).map(d => {
-                      const isOnline = (d.status === 'online' || d.status === 1 || d.status === '1' || d.status === true);
-                      return {
-                        ...d,
-                        online: isOnline ? 1 : null,
-                        offline: !isOnline ? 0 : null
-                      };
-                    })} 
-                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis
-                      dataKey="timestamp"
-                      tickFormatter={(t)=> { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }}
-                      tick={{ fontSize: 10, fill: '#374151' }}
-                      interval="preserveStartEnd"
-                      minTickGap={20}
-                    />
-                    <YAxis 
-                      domain={[0, 1]} 
-                      ticks={[0, 1]} 
-                      tickFormatter={(v) => v === 1 ? 'Online' : 'Offline'}
-                      tick={{ fontSize: 10, fill: '#374151' }}
-                      width={50}
-                    />
-                    <Tooltip
-                      labelFormatter={(t)=> new Date(t).toLocaleString('en-GB')} 
-                      formatter={(value, name) => {
-                        if (name === 'online') return ['Online', 'Status'];
-                        if (name === 'offline') return ['Offline', 'Status'];
-                        return [value, name];
-                      }}
-                      contentStyle={{ fontSize: '12px', backgroundColor: '#fff', border: '1px solid #e5e7eb' }}
-                      labelStyle={{ color: '#374151', fontWeight: 600 }}
-                      itemStyle={{ color: '#374151' }}
-                    />
-                    <Line 
-                      type="stepAfter" 
-                      dataKey="online" 
-                      stroke="#10b981" 
-                      strokeWidth={2.5}
-                      dot={false}
-                      name="online"
-                      isAnimationActive={false}
-                      connectNulls={false}
-                    />
-                    <Line 
-                      type="stepAfter" 
-                      dataKey="offline" 
-                      stroke="transparent" 
-                      strokeWidth={0}
-                      dot={{ fill: '#ef4444', r: 3 }}
-                      name="offline"
-                      isAnimationActive={false}
-                      connectNulls={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+          <div className="device-info-grid">
+            <div className="device-info-item">
+              <div className="device-info-icon">🔢</div>
+              <div className="device-info-content">
+                <span className="device-info-label">IMEI</span>
+                <span className="device-info-value">{router?.imei || latest?.imei || '—'}</span>
               </div>
             </div>
-          )}
-        </div>
-
-        {/* Inspections Section */}
-        <div className={`accordion-item ${expandedSection === 'inspections' ? 'expanded' : ''}`}>
-          <div 
-            className="accordion-header" 
-            onClick={() => setExpandedSection(expandedSection === 'inspections' ? null : 'inspections')}
-          >
-            <span className="accordion-title">Inspections</span>
-            <span className="accordion-icon">{expandedSection === 'inspections' ? '▼' : '▶'}</span>
-          </div>
-          {expandedSection === 'inspections' && (
-            <div className="accordion-content">
-              <button 
-                className="btn btn-sm btn-primary" 
-                style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '6px', marginBottom: '12px' }}
-                onClick={handleLogInspection}
-              >
-                ✓ Log Inspection
-              </button>
-              <div className="inspections-list">
-                {inspections.length === 0 ? (
-                  <div className="inspections-empty">
-                    No inspections logged yet
-                  </div>
-                ) : (
-                  <>
-                    {inspections.map((insp, idx) => (
-                      <div key={insp.id} className={`inspection-item ${idx === 0 ? 'latest' : ''}`}>
-                        <div className="inspection-header">
-                          <span className="inspection-date">
-                            {new Date(insp.inspected_at).toLocaleDateString('en-GB')}
-                          </span>
-                          <span className="inspection-time">
-                            {new Date(insp.inspected_at).toLocaleTimeString('en-GB')}
-                          </span>
-                        </div>
-                        {insp.inspected_by && (
-                          <div className="inspection-by">
-                            By: {insp.inspected_by}
-                          </div>
-                        )}
-                        {insp.notes && (
-                          <div className="inspection-notes">
-                            {insp.notes}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </>
-                )}
+            <div className="device-info-item">
+              <div className="device-info-icon">🔗</div>
+              <div className="device-info-content">
+                <span className="device-info-label">MAC Address</span>
+                <span className="device-info-value">{router?.mac_address || '—'}</span>
               </div>
             </div>
-          )}
-        </div>
-
-        {/* Latest Section */}
-        <div className={`accordion-item ${expandedSection === 'latest' ? 'expanded' : ''}`}>
-          <div 
-            className="accordion-header" 
-            onClick={() => setExpandedSection(expandedSection === 'latest' ? null : 'latest')}
-          >
-            <span className="accordion-title">Latest</span>
-            <span className="accordion-icon">{expandedSection === 'latest' ? '▼' : '▶'}</span>
-          </div>
-          {expandedSection === 'latest' && (
-            <div className="accordion-content">
-              <div className="kv">
-                <div><span>IMEI</span><strong>{router?.imei || latest?.imei || '—'}</strong></div>
-                <div><span>MAC Address</span><strong>{router?.mac_address || '—'}</strong></div>
-                <div><span>Operator</span><strong>{latest?.operator || '—'}</strong></div>
-                <div><span>Network</span><strong>{latest?.network_type || '—'}</strong></div>
-                <div><span>Firmware</span><strong>{latest?.firmware_version || router?.firmware_version || '—'}</strong></div>
-                <div><span>WAN IP</span><strong>{latest?.wan_ip || '—'}</strong></div>
+            <div className="device-info-item">
+              <div className="device-info-icon">📡</div>
+              <div className="device-info-content">
+                <span className="device-info-label">Operator</span>
+                <span className="device-info-value">{latest?.operator || '—'}</span>
               </div>
             </div>
-          )}
+            <div className="device-info-item">
+              <div className="device-info-icon">🌐</div>
+              <div className="device-info-content">
+                <span className="device-info-label">Network</span>
+                <span className="device-info-value">{latest?.network_type || '—'}</span>
+              </div>
+            </div>
+            <div className="device-info-item">
+              <div className="device-info-icon">⚙️</div>
+              <div className="device-info-content">
+                <span className="device-info-label">Firmware</span>
+                <span className="device-info-value">{latest?.firmware_version || router?.firmware_version || '—'}</span>
+              </div>
+            </div>
+            <div className="device-info-item">
+              <div className="device-info-icon">🌍</div>
+              <div className="device-info-content">
+                <span className="device-info-label">WAN IP</span>
+                <span className="device-info-value">{latest?.wan_ip || '—'}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* WiFi Users Section */}
-        <div className={`accordion-item ${expandedSection === 'wifi-users' ? 'expanded' : ''}`}>
-          <div 
-            className="accordion-header" 
-            onClick={() => setExpandedSection(expandedSection === 'wifi-users' ? null : 'wifi-users')}
-          >
-            <span className="accordion-title">
-              📶 WiFi Users {filteredGuests.length > 0 && <span className="badge">{filteredGuests.length}</span>}
-            </span>
-            <span className="accordion-icon">{expandedSection === 'wifi-users' ? '▼' : '▶'}</span>
+        {/* Uptime Timeline Card */}
+        <div className="info-card uptime-card">
+          <div className="info-card-header">
+            <div className="info-card-icon uptime-icon">⏱️</div>
+            <h3 className="info-card-title">Uptime Timeline</h3>
+            {uptime && uptime.length > 0 && (
+              <div className="uptime-summary">
+                <span className="uptime-online-count">
+                  {Math.round((uptime.filter(d => d.status === 'online' || d.status === 1 || d.status === '1').length / uptime.length) * 100)}% Online
+                </span>
+              </div>
+            )}
           </div>
-          {expandedSection === 'wifi-users' && (
-            <div className="accordion-content">
-              {filteredGuests.length === 0 ? (
-                <div className="wifi-users-empty">
-                  <p>No WiFi user logins recorded for this router in the selected time range.</p>
-                  <p className="muted" style={{ fontSize: '12px', marginTop: '8px' }}>
-                    WiFi guest data comes from the captive portal. Make sure the router MAC address is configured and matching.
-                  </p>
+          <div className="uptime-visual">
+            {uptime && uptime.length > 0 ? (
+              <>
+                <div className="uptime-timeline">
+                  {uptime.slice(-48).map((d, idx) => {
+                    const isOnline = d.status === 'online' || d.status === 1 || d.status === '1' || d.status === true;
+                    return (
+                      <div 
+                        key={idx} 
+                        className={`uptime-segment ${isOnline ? 'online' : 'offline'}`}
+                        title={`${new Date(d.timestamp).toLocaleString('en-GB')} - ${isOnline ? 'Online' : 'Offline'}`}
+                      />
+                    );
+                  })}
                 </div>
-              ) : (
-                <>
-                  <div className="wifi-users-summary" style={{ marginBottom: '16px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                    <div className="wifi-stat">
-                      <span className="wifi-stat-value">{filteredGuests.length}</span>
-                      <span className="wifi-stat-label">Total Logins</span>
-                    </div>
-                    <div className="wifi-stat">
-                      <span className="wifi-stat-value">{[...new Set(filteredGuests.map(g => g.username || g.email))].length}</span>
-                      <span className="wifi-stat-label">Unique Users</span>
-                    </div>
-                    <div className="wifi-stat">
-                      <span className="wifi-stat-value">{formatBytes(filteredGuests.reduce((sum, g) => sum + (Number(g.bytes_total) || 0), 0))}</span>
-                      <span className="wifi-stat-label">Total Data</span>
+                <div className="uptime-legend">
+                  <span className="uptime-legend-item"><span className="legend-dot online"></span> Online</span>
+                  <span className="uptime-legend-item"><span className="legend-dot offline"></span> Offline</span>
+                  <span className="uptime-legend-time">Last {Math.min(uptime.length, 48)} samples</span>
+                </div>
+              </>
+            ) : (
+              <div className="uptime-empty">No uptime data available</div>
+            )}
+          </div>
+        </div>
+
+        {/* Inspections Card */}
+        <div className="info-card inspections-card">
+          <div className="info-card-header">
+            <div className="info-card-icon inspections-icon">🔍</div>
+            <h3 className="info-card-title">Inspections</h3>
+            <button 
+              className="inspection-add-btn"
+              onClick={handleLogInspection}
+            >
+              + Log
+            </button>
+          </div>
+          <div className="inspections-content">
+            {inspectionStatus ? (
+              <div className="inspection-status-display">
+                <div className={`inspection-countdown ${inspectionStatus.overdue ? 'overdue' : inspectionStatus.daysRemaining <= 30 ? 'warning' : 'ok'}`}>
+                  <div className="countdown-ring">
+                    <svg viewBox="0 0 36 36">
+                      <path
+                        d="M18 2.0845
+                          a 15.9155 15.9155 0 0 1 0 31.831
+                          a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeDasharray={`${Math.max(0, Math.min(100, ((365 - Math.abs(inspectionStatus.daysRemaining)) / 365) * 100))}, 100`}
+                        strokeLinecap="round"
+                        className="countdown-progress"
+                      />
+                    </svg>
+                    <div className="countdown-value">
+                      {inspectionStatus.overdue ? (
+                        <span className="countdown-number">{Math.abs(inspectionStatus.daysRemaining)}</span>
+                      ) : (
+                        <span className="countdown-number">{inspectionStatus.daysRemaining}</span>
+                      )}
+                      <span className="countdown-label">{inspectionStatus.overdue ? 'days overdue' : 'days left'}</span>
                     </div>
                   </div>
-                  <div className="table-wrap" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                    <table className="wifi-users-table">
-                      <thead>
-                        <tr>
-                          <th>User</th>
-                          <th>Login Time</th>
-                          <th>Duration</th>
-                          <th>Data Used</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredGuests.map((guest, idx) => {
-                          const userName = guest.username || guest.email || 'Unknown';
-                          const userColor = userColors[userName];
-                          const isActive = !guest.session_end;
-                          const duration = guest.session_duration_seconds 
-                            ? `${Math.floor(guest.session_duration_seconds / 60)}m`
-                            : isActive ? 'Active' : '—';
-                          return (
-                            <tr 
-                              key={guest.id || idx} 
-                              className="wifi-user-row clickable"
-                              onClick={() => navigate(`/wifi-guest/${guest.id}`)}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span 
-                                    className="user-color-dot" 
-                                    style={{ 
-                                      width: '10px', 
-                                      height: '10px', 
-                                      borderRadius: '50%', 
-                                      backgroundColor: userColor,
-                                      flexShrink: 0
-                                    }} 
-                                  />
-                                  <div>
-                                    <div style={{ fontWeight: 500 }}>{userName}</div>
-                                    {guest.guest_name && guest.guest_name !== userName && (
-                                      <div className="muted" style={{ fontSize: '11px' }}>{guest.guest_name}</div>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                              <td>
-                                <div>{new Date(guest.session_start || guest.creation_date || guest.auth_date).toLocaleDateString('en-GB')}</div>
-                                <div className="muted" style={{ fontSize: '11px' }}>
-                                  {new Date(guest.session_start || guest.creation_date || guest.auth_date).toLocaleTimeString('en-GB')}
-                                </div>
-                              </td>
-                              <td style={{ textAlign: 'center' }}>
-                                {duration}
-                              </td>
-                              <td style={{ textAlign: 'right' }}>
-                                {guest.bytes_total ? formatBytes(guest.bytes_total) : '—'}
-                              </td>
-                              <td style={{ textAlign: 'center' }}>
-                                <span style={{ 
-                                  display: 'inline-block',
-                                  padding: '2px 8px',
-                                  borderRadius: '12px',
-                                  fontSize: '11px',
-                                  fontWeight: 500,
-                                  backgroundColor: isActive ? '#dcfce7' : '#f3f4f6',
-                                  color: isActive ? '#166534' : '#6b7280'
-                                }}>
-                                  {isActive ? '● Active' : 'Ended'}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                </div>
+                <div className="inspection-dates">
+                  <div className="inspection-date-item">
+                    <span className="date-label">Last Inspection</span>
+                    <span className="date-value">{inspectionStatus.createdDate.toLocaleDateString('en-GB')}</span>
                   </div>
-                </>
-              )}
-            </div>
-          )}
+                  <div className="inspection-date-item">
+                    <span className="date-label">Next Due</span>
+                    <span className="date-value">{inspectionStatus.inspectionDue.toLocaleDateString('en-GB')}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="inspection-no-data">
+                <span className="inspection-no-icon">📋</span>
+                <span>No inspection records</span>
+              </div>
+            )}
+            {inspections.length > 0 && (
+              <div className="inspection-history">
+                <div className="inspection-history-title">Recent History</div>
+                {inspections.slice(0, 3).map((insp, idx) => (
+                  <div key={insp.id} className={`inspection-history-item ${idx === 0 ? 'latest' : ''}`}>
+                    <span className="history-date">{new Date(insp.inspected_at).toLocaleDateString('en-GB')}</span>
+                    {insp.inspected_by && <span className="history-by">{insp.inspected_by}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* WiFi Users Card */}
+        <div className="info-card wifi-card">
+          <div className="info-card-header">
+            <div className="info-card-icon wifi-icon">📶</div>
+            <h3 className="info-card-title">WiFi Users</h3>
+            {filteredGuests.length > 0 && (
+              <span className="wifi-count-badge">{filteredGuests.length}</span>
+            )}
+          </div>
+          <div className="wifi-content">
+            {filteredGuests.length === 0 ? (
+              <div className="wifi-empty">
+                <div className="wifi-empty-icon">📵</div>
+                <div className="wifi-empty-text">No WiFi logins in this period</div>
+              </div>
+            ) : (
+              <>
+                <div className="wifi-stats-row">
+                  <div className="wifi-stat-card">
+                    <span className="wifi-stat-number">{filteredGuests.length}</span>
+                    <span className="wifi-stat-text">Logins</span>
+                  </div>
+                  <div className="wifi-stat-card">
+                    <span className="wifi-stat-number">{[...new Set(filteredGuests.map(g => g.username || g.email))].length}</span>
+                    <span className="wifi-stat-text">Users</span>
+                  </div>
+                  <div className="wifi-stat-card">
+                    <span className="wifi-stat-number">{formatBytes(filteredGuests.reduce((sum, g) => sum + (Number(g.bytes_total) || 0), 0))}</span>
+                    <span className="wifi-stat-text">Data</span>
+                  </div>
+                </div>
+                <div className="wifi-users-list">
+                  {filteredGuests.slice(0, 5).map((guest, idx) => {
+                    const userName = guest.username || guest.email || 'Unknown';
+                    const userColor = userColors[userName];
+                    const isActive = !guest.session_end;
+                    return (
+                      <div 
+                        key={guest.id || idx} 
+                        className="wifi-user-item"
+                        onClick={() => navigate(`/wifi-guest/${guest.id}`)}
+                      >
+                        <div className="wifi-user-avatar" style={{ backgroundColor: userColor }}>
+                          {userName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="wifi-user-info">
+                          <span className="wifi-user-name">{userName.split('@')[0]}</span>
+                          <span className="wifi-user-time">{new Date(guest.session_start || guest.creation_date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <div className={`wifi-user-status ${isActive ? 'active' : 'ended'}`}>
+                          {isActive ? '●' : '○'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {filteredGuests.length > 5 && (
+                    <div className="wifi-users-more">+{filteredGuests.length - 5} more users</div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
       </div>
