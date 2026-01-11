@@ -295,20 +295,20 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke={dark?'#334155':'#e5e7eb'} />
-                  <XAxis 
-                    dataKey="date" 
-                    tickFormatter={(t)=> { 
-                      const d = new Date(t); 
-                      return mode === 'rolling' 
-                        ? d.toLocaleDateString([], { month: 'short', day: 'numeric' })
-                        : (t || '').slice(5, 10); 
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(t)=> {
+                      const d = new Date(t);
+                      return mode === 'rolling'
+                        ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                        : (t || '').slice(5, 10);
                     }} 
                     tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} 
                   />
                   <YAxis domain={[0, Math.ceil(yMax * 1.1)]} tickFormatter={(v)=> formatBytes(v)} tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} />
                   <Tooltip
                     formatter={(v) => formatBytes(v)}
-                    labelFormatter={(t) => new Date(t).toLocaleString()}
+                    labelFormatter={(t) => new Date(t).toLocaleString('en-GB')}
                     contentStyle={{
                       backgroundColor: dark ? '#1f2937' : '#ffffff',
                       border: '1px solid ' + (dark ? '#374151' : '#e5e7eb'),
@@ -325,7 +325,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
             </div>
             <div className="v3-delta" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <span>Period change: <DeltaBadge current={totalNow} previous={totalPrev} /></span>
-              {latestTs && (<span className="v3-ts" style={{ color: '#64748b' }}>Data through {new Date(latestTs).toLocaleString()}</span>)}
+              {latestTs && (<span className="v3-ts" style={{ color: '#64748b' }}>Data through {new Date(latestTs).toLocaleString('en-GB')}</span>)}
             </div>
           </div>
 
@@ -466,7 +466,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
                           <div style={{ fontSize: 12, color: '#64748b' }}>{insp.location || 'No location'}</div>
                           {createdDate && inspectionDue && (
                             <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-                              First: {createdDate.toLocaleDateString()} | Due: {inspectionDue.toLocaleDateString()}
+                              First: {createdDate.toLocaleDateString('en-GB')} | Due: {inspectionDue.toLocaleDateString('en-GB')}
                             </div>
                           )}
                         </div>

@@ -57,7 +57,7 @@ function GuestDashboard() {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Never';
-    return new Date(dateStr).toLocaleString();
+    return new Date(dateStr).toLocaleString('en-GB');
   };
 
   if (loading) {

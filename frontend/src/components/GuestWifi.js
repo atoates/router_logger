@@ -79,7 +79,7 @@ const GuestWifi = () => {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleString();
+    return new Date(dateStr).toLocaleString('en-GB');
   };
 
   const formatDuration = (seconds) => {

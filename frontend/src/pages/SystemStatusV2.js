@@ -209,7 +209,7 @@ export default function SystemStatusV2() {
         <div>
           <h1>System Dashboard</h1>
           <div className="last-updated">
-            Last updated: {lastUpdated ? lastUpdated.toLocaleTimeString() : '-'}
+            Last updated: {lastUpdated ? lastUpdated.toLocaleTimeString('en-GB') : '-'}
           </div>
         </div>
         <button className="refresh-button" onClick={fetchAllData} disabled={loading}>
@@ -370,7 +370,7 @@ export default function SystemStatusV2() {
                 <span className="metric-label">Last Update</span>
                 <span className="metric-val" style={{fontSize: '12px'}}>
                   {data.radiusStatus?.radius?.lastAccountingUpdate
-                    ? new Date(data.radiusStatus.radius.lastAccountingUpdate).toLocaleString()
+                    ? new Date(data.radiusStatus.radius.lastAccountingUpdate).toLocaleString('en-GB')
                     : 'N/A'}
                 </span>
               </div>

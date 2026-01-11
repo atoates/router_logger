@@ -359,7 +359,7 @@ const ClickUpTaskWidget = ({ router, onStoredWith }) => {
             <div className="task-meta">
               {linkedTask.due_date && (
                 <span className="task-due">
-                  📅 {new Date(parseInt(linkedTask.due_date)).toLocaleDateString()}
+                  📅 {new Date(parseInt(linkedTask.due_date)).toLocaleDateString('en-GB')}
                 </span>
               )}
             </div>

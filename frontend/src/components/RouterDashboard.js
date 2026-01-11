@@ -58,7 +58,7 @@ export default function RouterDashboard({ router }) {
       const s = customStart ? new Date(customStart).toISOString() : isoMinus({ hours: 24 });
       const e = customEnd ? new Date(customEnd).toISOString() : nowIso;
       const lbl = customStart && customEnd
-        ? `${new Date(s).toLocaleString()} → ${new Date(e).toLocaleString()}`
+        ? `${new Date(s).toLocaleString('en-GB')} → ${new Date(e).toLocaleString('en-GB')}`
         : 'Custom (pick dates)';
       return { start: s, end: e, label: lbl };
     }
@@ -305,7 +305,7 @@ export default function RouterDashboard({ router }) {
             <StatusPill status={router?.current_status} />
             {(router?.last_seen || latest?.timestamp) && (
               <span className="muted">
-                Last seen {new Date(router?.last_seen || latest.timestamp).toLocaleString()}
+                Last seen {new Date(router?.last_seen || latest.timestamp).toLocaleString('en-GB')}
               </span>
             )}
             {latest?.wan_ip && <span className="muted">WAN {latest.wan_ip}</span>}
@@ -378,7 +378,7 @@ export default function RouterDashboard({ router }) {
                   : 'until reinspection'}
                 <br/>
                 <span style={{ fontSize: '11px', marginTop: '4px', display: 'block' }}>
-                  Due: {inspectionStatus.inspectionDue.toLocaleDateString()}
+                  Due: {inspectionStatus.inspectionDue.toLocaleDateString('en-GB')}
                 </span>
               </>
             ) : 'No inspection date'}
@@ -471,9 +471,9 @@ export default function RouterDashboard({ router }) {
                     margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis 
-                      dataKey="timestamp" 
-                      tickFormatter={(t)=> { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleDateString([], { month: 'short', day: 'numeric' }); }}
+                    <XAxis
+                      dataKey="timestamp"
+                      tickFormatter={(t)=> { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }}
                       tick={{ fontSize: 10, fill: '#374151' }}
                       interval="preserveStartEnd"
                       minTickGap={20}
@@ -485,8 +485,8 @@ export default function RouterDashboard({ router }) {
                       tick={{ fontSize: 10, fill: '#374151' }}
                       width={50}
                     />
-                    <Tooltip 
-                      labelFormatter={(t)=> new Date(t).toLocaleString()} 
+                    <Tooltip
+                      labelFormatter={(t)=> new Date(t).toLocaleString('en-GB')} 
                       formatter={(value, name) => {
                         if (name === 'online') return ['Online', 'Status'];
                         if (name === 'offline') return ['Offline', 'Status'];
@@ -552,10 +552,10 @@ export default function RouterDashboard({ router }) {
                       <div key={insp.id} className={`inspection-item ${idx === 0 ? 'latest' : ''}`}>
                         <div className="inspection-header">
                           <span className="inspection-date">
-                            {new Date(insp.inspected_at).toLocaleDateString()}
+                            {new Date(insp.inspected_at).toLocaleDateString('en-GB')}
                           </span>
                           <span className="inspection-time">
-                            {new Date(insp.inspected_at).toLocaleTimeString()}
+                            {new Date(insp.inspected_at).toLocaleTimeString('en-GB')}
                           </span>
                         </div>
                         {insp.inspected_by && (
@@ -683,9 +683,9 @@ export default function RouterDashboard({ router }) {
                                 </div>
                               </td>
                               <td>
-                                <div>{new Date(guest.session_start || guest.creation_date || guest.auth_date).toLocaleDateString()}</div>
+                                <div>{new Date(guest.session_start || guest.creation_date || guest.auth_date).toLocaleDateString('en-GB')}</div>
                                 <div className="muted" style={{ fontSize: '11px' }}>
-                                  {new Date(guest.session_start || guest.creation_date || guest.auth_date).toLocaleTimeString()}
+                                  {new Date(guest.session_start || guest.creation_date || guest.auth_date).toLocaleTimeString('en-GB')}
                                 </div>
                               </td>
                               <td style={{ textAlign: 'center' }}>
@@ -828,9 +828,9 @@ export default function RouterDashboard({ router }) {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis 
-                dataKey="date" 
-                tickFormatter={(t)=> new Date(t).toLocaleDateString()} 
+              <XAxis
+                dataKey="date"
+                tickFormatter={(t)=> new Date(t).toLocaleDateString('en-GB')} 
                 tick={{ fontSize: 11, fill: '#374151' }} 
               />
               <YAxis 
@@ -840,12 +840,12 @@ export default function RouterDashboard({ router }) {
                 tick={{ fontSize: 11, fill: '#374151' }} 
                 allowDataOverflow={false} 
               />
-              <Tooltip 
+              <Tooltip
                 formatter={(v, name) => {
                   if (name === 'TX' || name === 'RX') return formatBytes(v);
                   return v;
                 }}
-                labelFormatter={(t)=> new Date(t).toLocaleString()}
+                labelFormatter={(t)=> new Date(t).toLocaleString('en-GB')}
                 contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151' }}
                 labelStyle={{ color: '#f3f4f6' }}
                 itemStyle={{ color: '#f3f4f6' }}
@@ -903,7 +903,7 @@ export default function RouterDashboard({ router }) {
                 const isOnline = (s==='online'||s===1||s==='1'||s===true);
                 return (
                   <tr key={i}>
-                    <td>{new Date(d.date).toLocaleString()}</td>
+                    <td>{new Date(d.date).toLocaleString('en-GB')}</td>
                     <td>{isOnline? 'Online' : 'Offline'}</td>
                     <td>{d.operator || ''}</td>
                     <td>{d.wan_ip || ''}</td>
