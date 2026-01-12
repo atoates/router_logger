@@ -200,6 +200,66 @@ export default function RouterDashboard({ router }) {
     let m = 1; for (const d of series.txrx||[]) { if (d.tx_bytes>m) m=d.tx_bytes; if (d.rx_bytes>m) m=d.rx_bytes; } return Math.ceil(m*1.1);
   }, [series]);
 
+  // Calculate uptime buckets based on time range
+  const uptimeBuckets = useMemo(() => {
+    if (!uptime || uptime.length === 0) return { buckets: [], bucketLabel: '', bucketCount: 0 };
+    
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const rangeMs = endDate - startDate;
+    const rangeHours = rangeMs / (1000 * 60 * 60);
+    
+    // Determine bucket size and count based on range
+    let bucketCount;
+    if (rangeHours <= 24) {
+      bucketCount = 24; // 1 bucket per hour
+    } else if (rangeHours <= 168) { // 7 days
+      bucketCount = 42; // 4-hour blocks
+    } else if (rangeHours <= 720) { // 30 days
+      bucketCount = 30; // daily
+    } else {
+      bucketCount = 60; // ~12 hour blocks for longer ranges
+    }
+    
+    const bucketMs = rangeMs / bucketCount;
+    const buckets = [];
+    
+    for (let i = 0; i < bucketCount; i++) {
+      const bucketStart = new Date(startDate.getTime() + (i * bucketMs));
+      const bucketEnd = new Date(startDate.getTime() + ((i + 1) * bucketMs));
+      
+      // Find samples in this bucket
+      const samplesInBucket = uptime.filter(d => {
+        const ts = new Date(d.timestamp);
+        return ts >= bucketStart && ts < bucketEnd;
+      });
+      
+      if (samplesInBucket.length === 0) {
+        buckets.push({ status: 'unknown', start: bucketStart, end: bucketEnd, samples: 0, ratio: 0, onlineCount: 0 });
+      } else {
+        const onlineCount = samplesInBucket.filter(d => 
+          d.status === 'online' || d.status === 1 || d.status === '1' || d.status === true
+        ).length;
+        const ratio = onlineCount / samplesInBucket.length;
+        buckets.push({ 
+          status: ratio >= 0.5 ? 'online' : 'offline',
+          ratio,
+          start: bucketStart, 
+          end: bucketEnd, 
+          samples: samplesInBucket.length,
+          onlineCount 
+        });
+      }
+    }
+    
+    return { buckets, bucketCount };
+  }, [uptime, start, end]);
+  
+  const onlinePercent = useMemo(() => {
+    if (!uptime || uptime.length === 0) return 0;
+    return Math.round((uptime.filter(d => d.status === 'online' || d.status === 1 || d.status === '1').length / uptime.length) * 100);
+  }, [uptime]);
+
   // Filter WiFi guests to those within the selected time range
   const filteredGuests = useMemo(() => {
     if (!wifiGuests || wifiGuests.length === 0) return [];
@@ -434,35 +494,37 @@ export default function RouterDashboard({ router }) {
       <div className="uptime-strip">
         <div className="uptime-strip-header">
           <span className="uptime-strip-title">Uptime</span>
+          <span className="uptime-strip-samples">{uptime?.length || 0} samples</span>
           {uptime && uptime.length > 0 && (
-            <span className={`uptime-percent ${
-              Math.round((uptime.filter(d => d.status === 'online' || d.status === 1 || d.status === '1').length / uptime.length) * 100) >= 95 ? 'excellent' :
-              Math.round((uptime.filter(d => d.status === 'online' || d.status === 1 || d.status === '1').length / uptime.length) * 100) >= 80 ? 'good' : 'poor'
-            }`}>
-              {Math.round((uptime.filter(d => d.status === 'online' || d.status === 1 || d.status === '1').length / uptime.length) * 100)}%
+            <span className={`uptime-percent ${onlinePercent >= 95 ? 'excellent' : onlinePercent >= 80 ? 'good' : 'poor'}`}>
+              {onlinePercent}%
             </span>
           )}
         </div>
         <div className="uptime-strip-bar">
-          {uptime && uptime.length > 0 ? (
-            uptime.slice(-72).map((d, idx) => {
-              const isOnline = d.status === 'online' || d.status === 1 || d.status === '1' || d.status === true;
+          {uptimeBuckets.buckets && uptimeBuckets.buckets.length > 0 ? (
+            uptimeBuckets.buckets.map((bucket, idx) => {
+              const formatTime = (d) => d.toLocaleString('en-GB', { 
+                day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
+              });
               return (
                 <div 
                   key={idx} 
-                  className={`uptime-tick ${isOnline ? 'online' : 'offline'}`}
-                  title={`${new Date(d.timestamp).toLocaleString('en-GB')} - ${isOnline ? 'Online' : 'Offline'}`}
+                  className={`uptime-tick ${bucket.status}`}
+                  style={bucket.status === 'online' && bucket.ratio < 1 ? { opacity: 0.5 + (bucket.ratio * 0.5) } : {}}
+                  title={`${formatTime(bucket.start)} → ${formatTime(bucket.end)}\n${bucket.status === 'unknown' ? 'No data' : `${bucket.onlineCount}/${bucket.samples} online (${Math.round(bucket.ratio * 100)}%)`}`}
                 />
               );
             })
           ) : (
-            <div className="uptime-strip-empty">No data</div>
+            <div className="uptime-strip-empty">No data for this period</div>
           )}
         </div>
         <div className="uptime-strip-footer">
           <span className="uptime-strip-label"><span className="dot online"></span> Online</span>
           <span className="uptime-strip-label"><span className="dot offline"></span> Offline</span>
-          <span className="uptime-strip-range">{label}</span>
+          <span className="uptime-strip-label"><span className="dot unknown"></span> No data</span>
+          <span className="uptime-strip-range">{label} · {uptimeBuckets.bucketCount} buckets</span>
         </div>
       </div>
 

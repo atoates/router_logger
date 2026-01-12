@@ -314,6 +314,14 @@ body.dark-mode .muted{color:#64748b}
   color: #64748b;
 }
 
+.uptime-strip-samples {
+  font-size: 11px;
+  color: #94a3b8;
+  padding: 2px 8px;
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
 .uptime-percent {
   font-size: 11px;
   font-weight: 700;
@@ -367,6 +375,10 @@ body.dark-mode .muted{color:#64748b}
   background: linear-gradient(to top, #ef4444, #f87171);
 }
 
+.uptime-tick.unknown {
+  background: linear-gradient(to top, #cbd5e1, #e2e8f0);
+}
+
 .uptime-strip-empty {
   color: #94a3b8;
   font-size: 12px;
@@ -401,6 +413,10 @@ body.dark-mode .muted{color:#64748b}
 
 .uptime-strip-label .dot.offline {
   background: #ef4444;
+}
+
+.uptime-strip-label .dot.unknown {
+  background: #cbd5e1;
 }
 
 .uptime-strip-range {
@@ -757,6 +773,11 @@ body.dark-mode .uptime-strip {
 }
 
 body.dark-mode .uptime-strip-title {
+  color: #94a3b8;
+}
+
+body.dark-mode .uptime-strip-samples {
+  background: #334155;
   color: #94a3b8;
 }
 

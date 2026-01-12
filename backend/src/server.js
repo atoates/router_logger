@@ -163,6 +163,59 @@ app.use((err, req, res, next) => {
 });
 
 /**
+ * Diagnostic: Check network usage calculations
+ */
+async function runNetworkUsageDiagnostic() {
+  const { pool } = require('./config/database');
+  const routerStats = require('./models/routerStats');
+
+  try {
+    logger.info('🔍 Running network usage diagnostic...');
+
+    // Check raw cumulative values for top routers
+    const rawResult = await pool.query(`
+      SELECT
+        r.router_id,
+        r.name,
+        (SELECT total_tx_bytes FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as latest_tx,
+        (SELECT total_rx_bytes FROM router_logs WHERE router_id = r.router_id ORDER BY timestamp DESC LIMIT 1) as latest_rx,
+        (SELECT total_tx_bytes FROM router_logs WHERE router_id = r.router_id AND timestamp < NOW() - INTERVAL '24 hours' ORDER BY timestamp DESC LIMIT 1) as tx_24h_ago,
+        (SELECT total_rx_bytes FROM router_logs WHERE router_id = r.router_id AND timestamp < NOW() - INTERVAL '24 hours' ORDER BY timestamp DESC LIMIT 1) as rx_24h_ago
+      FROM routers r
+      WHERE EXISTS (SELECT 1 FROM router_logs WHERE router_id = r.router_id)
+      LIMIT 5
+    `);
+
+    logger.info('📊 Raw cumulative values (top 5 routers):');
+    for (const row of rawResult.rows) {
+      const delta_tx = (Number(row.latest_tx) || 0) - (Number(row.tx_24h_ago) || 0);
+      const delta_rx = (Number(row.latest_rx) || 0) - (Number(row.rx_24h_ago) || 0);
+      const formatBytes = (b) => {
+        const n = Number(b) || 0;
+        if (n >= 1e9) return (n / 1e9).toFixed(2) + ' GB';
+        if (n >= 1e6) return (n / 1e6).toFixed(2) + ' MB';
+        return n + ' B';
+      };
+      logger.info(`   ${row.name}: Latest TX=${formatBytes(row.latest_tx)}, RX=${formatBytes(row.latest_rx)} | 24h Delta: TX=${formatBytes(delta_tx)}, RX=${formatBytes(delta_rx)}`);
+    }
+
+    // Check the aggregated 24h network usage
+    const usage24h = await routerStats.getNetworkUsageRolling(24, 'hour');
+    const total24h = usage24h.reduce((s, d) => s + (Number(d.total_bytes) || 0), 0);
+    const formatBytes = (b) => {
+      const n = Number(b) || 0;
+      if (n >= 1e9) return (n / 1e9).toFixed(2) + ' GB';
+      if (n >= 1e6) return (n / 1e6).toFixed(2) + ' MB';
+      return n + ' B';
+    };
+    logger.info(`📈 Aggregated 24h network usage: ${formatBytes(total24h)} (${usage24h.length} hourly buckets)`);
+
+  } catch (error) {
+    logger.warn('Network usage diagnostic failed (non-fatal):', error.message);
+  }
+}
+
+/**
  * Diagnostic: Check captive portal integration status on startup
  */
 async function runCaptivePortalDiagnostic() {
@@ -279,6 +332,9 @@ async function startServer() {
     
     // Run startup diagnostic for captive portal integration
     await runCaptivePortalDiagnostic();
+
+    // Run network usage diagnostic
+    await runNetworkUsageDiagnostic();
 
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
