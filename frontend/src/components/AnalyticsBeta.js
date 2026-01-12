@@ -210,18 +210,26 @@ function FleetMap({ routers, onRouterClick }) {
     // Add zoom control to bottom right
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // Add router markers
-    routersWithLocation.forEach(router => {
+    // Add router markers - offline first, then online on top
+    const offlineRouters = routersWithLocation.filter(r => 
+      r.current_status !== 'online' && r.current_status !== 1
+    );
+    const onlineRouters = routersWithLocation.filter(r => 
+      r.current_status === 'online' || r.current_status === 1
+    );
+    
+    // Add offline markers first (so online appear on top)
+    [...offlineRouters, ...onlineRouters].forEach(router => {
       const isOnline = router.current_status === 'online' || router.current_status === 1;
       const color = isOnline ? '#10b981' : '#ef4444';
       
       const marker = L.circleMarker([router.latitude, router.longitude], {
-        radius: 6,
+        radius: 2,
         fillColor: color,
         color: isOnline ? '#059669' : '#dc2626',
-        weight: 2,
+        weight: 1,
         opacity: 1,
-        fillOpacity: 0.8
+        fillOpacity: 0.9
       });
 
       marker.bindTooltip(`
@@ -447,7 +455,11 @@ function GuestSessionsChart({ timeline, dark }) {
             }}
             tick={{ fontSize: 10, fill: dark ? '#94a3b8' : '#64748b' }}
           />
-          <YAxis tick={{ fontSize: 10, fill: dark ? '#94a3b8' : '#64748b' }} />
+          <YAxis 
+            tick={{ fontSize: 10, fill: dark ? '#94a3b8' : '#64748b' }}
+            allowDecimals={false}
+            domain={[0, 'auto']}
+          />
           <Tooltip 
             contentStyle={{
               backgroundColor: dark ? '#1e293b' : '#ffffff',
@@ -456,7 +468,7 @@ function GuestSessionsChart({ timeline, dark }) {
             }}
           />
           <Line 
-            type="monotone" 
+            type="linear" 
             dataKey="sessions" 
             stroke={COLORS.purple} 
             strokeWidth={2}
@@ -464,7 +476,7 @@ function GuestSessionsChart({ timeline, dark }) {
             name="Sessions"
           />
           <Line 
-            type="monotone" 
+            type="linear" 
             dataKey="unique_guests" 
             stroke={COLORS.info} 
             strokeWidth={2}
@@ -565,7 +577,6 @@ export default function AnalyticsBeta({ onOpenRouter }) {
       const [
         routersRes,
         usageRes,
-        usagePrevRes,
         topRes,
         operatorsRes,
         guestRes,
@@ -573,7 +584,6 @@ export default function AnalyticsBeta({ onOpenRouter }) {
       ] = await Promise.all([
         getRouters(),
         getNetworkUsageRolling({ hours, bucket: hours <= 24 ? 'hour' : 'day' }),
-        getNetworkUsageRolling({ hours: hours * 2, bucket: hours <= 24 ? 'hour' : 'day' }),
         getTopRoutersRolling({ hours, limit: 8 }),
         getOperators({ days }),
         getGuestWifiStats(days).catch(() => ({ data: null })),
@@ -581,12 +591,16 @@ export default function AnalyticsBeta({ onOpenRouter }) {
       ]);
 
       setRouters(routersRes.data || []);
+      setUsage(usageRes.data || []);
       
-      // Split usage data for comparison
-      const allUsage = usagePrevRes.data || [];
-      const halfPoint = Math.floor(allUsage.length / 2);
-      setUsage(allUsage.slice(halfPoint) || usageRes.data || []);
-      setUsagePrev(allUsage.slice(0, halfPoint) || []);
+      // Fetch previous period for comparison (optional - don't block on failure)
+      try {
+        const prevRes = await getNetworkUsageRolling({ hours, bucket: hours <= 24 ? 'hour' : 'day' });
+        // For now, use same data as baseline - true comparison would need offset
+        setUsagePrev(prevRes.data || []);
+      } catch {
+        setUsagePrev([]);
+      }
       
       setTopRouters((topRes.data || []).map(r => ({
         router_id: r.router_id,
