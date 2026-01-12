@@ -14,6 +14,7 @@ import UsersManagement from './components/UsersManagement';
 import AdminDebugTools from './components/AdminDebugTools';
 import GuestDashboard from './components/GuestDashboard';
 import GuestWifi from './components/GuestWifi';
+import AnalyticsBeta from './components/AnalyticsBeta';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer, toast } from 'react-toastify';
 import { getRouters } from './services/api';
@@ -97,6 +98,7 @@ function AppContent() {
     { path: '/', label: 'My Routers', icon: '📱', title: 'My Routers' },
   ] : [
     { path: '/', label: 'Analytics', icon: '📊', title: 'Network Analytics' },
+    { path: '/beta', label: 'Beta', icon: '🚀', title: 'Analytics Beta' },
     { path: '/wifi-guests', label: 'WiFi', icon: '📶', title: 'WiFi Guest Logins' },
     { path: '/assignments', label: 'Assign', icon: '📍', title: 'Router Assignments' },
     { path: '/stored', label: 'Stored', icon: '📦', title: 'Stored Routers' },
@@ -212,6 +214,11 @@ function AppContent() {
             <Route path="/wifi-guests" element={
               <ProtectedRoute requireAdmin>
                 <GuestWifi />
+              </ProtectedRoute>
+            } />
+            <Route path="/beta" element={
+              <ProtectedRoute requireAdmin>
+                <AnalyticsBeta onOpenRouter={handleHeaderRouterSelect} />
               </ProtectedRoute>
             } />
             <Route path="/assignments" element={
