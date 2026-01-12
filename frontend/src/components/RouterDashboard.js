@@ -430,247 +430,188 @@ export default function RouterDashboard({ router }) {
         </div>
       )}
 
-      {/* Info Cards Grid */}
-      <div className="info-cards-grid">
+      {/* === UPTIME STRIP - Full width, ultra compact === */}
+      <div className="uptime-strip">
+        <div className="uptime-strip-header">
+          <span className="uptime-strip-title">Uptime</span>
+          {uptime && uptime.length > 0 && (
+            <span className={`uptime-percent ${
+              Math.round((uptime.filter(d => d.status === 'online' || d.status === 1 || d.status === '1').length / uptime.length) * 100) >= 95 ? 'excellent' :
+              Math.round((uptime.filter(d => d.status === 'online' || d.status === 1 || d.status === '1').length / uptime.length) * 100) >= 80 ? 'good' : 'poor'
+            }`}>
+              {Math.round((uptime.filter(d => d.status === 'online' || d.status === 1 || d.status === '1').length / uptime.length) * 100)}%
+            </span>
+          )}
+        </div>
+        <div className="uptime-strip-bar">
+          {uptime && uptime.length > 0 ? (
+            uptime.slice(-72).map((d, idx) => {
+              const isOnline = d.status === 'online' || d.status === 1 || d.status === '1' || d.status === true;
+              return (
+                <div 
+                  key={idx} 
+                  className={`uptime-tick ${isOnline ? 'online' : 'offline'}`}
+                  title={`${new Date(d.timestamp).toLocaleString('en-GB')} - ${isOnline ? 'Online' : 'Offline'}`}
+                />
+              );
+            })
+          ) : (
+            <div className="uptime-strip-empty">No data</div>
+          )}
+        </div>
+        <div className="uptime-strip-footer">
+          <span className="uptime-strip-label"><span className="dot online"></span> Online</span>
+          <span className="uptime-strip-label"><span className="dot offline"></span> Offline</span>
+          <span className="uptime-strip-range">{label}</span>
+        </div>
+      </div>
+
+      {/* === MAIN CONTENT GRID - Map left, cards right === */}
+      <div className="dashboard-content-grid">
         
-        {/* Location Card */}
-        <div className="info-card location-card">
-          <div className="info-card-header">
-            <div className="info-card-icon location-icon">📍</div>
-            <h3 className="info-card-title">Location</h3>
-          </div>
-          <div className="location-map-container">
-            <LocationMap routerId={routerId} />
-          </div>
-        </div>
-
-        {/* Device Info Card */}
-        <div className="info-card device-card">
-          <div className="info-card-header">
-            <div className="info-card-icon device-icon">📱</div>
-            <h3 className="info-card-title">Device Info</h3>
-          </div>
-          <div className="device-info-grid">
-            <div className="device-info-item">
-              <div className="device-info-icon">🔢</div>
-              <div className="device-info-content">
-                <span className="device-info-label">IMEI</span>
-                <span className="device-info-value">{router?.imei || latest?.imei || '—'}</span>
-              </div>
+        {/* Left Column - Map */}
+        <div className="content-left">
+          <div className="map-card">
+            <div className="map-card-header">
+              <span className="map-icon">📍</span>
+              <span className="map-title">Location</span>
             </div>
-            <div className="device-info-item">
-              <div className="device-info-icon">🔗</div>
-              <div className="device-info-content">
-                <span className="device-info-label">MAC Address</span>
-                <span className="device-info-value">{router?.mac_address || '—'}</span>
-              </div>
-            </div>
-            <div className="device-info-item">
-              <div className="device-info-icon">📡</div>
-              <div className="device-info-content">
-                <span className="device-info-label">Operator</span>
-                <span className="device-info-value">{latest?.operator || '—'}</span>
-              </div>
-            </div>
-            <div className="device-info-item">
-              <div className="device-info-icon">🌐</div>
-              <div className="device-info-content">
-                <span className="device-info-label">Network</span>
-                <span className="device-info-value">{latest?.network_type || '—'}</span>
-              </div>
-            </div>
-            <div className="device-info-item">
-              <div className="device-info-icon">⚙️</div>
-              <div className="device-info-content">
-                <span className="device-info-label">Firmware</span>
-                <span className="device-info-value">{latest?.firmware_version || router?.firmware_version || '—'}</span>
-              </div>
-            </div>
-            <div className="device-info-item">
-              <div className="device-info-icon">🌍</div>
-              <div className="device-info-content">
-                <span className="device-info-label">WAN IP</span>
-                <span className="device-info-value">{latest?.wan_ip || '—'}</span>
-              </div>
+            <div className="map-container">
+              <LocationMap routerId={routerId} />
             </div>
           </div>
         </div>
 
-        {/* Uptime Timeline Card */}
-        <div className="info-card uptime-card">
-          <div className="info-card-header">
-            <div className="info-card-icon uptime-icon">⏱️</div>
-            <h3 className="info-card-title">Uptime Timeline</h3>
-            {uptime && uptime.length > 0 && (
-              <div className="uptime-summary">
-                <span className="uptime-online-count">
-                  {Math.round((uptime.filter(d => d.status === 'online' || d.status === 1 || d.status === '1').length / uptime.length) * 100)}% Online
-                </span>
+        {/* Right Column - Stacked Cards */}
+        <div className="content-right">
+          
+          {/* Device Info - Compact horizontal layout */}
+          <div className="compact-card device-compact">
+            <div className="compact-header">
+              <span className="compact-icon">📱</span>
+              <span className="compact-title">Device</span>
+            </div>
+            <div className="device-row">
+              <div className="device-item">
+                <span className="device-label">IMEI</span>
+                <span className="device-value">{router?.imei || latest?.imei || '—'}</span>
               </div>
-            )}
+              <div className="device-item">
+                <span className="device-label">MAC</span>
+                <span className="device-value">{router?.mac_address || '—'}</span>
+              </div>
+              <div className="device-item">
+                <span className="device-label">Operator</span>
+                <span className="device-value">{latest?.operator || '—'}</span>
+              </div>
+              <div className="device-item">
+                <span className="device-label">Network</span>
+                <span className="device-value">{latest?.network_type || '—'}</span>
+              </div>
+              <div className="device-item">
+                <span className="device-label">Firmware</span>
+                <span className="device-value">{latest?.firmware_version || router?.firmware_version || '—'}</span>
+              </div>
+              <div className="device-item">
+                <span className="device-label">WAN IP</span>
+                <span className="device-value">{latest?.wan_ip || '—'}</span>
+              </div>
+            </div>
           </div>
-          <div className="uptime-visual">
-            {uptime && uptime.length > 0 ? (
-              <>
-                <div className="uptime-timeline">
-                  {uptime.slice(-48).map((d, idx) => {
-                    const isOnline = d.status === 'online' || d.status === 1 || d.status === '1' || d.status === true;
-                    return (
-                      <div 
-                        key={idx} 
-                        className={`uptime-segment ${isOnline ? 'online' : 'offline'}`}
-                        title={`${new Date(d.timestamp).toLocaleString('en-GB')} - ${isOnline ? 'Online' : 'Offline'}`}
-                      />
-                    );
-                  })}
-                </div>
-                <div className="uptime-legend">
-                  <span className="uptime-legend-item"><span className="legend-dot online"></span> Online</span>
-                  <span className="uptime-legend-item"><span className="legend-dot offline"></span> Offline</span>
-                  <span className="uptime-legend-time">Last {Math.min(uptime.length, 48)} samples</span>
-                </div>
-              </>
-            ) : (
-              <div className="uptime-empty">No uptime data available</div>
-            )}
-          </div>
-        </div>
 
-        {/* Inspections Card */}
-        <div className="info-card inspections-card">
-          <div className="info-card-header">
-            <div className="info-card-icon inspections-icon">🔍</div>
-            <h3 className="info-card-title">Inspections</h3>
-            <button 
-              className="inspection-add-btn"
-              onClick={handleLogInspection}
-            >
-              + Log
-            </button>
-          </div>
-          <div className="inspections-content">
+          {/* Inspections - Compact inline */}
+          <div className="compact-card inspection-compact">
+            <div className="compact-header">
+              <span className="compact-icon">🔍</span>
+              <span className="compact-title">Inspection</span>
+              <button className="compact-btn" onClick={handleLogInspection}>+ Log</button>
+            </div>
             {inspectionStatus ? (
-              <div className="inspection-status-display">
-                <div className={`inspection-countdown ${inspectionStatus.overdue ? 'overdue' : inspectionStatus.daysRemaining <= 30 ? 'warning' : 'ok'}`}>
-                  <div className="countdown-ring">
-                    <svg viewBox="0 0 36 36">
-                      <path
-                        d="M18 2.0845
-                          a 15.9155 15.9155 0 0 1 0 31.831
-                          a 15.9155 15.9155 0 0 1 0 -31.831"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                        strokeDasharray={`${Math.max(0, Math.min(100, ((365 - Math.abs(inspectionStatus.daysRemaining)) / 365) * 100))}, 100`}
-                        strokeLinecap="round"
-                        className="countdown-progress"
-                      />
-                    </svg>
-                    <div className="countdown-value">
-                      {inspectionStatus.overdue ? (
-                        <span className="countdown-number">{Math.abs(inspectionStatus.daysRemaining)}</span>
-                      ) : (
-                        <span className="countdown-number">{inspectionStatus.daysRemaining}</span>
-                      )}
-                      <span className="countdown-label">{inspectionStatus.overdue ? 'days overdue' : 'days left'}</span>
-                    </div>
-                  </div>
+              <div className="inspection-inline">
+                <div className={`inspection-ring-small ${inspectionStatus.overdue ? 'overdue' : inspectionStatus.daysRemaining <= 30 ? 'warning' : 'ok'}`}>
+                  <svg viewBox="0 0 36 36">
+                    <circle cx="18" cy="18" r="15.9155" fill="none" stroke="currentColor" strokeWidth="3" opacity="0.2" />
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeDasharray={`${Math.max(0, Math.min(100, (inspectionStatus.daysRemaining / 365) * 100))}, 100`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <span className="ring-number">{Math.abs(inspectionStatus.daysRemaining)}</span>
                 </div>
-                <div className="inspection-dates">
-                  <div className="inspection-date-item">
-                    <span className="date-label">Last Inspection</span>
-                    <span className="date-value">{inspectionStatus.createdDate.toLocaleDateString('en-GB')}</span>
-                  </div>
-                  <div className="inspection-date-item">
-                    <span className="date-label">Next Due</span>
-                    <span className="date-value">{inspectionStatus.inspectionDue.toLocaleDateString('en-GB')}</span>
-                  </div>
+                <div className="inspection-info">
+                  <span className="inspection-status-text">
+                    {inspectionStatus.overdue ? 'Overdue' : `${inspectionStatus.daysRemaining} days left`}
+                  </span>
+                  <span className="inspection-date-text">Due: {inspectionStatus.inspectionDue.toLocaleDateString('en-GB')}</span>
+                </div>
+                <div className="inspection-last">
+                  <span className="inspection-last-label">Last</span>
+                  <span className="inspection-last-date">{inspectionStatus.createdDate.toLocaleDateString('en-GB')}</span>
                 </div>
               </div>
             ) : (
-              <div className="inspection-no-data">
-                <span className="inspection-no-icon">📋</span>
-                <span>No inspection records</span>
-              </div>
-            )}
-            {inspections.length > 0 && (
-              <div className="inspection-history">
-                <div className="inspection-history-title">Recent History</div>
-                {inspections.slice(0, 3).map((insp, idx) => (
-                  <div key={insp.id} className={`inspection-history-item ${idx === 0 ? 'latest' : ''}`}>
-                    <span className="history-date">{new Date(insp.inspected_at).toLocaleDateString('en-GB')}</span>
-                    {insp.inspected_by && <span className="history-by">{insp.inspected_by}</span>}
-                  </div>
-                ))}
-              </div>
+              <div className="inspection-none">No inspection records</div>
             )}
           </div>
-        </div>
 
-        {/* WiFi Users Card */}
-        <div className="info-card wifi-card">
-          <div className="info-card-header">
-            <div className="info-card-icon wifi-icon">📶</div>
-            <h3 className="info-card-title">WiFi Users</h3>
-            {filteredGuests.length > 0 && (
-              <span className="wifi-count-badge">{filteredGuests.length}</span>
-            )}
-          </div>
-          <div className="wifi-content">
+          {/* WiFi Users - Compact */}
+          <div className="compact-card wifi-compact">
+            <div className="compact-header">
+              <span className="compact-icon">📶</span>
+              <span className="compact-title">WiFi Users</span>
+              {filteredGuests.length > 0 && (
+                <span className="compact-badge">{filteredGuests.length}</span>
+              )}
+            </div>
             {filteredGuests.length === 0 ? (
-              <div className="wifi-empty">
-                <div className="wifi-empty-icon">📵</div>
-                <div className="wifi-empty-text">No WiFi logins in this period</div>
+              <div className="wifi-none">
+                <span>No logins in this period</span>
               </div>
             ) : (
-              <>
-                <div className="wifi-stats-row">
-                  <div className="wifi-stat-card">
-                    <span className="wifi-stat-number">{filteredGuests.length}</span>
-                    <span className="wifi-stat-text">Logins</span>
+              <div className="wifi-compact-content">
+                <div className="wifi-mini-stats">
+                  <div className="wifi-mini-stat">
+                    <span className="mini-num">{filteredGuests.length}</span>
+                    <span className="mini-label">Sessions</span>
                   </div>
-                  <div className="wifi-stat-card">
-                    <span className="wifi-stat-number">{[...new Set(filteredGuests.map(g => g.username || g.email))].length}</span>
-                    <span className="wifi-stat-text">Users</span>
+                  <div className="wifi-mini-stat">
+                    <span className="mini-num">{[...new Set(filteredGuests.map(g => g.username || g.email))].length}</span>
+                    <span className="mini-label">Users</span>
                   </div>
-                  <div className="wifi-stat-card">
-                    <span className="wifi-stat-number">{formatBytes(filteredGuests.reduce((sum, g) => sum + (Number(g.bytes_total) || 0), 0))}</span>
-                    <span className="wifi-stat-text">Data</span>
+                  <div className="wifi-mini-stat">
+                    <span className="mini-num">{formatBytes(filteredGuests.reduce((sum, g) => sum + (Number(g.bytes_total) || 0), 0))}</span>
+                    <span className="mini-label">Data</span>
                   </div>
                 </div>
-                <div className="wifi-users-list">
-                  {filteredGuests.slice(0, 5).map((guest, idx) => {
+                <div className="wifi-avatars">
+                  {filteredGuests.slice(0, 8).map((guest, idx) => {
                     const userName = guest.username || guest.email || 'Unknown';
                     const userColor = userColors[userName];
-                    const isActive = !guest.session_end;
                     return (
                       <div 
                         key={guest.id || idx} 
-                        className="wifi-user-item"
+                        className="wifi-avatar"
+                        style={{ backgroundColor: userColor }}
+                        title={userName}
                         onClick={() => navigate(`/wifi-guest/${guest.id}`)}
                       >
-                        <div className="wifi-user-avatar" style={{ backgroundColor: userColor }}>
-                          {userName.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="wifi-user-info">
-                          <span className="wifi-user-name">{userName.split('@')[0]}</span>
-                          <span className="wifi-user-time">{new Date(guest.session_start || guest.creation_date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                        <div className={`wifi-user-status ${isActive ? 'active' : 'ended'}`}>
-                          {isActive ? '●' : '○'}
-                        </div>
+                        {userName.charAt(0).toUpperCase()}
                       </div>
                     );
                   })}
-                  {filteredGuests.length > 5 && (
-                    <div className="wifi-users-more">+{filteredGuests.length - 5} more users</div>
+                  {filteredGuests.length > 8 && (
+                    <div className="wifi-avatar more">+{filteredGuests.length - 8}</div>
                   )}
                 </div>
-              </>
+              </div>
             )}
           </div>
-        </div>
 
+        </div>
       </div>
 
       {/* TX/RX Chart - Full Width */}
