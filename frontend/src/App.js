@@ -97,8 +97,7 @@ function AppContent() {
   const navItems = isGuest ? [
     { path: '/', label: 'My Routers', icon: '📱', title: 'My Routers' },
   ] : [
-    { path: '/', label: 'Analytics', icon: '📊', title: 'Network Analytics' },
-    { path: '/beta', label: 'Beta', icon: '🚀', title: 'Analytics Beta' },
+    { path: '/', label: 'Dashboard', icon: '📊', title: 'Dashboard' },
     { path: '/wifi-guests', label: 'WiFi', icon: '📶', title: 'WiFi Guest Logins' },
     { path: '/assignments', label: 'Assign', icon: '📍', title: 'Router Assignments' },
     { path: '/stored', label: 'Stored', icon: '📦', title: 'Stored Routers' },
@@ -207,18 +206,13 @@ function AppContent() {
                 {isGuest ? (
                   <GuestDashboard />
                 ) : (
-                  <DashboardV3 page="network" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
+                  <AnalyticsBeta onOpenRouter={handleHeaderRouterSelect} />
                 )}
               </ProtectedRoute>
             } />
             <Route path="/wifi-guests" element={
               <ProtectedRoute requireAdmin>
                 <GuestWifi />
-              </ProtectedRoute>
-            } />
-            <Route path="/beta" element={
-              <ProtectedRoute requireAdmin>
-                <AnalyticsBeta onOpenRouter={handleHeaderRouterSelect} />
               </ProtectedRoute>
             } />
             <Route path="/assignments" element={

@@ -668,7 +668,7 @@ export default function AnalyticsBeta({ onOpenRouter }) {
       {/* Header */}
       <div className="beta-header">
         <div className="beta-title-section">
-          <h1>Analytics <span className="beta-badge">BETA</span></h1>
+          <h1>Dashboard</h1>
           <p className="beta-subtitle">Real-time fleet monitoring and insights</p>
         </div>
         <div className="beta-controls">
