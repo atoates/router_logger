@@ -313,6 +313,16 @@ async function getOperatorDistribution(days = 7) {
 
     const usageQuery = `
       WITH latest AS (${latestPerRouter}),
+      base AS (
+        SELECT l.router_id, l.total_tx_bytes AS base_tx, l.total_rx_bytes AS base_rx
+        FROM router_logs l
+        JOIN (
+          SELECT router_id, MAX(timestamp) AS ts
+          FROM router_logs
+          WHERE timestamp < (CURRENT_DATE - ($1::int - 1) * INTERVAL '1 day')
+          GROUP BY router_id
+        ) b ON b.router_id = l.router_id AND b.ts = l.timestamp
+      ),
       filtered AS (
         SELECT l.router_id, l.timestamp, l.total_tx_bytes, l.total_rx_bytes, lat.operator
         FROM router_logs l
@@ -326,10 +336,17 @@ async function getOperatorDistribution(days = 7) {
         FROM filtered
       ), deltas AS (
         SELECT 
-          operator,
-          GREATEST(total_tx_bytes - COALESCE(prev_tx, 0), 0) AS tx_delta,
-          GREATEST(total_rx_bytes - COALESCE(prev_rx, 0), 0) AS rx_delta
-        FROM ordered
+          o.operator,
+          CASE 
+            WHEN o.prev_tx IS NOT NULL THEN GREATEST(o.total_tx_bytes - o.prev_tx, 0)
+            ELSE GREATEST(o.total_tx_bytes - COALESCE(b.base_tx, o.total_tx_bytes), 0)
+          END AS tx_delta,
+          CASE 
+            WHEN o.prev_rx IS NOT NULL THEN GREATEST(o.total_rx_bytes - o.prev_rx, 0)
+            ELSE GREATEST(o.total_rx_bytes - COALESCE(b.base_rx, o.total_rx_bytes), 0)
+          END AS rx_delta
+        FROM ordered o
+        LEFT JOIN base b ON b.router_id = o.router_id
       )
       SELECT operator,
              SUM(tx_delta)::bigint AS tx_bytes,
