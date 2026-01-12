@@ -14,6 +14,7 @@ import UsersManagement from './components/UsersManagement';
 import AdminDebugTools from './components/AdminDebugTools';
 import GuestDashboard from './components/GuestDashboard';
 import GuestWifi from './components/GuestWifi';
+import Users from './components/Users';
 import AnalyticsBeta from './components/AnalyticsBeta';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer, toast } from 'react-toastify';
@@ -98,7 +99,7 @@ function AppContent() {
     { path: '/', label: 'My Routers', icon: '📱', title: 'My Routers' },
   ] : [
     { path: '/', label: 'Dashboard', icon: '📊', title: 'Dashboard' },
-    { path: '/wifi-guests', label: 'WiFi', icon: '📶', title: 'WiFi Guest Logins' },
+    { path: '/users-activity', label: 'Users', icon: '👤', title: 'User Activity' },
     { path: '/assignments', label: 'Assign', icon: '📍', title: 'Router Assignments' },
     { path: '/stored', label: 'Stored', icon: '📦', title: 'Stored Routers' },
     { path: '/returns', label: 'Returns', icon: '🔄', title: 'Returns' },
@@ -210,9 +211,9 @@ function AppContent() {
                 )}
               </ProtectedRoute>
             } />
-            <Route path="/wifi-guests" element={
+            <Route path="/users-activity" element={
               <ProtectedRoute requireAdmin>
-                <GuestWifi />
+                <Users />
               </ProtectedRoute>
             } />
             <Route path="/assignments" element={
