@@ -247,15 +247,17 @@ async function syncFromRMS() {
             const deviceId = device.id || device.device_id || device.uuid || device.serial_number || telemetry.device_id;
             const latest = await getLatestLog(String(telemetry.device_id));
             
-            // Fetch stats since last log to get incremental usage
-            // Use shorter window if we have recent data, full day if no data
-            const hasRecentData = latest && latest.timestamp && (Date.now() - new Date(latest.timestamp).getTime() < 3 * 60 * 60 * 1000);
-            const fromIso = hasRecentData 
-              ? new Date(latest.timestamp).toISOString()
-              : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+            // FIXED APPROACH: Fetch LIFETIME cumulative data from RMS
+            // The RMS data-usage endpoint returns cumulative totals for the requested window.
+            // To get accurate cumulative counters, we request from device creation (or a far past date) to now.
+            // This ensures we store the TRUE cumulative value, not an additive one.
+            const deviceCreatedAt = device.created_at || device.createdAt || device.created;
+            const fromIso = deviceCreatedAt 
+              ? new Date(deviceCreatedAt).toISOString()
+              : new Date('2020-01-01T00:00:00Z').toISOString(); // Far past as fallback
             const toIso = new Date().toISOString();
             
-            logger.info(`Fetching data usage for ${deviceId} from ${fromIso} to ${toIso}`);
+            logger.info(`Fetching LIFETIME data usage for ${deviceId} from ${fromIso} to ${toIso}`);
             
             // Try data-usage endpoint first (most reliable for usage totals)
             let usageData = null;
@@ -266,31 +268,32 @@ async function syncFromRMS() {
               logger.warn(`Data usage fetch failed for device ${deviceId}: ${e.message}`);
             }
 
-            let addTx = 0, addRx = 0;
+            let totalTx = 0, totalRx = 0;
             
             if (usageData) {
               // Parse data-usage response (may be array of records or summary object)
+              // RMS returns cumulative totals - we sum all records to get the lifetime total
               const records = Array.isArray(usageData) ? usageData : (usageData?.data || usageData?.items || usageData?.records || []);
               if (Array.isArray(records)) {
                 for (const rec of records) {
                   const vals = typeof rec === 'object' && rec ? rec : {};
                   const sent = Number(vals.sent || vals.tx || vals.tx_bytes || vals.upload || vals.data_sent || 0);
                   const received = Number(vals.received || vals.rx || vals.rx_bytes || vals.download || vals.data_received || 0);
-                  if (isFinite(sent)) addTx += sent;
-                  if (isFinite(received)) addRx += received;
+                  if (isFinite(sent)) totalTx += sent;
+                  if (isFinite(received)) totalRx += received;
                 }
               } else if (typeof usageData === 'object' && usageData) {
                 // If response is a summary object
                 const sent = Number(usageData.sent || usageData.tx || usageData.tx_bytes || usageData.upload || usageData.total_sent || 0);
                 const received = Number(usageData.received || usageData.rx || usageData.rx_bytes || usageData.download || usageData.total_received || 0);
-                if (isFinite(sent)) addTx = sent;
-                if (isFinite(received)) addRx = received;
+                if (isFinite(sent)) totalTx = sent;
+                if (isFinite(received)) totalRx = received;
               }
-              logger.info(`Parsed usage for ${deviceId}: addTx=${addTx}, addRx=${addRx}`);
+              logger.info(`Parsed LIFETIME usage for ${deviceId}: totalTx=${totalTx}, totalRx=${totalRx}`);
             }
 
             // Fallback to statistics if data-usage was empty
-            if (addTx === 0 && addRx === 0) {
+            if (totalTx === 0 && totalRx === 0) {
               let stats = await rmsClient.getDeviceStatistics(deviceId, fromIso, toIso);
               if (!stats || (Array.isArray(stats) && stats.length === 0)) {
                 // company-level fallback (uses site/company IDs when present)
@@ -309,21 +312,26 @@ async function syncFromRMS() {
                 const vals = typeof s === 'object' && s ? s : {};
                 const tx = Number(vals.tx_bytes ?? vals.tx ?? 0);
                 const rx = Number(vals.rx_bytes ?? vals.rx ?? 0);
-                if (isFinite(tx)) addTx += tx;
-                if (isFinite(rx)) addRx += rx;
+                if (isFinite(tx)) totalTx += tx;
+                if (isFinite(rx)) totalRx += rx;
               }
             }
 
-            // Add new usage to previous cumulative total
-            const baseTx = latest?.total_tx_bytes ? Number(latest.total_tx_bytes) : 0;
-            const baseRx = latest?.total_rx_bytes ? Number(latest.total_rx_bytes) : 0;
-            telemetry.counters.total_tx_bytes = baseTx + addTx;
-            telemetry.counters.total_rx_bytes = baseRx + addRx;
+            // Store the RMS cumulative value directly
+            // Only update if we got a value AND it's >= our last known value (counters only go up)
+            const lastTx = latest?.total_tx_bytes ? Number(latest.total_tx_bytes) : 0;
+            const lastRx = latest?.total_rx_bytes ? Number(latest.total_rx_bytes) : 0;
             
-            if (addTx > 0 || addRx > 0) {
-              logger.info(`Updated counters for ${deviceId}: base=${baseTx}+${baseRx}, added=${addTx}+${addRx}, new total=${telemetry.counters.total_tx_bytes}+${telemetry.counters.total_rx_bytes}`);
+            if (totalTx > 0 || totalRx > 0) {
+              // Use the larger of: RMS value or last known value (handles edge cases where RMS might return partial data)
+              telemetry.counters.total_tx_bytes = Math.max(totalTx, lastTx);
+              telemetry.counters.total_rx_bytes = Math.max(totalRx, lastRx);
+              logger.info(`Updated counters for ${deviceId}: RMS=${totalTx}+${totalRx}, last=${lastTx}+${lastRx}, stored=${telemetry.counters.total_tx_bytes}+${telemetry.counters.total_rx_bytes}`);
             } else {
-              logger.debug(`No new usage for ${deviceId}, keeping base values: ${baseTx}+${baseRx}`);
+              // No data from RMS - keep last known values
+              telemetry.counters.total_tx_bytes = lastTx;
+              telemetry.counters.total_rx_bytes = lastRx;
+              logger.debug(`No RMS usage for ${deviceId}, keeping last values: ${lastTx}+${lastRx}`);
             }
           } catch (statsErr) {
             // Non-fatal; proceed with whatever we have
