@@ -158,9 +158,146 @@
 }
 
 /* ============================================================================
-   FLEET OVERVIEW
+   FLEET OVERVIEW - New Layout with Map
    ============================================================================ */
 
+.fleet-overview-content-new {
+  display: grid;
+  grid-template-columns: 280px 1fr 280px;
+  gap: 20px;
+  min-height: 400px;
+}
+
+.fleet-left-column,
+.fleet-right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fleet-health-card {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.fleet-counts-inline {
+  display: flex;
+  gap: 24px;
+}
+
+.count-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.count-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.count-item.online .count-dot {
+  background: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+}
+
+.count-item.offline .count-dot {
+  background: #ef4444;
+}
+
+.count-num {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.count-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Fleet Map */
+.fleet-map-column {
+  background: var(--bg-card);
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  position: relative;
+  min-height: 380px;
+}
+
+.fleet-map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 380px;
+}
+
+.fleet-map {
+  width: 100%;
+  height: 100%;
+  min-height: 380px;
+  background: #1a1a2e;
+}
+
+.map-legend {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(30, 41, 59, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  gap: 16px;
+  z-index: 1000;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.map-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #e2e8f0;
+}
+
+.map-legend .legend-marker {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.map-legend .legend-marker.online {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+.map-legend .legend-marker.offline {
+  background: #ef4444;
+}
+
+.map-no-data {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* Legacy grid styles (keeping for backwards compat) */
 .fleet-overview-content {
   display: grid;
   grid-template-columns: 200px 1fr 400px;
@@ -646,6 +783,10 @@
    ============================================================================ */
 
 @media (max-width: 1400px) {
+  .fleet-overview-content-new {
+    grid-template-columns: 250px 1fr 250px;
+  }
+  
   .fleet-overview-content {
     grid-template-columns: 180px 1fr 350px;
   }
@@ -660,6 +801,22 @@
 }
 
 @media (max-width: 1200px) {
+  .fleet-overview-content-new {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+  }
+  
+  .fleet-map-column {
+    grid-column: span 2;
+    grid-row: 1;
+    min-height: 350px;
+  }
+  
+  .fleet-left-column,
+  .fleet-right-column {
+    grid-row: 2;
+  }
+  
   .fleet-overview-content {
     grid-template-columns: 1fr;
   }
@@ -705,6 +862,27 @@
   .beta-time-selector {
     flex: 1;
     justify-content: center;
+  }
+  
+  .fleet-overview-content-new {
+    grid-template-columns: 1fr;
+  }
+  
+  .fleet-map-column {
+    grid-column: span 1;
+    min-height: 300px;
+  }
+  
+  .fleet-left-column,
+  .fleet-right-column {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  
+  .fleet-left-column .beta-stat-card,
+  .fleet-right-column .beta-stat-card {
+    flex: 1;
+    min-width: 200px;
   }
   
   .fleet-health-column {
@@ -780,15 +958,6 @@
    ANIMATIONS
    ============================================================================ */
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.router-dot.online {
-  animation: pulse 2s ease-in-out infinite;
-}
-
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -807,11 +976,7 @@
    LOADING STATES
    ============================================================================ */
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
 .refresh-btn:disabled {
-  animation: spin 1s linear infinite;
+  opacity: 0.7;
+  cursor: not-allowed;
 }

@@ -148,29 +148,128 @@ function FleetHealthRing({ online, total, size = 120 }) {
   );
 }
 
-function RouterStatusGrid({ routers }) {
-  const sorted = useMemo(() => {
-    return [...routers].sort((a, b) => {
-      // Online first, then by name
-      const aOnline = a.current_status === 'online' || a.current_status === 1;
-      const bOnline = b.current_status === 'online' || b.current_status === 1;
-      if (aOnline !== bOnline) return bOnline - aOnline;
-      return (a.name || '').localeCompare(b.name || '');
-    });
+// UK Map showing router locations
+function FleetMap({ routers, onRouterClick }) {
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const mapRef = React.useRef(null);
+  const mapInstanceRef = React.useRef(null);
+
+  // Get routers with valid coordinates
+  const routersWithLocation = useMemo(() => {
+    return routers.filter(r => r.latitude && r.longitude);
   }, [routers]);
 
+  // Load Leaflet dynamically
+  useEffect(() => {
+    if (window.L) {
+      setMapLoaded(true);
+      return;
+    }
+
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+    link.crossOrigin = '';
+    document.head.appendChild(link);
+
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+    script.crossOrigin = '';
+    script.onload = () => setMapLoaded(true);
+    document.head.appendChild(script);
+  }, []);
+
+  // Initialize/update map
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return;
+
+    const L = window.L;
+
+    // Clean up existing map
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove();
+      mapInstanceRef.current = null;
+    }
+
+    // UK center coordinates
+    const ukCenter = [54.5, -3.5];
+    const map = L.map(mapRef.current, {
+      zoomControl: false,
+      attributionControl: false
+    }).setView(ukCenter, 6);
+
+    mapInstanceRef.current = map;
+
+    // Dark mode tiles
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19
+    }).addTo(map);
+
+    // Add zoom control to bottom right
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // Add router markers
+    routersWithLocation.forEach(router => {
+      const isOnline = router.current_status === 'online' || router.current_status === 1;
+      const color = isOnline ? '#10b981' : '#ef4444';
+      
+      const marker = L.circleMarker([router.latitude, router.longitude], {
+        radius: 6,
+        fillColor: color,
+        color: isOnline ? '#059669' : '#dc2626',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.8
+      });
+
+      marker.bindTooltip(`
+        <strong>${router.name || router.router_id}</strong><br/>
+        ${isOnline ? '🟢 Online' : '🔴 Offline'}<br/>
+        ${router.location || 'No location set'}
+      `, { direction: 'top', offset: [0, -8] });
+
+      marker.on('click', () => onRouterClick && onRouterClick(router));
+      marker.addTo(map);
+    });
+
+    // Fit bounds if we have routers
+    if (routersWithLocation.length > 0) {
+      const bounds = L.latLngBounds(routersWithLocation.map(r => [r.latitude, r.longitude]));
+      map.fitBounds(bounds.pad(0.1), { maxZoom: 10 });
+    }
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [mapLoaded, routersWithLocation, onRouterClick]);
+
+  const onlineCount = routersWithLocation.filter(r => 
+    r.current_status === 'online' || r.current_status === 1
+  ).length;
+
   return (
-    <div className="router-status-grid">
-      {sorted.slice(0, 50).map(router => {
-        const isOnline = router.current_status === 'online' || router.current_status === 1;
-        return (
-          <div 
-            key={router.router_id} 
-            className={`router-dot ${isOnline ? 'online' : 'offline'}`}
-            title={`${router.name || router.router_id}: ${isOnline ? 'Online' : 'Offline'}${router.last_seen ? ` • Last seen: ${getTimeAgo(router.last_seen)}` : ''}`}
-          />
-        );
-      })}
+    <div className="fleet-map-container">
+      <div className="fleet-map" ref={mapRef} />
+      <div className="map-legend">
+        <div className="legend-item">
+          <span className="legend-marker online" />
+          <span>{onlineCount} Online</span>
+        </div>
+        <div className="legend-item">
+          <span className="legend-marker offline" />
+          <span>{routersWithLocation.length - onlineCount} Offline</span>
+        </div>
+      </div>
+      {routersWithLocation.length === 0 && (
+        <div className="map-no-data">
+          No location data available
+        </div>
+      )}
     </div>
   );
 }
@@ -561,12 +660,12 @@ export default function AnalyticsBeta({ onOpenRouter }) {
         <div className="beta-controls">
           <TimeRangeSelector selected={timeRange} onChange={setTimeRange} />
           <button className="refresh-btn" onClick={loadData} disabled={loading}>
-            {loading ? '⟳' : '↻'} Refresh
+            {loading ? '⏳' : '↻'} {loading ? 'Loading...' : 'Refresh'}
           </button>
         </div>
       </div>
 
-      {/* Fleet Health Overview */}
+      {/* Fleet Health Overview - New Layout with Map in Center */}
       <section className="beta-section fleet-overview">
         <div className="section-header">
           <h2>🌐 Fleet Overview</h2>
@@ -574,25 +673,24 @@ export default function AnalyticsBeta({ onOpenRouter }) {
             <span className="last-updated">Updated {getTimeAgo(lastUpdated)}</span>
           )}
         </div>
-        <div className="fleet-overview-content">
-          <div className="fleet-health-column">
-            <FleetHealthRing online={fleetMetrics.online} total={fleetMetrics.total} size={140} />
-            <div className="fleet-counts">
-              <div className="count online">
-                <span className="dot" />
-                {fleetMetrics.online} Online
-              </div>
-              <div className="count offline">
-                <span className="dot" />
-                {fleetMetrics.offline} Offline
+        <div className="fleet-overview-content-new">
+          {/* Left Column - Stats */}
+          <div className="fleet-left-column">
+            <div className="fleet-health-card">
+              <FleetHealthRing online={fleetMetrics.online} total={fleetMetrics.total} size={120} />
+              <div className="fleet-counts-inline">
+                <div className="count-item online">
+                  <span className="count-dot" />
+                  <span className="count-num">{fleetMetrics.online}</span>
+                  <span className="count-label">Online</span>
+                </div>
+                <div className="count-item offline">
+                  <span className="count-dot" />
+                  <span className="count-num">{fleetMetrics.offline}</span>
+                  <span className="count-label">Offline</span>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="fleet-grid-column">
-            <RouterStatusGrid routers={routers} />
-            <div className="grid-caption">{routers.length} routers monitored</div>
-          </div>
-          <div className="fleet-stats-column">
             <StatCard 
               icon="📊" 
               label={`${timeRange.label} Data Usage`}
@@ -601,6 +699,15 @@ export default function AnalyticsBeta({ onOpenRouter }) {
               color={COLORS.primary}
               trend={dataMetrics.change}
             />
+          </div>
+
+          {/* Center - UK Map */}
+          <div className="fleet-map-column">
+            <FleetMap routers={routers} onRouterClick={handleRouterClick} />
+          </div>
+
+          {/* Right Column - More Stats */}
+          <div className="fleet-right-column">
             <StatCard 
               icon="🏆" 
               label="Top Consumer"
@@ -609,6 +716,20 @@ export default function AnalyticsBeta({ onOpenRouter }) {
               color={COLORS.warning}
               onClick={() => topRouters[0] && handleRouterClick(topRouters[0])}
               className="clickable"
+            />
+            <StatCard 
+              icon="📡" 
+              label="Fleet Size"
+              value={`${fleetMetrics.total} Routers`}
+              subValue={`${routers.filter(r => r.latitude && r.longitude).length} with GPS data`}
+              color={COLORS.info}
+            />
+            <StatCard 
+              icon="⚡" 
+              label="Data Rate"
+              value={`${formatBytes(dataMetrics.current / timeRange.hours)}/hr`}
+              subValue={`£${((dataMetrics.current / 1e6) * 0.0022).toFixed(2)} total cost`}
+              color={COLORS.purple}
             />
           </div>
         </div>
