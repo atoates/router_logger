@@ -237,7 +237,7 @@ async function syncFromRMS() {
         const telemetry = transformRMSDeviceToTelemetry(device, monitoringData);
 
         // If monitoring did not provide cumulative counters, try to derive from statistics API
-        // BUT: Only do this if we have no previous data to avoid wasting API quota
+        // We ALWAYS need to fetch current data to track usage properly
         const tx0 = Number(telemetry?.counters?.total_tx_bytes || 0);
         const rx0 = Number(telemetry?.counters?.total_rx_bytes || 0);
         const bothZero = (!isFinite(tx0) || tx0 === 0) && (!isFinite(rx0) || rx0 === 0);
@@ -247,83 +247,83 @@ async function syncFromRMS() {
             const deviceId = device.id || device.device_id || device.uuid || device.serial_number || telemetry.device_id;
             const latest = await getLatestLog(String(telemetry.device_id));
             
-            // Only fetch stats if we have NO previous data at all
-            // This saves API quota after initial sync
-            if (!latest || (!latest.total_tx_bytes && !latest.total_rx_bytes)) {
-              logger.info(`No previous data for device ${deviceId}, fetching initial statistics`);
-              const fromIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-              const toIso = new Date().toISOString();
-              
-              // Try data-usage endpoint first (most reliable for usage totals)
-              let usageData = null;
-              try {
-                logger.info(`Attempting data-usage fetch for device ${deviceId} from ${fromIso} to ${toIso}`);
-                usageData = await rmsClient.getDeviceDataUsage(deviceId, fromIso, toIso);
-                logger.info(`Data-usage response for ${deviceId}: ${usageData ? JSON.stringify(usageData).substring(0, 500) : 'null'}`);
-              } catch (e) {
-                logger.warn(`Data usage fetch failed for device ${deviceId}: ${e.message}`);
-              }
+            // Fetch stats since last log to get incremental usage
+            // Use shorter window if we have recent data, full day if no data
+            const hasRecentData = latest && latest.timestamp && (Date.now() - new Date(latest.timestamp).getTime() < 3 * 60 * 60 * 1000);
+            const fromIso = hasRecentData 
+              ? new Date(latest.timestamp).toISOString()
+              : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+            const toIso = new Date().toISOString();
+            
+            logger.info(`Fetching data usage for ${deviceId} from ${fromIso} to ${toIso}`);
+            
+            // Try data-usage endpoint first (most reliable for usage totals)
+            let usageData = null;
+            try {
+              usageData = await rmsClient.getDeviceDataUsage(deviceId, fromIso, toIso);
+              logger.debug(`Data-usage response for ${deviceId}: ${usageData ? JSON.stringify(usageData).substring(0, 500) : 'null'}`);
+            } catch (e) {
+              logger.warn(`Data usage fetch failed for device ${deviceId}: ${e.message}`);
+            }
 
-              let addTx = 0, addRx = 0;
-              
-              if (usageData) {
-                // Parse data-usage response (may be array of records or summary object)
-                const records = Array.isArray(usageData) ? usageData : (usageData?.data || usageData?.items || usageData?.records || []);
-                if (Array.isArray(records)) {
-                  for (const rec of records) {
-                    const vals = typeof rec === 'object' && rec ? rec : {};
-                    const sent = Number(vals.sent || vals.tx || vals.tx_bytes || vals.upload || vals.data_sent || 0);
-                    const received = Number(vals.received || vals.rx || vals.rx_bytes || vals.download || vals.data_received || 0);
-                    if (isFinite(sent)) addTx += sent;
-                    if (isFinite(received)) addRx += received;
+            let addTx = 0, addRx = 0;
+            
+            if (usageData) {
+              // Parse data-usage response (may be array of records or summary object)
+              const records = Array.isArray(usageData) ? usageData : (usageData?.data || usageData?.items || usageData?.records || []);
+              if (Array.isArray(records)) {
+                for (const rec of records) {
+                  const vals = typeof rec === 'object' && rec ? rec : {};
+                  const sent = Number(vals.sent || vals.tx || vals.tx_bytes || vals.upload || vals.data_sent || 0);
+                  const received = Number(vals.received || vals.rx || vals.rx_bytes || vals.download || vals.data_received || 0);
+                  if (isFinite(sent)) addTx += sent;
+                  if (isFinite(received)) addRx += received;
+                }
+              } else if (typeof usageData === 'object' && usageData) {
+                // If response is a summary object
+                const sent = Number(usageData.sent || usageData.tx || usageData.tx_bytes || usageData.upload || usageData.total_sent || 0);
+                const received = Number(usageData.received || usageData.rx || usageData.rx_bytes || usageData.download || usageData.total_received || 0);
+                if (isFinite(sent)) addTx = sent;
+                if (isFinite(received)) addRx = received;
+              }
+              logger.info(`Parsed usage for ${deviceId}: addTx=${addTx}, addRx=${addRx}`);
+            }
+
+            // Fallback to statistics if data-usage was empty
+            if (addTx === 0 && addRx === 0) {
+              let stats = await rmsClient.getDeviceStatistics(deviceId, fromIso, toIso);
+              if (!stats || (Array.isArray(stats) && stats.length === 0)) {
+                // company-level fallback (uses site/company IDs when present)
+                const companyId = device.company_id || device.companyId || telemetry.site_id;
+                if (companyId) {
+                  try {
+                    stats = await rmsClient.getCompanyDeviceStatistics(companyId, deviceId, fromIso, toIso);
+                  } catch (e) {
+                    logger.warn(`Company stats fallback failed for device ${deviceId}: ${e.message}`);
                   }
-                } else if (typeof usageData === 'object' && usageData) {
-                  // If response is a summary object
-                  const sent = Number(usageData.sent || usageData.tx || usageData.tx_bytes || usageData.upload || usageData.total_sent || 0);
-                  const received = Number(usageData.received || usageData.rx || usageData.rx_bytes || usageData.download || usageData.total_received || 0);
-                  if (isFinite(sent)) addTx = sent;
-                  if (isFinite(received)) addRx = received;
-                }
-                logger.info(`Parsed usage for ${deviceId}: addTx=${addTx}, addRx=${addRx}`);
-              }
-
-              // Fallback to statistics if data-usage was empty
-              if (addTx === 0 && addRx === 0) {
-                let stats = await rmsClient.getDeviceStatistics(deviceId, fromIso, toIso);
-                if (!stats || (Array.isArray(stats) && stats.length === 0)) {
-                  // company-level fallback (uses site/company IDs when present)
-                  const companyId = device.company_id || device.companyId || telemetry.site_id;
-                  if (companyId) {
-                    try {
-                      stats = await rmsClient.getCompanyDeviceStatistics(companyId, deviceId, fromIso, toIso);
-                    } catch (e) {
-                      logger.warn(`Company stats fallback failed for device ${deviceId}: ${e.message}`);
-                    }
-                  }
-                }
-                // Normalize stats list
-                const list = Array.isArray(stats) ? stats : stats?.data || stats?.items || stats?.rows || [];
-                for (const s of list) {
-                  const vals = typeof s === 'object' && s ? s : {};
-                  const tx = Number(vals.tx_bytes ?? vals.tx ?? 0);
-                  const rx = Number(vals.rx_bytes ?? vals.rx ?? 0);
-                  if (isFinite(tx)) addTx += tx;
-                  if (isFinite(rx)) addRx += rx;
                 }
               }
+              // Normalize stats list
+              const list = Array.isArray(stats) ? stats : stats?.data || stats?.items || stats?.rows || [];
+              for (const s of list) {
+                const vals = typeof s === 'object' && s ? s : {};
+                const tx = Number(vals.tx_bytes ?? vals.tx ?? 0);
+                const rx = Number(vals.rx_bytes ?? vals.rx ?? 0);
+                if (isFinite(tx)) addTx += tx;
+                if (isFinite(rx)) addRx += rx;
+              }
+            }
 
-              const baseTx = latest?.total_tx_bytes ? Number(latest.total_tx_bytes) : 0;
-              const baseRx = latest?.total_rx_bytes ? Number(latest.total_rx_bytes) : 0;
-              telemetry.counters.total_tx_bytes = baseTx + addTx;
-              telemetry.counters.total_rx_bytes = baseRx + addRx;
-              logger.info(`Final counters for ${deviceId}: TX=${telemetry.counters.total_tx_bytes}, RX=${telemetry.counters.total_rx_bytes}`);
+            // Add new usage to previous cumulative total
+            const baseTx = latest?.total_tx_bytes ? Number(latest.total_tx_bytes) : 0;
+            const baseRx = latest?.total_rx_bytes ? Number(latest.total_rx_bytes) : 0;
+            telemetry.counters.total_tx_bytes = baseTx + addTx;
+            telemetry.counters.total_rx_bytes = baseRx + addRx;
+            
+            if (addTx > 0 || addRx > 0) {
+              logger.info(`Updated counters for ${deviceId}: base=${baseTx}+${baseRx}, added=${addTx}+${addRx}, new total=${telemetry.counters.total_tx_bytes}+${telemetry.counters.total_rx_bytes}`);
             } else {
-              // We have previous data, use it as baseline to save API quota
-              logger.info(`Using previous data for device ${device.id}, skipping stats API calls to conserve quota`);
-              const baseTx = latest?.total_tx_bytes ? Number(latest.total_tx_bytes) : 0;
-              const baseRx = latest?.total_rx_bytes ? Number(latest.total_rx_bytes) : 0;
-              telemetry.counters.total_tx_bytes = baseTx;
-              telemetry.counters.total_rx_bytes = baseRx;
+              logger.debug(`No new usage for ${deviceId}, keeping base values: ${baseTx}+${baseRx}`);
             }
           } catch (statsErr) {
             // Non-fatal; proceed with whatever we have
