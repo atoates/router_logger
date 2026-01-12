@@ -1205,6 +1205,569 @@ router.post('/routers/:routerId/upload-report', requireAdmin, async (req, res) =
   }
 });
 
+// Comprehensive analysis endpoint for finding anomalous/corrupt log entries
+router.get('/debug/data-anomalies', requireAdmin, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days || '7', 10);
+    const routerId = req.query.router_id || null;
+    const results = {};
+
+    // Build router filter clause
+    const routerFilter = routerId ? 'AND router_id = $2' : '';
+    const params = routerId ? [days, routerId] : [days];
+
+    // 1. Find NEGATIVE deltas - cumulative bytes decreased (should never happen except on reboot)
+    // This is a clear data corruption indicator
+    const negativeDeltas = await pool.query(`
+      WITH ordered AS (
+        SELECT 
+          router_id,
+          id,
+          timestamp,
+          total_tx_bytes,
+          total_rx_bytes,
+          uptime_seconds,
+          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_tx,
+          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_rx,
+          LAG(uptime_seconds) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_uptime,
+          LAG(timestamp) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_timestamp
+        FROM router_logs
+        WHERE timestamp >= NOW() - ($1::int || ' days')::interval
+        ${routerFilter}
+      )
+      SELECT 
+        router_id,
+        id AS log_id,
+        timestamp,
+        prev_timestamp,
+        total_tx_bytes::text as tx,
+        total_rx_bytes::text as rx,
+        prev_tx::text,
+        prev_rx::text,
+        uptime_seconds,
+        prev_uptime,
+        (total_tx_bytes - prev_tx)::text AS tx_delta,
+        (total_rx_bytes - prev_rx)::text AS rx_delta,
+        CASE WHEN uptime_seconds < prev_uptime THEN 'LIKELY_REBOOT' ELSE 'ANOMALY' END as reboot_indicator
+      FROM ordered
+      WHERE prev_tx IS NOT NULL AND prev_rx IS NOT NULL
+        AND (total_tx_bytes < prev_tx OR total_rx_bytes < prev_rx)
+      ORDER BY timestamp DESC
+      LIMIT 50;
+    `, params);
+    
+    results.negativeDeltas = {
+      description: 'Log entries where cumulative bytes DECREASED (without apparent reboot)',
+      count: negativeDeltas.rows.length,
+      entries: negativeDeltas.rows.map(row => ({
+        log_id: row.log_id,
+        router_id: row.router_id,
+        timestamp: row.timestamp,
+        prev_timestamp: row.prev_timestamp,
+        tx: { prev: row.prev_tx, current: row.tx, delta: row.tx_delta },
+        rx: { prev: row.prev_rx, current: row.rx, delta: row.rx_delta },
+        uptime: { prev: row.prev_uptime, current: row.uptime_seconds },
+        reboot_indicator: row.reboot_indicator
+      }))
+    };
+
+    // 2. Find IMPOSSIBLE data rates - more than 10GB in less than 5 minutes (physically impossible for 4G)
+    // Max theoretical 4G LTE-A speed is ~1Gbps = 125MB/s = 7.5GB/min
+    // Realistic max is ~100Mbps = 12.5MB/s = 750MB/min
+    // Flag anything > 2GB in 5 minutes as suspicious (covers edge cases)
+    const impossibleRates = await pool.query(`
+      WITH ordered AS (
+        SELECT 
+          router_id,
+          id,
+          timestamp,
+          total_tx_bytes,
+          total_rx_bytes,
+          uptime_seconds,
+          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_tx,
+          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_rx,
+          LAG(uptime_seconds) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_uptime,
+          LAG(timestamp) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_timestamp
+        FROM router_logs
+        WHERE timestamp >= NOW() - ($1::int || ' days')::interval
+        ${routerFilter}
+      )
+      SELECT 
+        router_id,
+        id AS log_id,
+        timestamp,
+        prev_timestamp,
+        EXTRACT(EPOCH FROM (timestamp - prev_timestamp)) AS seconds_between,
+        total_tx_bytes::text as tx,
+        total_rx_bytes::text as rx,
+        prev_tx::text,
+        prev_rx::text,
+        GREATEST(total_tx_bytes - prev_tx, 0)::text AS tx_delta,
+        GREATEST(total_rx_bytes - prev_rx, 0)::text AS rx_delta,
+        (GREATEST(total_tx_bytes - prev_tx, 0) + GREATEST(total_rx_bytes - prev_rx, 0))::text AS total_delta,
+        CASE 
+          WHEN EXTRACT(EPOCH FROM (timestamp - prev_timestamp)) > 0 THEN
+            ((GREATEST(total_tx_bytes - prev_tx, 0) + GREATEST(total_rx_bytes - prev_rx, 0)) / 
+             EXTRACT(EPOCH FROM (timestamp - prev_timestamp)) / 1000000)::numeric(10,2)
+          ELSE NULL
+        END AS mbps_rate,
+        uptime_seconds,
+        prev_uptime
+      FROM ordered
+      WHERE prev_tx IS NOT NULL 
+        AND prev_rx IS NOT NULL
+        AND EXTRACT(EPOCH FROM (timestamp - prev_timestamp)) <= 600  -- within 10 minutes
+        AND EXTRACT(EPOCH FROM (timestamp - prev_timestamp)) > 0
+        AND total_tx_bytes >= prev_tx  -- not a reboot
+        AND total_rx_bytes >= prev_rx
+        AND (GREATEST(total_tx_bytes - prev_tx, 0) + GREATEST(total_rx_bytes - prev_rx, 0)) > 2147483648  -- 2GB
+      ORDER BY (GREATEST(total_tx_bytes - prev_tx, 0) + GREATEST(total_rx_bytes - prev_rx, 0)) DESC
+      LIMIT 30;
+    `, params);
+    
+    results.impossibleRates = {
+      description: 'Log entries with >2GB transfer in <10 minutes (physically suspect for 4G)',
+      count: impossibleRates.rows.length,
+      entries: impossibleRates.rows.map(row => ({
+        log_id: row.log_id,
+        router_id: row.router_id,
+        timestamp: row.timestamp,
+        seconds_between: Math.round(parseFloat(row.seconds_between)),
+        delta_gb: ((parseInt(row.total_delta) || 0) / (1024*1024*1024)).toFixed(2),
+        apparent_mbps: row.mbps_rate,
+        tx_delta: row.tx_delta,
+        rx_delta: row.rx_delta
+      }))
+    };
+
+    // 3. Find GIANT jumps (>10GB in any single delta regardless of time)
+    const giantJumps = await pool.query(`
+      WITH ordered AS (
+        SELECT 
+          router_id,
+          id,
+          timestamp,
+          total_tx_bytes,
+          total_rx_bytes,
+          uptime_seconds,
+          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_tx,
+          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_rx,
+          LAG(uptime_seconds) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_uptime,
+          LAG(timestamp) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_timestamp
+        FROM router_logs
+        WHERE timestamp >= NOW() - ($1::int || ' days')::interval
+        ${routerFilter}
+      )
+      SELECT 
+        router_id,
+        id AS log_id,
+        timestamp,
+        prev_timestamp,
+        EXTRACT(EPOCH FROM (timestamp - prev_timestamp)) / 3600 AS hours_between,
+        total_tx_bytes::text as tx,
+        total_rx_bytes::text as rx,
+        prev_tx::text,
+        prev_rx::text,
+        (total_tx_bytes - COALESCE(prev_tx, 0))::text AS tx_delta,
+        (total_rx_bytes - COALESCE(prev_rx, 0))::text AS rx_delta,
+        (total_tx_bytes - COALESCE(prev_tx, 0) + total_rx_bytes - COALESCE(prev_rx, 0))::text AS total_delta
+      FROM ordered
+      WHERE (total_tx_bytes - COALESCE(prev_tx, 0) + total_rx_bytes - COALESCE(prev_rx, 0)) > 10737418240  -- 10GB
+      ORDER BY (total_tx_bytes - COALESCE(prev_tx, 0) + total_rx_bytes - COALESCE(prev_rx, 0)) DESC
+      LIMIT 30;
+    `, params);
+    
+    results.giantJumps = {
+      description: 'Log entries with >10GB jump in cumulative bytes (possible sync bug)',
+      count: giantJumps.rows.length,
+      entries: giantJumps.rows.map(row => ({
+        log_id: row.log_id,
+        router_id: row.router_id,
+        timestamp: row.timestamp,
+        prev_timestamp: row.prev_timestamp,
+        hours_between: parseFloat(row.hours_between).toFixed(1),
+        delta_gb: ((parseInt(row.total_delta) || 0) / (1024*1024*1024)).toFixed(2),
+        tx: { prev: row.prev_tx, current: row.tx },
+        rx: { prev: row.prev_rx, current: row.rx }
+      }))
+    };
+
+    // 4. Per-router anomaly summary - routers with most suspicious entries
+    const perRouterSummary = await pool.query(`
+      WITH ordered AS (
+        SELECT 
+          router_id,
+          id,
+          timestamp,
+          total_tx_bytes,
+          total_rx_bytes,
+          uptime_seconds,
+          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_tx,
+          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_rx,
+          LAG(uptime_seconds) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_uptime
+        FROM router_logs
+        WHERE timestamp >= NOW() - ($1::int || ' days')::interval
+        ${routerFilter}
+      ),
+      anomalies AS (
+        SELECT 
+          router_id,
+          -- Count negative deltas (excluding likely reboots)
+          COUNT(*) FILTER (
+            WHERE (total_tx_bytes < prev_tx OR total_rx_bytes < prev_rx) 
+              AND uptime_seconds >= prev_uptime
+          ) AS negative_delta_count,
+          -- Count giant jumps >5GB
+          COUNT(*) FILTER (
+            WHERE (total_tx_bytes - COALESCE(prev_tx, 0) + total_rx_bytes - COALESCE(prev_rx, 0)) > 5368709120
+          ) AS giant_jump_count,
+          -- Sum of suspicious data (positive only)
+          SUM(
+            CASE 
+              WHEN prev_tx IS NOT NULL AND prev_rx IS NOT NULL 
+                AND (total_tx_bytes - COALESCE(prev_tx, 0) + total_rx_bytes - COALESCE(prev_rx, 0)) > 5368709120
+              THEN GREATEST(total_tx_bytes - prev_tx, 0) + GREATEST(total_rx_bytes - prev_rx, 0)
+              ELSE 0
+            END
+          )::text AS suspicious_bytes,
+          COUNT(*) as total_logs
+        FROM ordered
+        GROUP BY router_id
+      )
+      SELECT 
+        a.router_id,
+        r.name,
+        a.negative_delta_count,
+        a.giant_jump_count,
+        a.suspicious_bytes,
+        a.total_logs
+      FROM anomalies a
+      LEFT JOIN routers r ON r.router_id = a.router_id
+      WHERE a.negative_delta_count > 0 OR a.giant_jump_count > 0
+      ORDER BY (a.negative_delta_count + a.giant_jump_count) DESC
+      LIMIT 25;
+    `, params);
+    
+    results.perRouterSummary = {
+      description: 'Routers with most anomalous entries',
+      entries: perRouterSummary.rows.map(row => ({
+        router_id: row.router_id,
+        name: row.name,
+        negative_delta_count: parseInt(row.negative_delta_count),
+        giant_jump_count: parseInt(row.giant_jump_count),
+        suspicious_gb: ((parseInt(row.suspicious_bytes) || 0) / (1024*1024*1024)).toFixed(2),
+        total_logs: parseInt(row.total_logs)
+      }))
+    };
+
+    // 5. Timeline of suspicious entries - when did anomalies occur?
+    const anomalyTimeline = await pool.query(`
+      WITH ordered AS (
+        SELECT 
+          router_id,
+          timestamp,
+          total_tx_bytes,
+          total_rx_bytes,
+          uptime_seconds,
+          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_tx,
+          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_rx,
+          LAG(uptime_seconds) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_uptime
+        FROM router_logs
+        WHERE timestamp >= NOW() - ($1::int || ' days')::interval
+        ${routerFilter}
+      ),
+      anomalies AS (
+        SELECT 
+          router_id,
+          timestamp,
+          CASE 
+            WHEN total_tx_bytes < prev_tx OR total_rx_bytes < prev_rx THEN 'negative_delta'
+            WHEN (total_tx_bytes - COALESCE(prev_tx, 0) + total_rx_bytes - COALESCE(prev_rx, 0)) > 10737418240 THEN 'giant_jump'
+            WHEN (total_tx_bytes - COALESCE(prev_tx, 0) + total_rx_bytes - COALESCE(prev_rx, 0)) > 5368709120 THEN 'large_jump'
+            ELSE NULL
+          END AS anomaly_type
+        FROM ordered
+      )
+      SELECT 
+        DATE_TRUNC('hour', timestamp) AS hour,
+        anomaly_type,
+        COUNT(*) as count
+      FROM anomalies
+      WHERE anomaly_type IS NOT NULL
+      GROUP BY DATE_TRUNC('hour', timestamp), anomaly_type
+      ORDER BY hour DESC
+      LIMIT 100;
+    `, params);
+    
+    results.anomalyTimeline = {
+      description: 'When anomalies occurred (hourly buckets)',
+      entries: anomalyTimeline.rows
+    };
+
+    // 6. Overall data quality score
+    const qualityScore = await pool.query(`
+      WITH ordered AS (
+        SELECT 
+          router_id,
+          timestamp,
+          total_tx_bytes,
+          total_rx_bytes,
+          uptime_seconds,
+          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_tx,
+          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_rx,
+          LAG(uptime_seconds) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_uptime
+        FROM router_logs
+        WHERE timestamp >= NOW() - ($1::int || ' days')::interval
+        ${routerFilter}
+      )
+      SELECT 
+        COUNT(*)::text as total_entries,
+        COUNT(*) FILTER (WHERE prev_tx IS NOT NULL)::text as entries_with_prev,
+        COUNT(*) FILTER (
+          WHERE (total_tx_bytes < prev_tx OR total_rx_bytes < prev_rx) 
+            AND uptime_seconds >= prev_uptime
+        )::text AS negative_deltas_excl_reboot,
+        COUNT(*) FILTER (
+          WHERE (total_tx_bytes < prev_tx OR total_rx_bytes < prev_rx) 
+            AND uptime_seconds < prev_uptime
+        )::text AS negative_deltas_with_reboot,
+        COUNT(*) FILTER (
+          WHERE (total_tx_bytes - COALESCE(prev_tx, 0) + total_rx_bytes - COALESCE(prev_rx, 0)) > 10737418240
+        )::text AS jumps_over_10gb,
+        COUNT(*) FILTER (
+          WHERE (total_tx_bytes - COALESCE(prev_tx, 0) + total_rx_bytes - COALESCE(prev_rx, 0)) > 5368709120
+        )::text AS jumps_over_5gb,
+        COUNT(*) FILTER (
+          WHERE (total_tx_bytes - COALESCE(prev_tx, 0) + total_rx_bytes - COALESCE(prev_rx, 0)) > 1073741824
+        )::text AS jumps_over_1gb
+      FROM ordered;
+    `, params);
+    
+    const qRow = qualityScore.rows[0];
+    const totalWithPrev = parseInt(qRow.entries_with_prev) || 1;
+    const anomalyCount = (parseInt(qRow.negative_deltas_excl_reboot) || 0) + (parseInt(qRow.jumps_over_10gb) || 0);
+    const qualityPct = ((totalWithPrev - anomalyCount) / totalWithPrev * 100).toFixed(2);
+    
+    results.qualityScore = {
+      days_analyzed: days,
+      total_entries: qRow.total_entries,
+      entries_with_previous: qRow.entries_with_prev,
+      negative_deltas_excluding_reboots: qRow.negative_deltas_excl_reboot,
+      negative_deltas_with_reboot: qRow.negative_deltas_with_reboot,
+      jumps_over_10gb: qRow.jumps_over_10gb,
+      jumps_over_5gb: qRow.jumps_over_5gb,
+      jumps_over_1gb: qRow.jumps_over_1gb,
+      quality_percentage: qualityPct + '%',
+      assessment: parseFloat(qualityPct) > 99 ? 'GOOD' : parseFloat(qualityPct) > 95 ? 'ACCEPTABLE' : 'NEEDS_ATTENTION'
+    };
+
+    res.json({
+      days,
+      router_id: routerId || 'all',
+      timestamp: new Date().toISOString(),
+      ...results
+    });
+  } catch (error) {
+    logger.error('Error in data anomalies analysis:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get specific bad log entry IDs for potential cleanup
+router.get('/debug/bad-log-ids', requireAdmin, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days || '7', 10);
+    const routerId = req.query.router_id || null;
+    const threshold = req.query.threshold || '5'; // GB threshold for "bad"
+    const thresholdBytes = parseInt(threshold) * 1024 * 1024 * 1024;
+    
+    const routerFilter = routerId ? 'AND router_id = $3' : '';
+    const params = routerId ? [days, thresholdBytes, routerId] : [days, thresholdBytes];
+
+    // Find log IDs that caused anomalous jumps
+    const badLogs = await pool.query(`
+      WITH ordered AS (
+        SELECT 
+          router_id,
+          id,
+          timestamp,
+          total_tx_bytes,
+          total_rx_bytes,
+          uptime_seconds,
+          LAG(id) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_id,
+          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_tx,
+          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_rx,
+          LAG(uptime_seconds) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_uptime,
+          LAG(timestamp) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_timestamp,
+          LEAD(id) OVER (PARTITION BY router_id ORDER BY timestamp) AS next_id,
+          LEAD(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS next_tx,
+          LEAD(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS next_rx
+        FROM router_logs
+        WHERE timestamp >= NOW() - ($1::int || ' days')::interval
+        ${routerFilter}
+      )
+      SELECT 
+        id AS log_id,
+        router_id,
+        timestamp,
+        prev_timestamp,
+        total_tx_bytes::text as tx,
+        total_rx_bytes::text as rx,
+        prev_tx::text,
+        prev_rx::text,
+        next_tx::text,
+        next_rx::text,
+        uptime_seconds,
+        prev_uptime,
+        (GREATEST(total_tx_bytes - COALESCE(prev_tx, 0), 0) + 
+         GREATEST(total_rx_bytes - COALESCE(prev_rx, 0), 0))::text AS delta_from_prev,
+        CASE 
+          WHEN total_tx_bytes < prev_tx OR total_rx_bytes < prev_rx THEN 'NEGATIVE_DELTA'
+          WHEN uptime_seconds < COALESCE(prev_uptime, 0) AND 
+               (total_tx_bytes < prev_tx OR total_rx_bytes < prev_rx) THEN 'REBOOT'
+          WHEN (total_tx_bytes - COALESCE(prev_tx, 0) + total_rx_bytes - COALESCE(prev_rx, 0)) > $2 THEN 'GIANT_JUMP'
+          ELSE 'UNKNOWN'
+        END AS anomaly_type,
+        CASE 
+          -- If current values are way higher than next values, current is likely bad
+          WHEN next_tx IS NOT NULL AND total_tx_bytes > next_tx THEN 'CURRENT_LIKELY_BAD'
+          -- If prev values are reasonable but current jumped, current is likely bad
+          WHEN prev_tx IS NOT NULL AND 
+               (total_tx_bytes - prev_tx) > $2 AND 
+               next_tx IS NOT NULL AND 
+               (next_tx - prev_tx) < $2 THEN 'CURRENT_LIKELY_BAD'
+          ELSE 'NEEDS_REVIEW'
+        END AS recommendation
+      FROM ordered
+      WHERE 
+        prev_tx IS NOT NULL AND prev_rx IS NOT NULL AND
+        (
+          -- Negative delta (not from reboot)
+          ((total_tx_bytes < prev_tx OR total_rx_bytes < prev_rx) AND uptime_seconds >= prev_uptime)
+          OR
+          -- Giant jump
+          (total_tx_bytes >= prev_tx AND total_rx_bytes >= prev_rx AND
+           (total_tx_bytes - prev_tx + total_rx_bytes - prev_rx) > $2)
+        )
+      ORDER BY timestamp DESC
+      LIMIT 100;
+    `, params);
+    
+    // Summary of IDs by anomaly type
+    const summary = {
+      total_bad_entries: badLogs.rows.length,
+      by_type: {},
+      by_recommendation: {}
+    };
+    
+    for (const row of badLogs.rows) {
+      summary.by_type[row.anomaly_type] = (summary.by_type[row.anomaly_type] || 0) + 1;
+      summary.by_recommendation[row.recommendation] = (summary.by_recommendation[row.recommendation] || 0) + 1;
+    }
+
+    res.json({
+      days,
+      router_id: routerId || 'all',
+      threshold_gb: threshold,
+      timestamp: new Date().toISOString(),
+      summary,
+      bad_logs: badLogs.rows.map(row => ({
+        log_id: row.log_id,
+        router_id: row.router_id,
+        timestamp: row.timestamp,
+        anomaly_type: row.anomaly_type,
+        recommendation: row.recommendation,
+        delta_gb: ((parseInt(row.delta_from_prev) || 0) / (1024*1024*1024)).toFixed(2),
+        tx: { prev: row.prev_tx, current: row.tx, next: row.next_tx },
+        rx: { prev: row.prev_rx, current: row.rx, next: row.next_rx }
+      })),
+      // Provide a list of IDs for easy cleanup
+      likely_bad_ids: badLogs.rows
+        .filter(r => r.recommendation === 'CURRENT_LIKELY_BAD')
+        .map(r => r.log_id),
+      needs_review_ids: badLogs.rows
+        .filter(r => r.recommendation === 'NEEDS_REVIEW')
+        .map(r => r.log_id)
+    });
+  } catch (error) {
+    logger.error('Error fetching bad log IDs:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Detailed router log timeline - see consecutive entries for a specific router
+router.get('/debug/router-timeline/:routerId', requireAdmin, async (req, res) => {
+  try {
+    const { routerId } = req.params;
+    const hours = parseInt(req.query.hours || '48', 10);
+    
+    const timeline = await pool.query(`
+      SELECT 
+        id,
+        timestamp,
+        total_tx_bytes::text as tx,
+        total_rx_bytes::text as rx,
+        uptime_seconds,
+        status,
+        operator,
+        wan_ip,
+        LAG(total_tx_bytes) OVER (ORDER BY timestamp)::text AS prev_tx,
+        LAG(total_rx_bytes) OVER (ORDER BY timestamp)::text AS prev_rx,
+        LAG(timestamp) OVER (ORDER BY timestamp) AS prev_timestamp
+      FROM router_logs
+      WHERE router_id = $1
+        AND timestamp >= NOW() - ($2::int || ' hours')::interval
+      ORDER BY timestamp DESC
+      LIMIT 500;
+    `, [routerId, hours]);
+    
+    const entries = timeline.rows.map(row => {
+      const txDelta = parseInt(row.tx) - parseInt(row.prev_tx || row.tx);
+      const rxDelta = parseInt(row.rx) - parseInt(row.prev_rx || row.rx);
+      const secondsElapsed = row.prev_timestamp 
+        ? (new Date(row.timestamp) - new Date(row.prev_timestamp)) / 1000 
+        : 0;
+      
+      return {
+        id: row.id,
+        timestamp: row.timestamp,
+        tx: row.tx,
+        rx: row.rx,
+        prev_tx: row.prev_tx,
+        prev_rx: row.prev_rx,
+        tx_delta: txDelta.toString(),
+        rx_delta: rxDelta.toString(),
+        total_delta_mb: ((txDelta + rxDelta) / (1024*1024)).toFixed(2),
+        seconds_elapsed: Math.round(secondsElapsed),
+        uptime: row.uptime_seconds,
+        status: row.status,
+        operator: row.operator,
+        wan_ip: row.wan_ip,
+        flags: [
+          txDelta < 0 ? 'TX_DECREASED' : null,
+          rxDelta < 0 ? 'RX_DECREASED' : null,
+          (txDelta + rxDelta) > 5 * 1024 * 1024 * 1024 ? 'LARGE_JUMP' : null
+        ].filter(Boolean)
+      };
+    });
+    
+    // Find anomalies
+    const anomalies = entries.filter(e => e.flags.length > 0);
+    
+    res.json({
+      router_id: routerId,
+      hours,
+      total_entries: entries.length,
+      anomaly_count: anomalies.length,
+      entries,
+      anomalies
+    });
+  } catch (error) {
+    logger.error('Error fetching router timeline:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Debug endpoint to investigate data usage issues
 router.get('/debug/data-usage', requireAdmin, async (req, res) => {
   try {
