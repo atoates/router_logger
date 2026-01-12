@@ -643,20 +643,25 @@
 .metric {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  background: var(--bg-tertiary, #363936);
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color, #3d403d);
 }
 
 .metric-label {
-  font-size: 11px;
-  color: var(--text-secondary);
+  font-size: 10px;
+  color: var(--text-secondary, #C7DFB9);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  font-weight: 600;
 }
 
 .metric-value {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary, #F6F7F8);
 }
 
 .data-bar {

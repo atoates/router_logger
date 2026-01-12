@@ -9,6 +9,7 @@
   --bg-primary: #232523; /* Eerie Black */
   --bg-secondary: #2d302d; /* Slightly lighter black */
   --bg-card: #2d302d; /* Card background */
+  --bg-tertiary: #363936; /* Even lighter for nested elements */
   --text-primary: #F6F7F8; /* Seasalt */
   --text-secondary: #C7DFB9; /* Tea Green for secondary text */
   --text-muted: #747975; /* Grey */
