@@ -386,6 +386,22 @@ async function processRouterTelemetry(data) {
               'default'
             );
             
+            // Also update Last Online field when router comes online
+            if (newStatusNormalized === 'online') {
+              await clickupClient.updateCustomField(
+                clickupTaskId,
+                CLICKUP_FIELD_IDS.LAST_ONLINE,
+                new Date(logData.timestamp).getTime(), // ClickUp expects timestamp in milliseconds
+                'default'
+              );
+              
+              logger.info('Updated Last Online field in ClickUp', {
+                routerId: data.device_id,
+                clickupTaskId,
+                lastOnline: new Date(logData.timestamp).toISOString()
+              });
+            }
+            
             logger.info('Immediately updated Operational Status field in ClickUp', {
               routerId: data.device_id,
               clickupTaskId,

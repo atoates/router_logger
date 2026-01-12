@@ -578,6 +578,16 @@
   margin: -8px -8px 0;
 }
 
+/* Clickable router names in charts */
+.clickable-router-name {
+  transition: fill 0.15s ease;
+}
+
+.clickable-router-name:hover {
+  fill: #8b5cf6 !important;
+  text-decoration: underline;
+}
+
 .no-data {
   display: flex;
   align-items: center;

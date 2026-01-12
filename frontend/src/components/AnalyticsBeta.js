@@ -346,6 +346,28 @@ function DataUsageChart({ data, dark }) {
 }
 
 function TopRoutersChart({ data, dark, onRouterClick }) {
+  // Custom tick component for clickable router names
+  const CustomYAxisTick = ({ x, y, payload }) => {
+    const router = data.find(r => r.name === payload.value);
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text
+          x={-6}
+          y={0}
+          dy={4}
+          textAnchor="end"
+          fill={dark ? '#94a3b8' : '#64748b'}
+          fontSize={11}
+          style={{ cursor: 'pointer' }}
+          onClick={() => router && onRouterClick && onRouterClick(router)}
+          className="clickable-router-name"
+        >
+          {payload.value}
+        </text>
+      </g>
+    );
+  };
+
   return (
     <div className="beta-chart-container">
       <ResponsiveContainer width="100%" height={280}>
@@ -360,8 +382,7 @@ function TopRoutersChart({ data, dark, onRouterClick }) {
             type="category" 
             dataKey="name" 
             width={140}
-            tick={{ fontSize: 11, fill: dark ? '#94a3b8' : '#64748b', cursor: 'pointer' }}
-            onClick={(data) => onRouterClick && onRouterClick(data)}
+            tick={<CustomYAxisTick />}
           />
           <Tooltip 
             formatter={(v) => formatBytes(v)}
