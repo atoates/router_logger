@@ -463,48 +463,62 @@ function GuestSessionsChart({ timeline, dark }) {
   // Reverse to get chronological order
   const data = [...timeline].reverse();
   
+  // Calculate max value for better Y-axis scaling
+  const maxSessions = Math.max(...data.map(d => d.sessions || 0), 1);
+  const yAxisMax = Math.ceil(maxSessions * 1.2); // Add 20% headroom
+  
   return (
     <div className="beta-chart-container">
-      <ResponsiveContainer width="100%" height={180}>
-        <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={dark ? '#334155' : '#e5e7eb'} />
+      <ResponsiveContainer width="100%" height={220}>
+        <AreaChart data={data} margin={{ top: 20, right: 30, left: 10, bottom: 10 }}>
+          <defs>
+            <linearGradient id="sessionsGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={COLORS.purple} stopOpacity={0.4}/>
+              <stop offset="95%" stopColor={COLORS.purple} stopOpacity={0.05}/>
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke={dark ? '#334155' : '#e5e7eb'} vertical={false} />
           <XAxis 
             dataKey="date" 
             tickFormatter={(t) => {
               const d = new Date(t);
               return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
             }}
-            tick={{ fontSize: 10, fill: dark ? '#94a3b8' : '#64748b' }}
+            tick={{ fontSize: 11, fill: dark ? '#94a3b8' : '#64748b' }}
+            axisLine={{ stroke: dark ? '#475569' : '#cbd5e1' }}
+            tickLine={{ stroke: dark ? '#475569' : '#cbd5e1' }}
           />
           <YAxis 
-            tick={{ fontSize: 10, fill: dark ? '#94a3b8' : '#64748b' }}
+            tick={{ fontSize: 11, fill: dark ? '#94a3b8' : '#64748b' }}
             allowDecimals={false}
-            domain={[0, 'auto']}
+            domain={[0, yAxisMax]}
+            axisLine={{ stroke: dark ? '#475569' : '#cbd5e1' }}
+            tickLine={{ stroke: dark ? '#475569' : '#cbd5e1' }}
+            width={40}
           />
           <Tooltip 
             contentStyle={{
               backgroundColor: dark ? '#1e293b' : '#ffffff',
-              border: `1px solid ${dark ? '#334155' : '#e2e8f0'}`,
-              borderRadius: 8
+              border: `1px solid ${dark ? '#475569' : '#e2e8f0'}`,
+              borderRadius: 8,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              padding: '10px 14px'
             }}
+            labelStyle={{ color: dark ? '#e2e8f0' : '#1e293b', fontWeight: 600, marginBottom: 4 }}
+            itemStyle={{ color: dark ? '#94a3b8' : '#64748b' }}
+            labelFormatter={(t) => new Date(t).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
           />
-          <Line 
-            type="linear" 
+          <Area 
+            type="monotone" 
             dataKey="sessions" 
             stroke={COLORS.purple} 
-            strokeWidth={2}
-            dot={{ r: 3, fill: COLORS.purple }}
+            strokeWidth={2.5}
+            fill="url(#sessionsGradient)"
+            dot={{ r: 5, fill: COLORS.purple, strokeWidth: 2, stroke: dark ? '#1e293b' : '#ffffff' }}
+            activeDot={{ r: 7, fill: COLORS.purple, strokeWidth: 2, stroke: '#ffffff' }}
             name="Sessions"
           />
-          <Line 
-            type="linear" 
-            dataKey="unique_guests" 
-            stroke={COLORS.info} 
-            strokeWidth={2}
-            dot={{ r: 3, fill: COLORS.info }}
-            name="Unique Guests"
-          />
-        </LineChart>
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );
