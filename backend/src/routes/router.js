@@ -1205,6 +1205,218 @@ router.post('/routers/:routerId/upload-report', requireAdmin, async (req, res) =
   }
 });
 
+// Debug endpoint to investigate data usage issues
+router.get('/debug/data-usage', requireAdmin, async (req, res) => {
+  try {
+    const hours = parseInt(req.query.hours || '24', 10);
+    const results = {};
+
+    // 1. Total usage by the rolling window calculation
+    const totalUsage = await pool.query(`
+      WITH params AS (
+        SELECT NOW() - ($1::int || ' hours')::interval AS start_ts
+      ), base AS (
+        SELECT l.router_id, l.total_tx_bytes AS base_tx, l.total_rx_bytes AS base_rx
+        FROM router_logs l
+        JOIN (
+          SELECT router_id, MAX(timestamp) AS ts
+          FROM router_logs, params
+          WHERE timestamp < (SELECT start_ts FROM params)
+          GROUP BY router_id
+        ) b ON b.router_id = l.router_id AND b.ts = l.timestamp
+      ), ordered AS (
+        SELECT 
+          l.router_id,
+          l.timestamp,
+          l.total_tx_bytes, l.total_rx_bytes,
+          LAG(l.total_tx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS prev_tx,
+          LAG(l.total_rx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS prev_rx
+        FROM router_logs l, params
+        WHERE l.timestamp >= (SELECT start_ts FROM params)
+      ), deltas AS (
+        SELECT 
+          o.router_id,
+          CASE 
+            WHEN o.prev_tx IS NOT NULL THEN GREATEST(o.total_tx_bytes - o.prev_tx, 0)
+            ELSE GREATEST(o.total_tx_bytes - COALESCE(b.base_tx, o.total_tx_bytes), 0)
+          END AS tx_delta,
+          CASE 
+            WHEN o.prev_rx IS NOT NULL THEN GREATEST(o.total_rx_bytes - o.prev_rx, 0)
+            ELSE GREATEST(o.total_rx_bytes - COALESCE(b.base_rx, o.total_rx_bytes), 0)
+          END AS rx_delta
+        FROM ordered o
+        LEFT JOIN base b ON b.router_id = o.router_id
+      )
+      SELECT 
+        SUM(tx_delta)::text AS total_tx_bytes,
+        SUM(rx_delta)::text AS total_rx_bytes,
+        SUM(tx_delta + rx_delta)::text AS total_bytes
+      FROM deltas;
+    `, [hours]);
+    
+    results.totalUsage = {
+      tx_bytes: totalUsage.rows[0]?.total_tx_bytes || '0',
+      rx_bytes: totalUsage.rows[0]?.total_rx_bytes || '0',
+      total_bytes: totalUsage.rows[0]?.total_bytes || '0',
+      total_gb: ((parseInt(totalUsage.rows[0]?.total_bytes) || 0) / (1024*1024*1024)).toFixed(2)
+    };
+
+    // 2. Large deltas (>1GB) - potential data spikes
+    const largeDeltas = await pool.query(`
+      WITH ordered AS (
+        SELECT 
+          router_id,
+          timestamp,
+          total_tx_bytes,
+          total_rx_bytes,
+          LAG(total_tx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_tx,
+          LAG(total_rx_bytes) OVER (PARTITION BY router_id ORDER BY timestamp) AS prev_rx
+        FROM router_logs
+        WHERE timestamp >= NOW() - ($1::int || ' hours')::interval
+      )
+      SELECT 
+        router_id,
+        timestamp,
+        total_tx_bytes::text as tx,
+        total_rx_bytes::text as rx,
+        prev_tx::text,
+        prev_rx::text,
+        GREATEST(total_tx_bytes - COALESCE(prev_tx, total_tx_bytes), 0)::text AS tx_delta,
+        GREATEST(total_rx_bytes - COALESCE(prev_rx, total_rx_bytes), 0)::text AS rx_delta,
+        (GREATEST(total_tx_bytes - COALESCE(prev_tx, total_tx_bytes), 0) + 
+         GREATEST(total_rx_bytes - COALESCE(prev_rx, total_rx_bytes), 0))::text AS total_delta
+      FROM ordered
+      WHERE (GREATEST(total_tx_bytes - COALESCE(prev_tx, total_tx_bytes), 0) + 
+             GREATEST(total_rx_bytes - COALESCE(prev_rx, total_rx_bytes), 0)) > 1000000000
+      ORDER BY (GREATEST(total_tx_bytes - COALESCE(prev_tx, total_tx_bytes), 0) + 
+             GREATEST(total_rx_bytes - COALESCE(prev_rx, total_rx_bytes), 0)) DESC
+      LIMIT 20;
+    `, [hours]);
+    
+    results.largeDeltas = largeDeltas.rows.map(row => ({
+      router_id: row.router_id,
+      timestamp: row.timestamp,
+      delta_gb: ((parseInt(row.total_delta) || 0) / (1024*1024*1024)).toFixed(2),
+      tx: row.tx,
+      rx: row.rx,
+      prev_tx: row.prev_tx,
+      prev_rx: row.prev_rx
+    }));
+
+    // 3. Top routers by usage
+    const topRouters = await pool.query(`
+      WITH params AS (
+        SELECT NOW() - ($1::int || ' hours')::interval AS start_ts
+      ), base AS (
+        SELECT l.router_id, l.total_tx_bytes AS base_tx, l.total_rx_bytes AS base_rx
+        FROM router_logs l
+        JOIN (
+          SELECT router_id, MAX(timestamp) AS ts
+          FROM router_logs, params
+          WHERE timestamp < (SELECT start_ts FROM params)
+          GROUP BY router_id
+        ) b ON b.router_id = l.router_id AND b.ts = l.timestamp
+      ), ordered AS (
+        SELECT 
+          l.router_id,
+          l.timestamp,
+          l.total_tx_bytes, l.total_rx_bytes,
+          LAG(l.total_tx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS prev_tx,
+          LAG(l.total_rx_bytes) OVER (PARTITION BY l.router_id ORDER BY l.timestamp) AS prev_rx
+        FROM router_logs l, params
+        WHERE l.timestamp >= (SELECT start_ts FROM params)
+      ), deltas AS (
+        SELECT 
+          o.router_id,
+          CASE 
+            WHEN o.prev_tx IS NOT NULL THEN GREATEST(o.total_tx_bytes - o.prev_tx, 0)
+            ELSE GREATEST(o.total_tx_bytes - COALESCE(b.base_tx, o.total_tx_bytes), 0)
+          END AS tx_delta,
+          CASE 
+            WHEN o.prev_rx IS NOT NULL THEN GREATEST(o.total_rx_bytes - o.prev_rx, 0)
+            ELSE GREATEST(o.total_rx_bytes - COALESCE(b.base_rx, o.total_rx_bytes), 0)
+          END AS rx_delta
+        FROM ordered o
+        LEFT JOIN base b ON b.router_id = o.router_id
+      )
+      SELECT 
+        d.router_id,
+        r.name,
+        SUM(d.tx_delta)::text AS tx_bytes,
+        SUM(d.rx_delta)::text AS rx_bytes,
+        SUM(d.tx_delta + d.rx_delta)::text AS total_bytes
+      FROM deltas d
+      LEFT JOIN routers r ON r.router_id = d.router_id
+      GROUP BY d.router_id, r.name
+      ORDER BY SUM(d.tx_delta + d.rx_delta) DESC
+      LIMIT 15;
+    `, [hours]);
+    
+    results.topRouters = topRouters.rows.map(row => ({
+      router_id: row.router_id,
+      name: row.name,
+      total_gb: ((parseInt(row.total_bytes) || 0) / (1024*1024*1024)).toFixed(2)
+    }));
+
+    // 4. Recent logs with byte values (to see pattern)
+    const recentLogs = await pool.query(`
+      SELECT 
+        router_id,
+        timestamp,
+        total_tx_bytes::text as tx,
+        total_rx_bytes::text as rx,
+        status
+      FROM router_logs
+      WHERE timestamp >= NOW() - INTERVAL '2 hours'
+      ORDER BY timestamp DESC
+      LIMIT 50;
+    `);
+    
+    results.recentLogs = recentLogs.rows;
+
+    // 5. Check for routers with no base record (first entry issue)
+    const noBaseRecords = await pool.query(`
+      WITH params AS (
+        SELECT NOW() - ($1::int || ' hours')::interval AS start_ts
+      ), 
+      base AS (
+        SELECT l.router_id
+        FROM router_logs l
+        JOIN (
+          SELECT router_id, MAX(timestamp) AS ts
+          FROM router_logs, params
+          WHERE timestamp < (SELECT start_ts FROM params)
+          GROUP BY router_id
+        ) b ON b.router_id = l.router_id AND b.ts = l.timestamp
+      ),
+      routers_in_window AS (
+        SELECT DISTINCT router_id
+        FROM router_logs, params
+        WHERE timestamp >= (SELECT start_ts FROM params)
+      )
+      SELECT 
+        riw.router_id,
+        r.name,
+        CASE WHEN b.router_id IS NULL THEN 'NO_BASE' ELSE 'HAS_BASE' END as base_status
+      FROM routers_in_window riw
+      LEFT JOIN base b ON b.router_id = riw.router_id
+      LEFT JOIN routers r ON r.router_id = riw.router_id
+      WHERE b.router_id IS NULL;
+    `, [hours]);
+    
+    results.routersWithNoBase = noBaseRecords.rows;
+
+    res.json({
+      hours,
+      timestamp: new Date().toISOString(),
+      ...results
+    });
+  } catch (error) {
+    logger.error('Error in data usage debug:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Export router and any functions that need to be called from other modules
 module.exports = router;
 
