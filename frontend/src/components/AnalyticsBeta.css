@@ -42,6 +42,7 @@
 .beta-badge {
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   -webkit-background-clip: unset;
+  background-clip: unset;
   -webkit-text-fill-color: unset;
   color: white;
   font-size: 10px;
