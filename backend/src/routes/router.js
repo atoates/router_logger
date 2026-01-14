@@ -483,6 +483,7 @@ router.get('/routers/with-locations', requireAdmin, async (req, res) => {
         ORDER BY timestamp DESC LIMIT 1
       ) l ON true
       WHERE r.clickup_location_task_id IS NOT NULL
+        AND LOWER(COALESCE(r.clickup_task_status, '')) != 'decommissioned'
       ORDER BY r.name ASC
     `);
     

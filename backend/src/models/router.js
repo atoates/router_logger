@@ -287,6 +287,7 @@ async function getAllRouters() {
       COALESCE(s.firmware_version, r.firmware_version) as firmware_version
     FROM routers r
     LEFT JOIN router_current_status s ON s.router_id = r.router_id
+    WHERE LOWER(COALESCE(r.clickup_task_status, '')) != 'decommissioned'
     ORDER BY COALESCE(s.last_online, s.last_seen, r.last_seen) DESC NULLS LAST;
   `;
   
@@ -331,9 +332,10 @@ async function getAllRouters() {
     LEFT JOIN LATERAL (
       SELECT COUNT(*) as log_count FROM router_logs WHERE router_id = r.router_id
     ) lc ON true
+    WHERE LOWER(COALESCE(r.clickup_task_status, '')) != 'decommissioned'
     ORDER BY COALESCE(ll.timestamp, r.last_seen) DESC NULLS LAST;
   `;
-  
+
   try {
     if (tableAvailable) {
       const result = await pool.query(optimizedQuery);
@@ -390,6 +392,7 @@ async function getRoutersForUser(userId) {
     JOIN routers r ON r.router_id = ura.router_id
     LEFT JOIN router_current_status s ON s.router_id = r.router_id
     WHERE ura.user_id = $1
+      AND LOWER(COALESCE(r.clickup_task_status, '')) != 'decommissioned'
     ORDER BY COALESCE(s.last_online, s.last_seen, r.last_seen) DESC NULLS LAST;
   `;
 
@@ -437,6 +440,7 @@ async function getRoutersForUser(userId) {
       SELECT COUNT(*) as log_count FROM router_logs WHERE router_id = r.router_id
     ) lc ON true
     WHERE ura.user_id = $1
+      AND LOWER(COALESCE(r.clickup_task_status, '')) != 'decommissioned'
     ORDER BY COALESCE(ll.timestamp, r.last_seen) DESC NULLS LAST;
   `;
 
@@ -1375,6 +1379,7 @@ async function getInspectionStatus() {
           ELSE false
         END AS overdue
       FROM routers r
+      WHERE LOWER(COALESCE(r.clickup_task_status, '')) != 'decommissioned'
       ORDER BY days_remaining ASC;
     `;
     const result = await pool.query(query);

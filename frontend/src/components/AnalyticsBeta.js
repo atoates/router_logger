@@ -563,24 +563,35 @@ function WiFiActivityHeatmap({ data, dark }) {
   );
 }
 
-function DataCostCalculator({ bytes }) {
-  const costPerMB = 0.0022; // £0.0022 per MB = £2.20 per GB
-  const mb = bytes / 1e6;
-  const cost = mb * costPerMB;
-  
+function DataUsageCard({ label, bytes, trend, color }) {
+  const gb = bytes / 1e9;
+  const costPerGB = 2.20;
+  const cost = gb * costPerGB;
+
   return (
-    <div className="cost-breakdown">
-      <div className="cost-row">
-        <span>Data Used</span>
-        <span className="cost-value">{formatBytes(bytes)}</span>
+    <div className="data-usage-card" style={{ '--accent': color }}>
+      <div className="data-usage-header">
+        <div className="data-usage-icon">📊</div>
+        <span className="data-usage-label">{label}</span>
+        {trend !== undefined && (
+          <span className={`data-usage-trend ${trend >= 0 ? 'up' : 'down'}`}>
+            {trend >= 0 ? '↑' : '↓'} {Math.abs(trend).toFixed(1)}%
+          </span>
+        )}
       </div>
-      <div className="cost-row">
-        <span>Rate</span>
-        <span className="cost-value">£2.20/GB</span>
+      <div className="data-usage-value">
+        <span className="data-value-number">{gb.toFixed(2)}</span>
+        <span className="data-value-unit">GB</span>
       </div>
-      <div className="cost-row total">
-        <span>Estimated Cost</span>
-        <span className="cost-value">£{cost.toFixed(2)}</span>
+      <div className="data-usage-details">
+        <div className="detail-row">
+          <span className="detail-label">Rate</span>
+          <span className="detail-value">£{costPerGB.toFixed(2)}/GB</span>
+        </div>
+        <div className="detail-row highlight">
+          <span className="detail-label">Estimated Cost</span>
+          <span className="detail-value">£{cost.toFixed(2)}</span>
+        </div>
       </div>
     </div>
   );
@@ -726,27 +737,25 @@ export default function AnalyticsBeta({ onOpenRouter }) {
           {/* Left Column - Stats */}
           <div className="fleet-left-column">
             <div className="fleet-health-card">
-              <FleetHealthRing online={fleetMetrics.online} total={fleetMetrics.total} size={120} />
-              <div className="fleet-counts-inline">
-                <div className="count-item online">
-                  <span className="count-dot" />
-                  <span className="count-num">{fleetMetrics.online}</span>
-                  <span className="count-label">Online</span>
+              <FleetHealthRing online={fleetMetrics.online} total={fleetMetrics.total} size={140} />
+              <div className="fleet-counts-row">
+                <div className="fleet-count online">
+                  <span className="fleet-count-dot" />
+                  <span className="fleet-count-value">{fleetMetrics.online}</span>
+                  <span className="fleet-count-label">Online</span>
                 </div>
-                <div className="count-item offline">
-                  <span className="count-dot" />
-                  <span className="count-num">{fleetMetrics.offline}</span>
-                  <span className="count-label">Offline</span>
+                <div className="fleet-count offline">
+                  <span className="fleet-count-dot" />
+                  <span className="fleet-count-value">{fleetMetrics.offline}</span>
+                  <span className="fleet-count-label">Offline</span>
                 </div>
               </div>
             </div>
-            <StatCard 
-              icon="📊" 
+            <DataUsageCard
               label={`${timeRange.label} Data Usage`}
-              value={formatBytes(dataMetrics.current)}
-              subValue={<DataCostCalculator bytes={dataMetrics.current} />}
-              color={COLORS.primary}
+              bytes={dataMetrics.current}
               trend={dataMetrics.change}
+              color={COLORS.primary}
             />
           </div>
 

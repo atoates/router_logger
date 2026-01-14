@@ -227,6 +227,172 @@
   letter-spacing: 0.5px;
 }
 
+/* New Fleet Counts Row */
+.fleet-counts-row {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  width: 100%;
+  padding-top: 8px;
+}
+
+.fleet-count {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fleet-count-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.fleet-count.online .fleet-count-dot {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.fleet-count.offline .fleet-count-dot {
+  background: #ef4444;
+}
+
+.fleet-count-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.fleet-count-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Data Usage Card - Clean Design */
+.data-usage-card {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  position: relative;
+  overflow: hidden;
+}
+
+.data-usage-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--accent, #6366f1);
+}
+
+.data-usage-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.data-usage-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.data-usage-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex: 1;
+}
+
+.data-usage-trend {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.data-usage-trend.up {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.data-usage-trend.down {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.data-usage-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.data-value-number {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.data-value-unit {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.data-usage-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.detail-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.detail-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-row.highlight {
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.detail-row.highlight .detail-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.detail-row.highlight .detail-value {
+  font-size: 15px;
+  color: var(--accent-primary, #6366f1);
+}
+
 /* Fleet Map */
 .fleet-map-column {
   background: var(--bg-card);

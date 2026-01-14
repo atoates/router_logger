@@ -656,6 +656,7 @@ async function getInspectionStatus() {
           ELSE false
         END AS overdue
       FROM routers r
+      WHERE LOWER(COALESCE(r.clickup_task_status, '')) != 'decommissioned'
       ORDER BY days_remaining ASC;
     `;
     const result = await pool.query(query);
