@@ -75,7 +75,7 @@ body.dark-mode .rd-range .seg button:hover{background:#334155;border-color:#4755
 body.dark-mode .rd-range .seg button.active{background:#6366f1;color:#fff;border-color:#6366f1}
 body.dark-mode .rd-range .seg button.btn-primary{background:#667eea;color:#fff;border-color:#667eea}
 body.dark-mode .rd-range .seg button.btn-primary:hover{background:#5568d3;border-color:#5568d3}
-body.dark-mode .metric{background:#1e293b;border-color:#334155}
+body.dark-mode .metric{background:#1e293b;border-top-color:#334155;border-right-color:#334155;border-bottom-color:#334155}
 body.dark-mode .metric .label{color:#94a3b8}
 body.dark-mode .metric .value{color:#f1f5f9}
 body.dark-mode .metric .sub{color:#64748b}
