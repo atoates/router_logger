@@ -74,6 +74,10 @@ function AppContent() {
   const location = useLocation();
   const { currentUser, logout, isAdmin, isGuest } = useAuth();
 
+  // State for user dropdown menu
+  const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+  const userMenuRef = React.useRef(null);
+
 
   // Header router selector opens the Router details page
   const handleHeaderRouterSelect = (router) => {
@@ -82,7 +86,17 @@ function AppContent() {
     toast.success(`Opening ${label}`);
   };
 
-  // Handle logout
+  // Close dropdown when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleLogout = async () => {
     await logout();
     toast.info('Logged out successfully');
@@ -136,20 +150,14 @@ function AppContent() {
           <div className="app-header-right">
             {!isGuest && <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />}
             {currentUser && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '12px',
-                color: 'var(--text-primary)',
-                fontSize: '14px'
-              }}>
-                <span>
-                  {currentUser.username} <span style={{ color: 'var(--text-muted)' }}>({currentUser.role})</span>
-                </span>
+              <div ref={userMenuRef} style={{ position: 'relative' }}>
                 <button
-                  onClick={handleLogout}
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
                   style={{
-                    padding: '8px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
                     background: 'var(--bg-secondary)',
                     color: 'var(--text-primary)',
                     border: '1px solid var(--border-color)',
@@ -158,11 +166,59 @@ function AppContent() {
                     fontSize: '14px',
                     transition: 'all 0.2s'
                   }}
-                  onMouseOver={(e) => e.target.style.background = 'var(--accent-primary)'}
-                  onMouseOut={(e) => e.target.style.background = 'var(--bg-secondary)'}
+                  onMouseOver={(e) => e.currentTarget.style.background = 'var(--bg-tertiary)'}
+                  onMouseOut={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
                 >
-                  Logout
+                  <span>{currentUser.username}</span>
+                  <span style={{ fontSize: '12px', opacity: 0.7 }}>▼</span>
                 </button>
+                {userMenuOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '4px',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    zIndex: 1000,
+                    minWidth: '200px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      padding: '8px 12px',
+                      borderBottom: '1px solid var(--border-color)',
+                      fontSize: '12px',
+                      color: 'var(--text-secondary)',
+                      fontWeight: '600',
+                      textTransform: 'uppercase'
+                    }}>
+                      {currentUser.role}
+                    </div>
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setUserMenuOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-primary)',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = 'var(--bg-tertiary)'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'none'}
+                    >
+                      🚪 Logout
+                    </button>
+                  </div>
+                )}
               </div>
             )}
             <ClickUpAuthButton />

@@ -6,7 +6,7 @@ import {
 } from '../services/api';
 import './ClickUpAuthButton.css';
 
-const ClickUpAuthButton = ({ onAuthChange }) => {
+const ClickUpAuthButton = ({ onAuthChange, hideButton = false }) => {
   const [status, setStatus] = useState({ authorized: false, workspace: null });
   const [loading, setLoading] = useState(true);
 
@@ -67,6 +67,10 @@ const ClickUpAuthButton = ({ onAuthChange }) => {
     }
   };
 
+  if (hideButton) {
+    return null;
+  }
+
   if (loading) {
     return (
       <button className="clickup-auth-btn loading" disabled>
@@ -98,6 +102,11 @@ const ClickUpAuthButton = ({ onAuthChange }) => {
       <span className="status-dot"></span>
       Connect ClickUp
     </button>
+  );
+};
+
+export default ClickUpAuthButton;
+export { ClickUpAuthButton };
   );
 };
 
