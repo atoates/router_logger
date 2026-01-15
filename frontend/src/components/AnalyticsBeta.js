@@ -287,9 +287,22 @@ function FleetMap({ routers, onRouterClick }) {
 function DataUsageChart({ data, dark }) {
   // Calculate max value and appropriate unit for Y axis
   const maxBytes = Math.max(...data.map(d => Math.max(d.tx_bytes || 0, d.rx_bytes || 0)), 1);
-  const isGB = maxBytes >= 1e9;
-  const divisor = isGB ? 1e9 : 1e6;
-  const unit = isGB ? 'GB' : 'MB';
+  
+  // Choose unit based on actual max bytes (not divisor logic)
+  let divisor, unit;
+  if (maxBytes >= 1e9) {
+    divisor = 1e9;
+    unit = 'GB';
+  } else if (maxBytes >= 1e6) {
+    divisor = 1e6;
+    unit = 'MB';
+  } else if (maxBytes >= 1e3) {
+    divisor = 1e3;
+    unit = 'KB';
+  } else {
+    divisor = 1;
+    unit = 'B';
+  }
   
   // Detect if data is hourly (multiple entries on same day)
   const isHourly = data.length >= 2 && data[0].date && data[1].date && 
