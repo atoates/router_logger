@@ -285,10 +285,16 @@ function FleetMap({ routers, onRouterClick }) {
 }
 
 function DataUsageChart({ data, dark }) {
+  // Calculate max value and appropriate unit for Y axis
+  const maxBytes = Math.max(...data.map(d => Math.max(d.tx_bytes || 0, d.rx_bytes || 0)), 1);
+  const isGB = maxBytes >= 1e9;
+  const divisor = isGB ? 1e9 : 1e6;
+  const unit = isGB ? 'GB' : 'MB';
+
   return (
     <div className="beta-chart-container">
       <ResponsiveContainer width="100%" height={280}>
-        <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <AreaChart data={data} margin={{ top: 10, right: 10, left: 5, bottom: 0 }}>
           <defs>
             <linearGradient id="betaGradTx" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.8}/>
@@ -300,8 +306,8 @@ function DataUsageChart({ data, dark }) {
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke={dark ? '#334155' : '#e5e7eb'} />
-          <XAxis 
-            dataKey="date" 
+          <XAxis
+            dataKey="date"
             tickFormatter={(t) => {
               const d = new Date(t);
               return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -309,10 +315,18 @@ function DataUsageChart({ data, dark }) {
             tick={{ fontSize: 11, fill: dark ? '#94a3b8' : '#64748b' }}
             axisLine={{ stroke: dark ? '#475569' : '#cbd5e1' }}
           />
-          <YAxis 
-            tickFormatter={(v) => formatBytes(v).split(' ')[0]}
+          <YAxis
+            tickFormatter={(v) => (v / divisor).toFixed(1)}
             tick={{ fontSize: 11, fill: dark ? '#94a3b8' : '#64748b' }}
             axisLine={{ stroke: dark ? '#475569' : '#cbd5e1' }}
+            domain={[0, 'dataMax + 10%']}
+            label={{
+              value: unit,
+              angle: -90,
+              position: 'insideLeft',
+              style: { fontSize: 11, fill: dark ? '#94a3b8' : '#64748b' }
+            }}
+            width={45}
           />
           <Tooltip
             formatter={(v) => formatBytes(v)}
