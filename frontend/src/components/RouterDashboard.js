@@ -262,9 +262,9 @@ export default function RouterDashboard({ router }) {
     const endDate = new Date(end);
     
     return wifiGuests.filter(guest => {
-      const guestDate = new Date(guest.creation_date || guest.auth_date);
+      const guestDate = new Date(guest.session_start);
       return guestDate >= startDate && guestDate <= endDate;
-    }).sort((a, b) => new Date(b.creation_date || b.auth_date) - new Date(a.creation_date || a.auth_date));
+    }).sort((a, b) => new Date(b.session_start) - new Date(a.session_start));
   }, [wifiGuests, start, end]);
 
   // Generate unique colors for users
