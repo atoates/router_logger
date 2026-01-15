@@ -290,11 +290,19 @@ function DataUsageChart({ data, dark }) {
   const isGB = maxBytes >= 1e9;
   const divisor = isGB ? 1e9 : 1e6;
   const unit = isGB ? 'GB' : 'MB';
+  
+  // Detect if data is hourly (multiple entries on same day)
+  const isHourly = data.length >= 2 && data[0].date && data[1].date && 
+    new Date(data[0].date).toDateString() === new Date(data[1].date).toDateString();
+
+  // Calculate safe max with proper padding
+  const maxValue = (maxBytes / divisor);
+  const yAxisMax = Math.ceil(maxValue * 1.15); // 15% padding
 
   return (
     <div className="beta-chart-container">
       <ResponsiveContainer width="100%" height={280}>
-        <AreaChart data={data} margin={{ top: 10, right: 10, left: 5, bottom: 0 }}>
+        <AreaChart data={data} margin={{ top: 10, right: 20, left: 10, bottom: 20 }}>
           <defs>
             <linearGradient id="betaGradTx" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.8}/>
@@ -305,28 +313,32 @@ function DataUsageChart({ data, dark }) {
               <stop offset="95%" stopColor={COLORS.success} stopOpacity={0.1}/>
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke={dark ? '#334155' : '#e5e7eb'} />
+          <CartesianGrid strokeDasharray="3 3" stroke={dark ? '#334155' : '#e5e7eb'} vertical={false} />
           <XAxis
             dataKey="date"
             tickFormatter={(t) => {
               const d = new Date(t);
+              if (isHourly) {
+                return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+              }
               return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
             }}
             tick={{ fontSize: 11, fill: dark ? '#94a3b8' : '#64748b' }}
             axisLine={{ stroke: dark ? '#475569' : '#cbd5e1' }}
+            tickLine={{ stroke: dark ? '#475569' : '#cbd5e1' }}
           />
           <YAxis
             tickFormatter={(v) => (v / divisor).toFixed(1)}
             tick={{ fontSize: 11, fill: dark ? '#94a3b8' : '#64748b' }}
             axisLine={{ stroke: dark ? '#475569' : '#cbd5e1' }}
-            domain={[0, 'dataMax + 10%']}
+            domain={[0, yAxisMax]}
             label={{
               value: unit,
               angle: -90,
               position: 'insideLeft',
               style: { fontSize: 11, fill: dark ? '#94a3b8' : '#64748b' }
             }}
-            width={45}
+            width={50}
           />
           <Tooltip
             formatter={(v) => formatBytes(v)}
