@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getRouters, getNetworkUsageRolling, getNetworkUsage, getTopRoutersRolling, getTopRouters, getOperators, getInspectionStatus, getRouterStatusSummary } from '../services/api';
-import api from '../services/api';
 import { AreaChart, Area, BarChart, Bar, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
-import ClickUpAuthButton from './ClickUpAuthButton';
 import StoredWithRouters from './OutOfServiceRouters';
 import InstalledRouters from './InstalledRouters';
 import SystemStatusPage from '../pages/SystemStatusV2';
@@ -16,8 +14,6 @@ function formatBytes(bytes) {
   if (n >= 1e3) return (n / 1e3).toFixed(2) + ' KB';
   return n + ' B';
 }
-
-function fmtNum(n) { return new Intl.NumberFormat().format(n || 0); }
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f97316', '#06b6d4', '#8b5cf6', '#ef4444', '#22c55e'];
 

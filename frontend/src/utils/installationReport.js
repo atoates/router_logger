@@ -26,14 +26,6 @@ export async function generateInstallationReport({ router, stats, logs, gpsLocat
   };
 
   // Helper functions
-  const addText = (text, x, size = 11, style = 'normal', color = colors.text) => {
-    doc.setFontSize(size);
-    doc.setFont('helvetica', style);
-    doc.setTextColor(...color);
-    doc.text(text, x, y);
-    y += size * 0.45 + 2;
-  };
-
   const addHeading = (text, size = 14) => {
     y += 8;
     doc.setFontSize(size);
@@ -44,14 +36,6 @@ export async function generateInstallationReport({ router, stats, logs, gpsLocat
     // Add subtle underline
     doc.setDrawColor(...colors.neutralLight);
     doc.setLineWidth(1);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 8;
-  };
-
-  const addLine = (weight = 0.3, color = colors.neutralLight) => {
-    y += 5;
-    doc.setLineWidth(weight);
-    doc.setDrawColor(...color);
     doc.line(margin, y, pageWidth - margin, y);
     y += 8;
   };
@@ -68,32 +52,6 @@ export async function generateInstallationReport({ router, stats, logs, gpsLocat
       return true;
     }
     return false;
-  };
-
-  const addBox = (content, bgColor, textColor, height = 'auto') => {
-    const boxPadding = 8;
-    const startY = y;
-    
-    // Calculate height if auto
-    if (height === 'auto') {
-      height = content.split('\n').length * 6 + boxPadding * 2;
-    }
-    
-    // Draw box
-    doc.setFillColor(...bgColor);
-    doc.roundedRect(margin, y, pageWidth - 2 * margin, height, 2, 2, 'F');
-    
-    // Add content
-    y += boxPadding + 5;
-    const lines = content.split('\n');
-    lines.forEach(line => {
-      doc.setTextColor(...textColor);
-      doc.setFontSize(11);
-      doc.text(line, margin + boxPadding, y);
-      y += 6;
-    });
-    
-    y = startY + height + 6;
   };
 
   const addInfoRow = (label, value, isBold = false) => {
@@ -556,7 +514,6 @@ export async function generateInstallationReport({ router, stats, logs, gpsLocat
       const pdfBase64 = doc.output('datauristring').split(',')[1];
       
       await uploadReportToClickUp(router.router_id, pdfBase64, 'installation-report', null);
-      console.log('Installation report uploaded to ClickUp successfully');
     } catch (error) {
       console.error('Failed to upload installation report to ClickUp:', error);
       // Don't throw - the PDF was still saved locally

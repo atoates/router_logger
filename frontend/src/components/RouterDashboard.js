@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { AreaChart, Area, BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell, ReferenceLine, ReferenceArea } from 'recharts';
+import { AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 import { getLogs, getUsageStats, getUptimeData, logInspection, getInspectionHistory, getGuestsByRouter } from '../services/api';
 import { exportUptimeReportToPDF } from '../utils/exportUtils';
 import { toast } from 'react-toastify';
@@ -47,7 +47,6 @@ export default function RouterDashboard({ router }) {
   const [showUserLogins, setShowUserLogins] = useState(true); // Toggle for showing user logins on chart
   const [showRawData, setShowRawData] = useState(false); // Toggle for chart scale (false = normalized)
   const [useRollingAverage, setUseRollingAverage] = useState(true); // Toggle for rolling average (true = smoothed by default)
-  const [expandedSection, setExpandedSection] = useState('location'); // Accordion state: 'location', 'latest', 'uptime', 'inspections', or 'wifi-users'
   const propertyWidgetRef = useRef(null);
 
   const routerId = router?.router_id;
@@ -193,12 +192,8 @@ export default function RouterDashboard({ router }) {
     }
     const on = uptime.filter(u => (u.status === 'online' || u.status === 1 || u.status === '1' || u.status === true)).length;
     const pct = Math.round(on / uptime.length * 100);
-    return pct;;
+    return pct;
   }, [uptime]);
-
-  const yMax = useMemo(() => {
-    let m = 1; for (const d of series.txrx||[]) { if (d.tx_bytes>m) m=d.tx_bytes; if (d.rx_bytes>m) m=d.rx_bytes; } return Math.ceil(m*1.1);
-  }, [series]);
 
   // Calculate uptime buckets based on time range
   const uptimeBuckets = useMemo(() => {

@@ -466,9 +466,8 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
         locationLon = locRes.data.current.longitude;
         locationAccuracy = locRes.data.current.accuracy;
       }
-    } catch (e) {
+    } catch {
       // Ignore - location just won't be shown
-      console.log('Could not fetch location for PDF:', e.message);
     }
   }
   
@@ -595,7 +594,6 @@ export async function exportUptimeReportToPDF(uptimeData, routerId, startDate, e
       const dateRange = `${format(new Date(startDate), 'MMM d, yyyy')} - ${format(new Date(endDate), 'MMM d, yyyy')}`;
       
       await uploadReportToClickUp(routerId, pdfBase64, 'uptime-report', dateRange);
-      console.log('Report uploaded to ClickUp successfully');
     } catch (error) {
       console.error('Failed to upload report to ClickUp:', error);
       // Don't throw - the PDF was still saved locally

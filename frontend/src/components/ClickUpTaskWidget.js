@@ -5,7 +5,6 @@ import {
   getClickUpWorkspaces,
   getClickUpRoutersList,
   getClickUpTasks,
-  createClickUpTask,
   createClickUpTaskForRouter,
   linkRouterToTask,
   unlinkRouterFromTask,

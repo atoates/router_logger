@@ -3,8 +3,6 @@ import { toast } from 'react-toastify';
 import api from '../services/api';
 import './PropertySearchWidget.css';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'https://routerlogger-production.up.railway.app';
-
 const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');

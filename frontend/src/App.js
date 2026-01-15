@@ -13,7 +13,6 @@ import ProtectedRoute from './components/ProtectedRoute';
 import UsersManagement from './components/UsersManagement';
 import AdminDebugTools from './components/AdminDebugTools';
 import GuestDashboard from './components/GuestDashboard';
-import GuestWifi from './components/GuestWifi';
 import Users from './components/Users';
 import AnalyticsBeta from './components/AnalyticsBeta';
 import { AuthProvider, useAuth } from './contexts/AuthContext';

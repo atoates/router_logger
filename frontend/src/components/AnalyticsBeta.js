@@ -7,10 +7,10 @@ import {
   getGuestWifiStats,
   getRouterStatusSummary
 } from '../services/api';
-import { 
-  AreaChart, Area, BarChart, Bar, CartesianGrid, Legend, 
+import {
+  AreaChart, Area, CartesianGrid, Legend,
   ResponsiveContainer, Tooltip, XAxis, YAxis, Cell,
-  LineChart, Line, PieChart, Pie, RadialBarChart, RadialBar
+  PieChart, Pie, RadialBarChart, RadialBar, BarChart, Bar
 } from 'recharts';
 import './AnalyticsBeta.css';
 
