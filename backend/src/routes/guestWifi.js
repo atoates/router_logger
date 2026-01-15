@@ -688,8 +688,21 @@ router.get('/stats', async (req, res) => {
     
     const byRouterResult = await pool.query(byRouterQuery, params);
     
-    // Sessions over time (daily)
-    const timelineQuery = `
+    // Sessions over time - hourly for short periods, daily for longer
+    const daysInt = parseInt(days);
+    const useHourly = daysInt <= 1;
+    
+    const timelineQuery = useHourly ? `
+      SELECT 
+        DATE_TRUNC('hour', session_start) as date,
+        COUNT(*) as sessions,
+        COUNT(DISTINCT username) as unique_guests
+      FROM wifi_guest_sessions
+      ${whereClause}
+      GROUP BY DATE_TRUNC('hour', session_start)
+      ORDER BY date DESC
+      LIMIT 48
+    ` : `
       SELECT 
         DATE(session_start) as date,
         COUNT(*) as sessions,

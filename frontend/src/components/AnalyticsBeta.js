@@ -483,6 +483,10 @@ function GuestSessionsChart({ timeline, dark }) {
   const maxSessions = Math.max(...data.map(d => d.sessions || 0), 1);
   const yAxisMax = Math.ceil(maxSessions * 1.2); // Add 20% headroom
   
+  // Detect if data is hourly (multiple entries on same day) vs daily
+  const isHourly = data.length >= 2 && data[0].date && data[1].date && 
+    new Date(data[0].date).toDateString() === new Date(data[1].date).toDateString();
+  
   return (
     <div className="beta-chart-container">
       <ResponsiveContainer width="100%" height={220}>
@@ -498,6 +502,9 @@ function GuestSessionsChart({ timeline, dark }) {
             dataKey="date" 
             tickFormatter={(t) => {
               const d = new Date(t);
+              if (isHourly) {
+                return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+              }
               return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
             }}
             tick={{ fontSize: 11, fill: dark ? '#94a3b8' : '#64748b' }}
@@ -522,7 +529,13 @@ function GuestSessionsChart({ timeline, dark }) {
             }}
             labelStyle={{ color: dark ? '#e2e8f0' : '#1e293b', fontWeight: 600, marginBottom: 4 }}
             itemStyle={{ color: dark ? '#94a3b8' : '#64748b' }}
-            labelFormatter={(t) => new Date(t).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+            labelFormatter={(t) => {
+              const d = new Date(t);
+              if (isHourly) {
+                return d.toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+              }
+              return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+            }}
           />
           <Area 
             type="monotone" 
