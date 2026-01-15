@@ -106,8 +106,3 @@ const ClickUpAuthButton = ({ onAuthChange, hideButton = false }) => {
 };
 
 export default ClickUpAuthButton;
-export { ClickUpAuthButton };
-  );
-};
-
-export default ClickUpAuthButton;
