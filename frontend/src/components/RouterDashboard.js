@@ -402,24 +402,24 @@ export default function RouterDashboard({ router }) {
       {/* Hero metrics */}
       <div className="rd-metrics">
         <div className="metric" style={{ borderLeftColor:'#6366f1' }}>
-          <div className="label">Data Transfer</div>
+          <div className="label">📊 Data Transfer</div>
           <div className="value">{formatBytes(totalBytes)}</div>
           <div className="sub">
             £{((totalBytes / 1e6) * 0.0022).toFixed(2)} cost · {label}
           </div>
         </div>
         <div className="metric" style={{ borderLeftColor:'#10b981' }}>
-          <div className="label">Uptime</div>
+          <div className="label">⚡ Uptime</div>
           <div className="value">{onlinePct==null? '—' : `${onlinePct}%`}</div>
           <div className="sub">{uptime?.length || 0} samples</div>
         </div>
         <div className="metric" style={{ borderLeftColor:'#8b5cf6' }}>
-          <div className="label">Logs</div>
+          <div className="label">📋 Logs</div>
           <div className="value">{stats?.total_logs?.toLocaleString?.() || (logs?.length||0)}</div>
           <div className="sub">in range</div>
         </div>
         <div className="metric" style={{ borderLeftColor: inspectionStatus?.overdue ? '#ef4444' : '#f59e0b' }}>
-          <div className="label">Inspection Status</div>
+          <div className="label">🔍 Inspection Status</div>
           <div className="value">
             {inspectionStatus ? (
               inspectionStatus.overdue 
