@@ -256,9 +256,11 @@ function FleetMap({ routers, onRouterClick }) {
     };
   }, [mapLoaded, routersWithLocation, onRouterClick]);
 
-  const onlineCount = routersWithLocation.filter(r => 
-    r.current_status === 'online' || r.current_status === 1
+  // Count from ALL routers for consistent legend (not just those with location)
+  const totalOnline = routers.filter(r =>
+    r.current_status === 'online' || r.current_status === 1 || r.current_status === '1'
   ).length;
+  const totalOffline = routers.length - totalOnline;
 
   return (
     <div className="fleet-map-container">
@@ -266,11 +268,11 @@ function FleetMap({ routers, onRouterClick }) {
       <div className="map-legend">
         <div className="legend-item">
           <span className="legend-marker online" />
-          <span>{onlineCount} Online</span>
+          <span>{totalOnline} Online</span>
         </div>
         <div className="legend-item">
           <span className="legend-marker offline" />
-          <span>{routersWithLocation.length - onlineCount} Offline</span>
+          <span>{totalOffline} Offline</span>
         </div>
       </div>
       {routersWithLocation.length === 0 && (
