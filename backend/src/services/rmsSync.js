@@ -181,9 +181,10 @@ async function syncFromRMS() {
   isSyncing = true;
   rmsSyncStats.isRunning = true;
   const startTime = Date.now();
+  const syncId = Date.now().toString(36);
 
   try {
-    logger.info('Starting RMS sync...');
+    logger.info(`[SYNC ${syncId}] ========== Starting RMS sync at ${new Date().toISOString()} ==========`);
     
     // Reset debug logging flag for this sync
     transformRMSDeviceToTelemetry._logged = false;
@@ -199,8 +200,10 @@ async function syncFromRMS() {
     const rmsClient = await RMSClient.createWithAuth();
     
     // Get all devices with monitoring data
+    const fetchStart = Date.now();
     const devices = await rmsClient.getAllDevicesWithMonitoring();
-    logger.info(`Fetched ${devices.length} devices from RMS`);
+    const fetchDuration = Date.now() - fetchStart;
+    logger.info(`[SYNC ${syncId}] Fetched ${devices.length} devices from RMS in ${fetchDuration}ms`);
     
     // Process each device
     let successCount = 0;
@@ -235,6 +238,7 @@ async function syncFromRMS() {
         }
         
         const telemetry = transformRMSDeviceToTelemetry(device, monitoringData);
+        const deviceName = device.name || `Device ${device.id}`;
 
         // If monitoring did not provide cumulative counters, try to derive from statistics API
         // If counters are zero, use last known values from database
@@ -251,30 +255,45 @@ async function syncFromRMS() {
           telemetry.counters.total_tx_bytes = lastTx;
           telemetry.counters.total_rx_bytes = lastRx;
           
-          if (lastTx > 0 || lastRx > 0) {
-            logger.debug(`Device ${telemetry.device_id} reports zero counters, using last known: tx=${lastTx}, rx=${lastRx}`);
-          }
+          logger.info(`[SYNC ${syncId}] ${deviceName}: Zero counters from RMS → using DB fallback: tx=${(lastTx/1024/1024).toFixed(2)}MB, rx=${(lastRx/1024/1024).toFixed(2)}MB`);
+        } else {
+          logger.info(`[SYNC ${syncId}] ${deviceName}: Got counters from RMS: tx=${(tx0/1024/1024).toFixed(2)}MB, rx=${(rx0/1024/1024).toFixed(2)}MB, status=${telemetry.status}`);
         }
         
         await processRouterTelemetry(telemetry);
         successCount++;
+        
+        // Log progress every 25 devices
+        if (successCount % 25 === 0) {
+          logger.info(`[SYNC ${syncId}] Progress: ${successCount}/${devices.length} devices processed`);
+        }
       } catch (error) {
         // Special handling for rate limits
         if (error.response?.status === 429) {
-          logger.error(`Rate limit error processing device ${device.id}. Stopping sync immediately to conserve quota.`);
+          const deviceName = device.name || `Device ${device.id}`;
+          logger.error(`[SYNC ${syncId}] RATE LIMIT HIT on ${deviceName}. Stopping sync immediately to conserve quota.`);
           rateLimitHit = true;
           errorCount++;
           break; // Stop processing remaining devices
         } else {
-          logger.error(`Error processing device ${device.id}:`, error.message);
+          const deviceName = device.name || `Device ${device.id}`;
+          logger.error(`[SYNC ${syncId}] ERROR processing ${deviceName}: ${error.message}`);
         }
         errorCount++;
       }
     }
     
-    logger.info(`RMS sync complete: ${successCount} successful, ${errorCount} errors`);
     const duration = Date.now() - startTime;
-    logger.info(`Sync duration: ${(duration / 1000).toFixed(2)}s for ${devices.length} devices`);
+    const avgTimePerDevice = devices.length > 0 ? (duration / devices.length).toFixed(0) : 0;
+    const successRate = ((successCount / devices.length) * 100).toFixed(1);
+    
+    logger.info(`[SYNC ${syncId}] ========== Sync Complete ==========`);
+    logger.info(`[SYNC ${syncId}] Total devices: ${devices.length}`);
+    logger.info(`[SYNC ${syncId}] Successful: ${successCount} (${successRate}%)`);
+    logger.info(`[SYNC ${syncId}] Errors: ${errorCount}`);
+    logger.info(`[SYNC ${syncId}] Duration: ${duration}ms (${avgTimePerDevice}ms/device)`);
+    logger.info(`[SYNC ${syncId}] Timestamp: ${new Date().toISOString()}`);
+    logger.info(`[SYNC ${syncId}] =====================================`);
     
     // Update sync statistics
     const now = new Date();
@@ -328,11 +347,14 @@ async function syncFromRMS() {
     
     return { successCount, errorCount, total: devices.length, duration, clickupTasksCreated, duplicatesMerged };
   } catch (error) {
-    logger.error('RMS sync failed:', error.message);
+    const duration = Date.now() - startTime;
+    logger.error(`[SYNC ${syncId}] ========== SYNC FAILED ==========`);
+    logger.error(`[SYNC ${syncId}] Error: ${error.message}`);
+    logger.error(`[SYNC ${syncId}] Duration before failure: ${duration}ms`);
+    logger.error(`[SYNC ${syncId}] =====================================`);
     
     // Track failed sync
     const now = new Date();
-    const duration = Date.now() - startTime;
     rmsSyncStats.lastSyncTime = now;
     rmsSyncStats.lastSyncErrors = 1;
     rmsSyncStats.lastSyncSuccess = 0;
@@ -370,18 +392,20 @@ async function startRMSSync(intervalMinutes = 15) {
 
   // Run shortly after startup (delayed to not block server initialization)
   setTimeout(() => {
-    logger.info('Running initial RMS sync...');
+    logger.info('⏰ SCHEDULER: Triggering initial RMS sync (5s after startup)...');
     syncFromRMS().catch(error => {
-      logger.error('Initial RMS sync failed:', error.message);
+      logger.error('⚠️  SCHEDULER: Initial RMS sync failed:', error.message);
     });
   }, 5000); // 5 second delay
 
   // Then run on schedule
   syncIntervalId = setInterval(async () => {
+    const nextRun = new Date(Date.now() + intervalMs);
+    logger.info(`⏰ SCHEDULER: Triggering scheduled RMS sync (next run at ${nextRun.toLocaleTimeString()})`);
     try {
       await syncFromRMS();
     } catch (error) {
-      logger.error('Scheduled RMS sync failed:', error.message, error.stack);
+      logger.error('⚠️  SCHEDULER: Scheduled RMS sync failed:', error.message, error.stack);
       // Don't let errors stop future syncs - the interval continues
     }
   }, intervalMs);
