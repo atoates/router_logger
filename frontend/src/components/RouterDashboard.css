@@ -562,7 +562,7 @@ body.dark-mode .muted{color:#64748b}
 }
 
 .device-item {
-  background: #fff;
+  background: #fff !important;
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
@@ -830,11 +830,11 @@ body.dark-mode .device-item {
 }
 
 body.dark-mode .device-label {
-  color: #94a3b8;
+  color: #64748b !important;
 }
 
 body.dark-mode .device-value {
-  color: #f1f5f9;
+  color: #0f172a !important;
 }
 
 body.dark-mode .inspection-compact .compact-header {
