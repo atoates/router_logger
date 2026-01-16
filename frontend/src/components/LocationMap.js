@@ -189,40 +189,41 @@ export default function LocationMap({ routerId }) {
     <div className="location-map-container">
       <div id="router-location-map" style={{ height: '400px', width: '100%', borderRadius: '8px', overflow: 'hidden' }} />
       
-      <div style={{ marginTop: '12px', padding: '12px', background: '#f9fafb', borderRadius: '8px', fontSize: '13px' }}>
+      <div style={{ marginTop: '12px', padding: '12px', background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', fontSize: '13px' }}>
         {selectedLocation ? (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-            <div><span style={{ color: '#6b7280' }}>Started:</span><br/><strong>{(() => {
+            <div><span style={{ color: '#94a3b8' }}>Started:</span><br/><strong style={{ color: '#f1f5f9' }}>{(() => {
               const d = new Date(selectedLocation.started_at);
               return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleString('en-GB');
             })()}</strong></div>
-            <div><span style={{ color: '#6b7280' }}>Ended:</span><br/><strong>{selectedLocation.ended_at ? (() => {
+            <div><span style={{ color: '#94a3b8' }}>Ended:</span><br/><strong style={{ color: '#f1f5f9' }}>{selectedLocation.ended_at ? (() => {
               const d = new Date(selectedLocation.ended_at);
               return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleString('en-GB');
             })() : '—'}</strong></div>
-            <div><span style={{ color: '#6b7280' }}>Duration:</span><br/><strong>{selectedLocation.duration_readable}</strong></div>
+            <div><span style={{ color: '#94a3b8' }}>Duration:</span><br/><strong style={{ color: '#f1f5f9' }}>{selectedLocation.duration_readable}</strong></div>
           </div>
         ) : (
-          <div style={{ textAlign: 'center', color: '#6b7280' }}>Click a location marker to see details</div>
+          <div style={{ textAlign: 'center', color: '#94a3b8' }}>Click a location marker to see details</div>
         )}
       </div>
 
       {locationData.locations.length > 1 && (
         <div style={{ marginTop: '16px' }}>
-          <div style={{ fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+          <div style={{ fontSize: '12px', fontWeight: '600', color: '#f1f5f9', marginBottom: '8px' }}>
             📍 Location History ({locationData.count} locations)
           </div>
-          <div style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '12px', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+          <div style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '12px', border: '1px solid #334155', borderRadius: '8px', background: '#1e293b' }}>
             {locationData.locations.map((loc, idx) => (
               <div 
                 key={loc.id}
                 onClick={() => setSelectedLocation(loc)}
                 style={{ 
                   padding: '8px 12px',
-                  borderBottom: idx < locationData.locations.length - 1 ? '1px solid #e5e7eb' : 'none',
+                  borderBottom: idx < locationData.locations.length - 1 ? '1px solid #334155' : 'none',
                   cursor: 'pointer',
-                  background: selectedLocation?.id === loc.id ? '#eff6ff' : 'transparent',
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                  background: selectedLocation?.id === loc.id ? '#1e3a5f' : 'transparent',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  color: '#f1f5f9'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -232,10 +233,10 @@ export default function LocationMap({ routerId }) {
                       const d = new Date(loc.started_at);
                       return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleDateString('en-GB');
                     })()}</div>
-                    <div style={{ color: '#9ca3af', fontSize: '11px' }}>{loc.operator || 'Unknown'} • {loc.duration_readable}</div>
+                    <div style={{ color: '#94a3b8', fontSize: '11px' }}>{loc.operator || 'Unknown'} • {loc.duration_readable}</div>
                   </div>
                 </div>
-                <div style={{ color: '#9ca3af', fontSize: '11px' }}>{loc.sample_count} sample{loc.sample_count !== 1 ? 's' : ''}</div>
+                <div style={{ color: '#94a3b8', fontSize: '11px' }}>{loc.sample_count} sample{loc.sample_count !== 1 ? 's' : ''}</div>
               </div>
             ))}
           </div>
