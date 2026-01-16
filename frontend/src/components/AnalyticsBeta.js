@@ -308,9 +308,8 @@ function DataUsageChart({ data, dark }) {
   const isHourly = data.length >= 2 && data[0].date && data[1].date && 
     new Date(data[0].date).toDateString() === new Date(data[1].date).toDateString();
 
-  // Calculate safe max with proper padding
-  const maxValue = (maxBytes / divisor);
-  const yAxisMax = Math.ceil(maxValue * 1.15); // 15% padding
+  // Calculate safe max with proper padding - domain must be in BYTES (raw data units)
+  const yAxisMax = Math.ceil(maxBytes * 1.15); // 15% padding in bytes
 
   return (
     <div className="beta-chart-container">
