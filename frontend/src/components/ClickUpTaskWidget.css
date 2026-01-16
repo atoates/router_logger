@@ -1,6 +1,6 @@
 .clickup-task-widget {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: #1e293b;
+  border: 1px solid #334155;
   border-left: 4px solid #7c3aed;
   border-radius: 8px;
   padding: 16px;
@@ -12,22 +12,22 @@
 /* Status-based card highlighting - solid colors like ClickUp */
 .clickup-task-widget.status-ready {
   border-left-color: #3b82f6;
-  background: #dbeafe;
+  background: #1e3a5f;
 }
 
 .clickup-task-widget.status-attention {
   border-left-color: #ef4444;
-  background: #fee2e2;
+  background: #4c1d1d;
 }
 
 .clickup-task-widget.status-returning {
   border-left-color: #f97316;
-  background: #ffedd5;
+  background: #422006;
 }
 
 .clickup-task-widget.status-decommissioned {
   border-left-color: #ef4444;
-  background: #fee2e2;
+  background: #4c1d1d;
 }
 
 .clickup-task-widget h4 {

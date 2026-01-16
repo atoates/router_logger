@@ -138,7 +138,7 @@ function AppContent() {
           <div className="app-header-left">
             <Link to="/" className="app-logo-link">
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <img src="/Logo.png" alt="Router Logger" style={{ width: '40px', height: 'auto' }} />
+                <img src="/Logo.png" alt="Router Logger" style={{ width: '60px', height: 'auto' }} />
                 <div>
                   <h1 className="app-title">Router Logger</h1>
                   <p className="app-subtitle">Monitor router network and property assignments</p>
