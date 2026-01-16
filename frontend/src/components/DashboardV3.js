@@ -161,7 +161,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
 
         const promises = [
           getRouters(),
-          mode==='rolling' ? getNetworkUsageRolling({ hours: hrs, bucket: 'hour' }) : getNetworkUsage({ days }),
+          mode==='rolling' ? getNetworkUsageRolling({ hours: (hrs||24)*2, bucket: 'hour' }) : getNetworkUsage({ days: (days||7)*2 }),
           mode==='rolling' ? getTopRoutersRolling({ hours: hrs, limit: 5 }) : getTopRouters({ days, limit: 5 }),
           getOperators({ days: effectiveDaysForOps })
         ];
@@ -179,42 +179,22 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
         const inspRes = await inspectionPromise;
         const statusRes = await statusSummaryPromise;
         setRouters(rRes.data || []);
-        setUsage(uRes.data || []);
+        
+        // Split usage data into current and previous periods
+        const arr = uRes.data || [];
+        const halfPoint = Math.floor(arr.length / 2);
+        if (arr.length >= 2) {
+          setUsagePrev(arr.slice(0, halfPoint));
+          setUsage(arr.slice(halfPoint));
+        } else {
+          setUsage(arr);
+          setUsagePrev([]);
+        }
+        
         setTop((tRes.data || []).map(r=>({ router_id: r.router_id, name: r.name || r.router_id, tx_bytes: Number(r.tx_bytes)||0, rx_bytes: Number(r.rx_bytes)||0, total_bytes: Number(r.total_bytes)||0 })));
         setOperators((oRes.data || []).map((x,i)=>({ name: x.operator || 'Unknown', value: Number(x.total_bytes)||0, fill: COLORS[i%COLORS.length] })));
         setInspections(inspRes?.data || []);
         setStatusSummary(statusRes?.data || null);
-
-        // Previous period for network-level delta
-        if (mode==='rolling') {
-          const prevRes = await getNetworkUsageRolling({ hours: (hrs||24)*2, bucket: 'hour' });
-          const arr = prevRes.data || [];
-          // Ensure we have enough data before slicing
-          if (arr.length >= hrs) {
-            const tail = arr.slice(-hrs);
-            const head = arr.slice(-2*hrs, -hrs);
-            setUsagePrev(head.length > 0 ? head : tail); // Fallback to current if no previous data
-            setUsage(tail);
-          } else {
-            // Not enough historical data, use what we have
-            setUsage(arr);
-            setUsagePrev([]);
-          }
-        } else {
-          const prevRes = await getNetworkUsage({ days: (days||7)*2 });
-          const arr = prevRes.data || [];
-          // Ensure we have enough data before slicing
-          if (arr.length >= days) {
-            const tail = arr.slice(-days);
-            const head = arr.slice(-2*days, -days);
-            setUsagePrev(head.length > 0 ? head : tail); // Fallback to current if no previous data
-            setUsage(tail);
-          } else {
-            // Not enough historical data, use what we have
-            setUsage(arr);
-            setUsagePrev([]);
-          }
-        }
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Failed to load V3', e);
