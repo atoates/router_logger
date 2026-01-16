@@ -128,8 +128,8 @@
 }
 
 .users-stat-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: #ffffff;
+  border: 1.5px solid #6366f1;
   border-radius: 16px;
   padding: 20px;
   display: flex;
