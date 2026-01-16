@@ -211,7 +211,9 @@ export async function generateInstallationReport({ router, stats, logs, gpsLocat
   addInfoRow('Latitude:', `${gpsLocation.latitude.toFixed(6)}°`);
   addInfoRow('Longitude:', `${gpsLocation.longitude.toFixed(6)}°`);
   addInfoRow('Accuracy:', `${gpsLocation.accuracy.toFixed(1)} meters`);
-  addInfoRow('Captured:', new Date(gpsLocation.timestamp).toLocaleString('en-GB', {
+  addInfoRow('Captured:', (() => {
+    const d = new Date(gpsLocation.timestamp);
+    return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleString('en-GB', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -261,13 +263,16 @@ export async function generateInstallationReport({ router, stats, logs, gpsLocat
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...colors.textLight);
   const lastSeenText = router.last_seen
-    ? new Date(router.last_seen).toLocaleString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
+    ? (() => {
+        const d = new Date(router.last_seen);
+        return isNaN(d.getTime()) ? 'Never' : d.toLocaleString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      })()
     : 'Never';
   doc.text(`Last Seen: ${lastSeenText}`, margin, y);
   y += 8;

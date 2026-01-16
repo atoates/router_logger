@@ -123,6 +123,7 @@ export default function RouterDashboard({ router }) {
     const txrx = [];
     for (const l of asc) {
       const ts = new Date(l.timestamp);
+      if (isNaN(ts.getTime())) continue; // Skip invalid dates
       const tx = Number(l.total_tx_bytes)||0;
       const rx = Number(l.total_rx_bytes)||0;
       const dtx = prevTx == null ? 0 : Math.max(tx - prevTx, 0);
@@ -226,6 +227,7 @@ export default function RouterDashboard({ router }) {
       // Find samples in this bucket
       const samplesInBucket = uptime.filter(d => {
         const ts = new Date(d.timestamp);
+        if (isNaN(ts.getTime())) return false;
         return ts >= bucketStart && ts < bucketEnd;
       });
       
@@ -297,6 +299,9 @@ export default function RouterDashboard({ router }) {
       return null;
     }
     const createdDate = new Date(inspectionDate);
+    if (isNaN(createdDate.getTime())) {
+      return null;
+    }
     const inspectionDue = new Date(createdDate);
     inspectionDue.setFullYear(inspectionDue.getFullYear() + 1); // 365 days from inspection date
     const now = new Date();
@@ -362,7 +367,10 @@ export default function RouterDashboard({ router }) {
             <StatusPill status={router?.current_status} />
             {(router?.last_seen || latest?.timestamp) && (
               <span className="muted">
-                Last seen {new Date(router?.last_seen || latest.timestamp).toLocaleString('en-GB')}
+                Last seen {(() => {
+                  const d = new Date(router?.last_seen || latest.timestamp);
+                  return isNaN(d.getTime()) ? 'Never' : d.toLocaleString('en-GB');
+                })()}
               </span>
             )}
             {latest?.wan_ip && <span className="muted">WAN {latest.wan_ip}</span>}
@@ -499,9 +507,12 @@ export default function RouterDashboard({ router }) {
         <div className="uptime-strip-bar">
           {uptimeBuckets.buckets && uptimeBuckets.buckets.length > 0 ? (
             uptimeBuckets.buckets.map((bucket, idx) => {
-              const formatTime = (d) => d.toLocaleString('en-GB', { 
-                day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
-              });
+              const formatTime = (d) => {
+                if (!d || isNaN(d.getTime())) return 'Invalid';
+                return d.toLocaleString('en-GB', { 
+                  day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
+                });
+              };
               return (
                 <div 
                   key={idx} 
@@ -780,7 +791,10 @@ export default function RouterDashboard({ router }) {
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis
                 dataKey="date"
-                tickFormatter={(t)=> new Date(t).toLocaleDateString('en-GB')} 
+                tickFormatter={(t)=> {
+                  const d = new Date(t);
+                  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB');
+                }} 
                 tick={{ fontSize: 11, fill: '#374151' }} 
               />
               <YAxis 
@@ -795,7 +809,10 @@ export default function RouterDashboard({ router }) {
                   if (name === 'TX' || name === 'RX') return formatBytes(v);
                   return v;
                 }}
-                labelFormatter={(t)=> new Date(t).toLocaleString('en-GB')}
+                labelFormatter={(t)=> {
+                  const d = new Date(t);
+                  return isNaN(d.getTime()) ? '' : d.toLocaleString('en-GB');
+                }}
                 contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151' }}
                 labelStyle={{ color: '#f3f4f6' }}
                 itemStyle={{ color: '#f3f4f6' }}
@@ -804,7 +821,10 @@ export default function RouterDashboard({ router }) {
               
               {/* User login reference lines */}
               {showUserLogins && filteredGuests.map((guest, idx) => {
-                const loginDate = new Date(guest.creation_date || guest.auth_date).toISOString();
+                const loginDate = (() => {
+                  const d = new Date(guest.creation_date || guest.auth_date);
+                  return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+                })();
                 const userName = guest.username || guest.email || 'Unknown';
                 const userColor = userColors[userName];
                 return (
@@ -853,7 +873,10 @@ export default function RouterDashboard({ router }) {
                 const isOnline = (s==='online'||s===1||s==='1'||s===true);
                 return (
                   <tr key={i}>
-                    <td>{new Date(d.date).toLocaleString('en-GB')}</td>
+                    <td>{(() => {
+                      const date = new Date(d.date);
+                      return isNaN(date.getTime()) ? 'Invalid' : date.toLocaleString('en-GB');
+                    })()}</td>
                     <td>{isOnline? 'Online' : 'Offline'}</td>
                     <td>{d.operator || ''}</td>
                     <td>{d.wan_ip || ''}</td>

@@ -180,7 +180,10 @@ function AdminDebugTools() {
       if (!lastSyncTime) {
         setClickupMessage('ℹ️ No sync has run yet');
       } else {
-        const timeAgo = new Date(lastSyncTime).toLocaleString('en-GB');
+        const timeAgo = (() => {
+          const d = new Date(lastSyncTime);
+          return isNaN(d.getTime()) ? 'Never' : d.toLocaleString('en-GB');
+        })();
         setClickupMessage(`📊 Last sync: ${timeAgo} (${lastSyncUpdated} updated, ${lastSyncErrors} errors)${isRunning ? ' - Scheduler is running' : ' - Scheduler is stopped'}`);
       }
     } catch (error) {
@@ -285,7 +288,10 @@ function AdminDebugTools() {
                 <>
                   <div className="stat-item">
                     <span className="stat-label">Last Sync:</span>
-                    <span className="stat-value">{new Date(syncStats.lastSyncTime).toLocaleString('en-GB')}</span>
+                    <span className="stat-value">{(() => {
+                      const d = new Date(syncStats.lastSyncTime);
+                      return isNaN(d.getTime()) ? 'Never' : d.toLocaleString('en-GB');
+                    })()}</span>
                   </div>
                   <div className="stat-item">
                     <span className="stat-label">Duration:</span>
@@ -364,7 +370,10 @@ function AdminDebugTools() {
                   <div className="router-details">
                     <span>ID: {dup.kept.router_id}</span>
                     <span>Logs: {dup.kept.log_count || 0}</span>
-                    <span>Last Seen: {dup.kept.last_seen ? new Date(dup.kept.last_seen).toLocaleString('en-GB') : 'Never'}</span>
+                    <span>Last Seen: {dup.kept.last_seen ? (() => {
+                      const d = new Date(dup.kept.last_seen);
+                      return isNaN(d.getTime()) ? 'Never' : d.toLocaleString('en-GB');
+                    })() : 'Never'}</span>
                     {dup.kept.is_serial && <span className="badge">Serial ID</span>}
                   </div>
                 </div>
@@ -375,7 +384,10 @@ function AdminDebugTools() {
                     <div key={hidx} className="router-details hidden">
                       <span>ID: {hidden.router_id}</span>
                       <span>Logs: {hidden.log_count || 0}</span>
-                      <span>Last Seen: {hidden.last_seen ? new Date(hidden.last_seen).toLocaleString('en-GB') : 'Never'}</span>
+                      <span>Last Seen: {hidden.last_seen ? (() => {
+                        const d = new Date(hidden.last_seen);
+                        return isNaN(d.getTime()) ? 'Never' : d.toLocaleString('en-GB');
+                      })() : 'Never'}</span>
                       {hidden.is_serial && <span className="badge">Serial ID</span>}
                     </div>
                   ))}

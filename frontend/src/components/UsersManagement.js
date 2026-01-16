@@ -399,7 +399,10 @@ function UsersManagement() {
                 <td>{user.full_name || '-'}</td>
                 <td>
                   {user.last_login 
-                    ? new Date(user.last_login).toLocaleString()
+                    ? (() => {
+                        const d = new Date(user.last_login);
+                        return isNaN(d.getTime()) ? 'Never' : d.toLocaleString();
+                      })()
                     : 'Never'}
                 </td>
                 <td>

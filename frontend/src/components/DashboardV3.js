@@ -304,7 +304,10 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
                   <YAxis domain={[0, Math.ceil(yMax * 1.1)]} tickFormatter={(v)=> formatBytes(v)} tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} />
                   <Tooltip
                     formatter={(v) => formatBytes(v)}
-                    labelFormatter={(t) => new Date(t).toLocaleString('en-GB')}
+                    labelFormatter={(t) => {
+                      const d = new Date(t);
+                      return isNaN(d.getTime()) ? '' : d.toLocaleString('en-GB');
+                    }}
                     contentStyle={{
                       backgroundColor: dark ? '#1f2937' : '#ffffff',
                       border: '1px solid ' + (dark ? '#374151' : '#e5e7eb'),
@@ -321,7 +324,10 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
             </div>
             <div className="v3-delta" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <span>Period change: <DeltaBadge current={totalNow} previous={totalPrev} /></span>
-              {latestTs && (<span className="v3-ts" style={{ color: '#64748b' }}>Data through {new Date(latestTs).toLocaleString('en-GB')}</span>)}
+              {latestTs && (<span className="v3-ts" style={{ color: '#64748b' }}>Data through {(() => {
+                const d = new Date(latestTs);
+                return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleString('en-GB');
+              })()}</span>)}
             </div>
           </div>
 
@@ -438,6 +444,9 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
                   {overdue.map(insp => {
                     const createdDate = insp.created_at ? new Date(insp.created_at) : null;
                     const inspectionDue = insp.inspection_due ? new Date(insp.inspection_due) : null;
+                    // Validate dates
+                    const validCreated = createdDate && !isNaN(createdDate.getTime()) ? createdDate : null;
+                    const validDue = inspectionDue && !isNaN(inspectionDue.getTime()) ? inspectionDue : null;
                     return (
                       <div 
                         key={insp.router_id} 
@@ -460,9 +469,9 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 600 }}>{insp.name}</div>
                           <div style={{ fontSize: 12, color: '#64748b' }}>{insp.location || 'No location'}</div>
-                          {createdDate && inspectionDue && (
+                          {validCreated && validDue && (
                             <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-                              First: {createdDate.toLocaleDateString('en-GB')} | Due: {inspectionDue.toLocaleDateString('en-GB')}
+                              First: {validCreated.toLocaleDateString('en-GB')} | Due: {validDue.toLocaleDateString('en-GB')}
                             </div>
                           )}
                         </div>

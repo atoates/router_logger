@@ -100,8 +100,14 @@ export default function LocationMap({ routerId }) {
         radius, weight: loc.is_current ? 3 : 2
       }).addTo(map);
       
-      const startDate = new Date(loc.started_at).toLocaleString('en-GB');
-      const endDate = loc.ended_at ? new Date(loc.ended_at).toLocaleString('en-GB') : 'Present';
+      const startDate = (() => {
+        const d = new Date(loc.started_at);
+        return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleString('en-GB');
+      })();
+      const endDate = loc.ended_at ? (() => {
+        const d = new Date(loc.ended_at);
+        return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleString('en-GB');
+      })() : 'Present';
       
       marker.bindPopup(`
         <div style="min-width: 180px;">
@@ -186,8 +192,14 @@ export default function LocationMap({ routerId }) {
       <div style={{ marginTop: '12px', padding: '12px', background: '#f9fafb', borderRadius: '8px', fontSize: '13px' }}>
         {selectedLocation ? (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-            <div><span style={{ color: '#6b7280' }}>Started:</span><br/><strong>{new Date(selectedLocation.started_at).toLocaleString('en-GB')}</strong></div>
-            <div><span style={{ color: '#6b7280' }}>Ended:</span><br/><strong>{selectedLocation.ended_at ? new Date(selectedLocation.ended_at).toLocaleString('en-GB') : '—'}</strong></div>
+            <div><span style={{ color: '#6b7280' }}>Started:</span><br/><strong>{(() => {
+              const d = new Date(selectedLocation.started_at);
+              return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleString('en-GB');
+            })()}</strong></div>
+            <div><span style={{ color: '#6b7280' }}>Ended:</span><br/><strong>{selectedLocation.ended_at ? (() => {
+              const d = new Date(selectedLocation.ended_at);
+              return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleString('en-GB');
+            })() : '—'}</strong></div>
             <div><span style={{ color: '#6b7280' }}>Duration:</span><br/><strong>{selectedLocation.duration_readable}</strong></div>
           </div>
         ) : (
@@ -216,7 +228,10 @@ export default function LocationMap({ routerId }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: loc.is_current ? '#22c55e' : '#6366f1', flexShrink: 0 }} />
                   <div>
-                    <div style={{ fontWeight: loc.is_current ? '600' : '400' }}>{loc.is_current ? 'Current' : new Date(loc.started_at).toLocaleDateString('en-GB')}</div>
+                    <div style={{ fontWeight: loc.is_current ? '600' : '400' }}>{loc.is_current ? 'Current' : (() => {
+                      const d = new Date(loc.started_at);
+                      return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleDateString('en-GB');
+                    })()}</div>
                     <div style={{ color: '#9ca3af', fontSize: '11px' }}>{loc.operator || 'Unknown'} • {loc.duration_readable}</div>
                   </div>
                 </div>

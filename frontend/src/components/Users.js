@@ -142,7 +142,9 @@ const Users = () => {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleString('en-GB', {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleString('en-GB', {
       day: 'numeric',
       month: 'short',
       hour: '2-digit',
@@ -678,7 +680,10 @@ const Users = () => {
                     </div>
                   </div>
                   <span className="bar-label">
-                    {new Date(day.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    {(() => {
+                      const d = new Date(day.date);
+                      return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                    })()}
                   </span>
                 </div>
               );

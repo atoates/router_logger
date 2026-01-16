@@ -304,7 +304,10 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
           <div className="psw-current-content">
             <div className="psw-property-name">{currentLocation.name}</div>
             <div className="psw-property-meta">
-              Linked {new Date(currentLocation.linkedAt).toLocaleDateString('en-GB')}
+              Linked {(() => {
+                const d = new Date(currentLocation.linkedAt);
+                return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleDateString('en-GB');
+              })()}
             </div>
             <a 
               href={`https://app.clickup.com/${workspaceId}/v/li/${currentLocation.id}`}
@@ -319,14 +322,20 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
               {currentLocation.dateInstalled ? (
                 <div className="psw-date-pills">
                   <span className="psw-date-pill">
-                    📅 Install: {new Date(Number(currentLocation.dateInstalled)).toLocaleDateString('en-GB')}
+                    📅 Install: {(() => {
+                      const d = new Date(Number(currentLocation.dateInstalled));
+                      return isNaN(d.getTime()) ? 'Invalid' : d.toLocaleDateString('en-GB');
+                    })()}
                   </span>
                   <span className={`psw-date-pill ${
                     Number(currentLocation.dateInstalled) + (92 * 24 * 60 * 60 * 1000) < Date.now()
                       ? 'overdue'
                       : ''
                   }`}>
-                    🔔 Uninstall: {new Date(Number(currentLocation.dateInstalled) + (92 * 24 * 60 * 60 * 1000)).toLocaleDateString('en-GB')}
+                    🔔 Uninstall: {(() => {
+                      const d = new Date(Number(currentLocation.dateInstalled) + (92 * 24 * 60 * 60 * 1000));
+                      return isNaN(d.getTime()) ? 'Invalid' : d.toLocaleDateString('en-GB');
+                    })()}
                   </span>
                 </div>
               ) : (

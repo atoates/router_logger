@@ -131,12 +131,15 @@ export default function SystemStatusV2() {
   }, [data.routers]);
 
   const networkChartData = useMemo(() => {
-    return data.networkHistory.map(item => ({
-      date: new Date(item.date).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }),
-      tx: Number(item.tx_bytes),
-      rx: Number(item.rx_bytes),
-      total: Number(item.total_bytes)
-    }));
+    return data.networkHistory.map(item => {
+      const date = new Date(item.date);
+      return {
+        date: isNaN(date.getTime()) ? 'Invalid' : date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }),
+        tx: Number(item.tx_bytes),
+        rx: Number(item.rx_bytes),
+        total: Number(item.total_bytes)
+      };
+    });
   }, [data.networkHistory]);
 
   const dbTableData = useMemo(() => {
@@ -370,7 +373,10 @@ export default function SystemStatusV2() {
                 <span className="metric-label">Last Update</span>
                 <span className="metric-val" style={{fontSize: '12px'}}>
                   {data.radiusStatus?.radius?.lastAccountingUpdate
-                    ? new Date(data.radiusStatus.radius.lastAccountingUpdate).toLocaleString('en-GB')
+                    ? (() => {
+                        const d = new Date(data.radiusStatus.radius.lastAccountingUpdate);
+                        return isNaN(d.getTime()) ? 'N/A' : d.toLocaleString('en-GB');
+                      })()
                     : 'N/A'}
                 </span>
               </div>

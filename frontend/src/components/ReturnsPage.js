@@ -103,7 +103,9 @@ function ReturnsPage() {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Never';
-    return new Date(dateStr).toLocaleString('en-GB');
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'Never';
+    return date.toLocaleString('en-GB');
   };
 
   if (loading) {

@@ -79,7 +79,9 @@ const GuestWifi = () => {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleString('en-GB');
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleString('en-GB');
   };
 
   const formatDuration = (seconds) => {
@@ -459,7 +461,10 @@ const GuestWifi = () => {
                   style={{ height: `${Math.min(100, (day.sessions / Math.max(...stats.timeline.map(d => d.sessions))) * 100)}%` }}
                   title={`${day.sessions} sessions, ${day.unique_guests} guests`}
                 />
-                <div className="bar-label">{new Date(day.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>
+                <div className="bar-label">{(() => {
+                  const d = new Date(day.date);
+                  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                })()}</div>
               </div>
             ))}
           </div>

@@ -355,7 +355,10 @@ function DataUsageChart({ data, dark }) {
           />
           <Tooltip
             formatter={(v) => formatBytes(v)}
-            labelFormatter={(t) => new Date(t).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}
+            labelFormatter={(t) => {
+              const d = new Date(t);
+              return isNaN(d.getTime()) ? '' : d.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+            }}
             contentStyle={{
               backgroundColor: dark ? '#1e293b' : '#ffffff',
               border: `1px solid ${dark ? '#334155' : '#e2e8f0'}`,
