@@ -880,8 +880,8 @@ export default function RouterDashboard({ router }) {
                     <td>{isOnline? 'Online' : 'Offline'}</td>
                     <td>{d.operator || ''}</td>
                     <td>{d.wan_ip || ''}</td>
-                    <td>{formatBytes(d.tx_bytes)}</td>
-                    <td>{formatBytes(d.rx_bytes)}</td>
+                    <td>{isOnline ? formatBytes(d.tx_bytes) : '0 B'}</td>
+                    <td>{isOnline ? formatBytes(d.rx_bytes) : '0 B'}</td>
                     {/* Signal values removed */}
                   </tr>
                 );
