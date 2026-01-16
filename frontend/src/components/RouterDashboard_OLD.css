@@ -1,13 +1,12 @@
-/* RouterDashboard.css - Fixed for permanent dark mode */
 .router-dash{display:flex;flex-direction:column;gap:20px;padding:0}
 .rd-header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
 .rd-header h2{margin:0;font-size:24px;font-weight:700;color:#f1f5f9}
 .rd-header h2.router-title{color:#f1f5f9;text-shadow:0 1px 2px rgba(0,0,0,0.5)}
-.rd-sub{display:flex;gap:12px;align-items:center;color:#94a3b8;margin-top:8px;flex-wrap:wrap}
+.rd-sub{display:flex;gap:12px;align-items:center;color:#cbd5e1;margin-top:8px;flex-wrap:wrap}
 .rd-range{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
 .rd-range .seg{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.rd-range .seg button{padding:8px 14px;border-radius:8px;border:1px solid #334155;background:#1e293b;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s ease;color:#e2e8f0}
-.rd-range .seg button:hover{background:#334155;border-color:#475569}
+.rd-range .seg button{padding:8px 14px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s ease}
+.rd-range .seg button:hover{background:#f8fafc;border-color:#cbd5e1}
 .rd-range .seg button.active{background:#6366f1;color:#fff;border-color:#6366f1;box-shadow:0 2px 4px rgba(99,102,241,0.2)}
 .rd-range .seg button.btn-primary{background:#667eea;color:#fff;border-color:#667eea}
 .rd-range .seg button.btn-primary:hover{background:#5568d3;border-color:#5568d3}
@@ -24,48 +23,85 @@
 }
 
 .rd-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
-.metric{background:#1e293b;border:1.5px solid #334155;border-left:6px solid #6366f1;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);transition:all 0.2s ease}
+.metric{background:#ffffff !important;border:1.5px solid #6366f1;border-left:6px solid #6366f1;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);transition:all 0.2s ease}
 .metric:hover{box-shadow:0 4px 12px rgba(0,0,0,0.08);transform:translateY(-2px)}
-.metric .label{font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:8px}
-.metric .value{font-size:26px;font-weight:700;color:#f1f5f9;margin:4px 0}
-.metric .sub{font-size:11px;color:#64748b;margin-top:4px;line-height:1.5}
+.metric .label{font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:8px}
+.metric .value{font-size:26px;font-weight:700;color:#111827;margin:4px 0}
+.metric .sub{font-size:11px;color:#94a3b8;margin-top:4px;line-height:1.5}
 .rd-grid{display:grid;grid-template-columns:1.2fr 0.8fr;gap:16px}
 .rd-grid .col{display:flex;flex-direction:column;gap:16px}
-.card{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
-.card-title{font-weight:700;font-size:15px;margin-bottom:12px;color:#f1f5f9;display:flex;align-items:center;gap:8px;text-shadow:0 1px 1px rgba(0,0,0,0.6)}
-.card-title.latest-title,.card-title.uptime-title{color:#f1f5f9;text-shadow:0 1px 1px rgba(0,0,0,0.6)}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
+.card-title{font-weight:700;font-size:15px;margin-bottom:12px;color:#111827;display:flex;align-items:center;gap:8px;text-shadow:none}
+.card-title.latest-title,.card-title.uptime-title{color:#111827;text-shadow:none}
 .kv{display:grid;grid-template-columns:1fr;gap:10px}
-.kv div{display:flex;justify-content:space-between;gap:12px;padding:8px;background:#334155;border-radius:6px;border:1px solid #475569}
-.kv span{color:#94a3b8;font-size:12px;font-weight:500}
-.kv strong{color:#e2e8f0;font-size:13px}
-.table-wrap{overflow:auto;border-radius:8px;background:#0f172a}
+.kv div{display:flex;justify-content:space-between;gap:12px;padding:8px;background:#f1f5f9;border-radius:6px;border:1px solid #e2e8f0}
+.kv span{color:#64748b;font-size:12px;font-weight:500}
+.kv strong{color:#0f172a;font-size:13px}
+.table-wrap{overflow:auto;border-radius:8px;background:#fff}
 .table-wrap table{width:100%;border-collapse:collapse}
-.table-wrap th,.table-wrap td{border-bottom:1px solid #334155;padding:10px 12px;text-align:left;font-size:12px}
-.table-wrap th{background:#1e293b;font-weight:600;color:#cbd5e1;position:sticky;top:0}
-.table-wrap td{color:#e2e8f0;background:#0f172a}
-.table-wrap tbody tr{background:#0f172a}
-.table-wrap tbody tr:hover{background:#334155}
+.table-wrap th,.table-wrap td{border-bottom:1px solid #e5e7eb;padding:10px 12px;text-align:left;font-size:12px}
+.table-wrap th{background:#f8fafc;font-weight:600;color:#475569;position:sticky;top:0}
+.table-wrap td{color:#0f172a;background:#fff}
+.table-wrap tbody tr{background:#fff}
+.table-wrap tbody tr:hover{background:#fafbfc}
 .rd-pill{padding:4px 10px;border-radius:9999px;font-size:11px;font-weight:600}
 .rd-pill.ok{background:#d1fae5;color:#065f46}
 .rd-pill.bad{background:#fee2e2;color:#991b1b}
-.muted{color:#64748b;font-size:12px}
+.muted{color:#94a3b8;font-size:12px}
 
 .inspections-list{max-height:220px;overflow-y:auto;margin-top:4px}
 .inspections-list::-webkit-scrollbar{width:6px}
-.inspections-list::-webkit-scrollbar-track{background:#0f172a;border-radius:3px}
-.inspections-list::-webkit-scrollbar-thumb{background:#475569;border-radius:3px}
-.inspections-list::-webkit-scrollbar-thumb:hover{background:#64748b}
-.inspection-item{padding:10px 12px;background:#0f172a;border-left:3px solid #334155;border-radius:6px;font-size:13px;margin-bottom:8px;transition:all 0.15s ease;color:#e2e8f0}
+.inspections-list::-webkit-scrollbar-track{background:#f1f5f9;border-radius:3px}
+.inspections-list::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+.inspections-list::-webkit-scrollbar-thumb:hover{background:#94a3b8}
+.inspection-item{padding:10px 12px;background:#f8fafc;border-left:3px solid #e2e8f0;border-radius:6px;font-size:13px;margin-bottom:8px;transition:all 0.15s ease}
 .inspection-item:last-child{margin-bottom:0}
+.inspection-item:hover{background:#f1f5f9}
+.inspection-item.latest{background:#f0fdf4;border-left-color:#10b981}
+.inspection-item.latest:hover{background:#dcfce7}
+.inspection-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.inspection-date{font-weight:600;color:#0f172a;font-size:13px}
+.inspection-time{color:#64748b;font-size:11px}
+.inspection-by{color:#64748b;font-size:11px;margin-bottom:4px}
+.inspection-notes{color:#475569;font-size:11px;margin-top:6px;padding-top:6px;border-top:1px solid #e2e8f0}
+.inspections-empty{padding:20px;text-align:center;color:#94a3b8;font-size:13px}
+
+/* Dark mode styles */
+.rd-header h2{color:#f1f5f9}
+.rd-header h2.router-title{color:#f1f5f9;text-shadow:0 1px 2px rgba(0,0,0,0.5)}
+.rd-sub{color:#94a3b8}
+.rd-range .seg button{background:#1e293b;border-color:#334155;color:#e2e8f0}
+.rd-range .seg button:hover{background:#334155;border-color:#475569}
+.rd-range .seg button.active{background:#6366f1;color:#fff;border-color:#6366f1}
+.rd-range .seg button.btn-primary{background:#667eea;color:#fff;border-color:#667eea}
+.rd-range .seg button.btn-primary:hover{background:#5568d3;border-color:#5568d3}
+.metric{background:#1e293b;border-top-color:#334155;border-right-color:#334155;border-bottom-color:#334155}
+.metric .label{color:#94a3b8}
+.metric .value{color:#f1f5f9}
+.metric .sub{color:#64748b}
+.card{background:#1e293b;border-color:#334155}
+.card-title{color:#f1f5f9}
+.card-title.latest-title,.card-title.uptime-title{color:#f1f5f9;text-shadow:0 1px 1px rgba(0,0,0,0.6)}
+.kv div{background:#334155;border-color:#475569}
+.kv span{color:#94a3b8}
+.kv strong{color:#e2e8f0}
+.table-wrap{background:#0f172a}
+.table-wrap th{background:#1e293b;color:#cbd5e1}
+.table-wrap td{color:#e2e8f0;border-bottom-color:#334155;background:#0f172a}
+.table-wrap tbody tr{background:#0f172a}
+.table-wrap tbody tr:hover{background:#334155}
+.inspections-list::-webkit-scrollbar-track{background:#0f172a}
+.inspections-list::-webkit-scrollbar-thumb{background:#475569}
+.inspections-list::-webkit-scrollbar-thumb:hover{background:#64748b}
+.inspection-item{background:#0f172a;border-left-color:#334155;color:#e2e8f0}
 .inspection-item:hover{background:#1e293b}
 .inspection-item.latest{background:#064e3b;border-left-color:#10b981}
 .inspection-item.latest:hover{background:#065f46}
-.inspection-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.inspection-date{font-weight:600;color:#f1f5f9;font-size:13px}
-.inspection-time{color:#94a3b8;font-size:11px}
-.inspection-by{color:#94a3b8;font-size:11px;margin-bottom:4px}
-.inspection-notes{color:#cbd5e1;font-size:11px;margin-top:6px;padding-top:6px;border-top:1px solid #334155}
-.inspections-empty{padding:20px;text-align:center;color:#64748b;font-size:13px}
+.inspection-date{color:#f1f5f9}
+.inspection-time{color:#94a3b8}
+.inspection-by{color:#94a3b8}
+.inspection-notes{color:#cbd5e1;border-top-color:#334155}
+.inspections-empty{color:#64748b}
 
 /* Accordion Styles */
 .rd-accordion{
@@ -76,8 +112,8 @@
 }
 
 .accordion-item{
-  background:#1e293b;
-  border:1px solid #334155;
+  background:#fff;
+  border:1px solid #e5e7eb;
   border-radius:10px;
   overflow:hidden;
   transition:all 0.3s ease;
@@ -94,24 +130,24 @@
   align-items:center;
   padding:14px 18px;
   cursor:pointer;
-  background:#0f172a;
-  border-bottom:1px solid #334155;
+  background:#f8fafc;
+  border-bottom:1px solid #e5e7eb;
   transition:all 0.2s ease;
   user-select:none;
 }
 
 .accordion-header:hover{
-  background:#1e293b;
+  background:#f1f5f9;
 }
 
 .accordion-title{
   font-weight:600;
   font-size:14px;
-  color:#f1f5f9;
+  color:#0f172a;
 }
 
 .accordion-icon{
-  color:#94a3b8;
+  color:#64748b;
   font-size:12px;
   transition:transform 0.3s ease;
 }
@@ -132,6 +168,28 @@
   }
 }
 
+/* Dark mode accordion styles */
+.accordion-item{
+  background:#1e293b;
+  border-color:#334155;
+}
+
+.accordion-header{
+  background:#0f172a;
+  border-bottom-color:#334155;
+}
+
+.accordion-header:hover{
+  background:#1e293b;
+}
+
+.accordion-title{
+  color:#f1f5f9;
+}
+
+.accordion-icon{
+  color:#94a3b8;
+}
 .muted{color:#64748b}
 
 /* WiFi Users Section */
@@ -156,21 +214,21 @@
   flex-direction: column;
   align-items: center;
   padding: 12px 20px;
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   border-radius: 8px;
-  border: 1px solid #334155;
+  border: 1px solid #e2e8f0;
   min-width: 100px;
 }
 
 .wifi-stat-value {
   font-size: 24px;
   font-weight: 700;
-  color: #f1f5f9;
+  color: #1e293b;
 }
 
 .wifi-stat-label {
   font-size: 11px;
-  color: #94a3b8;
+  color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-top: 4px;
@@ -182,30 +240,30 @@
 }
 
 .wifi-users-table th {
-  background: #1e293b;
+  background: #f8fafc;
   font-weight: 600;
-  color: #cbd5e1;
+  color: #475569;
   padding: 10px 12px;
   text-align: left;
   font-size: 12px;
-  border-bottom: 2px solid #334155;
+  border-bottom: 2px solid #e2e8f0;
   position: sticky;
   top: 0;
 }
 
 .wifi-users-table td {
   padding: 12px;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #e5e7eb;
   font-size: 13px;
-  color: #e2e8f0;
+  color: #1e293b;
 }
 
 .wifi-user-row.clickable:hover {
-  background: #1e293b;
+  background: #f8fafc;
 }
 
 .wifi-user-row.clickable:hover td {
-  background: #1e293b;
+  background: #f8fafc;
 }
 
 .user-color-dot {
@@ -233,8 +291,8 @@
    ============================================ */
 
 .uptime-strip {
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-  border: 1px solid #334155;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 12px 16px;
   margin-top: 16px;
@@ -253,14 +311,14 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .uptime-strip-samples {
   font-size: 11px;
   color: #94a3b8;
   padding: 2px 8px;
-  background: #334155;
+  background: #f1f5f9;
   border-radius: 10px;
 }
 
@@ -291,7 +349,7 @@
   display: flex;
   gap: 2px;
   height: 24px;
-  background: #0f172a;
+  background: #f1f5f9;
   border-radius: 6px;
   padding: 4px;
   overflow: hidden;
@@ -340,7 +398,7 @@
   align-items: center;
   gap: 5px;
   font-size: 10px;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .uptime-strip-label .dot {
@@ -391,8 +449,8 @@
 
 /* Map Card */
 .map-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #fff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   overflow: hidden;
   height: 100%;
@@ -405,8 +463,8 @@
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  background: linear-gradient(135deg, #422006 0%, #78350f 100%);
-  border-bottom: 1px solid #92400e;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-bottom: 1px solid #fcd34d;
 }
 
 .map-icon {
@@ -416,7 +474,7 @@
 .map-title {
   font-size: 13px;
   font-weight: 700;
-  color: #fcd34d;
+  color: #92400e;
 }
 
 .map-container {
@@ -426,8 +484,8 @@
 
 /* Compact Cards */
 .compact-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #fff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -443,8 +501,8 @@
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background: #0f172a;
-  border-bottom: 1px solid #334155;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .compact-icon {
@@ -454,7 +512,7 @@
 .compact-title {
   font-size: 12px;
   font-weight: 700;
-  color: #e2e8f0;
+  color: #374151;
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
@@ -488,22 +546,23 @@
 
 /* Device Compact */
 .device-compact .compact-header {
-  background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border-bottom-color: #bfdbfe;
 }
 
 .device-compact .compact-title {
-  color: #e2e8f0;
+  color: #1e40af;
 }
 
 .device-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
-  background: #334155;
+  background: #e2e8f0;
 }
 
 .device-item {
-  background: #1e293b !important;
+  background: #fff !important;
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
@@ -514,14 +573,14 @@
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #94a3b8 !important;
+  color: #64748b !important;
   font-weight: 600;
 }
 
 .device-value {
   font-size: 12px;
   font-weight: 600;
-  color: #e2e8f0 !important;
+  color: #0f172a !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -529,11 +588,12 @@
 
 /* Inspection Compact */
 .inspection-compact .compact-header {
-  background: linear-gradient(135deg, #3b0764 0%, #6b21a8 100%);
+  background: linear-gradient(135deg, #faf5ff, #f3e8ff);
+  border-bottom-color: #e9d5ff;
 }
 
 .inspection-compact .compact-title {
-  color: #e2e8f0;
+  color: #7c3aed;
 }
 
 .inspection-inline {
@@ -580,7 +640,7 @@
 .inspection-status-text {
   font-size: 14px;
   font-weight: 700;
-  color: #f1f5f9;
+  color: #0f172a;
 }
 
 .inspection-date-text {
@@ -605,7 +665,7 @@
 .inspection-last-date {
   font-size: 12px;
   font-weight: 600;
-  color: #cbd5e1;
+  color: #475569;
 }
 
 .inspection-none {
@@ -617,11 +677,12 @@
 
 /* WiFi Compact */
 .wifi-compact .compact-header {
-  background: linear-gradient(135deg, #831843 0%, #be185d 100%);
+  background: linear-gradient(135deg, #fdf2f8, #fce7f3);
+  border-bottom-color: #fbcfe8;
 }
 
 .wifi-compact .compact-title {
-  color: #e2e8f0;
+  color: #be185d;
 }
 
 .wifi-none {
@@ -649,21 +710,21 @@
   flex-direction: column;
   align-items: center;
   padding: 8px;
-  background: linear-gradient(135deg, #581c87 0%, #6b21a8 100%);
+  background: linear-gradient(135deg, #fdf4ff, #fae8ff);
   border-radius: 8px;
 }
 
 .mini-num {
   font-size: 16px;
   font-weight: 800;
-  color: #f5d0fe;
+  color: #a21caf;
 }
 
 .mini-label {
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  color: #e9d5ff;
+  color: #c026d3;
   font-weight: 600;
 }
 
@@ -692,15 +753,126 @@
 }
 
 .wifi-avatar.more {
-  background: #334155;
-  color: #94a3b8;
+  background: #e2e8f0;
+  color: #64748b;
   font-size: 10px;
 }
 
 /* User login legend */
 .user-login-legend {
+  border: 1px solid #e2e8f0;
+}
+
+/* ============================================
+   DARK MODE
+   ============================================ */
+
+.uptime-strip {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-color: #334155;
+}
+
+.uptime-strip-title {
+  color: #94a3b8;
+}
+
+.uptime-strip-samples {
+  background: #334155;
+  color: #94a3b8;
+}
+
+.uptime-strip-bar {
+  background: #0f172a;
+}
+
+.uptime-strip-label {
+  color: #94a3b8;
+}
+
+.map-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.map-card-header {
+  background: linear-gradient(135deg, #422006 0%, #78350f 100%);
+  border-bottom-color: #92400e;
+}
+
+.map-title {
+  color: #fcd34d;
+}
+
+.compact-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.compact-header {
+  background: #0f172a;
+  border-bottom-color: #334155;
+}
+
+.compact-title {
+  color: #e2e8f0;
+}
+
+.device-compact .compact-header {
+  background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+}
+
+.device-row {
+  background: #334155;
+}
+
+.device-item {
+  background: #1e293b;
+}
+
+.device-label {
+  color: #64748b !important;
+}
+
+.device-value {
+  color: #0f172a !important;
+}
+
+.inspection-compact .compact-header {
+  background: linear-gradient(135deg, #3b0764 0%, #6b21a8 100%);
+}
+
+.inspection-status-text {
+  color: #f1f5f9;
+}
+
+.inspection-last-date {
+  color: #cbd5e1;
+}
+
+.wifi-compact .compact-header {
+  background: linear-gradient(135deg, #831843 0%, #be185d 100%);
+}
+
+.wifi-mini-stat {
+  background: linear-gradient(135deg, #581c87 0%, #6b21a8 100%);
+}
+
+.mini-num {
+  color: #f5d0fe;
+}
+
+.mini-label {
+  color: #e9d5ff;
+}
+
+.wifi-avatar.more {
+  background: #334155;
+  color: #94a3b8;
+}
+
+.user-login-legend {
   background: #1e293b !important;
-  border: 1px solid #334155;
+  border-color: #334155;
 }
 
 /* ============================================
