@@ -135,10 +135,9 @@ function DeltaBadge({ current, previous }) {
   return <span className={`delta ${cls}`}>{sym} {displayValue}%</span>;
 }
 
-export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page = 'network' }) {
+export default function DashboardV3({ onOpenRouter, page = 'network' }) {
   const [mode, setMode] = useState('rolling');
   const [value, setValue] = useState(24);
-  const [dark, setDark] = useState(defaultDarkMode);
   const [hoveredPill, setHoveredPill] = useState(null);
   const [routers, setRouters] = useState([]);
   const [usage, setUsage] = useState([]);
@@ -233,7 +232,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
     return m;
   }, [usage]);
 
-  const className = `dashboard-v3${dark ? ' dark' : ''}`;
+  const className = `dashboard-v3 dark`;
 
   return (
     <div className={className}>
@@ -241,7 +240,6 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
       {page === 'network' && (
         <div className="v3-controls-bar">
           <TimeControls mode={mode} value={value} onChange={updateTime} />
-          <div className="toggle" onClick={()=>setDark(!dark)} title="Toggle dark mode">{dark ? '🌙' : '🌞'}</div>
         </div>
       )}
 
@@ -278,7 +276,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
                       <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke={dark?'#334155':'#e5e7eb'} />
+                  <CartesianGrid strokeDasharray="3 3" stroke='#334155' />
                   <XAxis
                     dataKey="date"
                     tickFormatter={(t)=> {
@@ -287,9 +285,9 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
                         ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
                         : (t || '').slice(5, 10);
                     }} 
-                    tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} 
+                    tick={{ fontSize: 11, fill: '#cbd5e1' }} 
                   />
-                  <YAxis domain={[0, Math.ceil(yMax * 1.1)]} tickFormatter={(v)=> formatBytes(v)} tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} />
+                  <YAxis domain={[0, Math.ceil(yMax * 1.1)]} tickFormatter={(v)=> formatBytes(v)} tick={{ fontSize: 11, fill: '#cbd5e1' }} />
                   <Tooltip
                     formatter={(v) => formatBytes(v)}
                     labelFormatter={(t) => {
@@ -297,12 +295,12 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
                       return isNaN(d.getTime()) ? '' : d.toLocaleString('en-GB');
                     }}
                     contentStyle={{
-                      backgroundColor: dark ? '#1f2937' : '#ffffff',
-                      border: '1px solid ' + (dark ? '#374151' : '#e5e7eb'),
-                      color: dark ? '#e5e7eb' : '#111827',
+                      backgroundColor: '#1f2937',
+                      border: '1px solid #374151',
+                      color: '#e5e7eb',
                     }}
-                    labelStyle={{ color: dark ? '#e5e7eb' : '#111827' }}
-                    itemStyle={{ color: dark ? '#e5e7eb' : '#111827' }}
+                    labelStyle={{ color: '#e5e7eb' }}
+                    itemStyle={{ color: '#e5e7eb' }}
                   />
                   <Legend />
                   <Area type="monotone" dataKey="tx_bytes" stroke="#6366f1" fill="url(#gTx)" name="TX" />
@@ -328,8 +326,8 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
             <div style={{ height: 240 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={top} layout="vertical" margin={{ left: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={dark?'#334155':'#e5e7eb'} />
-                  <XAxis type="number" tickFormatter={(v)=>formatBytes(v).split(' ')[0]} tick={{ fontSize: 11, fill: dark?'#cbd5e1':'#475569' }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke='#334155' />
+                  <XAxis type="number" tickFormatter={(v)=>formatBytes(v).split(' ')[0]} tick={{ fontSize: 11, fill: '#cbd5e1' }} />
                   <YAxis 
                     type="category" 
                     dataKey="name" 
@@ -338,9 +336,9 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
                       const { x, y, payload } = props;
                       const name = String(payload?.value || '');
                       const on = !!onOpenRouter;
-                      const textColor = dark ? '#cbd5e1' : '#1f2937';
-                      const baseBg = dark ? '#1f2937' : '#e5e7eb';
-                      const hoverBg = dark ? '#374151' : '#d1d5db';
+                      const textColor = '#cbd5e1';
+                      const baseBg = '#1f2937';
+                      const hoverBg = '#374151';
                       const pillBg = hoveredPill === name ? hoverBg : baseBg;
                       const charW = 6; // rough estimate
                       const padX = 10;
@@ -364,7 +362,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
                            role={on ? 'button' : undefined}
                            tabIndex={on ? 0 : undefined}
                         >
-                          <rect x={rectX} y={rectY} rx={9} ry={9} width={w} height={h} fill={pillBg} stroke={dark?'#475569':'#cbd5e1'} />
+                          <rect x={rectX} y={rectY} rx={9} ry={9} width={w} height={h} fill={pillBg} stroke='#475569' />
                           <text x={x - padX} y={y + 4} textAnchor="end" fill={textColor} style={{ fontSize: 12, fontWeight: 600 }}>{name}</text>
                         </g>
                       );
@@ -373,7 +371,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
                   <Tooltip 
                     formatter={(v)=>formatBytes(v)} 
                     labelFormatter={(label) => `Router: ${label}`}
-                    contentStyle={{ backgroundColor: dark ? '#1f2937' : '#ffffff', border: '1px solid ' + (dark ? '#374151' : '#e5e7eb') }}
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
                   />
                   <Legend />
                   <Bar dataKey="tx_bytes" stackId="a" fill="#6366f1" name="TX" onClick={(d)=>{
@@ -443,7 +441,7 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
                           justifyContent:'space-between', 
                           alignItems:'center',
                           padding: 8,
-                          background: dark ? '#1f2937' : '#fee2e2',
+                          background: '#1f2937',
                           borderRadius: 6,
                           cursor: onOpenRouter ? 'pointer' : 'default',
                           borderLeft: '3px solid #ef4444'

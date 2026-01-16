@@ -1,0 +1,270 @@
+.admin-debug-tools {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  color: #e0e0e0;
+}
+
+.admin-debug-tools h2 {
+  margin-bottom: 2rem;
+  font-size: 2rem;
+}
+
+.debug-section {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.debug-section h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: #4a9eff;
+}
+
+.debug-description {
+  color: #999;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+}
+
+.debug-buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #4a9eff;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #3a8eef;
+  transform: translateY(-1px);
+}
+
+.btn-warning {
+  background: #ff9800;
+  color: white;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: #f57c00;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: #666;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #555;
+  transform: translateY(-1px);
+}
+
+.debug-message {
+  padding: 1rem;
+  border-radius: 6px;
+  margin: 1.5rem 0;
+  font-weight: 500;
+}
+
+.debug-message.success {
+  background: rgba(76, 175, 80, 0.2);
+  border: 1px solid #4caf50;
+  color: #81c784;
+}
+
+.debug-message.warning {
+  background: rgba(255, 152, 0, 0.2);
+  border: 1px solid #ff9800;
+  color: #ffb74d;
+}
+
+.debug-message.error {
+  background: rgba(244, 67, 54, 0.2);
+  border: 1px solid #f44336;
+  color: #e57373;
+}
+
+.debug-report {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.debug-report h3 {
+  margin-top: 0;
+  color: #4a9eff;
+}
+
+.report-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.report-summary .stat {
+  background: #252525;
+  padding: 1rem;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.report-summary .label {
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.report-summary .value {
+  color: #4a9eff;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.duplicates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.duplicate-group {
+  background: #252525;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 1.5rem;
+}
+
+.duplicate-group h4 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #ffb74d;
+}
+
+.kept-router,
+.hidden-routers {
+  margin-bottom: 1rem;
+}
+
+.kept-router strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #81c784;
+}
+
+.hidden-routers strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #e57373;
+}
+
+.router-details {
+  background: #1e1e1e;
+  padding: 0.75rem;
+  border-radius: 4px;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.router-details.hidden {
+  opacity: 0.8;
+  margin-top: 0.5rem;
+}
+
+.router-details span {
+  color: #ccc;
+}
+
+.badge {
+  background: #4a9eff;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.duplicate-explanation {
+  background: rgba(74, 158, 255, 0.1);
+  border-left: 3px solid #4a9eff;
+  padding: 0.75rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: #999;
+  border-radius: 0 4px 4px 0;
+}
+
+.no-duplicates {
+  text-align: center;
+  padding: 2rem;
+  color: #81c784;
+  font-size: 1.1rem;
+}
+
+.sync-stats {
+  margin-top: 1.5rem;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.sync-stats h4 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #4a9eff;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.stat-item {
+  background: #252525;
+  padding: 1rem;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stat-label {
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.stat-value {
+  color: #4a9eff;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+

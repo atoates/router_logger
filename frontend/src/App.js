@@ -69,7 +69,6 @@ function RouterDetailPage() {
 }
 
 function AppContent() {
-  const [darkMode] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser, logout, isAdmin, isGuest } = useAuth();
@@ -132,7 +131,7 @@ function AppContent() {
   }
 
   return (
-    <div className={`app ${darkMode ? 'dark-mode' : ''}`}>
+    <div className="app">
       <div className="container">
         {/* Header */}
         <div className="app-header">
@@ -273,17 +272,17 @@ function AppContent() {
             } />
             <Route path="/assignments" element={
               <ProtectedRoute requireAdmin>
-                <DashboardV3 page="assignments" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
+                <DashboardV3 page="assignments" onOpenRouter={handleHeaderRouterSelect} />
               </ProtectedRoute>
             } />
             <Route path="/stored" element={
               <ProtectedRoute requireAdmin>
-                <DashboardV3 page="stored" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
+                <DashboardV3 page="stored" onOpenRouter={handleHeaderRouterSelect} />
               </ProtectedRoute>
             } />
             <Route path="/status" element={
               <ProtectedRoute requireAdmin>
-                <DashboardV3 page="status" onOpenRouter={handleHeaderRouterSelect} defaultDarkMode={true} />
+                <DashboardV3 page="status" onOpenRouter={handleHeaderRouterSelect} />
               </ProtectedRoute>
             } />
             <Route path="/returns" element={

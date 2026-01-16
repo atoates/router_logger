@@ -251,60 +251,60 @@
 }
 
 /* Dark mode styles */
-.installed-routers-card {
+.dark-mode .installed-routers-card {
   background: #1f2937;
   border-color: #374151;
 }
 
-.installed-routers-title {
+.dark-mode .installed-routers-title {
   color: #f3f4f6;
 }
 
-.installed-routers-table thead {
+.dark-mode .installed-routers-table thead {
   background: #374151;
   border-bottom-color: #4b5563;
 }
 
-.installed-routers-table th {
+.dark-mode .installed-routers-table th {
   color: #d1d5db;
 }
 
-.installed-routers-table th:hover {
+.dark-mode .installed-routers-table th:hover {
   background: #4b5563;
 }
 
-.installed-routers-table tbody tr {
+.dark-mode .installed-routers-table tbody tr {
   border-bottom-color: #374151;
 }
 
-.installed-routers-table tbody tr:hover {
+.dark-mode .installed-routers-table tbody tr:hover {
   background: #374151;
 }
 
-.installed-routers-table td {
+.dark-mode .installed-routers-table td {
   color: #d1d5db;
 }
 
-.ir-router-id {
+.dark-mode .ir-router-id {
   color: #f3f4f6;
 }
 
-.ir-router-name {
+.dark-mode .ir-router-name {
   color: #9ca3af;
 }
 
-.ir-property-name {
+.dark-mode .ir-property-name {
   color: #e5e7eb;
 }
 
-.installed-routers-table-wrap {
+.dark-mode .installed-routers-table-wrap {
   border-color: #4b5563;
 }
 
-.sort-icon {
+.dark-mode .sort-icon {
   color: #6b7280;
 }
 
-.sort-icon.active {
+.dark-mode .sort-icon.active {
   color: #8b5cf6;
 }

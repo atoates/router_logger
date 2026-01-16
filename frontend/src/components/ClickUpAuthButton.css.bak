@@ -78,39 +78,39 @@
 }
 
 /* Dark mode */
-.clickup-auth-btn {
+body.dark-mode .clickup-auth-btn {
   background: #1e293b;
   border-color: #334155;
   color: #e2e8f0;
 }
 
-.clickup-auth-btn:hover {
+body.dark-mode .clickup-auth-btn:hover {
   background: #334155;
   border-color: #475569;
 }
 
-.clickup-auth-btn.connected {
+body.dark-mode .clickup-auth-btn.connected {
   background: #064e3b;
   border-color: #10b981;
   color: #6ee7b7;
 }
 
-.clickup-auth-btn.connected:hover {
+body.dark-mode .clickup-auth-btn.connected:hover {
   background: #065f46;
   border-color: #34d399;
 }
 
-.clickup-auth-btn .workspace-name {
+body.dark-mode .clickup-auth-btn .workspace-name {
   color: #94a3b8;
 }
 
-.clickup-disconnect {
+body.dark-mode .clickup-disconnect {
   background: #7f1d1d;
   border-color: #991b1b;
   color: #fca5a5;
 }
 
-.clickup-disconnect:hover {
+body.dark-mode .clickup-disconnect:hover {
   background: #991b1b;
   border-color: #b91c1c;
 }
