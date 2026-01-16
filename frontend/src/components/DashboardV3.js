@@ -180,12 +180,20 @@ export default function DashboardV3({ onOpenRouter, defaultDarkMode = true, page
         const statusRes = await statusSummaryPromise;
         setRouters(rRes.data || []);
         
-        // Split usage data into current and previous periods
+        // Split usage data into current and previous periods based on timestamps
         const arr = uRes.data || [];
-        const halfPoint = Math.floor(arr.length / 2);
-        if (arr.length >= 2) {
-          setUsagePrev(arr.slice(0, halfPoint));
-          setUsage(arr.slice(halfPoint));
+        if (arr.length >= 2 && arr[0]?.date) {
+          // Calculate the split timestamp (halfway through the data range)
+          const firstDate = new Date(arr[0].date);
+          const lastDate = new Date(arr[arr.length - 1].date);
+          const splitTimestamp = new Date((firstDate.getTime() + lastDate.getTime()) / 2);
+          
+          // Split by comparing timestamps
+          const currentPeriod = arr.filter(d => new Date(d.date) >= splitTimestamp);
+          const previousPeriod = arr.filter(d => new Date(d.date) < splitTimestamp);
+          
+          setUsage(currentPeriod);
+          setUsagePrev(previousPeriod);
         } else {
           setUsage(arr);
           setUsagePrev([]);
