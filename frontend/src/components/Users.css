@@ -195,14 +195,14 @@
 .stat-value {
   font-size: 28px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: #ffffff !important;
   line-height: 1;
   margin-bottom: 4px;
 }
 
 .stat-label {
   font-size: 13px;
-  color: var(--text-secondary);
+  color: #ffffff !important;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
