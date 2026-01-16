@@ -518,18 +518,18 @@ export default function RouterDashboard({ router }) {
                   key={idx} 
                   className={`uptime-tick ${bucket.status}`}
                   style={bucket.status === 'online' && bucket.ratio < 1 ? { opacity: 0.5 + (bucket.ratio * 0.5) } : {}}
-                  title={`${formatTime(bucket.start)} → ${formatTime(bucket.end)}\n${bucket.status === 'unknown' ? 'No data' : `${bucket.onlineCount}/${bucket.samples} online (${Math.round(bucket.ratio * 100)}%)`}`}
+                  title={`${formatTime(bucket.start)} → ${formatTime(bucket.end)}\n${bucket.status === 'unknown' ? 'Partial data' : `${bucket.onlineCount}/${bucket.samples} online (${Math.round(bucket.ratio * 100)}%)`}`}
                 />
               );
             })
           ) : (
-            <div className="uptime-strip-empty">No data for this period</div>
+            <div className="uptime-strip-empty">Partial data for this period</div>
           )}
         </div>
         <div className="uptime-strip-footer">
           <span className="uptime-strip-label"><span className="dot online"></span> Online</span>
           <span className="uptime-strip-label"><span className="dot offline"></span> Offline</span>
-          <span className="uptime-strip-label"><span className="dot unknown"></span> No data</span>
+          <span className="uptime-strip-label"><span className="dot unknown"></span> Partial data</span>
           <span className="uptime-strip-range">{label} · {uptimeBuckets.bucketCount} buckets</span>
         </div>
       </div>
