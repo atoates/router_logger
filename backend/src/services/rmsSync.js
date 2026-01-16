@@ -237,112 +237,22 @@ async function syncFromRMS() {
         const telemetry = transformRMSDeviceToTelemetry(device, monitoringData);
 
         // If monitoring did not provide cumulative counters, try to derive from statistics API
-        // We ALWAYS need to fetch current data to track usage properly
+        // If counters are zero, use last known values from database
         const tx0 = Number(telemetry?.counters?.total_tx_bytes || 0);
         const rx0 = Number(telemetry?.counters?.total_rx_bytes || 0);
         const bothZero = (!isFinite(tx0) || tx0 === 0) && (!isFinite(rx0) || rx0 === 0);
         
         if (bothZero) {
-          try {
-            const deviceId = device.id || device.device_id || device.uuid || device.serial_number || telemetry.device_id;
-            const latest = await getLatestLog(String(telemetry.device_id));
-            
-            // FIXED APPROACH: Fetch LIFETIME cumulative data from RMS
-            // The RMS data-usage endpoint returns cumulative totals for the requested window.
-            // To get accurate cumulative counters, we request from device creation (or a far past date) to now.
-            // This ensures we store the TRUE cumulative value, not an additive one.
-            const deviceCreatedAt = device.created_at || device.createdAt || device.created;
-            const fromIso = deviceCreatedAt 
-              ? new Date(deviceCreatedAt).toISOString()
-              : new Date('2020-01-01T00:00:00Z').toISOString(); // Far past as fallback
-            const toIso = new Date().toISOString();
-            
-            logger.info(`Fetching LIFETIME data usage for ${deviceId} from ${fromIso} to ${toIso}`);
-            
-            // Try data-usage endpoint first (most reliable for usage totals)
-            let usageData = null;
-            try {
-              usageData = await rmsClient.getDeviceDataUsage(deviceId, fromIso, toIso);
-              logger.debug(`Data-usage response for ${deviceId}: ${usageData ? JSON.stringify(usageData).substring(0, 500) : 'null'}`);
-            } catch (e) {
-              logger.warn(`Data usage fetch failed for device ${deviceId}: ${e.message}`);
-            }
-
-            let totalTx = 0, totalRx = 0;
-            
-            if (usageData) {
-              // Parse data-usage response (may be array of records or summary object)
-              // RMS returns cumulative totals - we sum all records to get the lifetime total
-              const records = Array.isArray(usageData) ? usageData : (usageData?.data || usageData?.items || usageData?.records || []);
-              if (Array.isArray(records)) {
-                for (const rec of records) {
-                  const vals = typeof rec === 'object' && rec ? rec : {};
-                  const sent = Number(vals.sent || vals.tx || vals.tx_bytes || vals.upload || vals.data_sent || 0);
-                  const received = Number(vals.received || vals.rx || vals.rx_bytes || vals.download || vals.data_received || 0);
-                  if (isFinite(sent)) totalTx += sent;
-                  if (isFinite(received)) totalRx += received;
-                }
-              } else if (typeof usageData === 'object' && usageData) {
-                // If response is a summary object
-                const sent = Number(usageData.sent || usageData.tx || usageData.tx_bytes || usageData.upload || usageData.total_sent || 0);
-                const received = Number(usageData.received || usageData.rx || usageData.rx_bytes || usageData.download || usageData.total_received || 0);
-                if (isFinite(sent)) totalTx = sent;
-                if (isFinite(received)) totalRx = received;
-              }
-              logger.info(`Parsed LIFETIME usage for ${deviceId}: totalTx=${totalTx}, totalRx=${totalRx}`);
-            }
-
-            // Fallback to statistics if data-usage was empty
-            if (totalTx === 0 && totalRx === 0) {
-              let stats = await rmsClient.getDeviceStatistics(deviceId, fromIso, toIso);
-              if (!stats || (Array.isArray(stats) && stats.length === 0)) {
-                // company-level fallback (uses site/company IDs when present)
-                const companyId = device.company_id || device.companyId || telemetry.site_id;
-                if (companyId) {
-                  try {
-                    stats = await rmsClient.getCompanyDeviceStatistics(companyId, deviceId, fromIso, toIso);
-                  } catch (e) {
-                    logger.warn(`Company stats fallback failed for device ${deviceId}: ${e.message}`);
-                  }
-                }
-              }
-              // Normalize stats list
-              const list = Array.isArray(stats) ? stats : stats?.data || stats?.items || stats?.rows || [];
-              for (const s of list) {
-                const vals = typeof s === 'object' && s ? s : {};
-                const tx = Number(vals.tx_bytes ?? vals.tx ?? 0);
-                const rx = Number(vals.rx_bytes ?? vals.rx ?? 0);
-                if (isFinite(tx)) totalTx += tx;
-                if (isFinite(rx)) totalRx += rx;
-              }
-            }
-
-            // Store the RMS cumulative value directly
-            // Only update if we got a value AND it's >= our last known value (counters only go up)
-            const lastTx = latest?.total_tx_bytes ? Number(latest.total_tx_bytes) : 0;
-            const lastRx = latest?.total_rx_bytes ? Number(latest.total_rx_bytes) : 0;
-            
-            if (totalTx > 0 || totalRx > 0) {
-              // Use the larger of: RMS value or last known value (handles edge cases where RMS might return partial data)
-              telemetry.counters.total_tx_bytes = Math.max(totalTx, lastTx);
-              telemetry.counters.total_rx_bytes = Math.max(totalRx, lastRx);
-              logger.info(`Updated counters for ${deviceId}: RMS=${totalTx}+${totalRx}, last=${lastTx}+${lastRx}, stored=${telemetry.counters.total_tx_bytes}+${telemetry.counters.total_rx_bytes}`);
-            } else {
-              // No data from RMS - keep last known values
-              telemetry.counters.total_tx_bytes = lastTx;
-              telemetry.counters.total_rx_bytes = lastRx;
-              logger.debug(`No RMS usage for ${deviceId}, keeping last values: ${lastTx}+${lastRx}`);
-            }
-          } catch (statsErr) {
-            // Non-fatal; proceed with whatever we have
-            // If it's a rate limit error, set flag and abort sync
-            if (statsErr.response?.status === 429) {
-              logger.error(`Rate limit hit during stats fetch for device ${device.id}. Aborting sync to prevent quota exhaustion.`);
-              rateLimitHit = true;
-              throw statsErr; // Re-throw to trigger outer catch and stop sync
-            } else {
-              logger.warn(`Stats fallback failed for device ${device.id}: ${statsErr.message}`);
-            }
+          // Device reports zero counters - use last known values from database
+          const latest = await getLatestLog(String(telemetry.device_id));
+          const lastTx = latest?.total_tx_bytes ? Number(latest.total_tx_bytes) : 0;
+          const lastRx = latest?.total_rx_bytes ? Number(latest.total_rx_bytes) : 0;
+          
+          telemetry.counters.total_tx_bytes = lastTx;
+          telemetry.counters.total_rx_bytes = lastRx;
+          
+          if (lastTx > 0 || lastRx > 0) {
+            logger.debug(`Device ${telemetry.device_id} reports zero counters, using last known: tx=${lastTx}, rx=${lastRx}`);
           }
         }
         
