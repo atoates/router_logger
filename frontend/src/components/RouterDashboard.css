@@ -376,11 +376,11 @@ body.dark-mode .muted{color:#64748b}
 }
 
 .uptime-tick.unknown {
-  background: linear-gradient(to top, #f97316, #fb923c);
+  background: linear-gradient(to top, #fed7aa, #fdba74);
 }
 
 .uptime-strip-empty {
-  color: #f97316;
+  color: #fb923c;
   font-size: 12px;
   text-align: center;
   padding: 4px;
@@ -416,7 +416,7 @@ body.dark-mode .muted{color:#64748b}
 }
 
 .uptime-strip-label .dot.unknown {
-  background: #f97316;
+  background: #fdba74;
 }
 
 .uptime-strip-range {
