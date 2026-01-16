@@ -467,10 +467,13 @@ async function startRMSSync(intervalMinutes = 15) {
   }, 5000); // 5 second delay
 
   // Then run on schedule
-  syncIntervalId = setInterval(() => {
-    syncFromRMS().catch(error => {
-      logger.error('Scheduled RMS sync failed:', error.message);
-    });
+  syncIntervalId = setInterval(async () => {
+    try {
+      await syncFromRMS();
+    } catch (error) {
+      logger.error('Scheduled RMS sync failed:', error.message, error.stack);
+      // Don't let errors stop future syncs - the interval continues
+    }
   }, intervalMs);
 
   return syncIntervalId;
