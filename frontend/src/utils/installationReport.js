@@ -214,12 +214,13 @@ export async function generateInstallationReport({ router, stats, logs, gpsLocat
   addInfoRow('Captured:', (() => {
     const d = new Date(gpsLocation.timestamp);
     return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  }));
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  })());
   
   y += 6;
   
