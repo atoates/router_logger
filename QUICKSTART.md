@@ -254,6 +254,117 @@ POST /api/router-properties/assign
 
 ---
 
+## 📡 Guest WiFi / RADIUS Setup
+
+### Overview
+
+RouterLogger integrates with a self-hosted RADIUS server for guest WiFi authentication and tracking. This replaces the deprecated IronWifi integration (removed Dec 2024).
+
+### Architecture
+
+```
+Teltonika Router (CoovaChilli) → FreeRADIUS (VPS) → MariaDB
+                                       ↓
+                                   Webhooks
+                                       ↓
+                             RouterLogger (Railway)
+                                       ↓
+                          PostgreSQL (guest sessions)
+```
+
+### Setup Steps
+
+**1. Deploy RADIUS Server**
+
+The RADIUS server runs on a separate VPS (DigitalOcean/Vultr):
+
+```bash
+# See detailed setup guide
+cd radius-server
+cat README.md
+```
+
+**Key components:**
+- FreeRADIUS - Authentication & accounting
+- MariaDB - User database & session storage
+- Captive Portal - Guest login page
+- daloRADIUS - Admin interface
+
+**2. Configure Environment Variables**
+
+Add to **Backend Service** in Railway:
+
+```env
+# RADIUS database connection (for accounting sync)
+RADIUS_DB_HOST=134.122.101.195
+RADIUS_DB_PORT=3306
+RADIUS_DB_USER=radius
+RADIUS_DB_PASS=your-radius-db-password
+RADIUS_DB_NAME=radius
+```
+
+**3. Configure Routers**
+
+See [radius-server/docs/TELTONIKA-SETUP.md](radius-server/docs/TELTONIKA-SETUP.md) for:
+- CoovaChilli configuration
+- RADIUS server IP/secret setup
+- UAM (Universal Access Method) configuration
+
+### Features
+
+- ✅ Guest registration via captive portal
+- ✅ RADIUS accounting sync (every 2 minutes)
+- ✅ Session tracking (start/end, duration, data usage)
+- ✅ Router matching by MAC address (fuzzy matching for Teltonika)
+- ✅ Guest WiFi dashboard with session history
+- ✅ Data usage monitoring per guest
+
+### Webhook Endpoint
+
+The RADIUS server sends events to:
+```
+POST /api/guests/captive-portal/event
+```
+
+Event types:
+- `registration_completed` - Guest registered
+- `guest_login` - Session start
+- `guest_logout` - Session end
+- `radius_accounting` - Accounting update (bytes, duration)
+
+### Monitoring
+
+**View RADIUS Status:**
+```bash
+# Check accounting sync
+curl https://your-backend.railway.app/api/guests/radius-status
+
+# View guest sessions
+curl https://your-backend.railway.app/api/guests/sessions
+```
+
+**Check RADIUS Server:**
+```bash
+# SSH to VPS
+ssh root@134.122.101.195
+
+# View FreeRADIUS logs
+docker logs freeradius --tail=100
+
+# Check accounting data
+docker exec radius-db mysql -u radius -p radius \
+  -e "SELECT username, acctinputoctets, acctoutputoctets FROM radacct ORDER BY acctstarttime DESC LIMIT 10;"
+```
+
+### Documentation
+
+- [RADIUS Server Setup](../radius-server/README.md)
+- [Teltonika Router Setup](../radius-server/docs/TELTONIKA-SETUP.md)
+- [Migration from IronWifi](../radius-server/docs/MIGRATION-GUIDE.md)
+- [RADIUS Shared Secret Setup](../radius-server/docs/RADIUS-SHARED-SECRET.md)
+
+---
+
 ## 💻 Local Development
 
 ### Backend Setup

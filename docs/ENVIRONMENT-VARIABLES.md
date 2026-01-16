@@ -48,58 +48,38 @@ RMS_SYNC_INTERVAL_MINUTES=5
 # RMS_OAUTH_SCOPES="devices:read monitoring:read statistics:read company_device_statistics:read"
 ```
 
-### IronWifi Integration - Webhook (✅ Recommended)
+### IronWifi Integration (⚠️ DEPRECATED - December 2024)
+
+**This integration has been replaced with self-hosted RADIUS/captive portal.**
+
+IronWifi was deprecated in December 2024 due to unreliable webhooks. The system now uses a self-hosted FreeRADIUS server with custom captive portal for guest WiFi tracking.
+
+**For new installations**: Skip this section and use [Self-Hosted RADIUS Server Integration](#self-hosted-radius-server-integration) below.
+
+**Legacy webhook endpoint** (`/api/ironwifi/webhook`) is kept for backwards compatibility but should not be used for new deployments.
+
+**See [Migration Guide](../radius-server/docs/MIGRATION-GUIDE.md)** for migrating from IronWifi to self-hosted RADIUS.
+
+### Self-Hosted RADIUS Server Integration (✅ Recommended for Guest WiFi)
+
+The RouterLogger backend connects to your self-hosted RADIUS server (FreeRADIUS + MariaDB) to sync guest WiFi session data and RADIUS accounting information.
+
+**Architecture**: The RADIUS server runs on a separate VPS (DigitalOcean) and sends webhook events to RouterLogger. RouterLogger also polls the RADIUS database every 2 minutes for accounting updates (bytes uploaded/downloaded, session duration).
+
+**See [RADIUS Server Setup Guide](../../radius-server/README.md) for complete installation instructions.**
+
+**Environment Variables**:
 
 ```bash
-# IronWifi webhook integration (NO API KEY NEEDED!)
-# Simply configure webhook in IronWifi Console:
-# Reports → Report Scheduler → New Report
-# - Type: RADIUS Accounting
-# - Delivery: Webhook
-# - URL: https://your-backend.railway.app/api/ironwifi/webhook
-# - Frequency: Hourly
-
-# No environment variables required for webhook!
-# Data flows automatically when IronWifi sends reports
+# RADIUS database connection (MariaDB on VPS)
+RADIUS_DB_HOST=134.122.101.195          # VPS IP address
+RADIUS_DB_PORT=3306                      # MySQL/MariaDB port
+RADIUS_DB_USER=radius                    # RADIUS database user
+RADIUS_DB_PASS=your-radius-db-password   # Database password
+RADIUS_DB_NAME=radius                    # Database name (default: radius)
 ```
 
-### IronWifi Integration - API Polling (Alternative)
-
-```bash
-# IronWifi API key (from IronWifi Console → Account → API Keys)
-IRONWIFI_API_KEY=your-api-key-from-ironwifi-console
-
-# IMPORTANT: Use your regional API URL (check top-right of IronWifi Console)
-# Examples: europe-west2, us-east1, etc.
-IRONWIFI_API_URL=https://europe-west2.ironwifi.com/api
-
-# Sync interval in minutes (default: 15)
-IRONWIFI_SYNC_INTERVAL_MINUTES=15
-
-# Hourly API call limit for rate limiting (default: 1000)
-IRONWIFI_HOURLY_LIMIT=1000
-
-# SSL certificate validation (set to 'false' if certificate issues)
-IRONWIFI_REJECT_UNAUTHORIZED=false
-
-# Hour of day to run daily deduplication (0-23, default: 3 = 3 AM)
-IRONWIFI_DEDUPLICATION_HOUR=3
-```
-
-**Important**: The API provides guest data (username, name, auth time) but NOT the `Called-Station-Id` (router MAC). For linking guests to specific routers, you MUST configure the IronWifi **webhook** which sends RADIUS accounting data.
-
-**Deduplication**: The system automatically removes duplicate guest records daily. Duplicates are identified by matching username or email. When duplicates are found, the most recent record is kept and data from others is merged (MAC addresses, auth counts, etc.).
-
-### Self-Hosted RADIUS Server Integration
-
-```bash
-# RADIUS database connection (for self-hosted FreeRADIUS)
-RADIUS_DB_HOST=134.122.101.195
-RADIUS_DB_PORT=3306
-RADIUS_DB_USER=radius
-RADIUS_DB_PASS=your-radius-db-password
-RADIUS_DB_NAME=radius
-```
+**Note**: These credentials allow read-only access to RADIUS accounting data. The RouterLogger backend never writes to the RADIUS database.
 
 ### ClickUp Integration
 

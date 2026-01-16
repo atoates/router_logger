@@ -111,7 +111,7 @@ RADIUS_DB_PASSWORD=your-secure-radius-password
 RADIUS_SECRET=your-shared-secret-for-routers
 
 # RouterLogger Integration
-ROUTERLOGGER_WEBHOOK_URL=https://your-backend.railway.app/api/ironwifi/webhook
+ROUTERLOGGER_WEBHOOK_URL=https://your-backend.railway.app/api/guests/captive-portal/event
 ROUTERLOGGER_API_URL=https://your-backend.railway.app
 
 # Captive Portal
@@ -248,16 +248,20 @@ ORDER BY date DESC;
 
 ## 🔄 RouterLogger Integration
 
-The RADIUS server sends accounting data to RouterLogger via webhooks, maintaining compatibility with the existing IronWifi integration.
+The RADIUS server sends guest WiFi events and accounting data to RouterLogger via webhooks.
 
 ### Webhook Events
 
+The captive portal and FreeRADIUS send events to RouterLogger's guest WiFi webhook endpoint at `/api/guests/captive-portal/event`.
+
+**Note**: The legacy endpoint `/api/ironwifi/webhook` is also supported for backwards compatibility (IronWifi was replaced in Dec 2024).
+
 | Event | Endpoint | Data |
 |-------|----------|------|
-| Auth Success | `/api/ironwifi/webhook` | username, mac, router_mac, timestamp |
-| Session Start | `/api/ironwifi/webhook` | session_id, username, start_time |
-| Session Update | `/api/ironwifi/webhook` | session_id, bytes_in, bytes_out |
-| Session End | `/api/ironwifi/webhook` | session_id, duration, total_bytes |
+| Auth Success | `/api/guests/captive-portal/event` | username, mac, router_mac, timestamp |
+| Session Start | `/api/guests/captive-portal/event` | session_id, username, start_time |
+| Session Update | `/api/guests/captive-portal/event` | session_id, bytes_in, bytes_out |
+| Session End | `/api/guests/captive-portal/event` | session_id, duration, total_bytes |
 
 ## 🛠️ Troubleshooting
 

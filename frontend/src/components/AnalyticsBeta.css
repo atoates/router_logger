@@ -367,13 +367,14 @@
 
 .detail-label {
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .detail-value {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--accent-primary, #6366f1);
   font-variant-numeric: tabular-nums;
 }
 

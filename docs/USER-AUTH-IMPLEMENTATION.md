@@ -239,7 +239,8 @@ Get user's login history.
 
 ### Public (No Auth Required)
 - `POST /api/log` - MQTT telemetry ingestion
-- `POST /api/ironwifi/webhook` - IronWifi webhook receiver
+- `POST /api/guests/captive-portal/event` - Guest WiFi webhook (RADIUS/captive portal)
+- `POST /api/ironwifi/webhook` - Guest WiFi webhook (deprecated, kept for compatibility)
 - `GET /health` - Health check
 - `GET /` - API info
 

@@ -775,8 +775,8 @@ export default function AnalyticsBeta({ onOpenRouter }) {
         </div>
         <div className="beta-controls">
           <TimeRangeSelector selected={timeRange} onChange={setTimeRange} />
-          <button className="refresh-btn" onClick={loadData} disabled={loading}>
-            {loading ? '⏳' : '↻'} {loading ? 'Loading...' : 'Refresh'}
+          <button className="refresh-btn" onClick={loadData} disabled={loading} title={loading ? 'Loading...' : 'Refresh'}>
+            {loading ? '⏳' : '↻'}
           </button>
         </div>
       </div>
@@ -842,8 +842,14 @@ export default function AnalyticsBeta({ onOpenRouter }) {
               icon="⚡" 
               label="Data Rate"
               value={`${formatBytes(dataMetrics.current / timeRange.hours)}/hr`}
-              subValue={`£${((dataMetrics.current / 1e6) * 0.0022).toFixed(2)} total cost`}
               color={COLORS.purple}
+            />
+            <StatCard 
+              icon="👥" 
+              label="Guest Users"
+              value={formatNumber(guestStats?.summary?.unique_guests || 0)}
+              subValue={`${formatNumber(guestStats?.summary?.total_sessions || 0)} sessions`}
+              color={COLORS.success}
             />
           </div>
         </div>

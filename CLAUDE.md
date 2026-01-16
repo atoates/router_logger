@@ -108,7 +108,10 @@ System matches routers by MAC address with fuzzy matching on first 5 octets (Tel
 - `backend/src/routes/guestWifi.js` - Guest WiFi webhook + session queries
 
 ### Frontend
-- `frontend/src/components/GuestWifi.js` - Guest WiFi dashboard
+- `frontend/src/components/AnalyticsBeta.js` - Main Dashboard tab (renamed from "Beta" to "Dashboard" in UI)
+- `frontend/src/components/GuestWifi.js` - Guest WiFi/Users dashboard
+- `frontend/src/components/DashboardV3.js` - Legacy dashboard
+- `frontend/src/components/RouterDashboard.js` - Individual router detail page
 
 ### RADIUS Server
 - `radius-server/config/freeradius/` - FreeRADIUS configuration

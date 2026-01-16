@@ -13,7 +13,7 @@ See `docs/README.md` for the documentation index.
 - **Cell Tower Geolocation**: Approximate GPS coordinates from cell tower information
 - **Data Usage Tracking**: Monitor data sent/received with delta calculations
 - **Signal Quality Monitoring**: Track RSRP, RSRQ, RSSI, and SINR metrics
-- **WiFi User Analytics**: Track connected users, session duration, and bandwidth per router
+- **Guest WiFi Analytics**: Self-hosted RADIUS/captive portal with session tracking, RADIUS accounting sync, and data usage monitoring per guest
 - **Interactive Dashboards**: Beautiful charts and graphs for data visualization
 - **Export Capabilities**: Generate CSV and PDF reports for any date range
 - **ClickUp Integration**: Property tracking and smart sync for work orders
@@ -22,17 +22,23 @@ See `docs/README.md` for the documentation index.
 ## 📋 Architecture
 
 ```
-RUT200 Routers (100+)
-    ↓ (MQTT/HTTPS)
-    ↓
-Ingestion Layer (Node.js/Express)
-    ↓
-PostgreSQL Database
-    ↓
-REST API
-    ↓
-React Dashboard (Recharts visualization)
+RUT200 Routers (100+)                    Self-Hosted RADIUS Server
+    ↓ (MQTT/HTTPS)                           ↓ (Webhooks + DB Sync)
+    ↓                                        ↓
+    ↓                                   FreeRADIUS + MariaDB
+    ↓                                   Captive Portal (Node.js)
+    ↓                                        ↓
+    └────────────► Ingestion Layer ◄─────────┘
+                   (Node.js/Express)
+                          ↓
+                   PostgreSQL Database
+                          ↓
+                       REST API
+                          ↓
+              React Dashboard (Recharts)
 ```
+
+**Guest WiFi**: Teltonika routers with CoovaChilli connect to self-hosted FreeRADIUS for authentication. Guest sessions and RADIUS accounting data sync to RouterLogger every 2 minutes.
 
 ## 🚀 Quick Start
 
