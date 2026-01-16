@@ -573,14 +573,14 @@ body.dark-mode .muted{color:#64748b}
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #64748b;
+  color: #64748b !important;
   font-weight: 600;
 }
 
 .device-value {
   font-size: 12px;
   font-weight: 600;
-  color: #0f172a;
+  color: #0f172a !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
