@@ -388,18 +388,45 @@ async function processRouterTelemetry(data) {
             
             // Also update Last Online field when router comes online
             if (newStatusNormalized === 'online') {
-              await clickupClient.updateCustomField(
-                clickupTaskId,
-                CLICKUP_FIELD_IDS.LAST_ONLINE,
-                new Date(logData.timestamp).getTime(), // ClickUp expects timestamp in milliseconds
-                'default'
-              );
+              const timestampMs = new Date(logData.timestamp).getTime();
               
-              logger.info('Updated Last Online field in ClickUp', {
+              logger.info('[LAST_ONLINE_DEBUG] About to update Last Online field', {
                 routerId: data.device_id,
                 clickupTaskId,
-                lastOnline: new Date(logData.timestamp).toISOString()
+                fieldId: CLICKUP_FIELD_IDS.LAST_ONLINE,
+                rawTimestamp: logData.timestamp,
+                timestampMs,
+                timestampISO: new Date(logData.timestamp).toISOString(),
+                valueType: typeof timestampMs
               });
+              
+              try {
+                const result = await clickupClient.updateCustomField(
+                  clickupTaskId,
+                  CLICKUP_FIELD_IDS.LAST_ONLINE,
+                  timestampMs, // ClickUp expects timestamp in milliseconds
+                  'default'
+                );
+                
+                logger.info('[LAST_ONLINE_DEBUG] Successfully updated Last Online field in ClickUp', {
+                  routerId: data.device_id,
+                  clickupTaskId,
+                  timestampMs,
+                  lastOnline: new Date(logData.timestamp).toISOString(),
+                  resultData: result
+                });
+              } catch (lastOnlineError) {
+                logger.error('[LAST_ONLINE_DEBUG] Failed to update Last Online field', {
+                  routerId: data.device_id,
+                  clickupTaskId,
+                  fieldId: CLICKUP_FIELD_IDS.LAST_ONLINE,
+                  timestampMs,
+                  error: lastOnlineError.message,
+                  status: lastOnlineError.response?.status,
+                  responseData: lastOnlineError.response?.data
+                });
+                throw lastOnlineError; // Re-throw to be caught by outer catch
+              }
             }
             
             logger.info('Immediately updated Operational Status field in ClickUp', {

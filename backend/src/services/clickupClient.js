@@ -446,22 +446,32 @@ class ClickUpClient {
       try {
         const client = await this.getAuthorizedClient(userId);
         
-        logger.info('ClickUp updateCustomField request:', {
+        // Enhanced logging for Last Online field
+        const isLastOnlineField = fieldId === '684e19a1-06c3-4bfd-94dd-6aca4a9b85fe';
+        const logLevel = isLastOnlineField ? 'info' : 'debug';
+        
+        logger[logLevel](`${isLastOnlineField ? '[LAST_ONLINE_DEBUG] ' : ''}ClickUp updateCustomField request:`, {
           taskId,
           fieldId,
+          fieldName: isLastOnlineField ? 'LAST_ONLINE' : 'unknown',
           value,
-          valueType: typeof value
+          valueType: typeof value,
+          valueAsDate: typeof value === 'number' ? new Date(value).toISOString() : null,
+          apiEndpoint: `/task/${taskId}/field/${fieldId}`,
+          attempt
         });
         
         const response = await client.post(`/task/${taskId}/field/${fieldId}`, { value });
         
         trackClickUpCall('updateCustomField', response.status, isRetry);
         
-        logger.info('ClickUp updateCustomField response:', {
+        logger[logLevel](`${isLastOnlineField ? '[LAST_ONLINE_DEBUG] ' : ''}ClickUp updateCustomField response:`, {
           taskId,
           fieldId,
+          fieldName: isLastOnlineField ? 'LAST_ONLINE' : 'unknown',
           status: response.status,
-          hasData: !!response.data
+          hasData: !!response.data,
+          responseData: isLastOnlineField ? response.data : undefined
         });
         
         return response.data;

@@ -201,9 +201,24 @@ async function syncRouterToClickUp(router, dataUsageMap = {}, force = false) {
 
     // Last Online (date timestamp in milliseconds)
     if (router.last_seen) {
+      const timestampMs = new Date(router.last_seen).getTime();
+      logger.info('[LAST_ONLINE_DEBUG] Adding Last Online to sync payload', {
+        routerId: router.router_id,
+        fieldId: CUSTOM_FIELDS.LAST_ONLINE,
+        rawLastSeen: router.last_seen,
+        timestampMs,
+        timestampISO: new Date(router.last_seen).toISOString(),
+        valueType: typeof timestampMs
+      });
+      
       customFields.push({
         id: CUSTOM_FIELDS.LAST_ONLINE,
-        value: new Date(router.last_seen).getTime()
+        value: timestampMs
+      });
+    } else {
+      logger.warn('[LAST_ONLINE_DEBUG] Router has no last_seen value', {
+        routerId: router.router_id,
+        lastSeen: router.last_seen
       });
     }
 
@@ -948,9 +963,24 @@ async function autoCreateClickUpTask(router) {
 
     // Last Online (date timestamp in milliseconds)
     if (router.last_seen) {
+      const timestampMs = new Date(router.last_seen).getTime();
+      logger.info('[LAST_ONLINE_DEBUG] Adding Last Online to creation payload', {
+        routerId: router.router_id,
+        fieldId: CUSTOM_FIELDS.LAST_ONLINE,
+        rawLastSeen: router.last_seen,
+        timestampMs,
+        timestampISO: new Date(router.last_seen).toISOString(),
+        valueType: typeof timestampMs
+      });
+      
       customFields.push({
         id: CUSTOM_FIELDS.LAST_ONLINE,
-        value: new Date(router.last_seen).getTime()
+        value: timestampMs
+      });
+    } else {
+      logger.warn('[LAST_ONLINE_DEBUG] Router has no last_seen value in creation', {
+        routerId: router.router_id,
+        lastSeen: router.last_seen
       });
     }
 
