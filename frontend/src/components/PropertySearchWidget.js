@@ -85,7 +85,7 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
       setSearching(true);
       try {
         // Get the space's folder structure with all lists
-        const res = await api.get(`/clickup/debug/space-lists/${spaceId}`);
+        const res = await api.get(`/clickup/space-lists/${spaceId}`);
         const data = res.data;
         
         // Extract all lists from all folders
