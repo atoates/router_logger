@@ -76,7 +76,8 @@ const TIME_RANGES = [
   { label: '24H', hours: 24, days: 1 },
   { label: '7D', hours: 168, days: 7 },
   { label: '30D', hours: 720, days: 30 },
-  { label: '90D', hours: 2160, days: 90 }
+  { label: '90D', hours: 2160, days: 90 },
+  { label: '1Y', hours: 8760, days: 365 }
 ];
 
 // ============================================================================
@@ -285,6 +286,18 @@ function FleetMap({ routers, onRouterClick }) {
 }
 
 function DataUsageChart({ data, dark }) {
+  // Early return for empty data
+  if (!data || data.length === 0) {
+    return (
+      <div className="beta-chart-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 280, color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '12px' }}>📊</div>
+          <div>No data available for this time period</div>
+        </div>
+      </div>
+    );
+  }
+  
   // Calculate max value and appropriate unit for Y axis
   const maxBytes = Math.max(...data.map(d => Math.max(d.tx_bytes || 0, d.rx_bytes || 0)), 1);
   
@@ -675,6 +688,8 @@ export default function AnalyticsBeta({ onOpenRouter }) {
     try {
       const { hours, days } = timeRange;
       
+      console.log('AnalyticsBeta loadData - Starting data fetch for timeRange:', timeRange);
+      
       // Parallel data fetching
       const [
         routersRes,
@@ -685,7 +700,10 @@ export default function AnalyticsBeta({ onOpenRouter }) {
         statusRes
       ] = await Promise.all([
         getRouters(),
-        getNetworkUsageRolling({ hours, bucket: hours <= 24 ? 'hour' : 'day' }),
+        getNetworkUsageRolling({ hours, bucket: hours <= 24 ? 'hour' : 'day' }).catch(err => {
+          console.error('AnalyticsBeta - getNetworkUsageRolling failed:', err);
+          return { data: [] };
+        }),
         getTopRoutersRolling({ hours, limit: 8 }),
         getOperators({ days }),
         getGuestWifiStats(days).catch(() => ({ data: null })),
@@ -693,6 +711,12 @@ export default function AnalyticsBeta({ onOpenRouter }) {
       ]);
 
       setRouters(routersRes.data || []);
+      
+      // Debug logging for 24H issue
+      console.log('AnalyticsBeta loadData - hours:', hours, 'bucket:', hours <= 24 ? 'hour' : 'day');
+      console.log('AnalyticsBeta loadData - usageRes.data length:', usageRes.data?.length || 0);
+      console.log('AnalyticsBeta loadData - usageRes.data:', usageRes.data);
+      
       setUsage(usageRes.data || []);
       
       // Fetch previous period for comparison (optional - don't block on failure)

@@ -81,6 +81,8 @@ export default function RouterDashboard({ router }) {
       // Calculate days for guest query based on selected date range
       const daysDiff = Math.max(1, Math.ceil((new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24)));
       try {
+        console.log('RouterDashboard - Loading data for router:', routerId, 'range:', range, 'start:', start, 'end:', end);
+        
         const [logsRes, statsRes, upRes, inspRes, guestsRes] = await Promise.all([
           getLogs({ router_id: routerId, start_date: start, end_date: end, limit: 5000 }),
           getUsageStats({ router_id: routerId, start_date: start, end_date: end }),
@@ -88,6 +90,10 @@ export default function RouterDashboard({ router }) {
           getInspectionHistory(routerId),
           getGuestsByRouter(routerId, 500, daysDiff).catch(() => ({ data: { guests: [] } }))
         ]);
+        
+        console.log('RouterDashboard - Logs received:', logsRes.data?.length || 0, 'logs');
+        console.log('RouterDashboard - Uptime data points:', upRes.data?.length || 0);
+        
         // Ignore if a newer load started or component unmounted
         if (!mounted || seq !== loadSeqRef.current) return;
         setLogs(Array.isArray(logsRes.data) ? logsRes.data : []);
@@ -775,6 +781,24 @@ export default function RouterDashboard({ router }) {
           </div>
         )}
         
+        {/* Empty state for chart */}
+        {(!series.txrx || series.txrx.length === 0) ? (
+          <div style={{ 
+            height: 260, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: '12px',
+            color: '#6b7280'
+          }}>
+            <div style={{ fontSize: '48px' }}>📊</div>
+            <div style={{ fontSize: '16px', fontWeight: '500' }}>No data available</div>
+            <div style={{ fontSize: '14px', color: '#9ca3af' }}>
+              No logs found for this time period ({label})
+            </div>
+          </div>
+        ) : (
         <div style={{ height: 260 }}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={series.txrx} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -850,6 +874,7 @@ export default function RouterDashboard({ router }) {
             </AreaChart>
           </ResponsiveContainer>
         </div>
+        )}
       </div>
 
       <div className="card">

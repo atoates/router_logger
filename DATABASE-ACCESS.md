@@ -1,6 +1,8 @@
-# DATABASE ACCESS - CRITICAL REMINDER
+# IMPORTANT REMINDERS FOR AI ASSISTANT
 
-## ⚠️ DO NOT USE `psql $DATABASE_URL` - IT WILL ALWAYS FAIL
+## 🗄️ DATABASE ACCESS - CRITICAL REMINDER
+
+### ⚠️ DO NOT USE `psql $DATABASE_URL` - IT WILL ALWAYS FAIL
 
 The database is **NOT** running locally. It's hosted on **Railway**.
 
@@ -37,3 +39,27 @@ OR use the backend API/models if you need programmatic access
 
 ---
 **REMEMBER THIS - STOP TRYING LOCAL PSQL CONNECTIONS!**
+
+---
+
+## 🐛 DEBUG ENDPOINTS
+
+### ⚠️ `/api/clickup/debug/*` endpoints are DISABLED in production
+
+All endpoints under `/api/clickup/debug/*` require the environment variable:
+```
+ENABLE_DEBUG_ENDPOINTS=true
+```
+
+This is **NOT set** on Railway production, so these endpoints return 404.
+
+### ✅ Use Production-Safe Alternatives:
+
+| ❌ Debug Endpoint (404 in prod) | ✅ Production Endpoint |
+|----------------------------------|------------------------|
+| `/api/clickup/debug/space-lists/:spaceId` | `/api/clickup/space-lists/:spaceId` |
+
+**Example Fix Applied**: PropertySearchWidget was calling the debug endpoint and failing with "Failed to search properties". Fixed by changing to the non-debug version.
+
+---
+**CHECK THESE REMINDERS BEFORE DEBUGGING ISSUES!**
