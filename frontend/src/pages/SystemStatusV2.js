@@ -580,9 +580,14 @@ export default function SystemStatusV2() {
               <span className="health-label">PostgreSQL</span>
             </div>
 
-            <div className={`health-item ${data.rmsStatus?.enabled ? 'healthy' : 'warning'}`}>
+            <div className={`health-item ${data.rmsStatus?.healthy ? 'healthy' : (data.rmsStatus?.enabled ? 'warning' : 'error')}`}>
               <div className="health-indicator"></div>
               <span className="health-label">RMS Sync</span>
+              {data.rmsStatus?.enabled && !data.rmsStatus?.healthy && (
+                <span className="health-detail" style={{ fontSize: '0.7rem', color: '#f59e0b', display: 'block' }}>
+                  Stale data detected
+                </span>
+              )}
             </div>
 
             <div className={`health-item ${data.clickupStatus?.connected ? 'healthy' : 'warning'}`}>

@@ -564,13 +564,37 @@ router.get('/status', async (req, res) => {
   const { getRMSSyncStats } = require('../services/rmsSync');
   const syncStats = getRMSSyncStats();
   
+  // Query actual last log from database (not in-memory stats which reset on deploy)
+  let lastLogFromDB = null;
+  let syncHealthy = false;
+  const syncIntervalMinutes = parseInt(process.env.RMS_SYNC_INTERVAL_MINUTES || '15', 10);
+  const staleThresholdMinutes = syncIntervalMinutes * 3; // Allow 3x interval before marking unhealthy
+  
+  try {
+    const result = await pool.query(
+      'SELECT MAX(timestamp) as last_log FROM router_logs'
+    );
+    lastLogFromDB = result.rows[0]?.last_log || null;
+    
+    if (lastLogFromDB) {
+      const minutesSinceLastLog = (Date.now() - new Date(lastLogFromDB).getTime()) / 60000;
+      syncHealthy = minutesSinceLastLog < staleThresholdMinutes;
+    }
+  } catch (err) {
+    logger.error('Failed to query last log time for status', { error: err.message });
+  }
+  
   res.json({
     enabled: rmsEnabled,
-    syncInterval: process.env.RMS_SYNC_INTERVAL_MINUTES || 5,
+    syncInterval: syncIntervalMinutes,
     tokenType: hasOAuth ? 'oauth' : (hasPat ? 'pat' : 'none'),
     message: rmsEnabled 
       ? `RMS integration is enabled via ${hasOAuth ? 'OAuth' : 'PAT'}` 
       : 'RMS integration is disabled (no token)',
+    // New health status based on actual database data
+    healthy: syncHealthy,
+    lastLogFromDB,
+    staleThresholdMinutes,
     syncStats: {
       lastSyncTime: syncStats.lastSyncTime,
       lastSyncSuccess: syncStats.lastSyncSuccess,
