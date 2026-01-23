@@ -382,8 +382,12 @@ async function getOperatorDistribution(days = 7) {
 async function getNetworkUsageRolling(hours = 24, bucket = 'hour') {
   try {
     const hrs = Math.max(1, Math.min(24 * 30, Number(hours) || 24));
-    // Validate bucket to prevent SQL injection - only allow 'day' or 'hour'
-    const buck = bucket === 'day' ? 'day' : 'hour';
+    
+    // SECURITY: Whitelist valid bucket values to prevent SQL injection
+    // PostgreSQL's date_trunc doesn't support parameterized identifiers
+    const VALID_BUCKETS = ['hour', 'day'];
+    const buck = VALID_BUCKETS.includes(bucket) ? bucket : 'hour';
+    
     const query = `
       WITH params AS (
         SELECT NOW() - ($1::int || ' hours')::interval AS start_ts
