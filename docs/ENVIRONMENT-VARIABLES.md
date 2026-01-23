@@ -100,6 +100,21 @@ CLICKUP_AUTO_CREATE_TASKS=true
 CLICKUP_SYNC_INTERVAL_MINUTES=30
 ```
 
+### Cell Tower Geolocation (Unwired Labs)
+
+```bash
+# Unwired Labs API key for cell tower geolocation
+# Get your API key from https://unwiredlabs.com/ (free tier: 100 requests/day)
+LOCATION_API=your_unwiredlabs_api_token
+
+# Rate limiting (optional, defaults shown)
+LOCATION_API_DAILY_LIMIT=100   # Max API calls per day
+LOCATION_API_MINUTE_LIMIT=10   # Max API calls per minute
+```
+
+**Note**: Cell tower lookups are cached for 24 hours (cell towers don't move). 
+Rate limiting prevents excessive API usage - when limits are reached, lookups are skipped silently.
+
 ### MQTT (Optional - for router push)
 
 ```bash

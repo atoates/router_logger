@@ -8,6 +8,7 @@ import {
   getStorageStats,
   getRMSUsage,
   getClickUpUsage,
+  getLocationUsage,
   getRouterStatusSummary,
   getClickUpAuthStatus,
   getNetworkUsageRolling,
@@ -48,6 +49,7 @@ export default function SystemStatusV2() {
     storage: null,
     rmsUsage: null,
     clickupUsage: null,
+    locationUsage: null,
     rmsStatus: null,
     clickupStatus: null,
     apiHealth: null,
@@ -68,6 +70,7 @@ export default function SystemStatusV2() {
         storageRes,
         rmsUsageRes,
         clickupUsageRes,
+        locationUsageRes,
         clickupAuthRes,
         rmsStatusRes,
         dbHealthRes,
@@ -81,6 +84,7 @@ export default function SystemStatusV2() {
         getStorageStats({ sample_size: 500 }),
         getRMSUsage(),
         getClickUpUsage(),
+        getLocationUsage(),
         getClickUpAuthStatus(),
         api.get('/rms/status'),
         api.get('/monitoring/db-health'),
@@ -96,6 +100,7 @@ export default function SystemStatusV2() {
         storage: storageRes.status === 'fulfilled' ? storageRes.value.data : null,
         rmsUsage: rmsUsageRes.status === 'fulfilled' ? rmsUsageRes.value.data : null,
         clickupUsage: clickupUsageRes.status === 'fulfilled' ? clickupUsageRes.value.data : null,
+        locationUsage: locationUsageRes.status === 'fulfilled' ? locationUsageRes.value.data : null,
         clickupStatus: clickupAuthRes.status === 'fulfilled' ? clickupAuthRes.value.data : null,
         rmsStatus: rmsStatusRes.status === 'fulfilled' ? rmsStatusRes.value.data : null,
         dbHealth: dbHealthRes.status === 'fulfilled' ? dbHealthRes.value.data : null,
@@ -491,7 +496,7 @@ export default function SystemStatusV2() {
       {/* ===== SECTION: API & INTEGRATIONS ===== */}
       <section className="status-section">
         <h2 className="section-title">API & Integrations</h2>
-        <div className="stats-grid three-col">
+        <div className="stats-grid four-col">
           {/* RMS Integration */}
           <div className="health-card">
             <div className="chart-header">
@@ -540,6 +545,37 @@ export default function SystemStatusV2() {
               </div>
               <div className="metric-sub">
                 {data.clickupUsage?.apiUsage?.last24Hours?.toLocaleString() || 0} calls in last 24h
+              </div>
+            </div>
+          </div>
+
+          {/* Unwired Labs (Cell Tower Geolocation) */}
+          <div className="health-card">
+            <div className="chart-header">
+              <h3 className="chart-title">Cell Tower API</h3>
+            </div>
+            <div className={`health-item ${data.locationUsage?.enabled ? (parseFloat(data.locationUsage?.apiUsage?.percentUsed || 0) > 80 ? 'warning' : 'healthy') : 'error'}`} style={{marginBottom: '16px'}}>
+              <div className="health-indicator"></div>
+              <span className="health-label">
+                {data.locationUsage?.enabled 
+                  ? (parseFloat(data.locationUsage?.apiUsage?.percentUsed || 0) > 80 ? 'Near Limit' : 'Active')
+                  : 'Not Configured'}
+              </span>
+            </div>
+            <div className="quota-section">
+              <div className="metric-row">
+                <span className="metric-label">Daily Quota Used</span>
+                <span className="metric-val">{data.locationUsage?.apiUsage?.percentUsed || '0'}%</span>
+              </div>
+              <div className="progress-bar-container">
+                <div
+                  className={`progress-bar ${parseFloat(data.locationUsage?.apiUsage?.percentUsed || 0) > 80 ? 'high' : ''}`}
+                  style={{ width: `${data.locationUsage?.apiUsage?.percentUsed || 0}%` }}
+                />
+              </div>
+              <div className="metric-sub">
+                {data.locationUsage?.apiUsage?.today || 0} / {data.locationUsage?.apiUsage?.dailyLimit || 100} calls today
+                {data.locationUsage?.apiUsage?.cacheHits > 0 && ` • ${data.locationUsage?.apiUsage?.cacheHits} cache hits`}
               </div>
             </div>
           </div>

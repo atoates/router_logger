@@ -95,6 +95,7 @@ export const getRouterLocationHistory = (routerId, params = {}) => api.get(`/rou
 // Monitoring
 export const getRMSUsage = () => api.get('/monitoring/rms-usage');
 export const getClickUpUsage = () => api.get('/monitoring/clickup-usage');
+export const getLocationUsage = () => api.get('/monitoring/location-usage');
 
 // Guest WiFi (Captive Portal)
 export const getGuestWifiStats = (days = 30) => api.get('/guests/stats', { params: { days } });

@@ -1,9 +1,108 @@
 const axios = require('axios');
-const { logger } = require('../config/database');
+const { logger, pool } = require('../config/database');
 
 // Simple in-memory cache for cell locations (avoids repeated API calls)
 const cellLocationCache = new Map();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours - cell towers don't move
+
+// Rate limiting for Unwired Labs API
+// Free tier: ~100 requests/day, Business plans vary
+const DAILY_LIMIT = parseInt(process.env.LOCATION_API_DAILY_LIMIT || '100', 10);
+const MINUTE_LIMIT = parseInt(process.env.LOCATION_API_MINUTE_LIMIT || '10', 10);
+
+// In-memory usage tracking (persisted to DB for dashboard)
+let apiUsageStats = {
+  today: 0,
+  todayDate: new Date().toDateString(),
+  thisMinute: 0,
+  minuteTimestamp: Date.now(),
+  totalCalls: 0,
+  successCount: 0,
+  errorCount: 0,
+  cacheHits: 0,
+  rateLimitHits: 0,
+  lastCallTime: null,
+  lastError: null
+};
+
+/**
+ * Check if we can make an API call (rate limiting)
+ */
+function canMakeApiCall() {
+  const now = Date.now();
+  const today = new Date().toDateString();
+  
+  // Reset daily counter if new day
+  if (apiUsageStats.todayDate !== today) {
+    apiUsageStats.today = 0;
+    apiUsageStats.todayDate = today;
+  }
+  
+  // Reset minute counter if new minute
+  if (now - apiUsageStats.minuteTimestamp > 60000) {
+    apiUsageStats.thisMinute = 0;
+    apiUsageStats.minuteTimestamp = now;
+  }
+  
+  // Check limits
+  if (apiUsageStats.today >= DAILY_LIMIT) {
+    return { allowed: false, reason: 'daily_limit', remaining: 0 };
+  }
+  if (apiUsageStats.thisMinute >= MINUTE_LIMIT) {
+    return { allowed: false, reason: 'minute_limit', remaining: DAILY_LIMIT - apiUsageStats.today };
+  }
+  
+  return { 
+    allowed: true, 
+    remaining: DAILY_LIMIT - apiUsageStats.today,
+    minuteRemaining: MINUTE_LIMIT - apiUsageStats.thisMinute
+  };
+}
+
+/**
+ * Record an API call (for tracking)
+ */
+async function recordApiCall(callType, statusCode, isError = false) {
+  apiUsageStats.totalCalls++;
+  apiUsageStats.today++;
+  apiUsageStats.thisMinute++;
+  apiUsageStats.lastCallTime = new Date();
+  
+  if (isError) {
+    apiUsageStats.errorCount++;
+  } else {
+    apiUsageStats.successCount++;
+  }
+  
+  // Log to database for persistent tracking
+  try {
+    await pool.query(
+      'INSERT INTO api_call_log (service, call_type, status_code) VALUES ($1, $2, $3)',
+      ['unwiredlabs', callType, statusCode]
+    );
+  } catch (err) {
+    logger.warn('Failed to log Unwired Labs API call:', err.message);
+  }
+}
+
+/**
+ * Get current API usage stats
+ */
+function getLocationApiStats() {
+  const today = new Date().toDateString();
+  if (apiUsageStats.todayDate !== today) {
+    apiUsageStats.today = 0;
+    apiUsageStats.todayDate = today;
+  }
+  
+  return {
+    ...apiUsageStats,
+    dailyLimit: DAILY_LIMIT,
+    minuteLimit: MINUTE_LIMIT,
+    dailyRemaining: DAILY_LIMIT - apiUsageStats.today,
+    percentUsed: ((apiUsageStats.today / DAILY_LIMIT) * 100).toFixed(1)
+  };
+}
 
 /**
  * Generate a cache key from cell info
@@ -83,7 +182,16 @@ async function getCellLocation(cellInfo) {
   const cached = cellLocationCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     logger.debug(`Cell location cache hit for ${cacheKey}`);
+    apiUsageStats.cacheHits++;
     return cached.data;
+  }
+
+  // Check rate limits before making API call
+  const rateCheck = canMakeApiCall();
+  if (!rateCheck.allowed) {
+    apiUsageStats.rateLimitHits++;
+    logger.warn(`Unwired Labs API rate limited (${rateCheck.reason}). Remaining today: ${rateCheck.remaining || 0}`);
+    return null;
   }
 
   try {
@@ -126,6 +234,9 @@ async function getCellLocation(cellInfo) {
       headers: { 'Content-Type': 'application/json' }
     });
     
+    // Record the API call
+    await recordApiCall('geolocation', response.status, false);
+    
     // Check for successful response
     // status: "ok" = success, "error" = failure
     if (response.data && response.data.status === 'ok' && response.data.lat && response.data.lon) {
@@ -154,12 +265,19 @@ async function getCellLocation(cellInfo) {
     
     return null;
   } catch (error) {
+    // Record the failed API call
+    await recordApiCall('geolocation', error.response?.status || 0, true);
+    
     // Don't spam logs for rate limits or network issues
     if (error.response?.status === 429) {
+      apiUsageStats.rateLimitHits++;
+      apiUsageStats.lastError = 'API rate limit (429)';
       logger.warn('Unwired Labs rate limit reached');
     } else if (error.code === 'ECONNABORTED') {
+      apiUsageStats.lastError = 'Timeout';
       logger.warn('Unwired Labs API timeout');
     } else {
+      apiUsageStats.lastError = error.message;
       logger.error('Error fetching cell location from Unwired Labs:', { 
         message: error.message,
         status: error.response?.status 
@@ -229,5 +347,7 @@ module.exports = {
   getCellLocation,
   getIpLocation,
   clearLocationCache,
-  getLocationCacheStats
+  getLocationCacheStats,
+  getLocationApiStats,
+  canMakeApiCall
 };

@@ -327,6 +327,70 @@ router.get('/api/monitoring/clickup-usage', async (req, res) => {
   }
 });
 
+// Get Unwired Labs (cell tower geolocation) API usage metrics
+router.get('/api/monitoring/location-usage', async (req, res) => {
+  try {
+    const { getLocationApiStats, getLocationCacheStats } = require('../services/geoService');
+    
+    // Get in-memory stats
+    const stats = getLocationApiStats();
+    const cacheStats = getLocationCacheStats();
+    
+    // Get actual API calls from database (last 24 hours)
+    const last24hCalls = await pool.query(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status_code = 429) as rate_limit_hits,
+        COUNT(*) FILTER (WHERE status_code >= 400 OR status_code = 0) as errors
+      FROM api_call_log
+      WHERE service = 'unwiredlabs' 
+        AND timestamp >= NOW() - INTERVAL '24 hours'
+    `);
+    
+    // Get calls for last 7 days for trending
+    const last7dCalls = await pool.query(`
+      SELECT 
+        DATE(timestamp) as date,
+        COUNT(*) as count
+      FROM api_call_log
+      WHERE service = 'unwiredlabs' 
+        AND timestamp >= NOW() - INTERVAL '7 days'
+      GROUP BY DATE(timestamp)
+      ORDER BY date DESC
+    `);
+    
+    const dbStats = last24hCalls.rows[0];
+    const dailyLimit = stats.dailyLimit;
+    
+    res.json({
+      enabled: !!process.env.LOCATION_API,
+      apiUsage: {
+        today: stats.today,
+        dailyLimit: dailyLimit,
+        dailyRemaining: stats.dailyRemaining,
+        percentUsed: stats.percentUsed,
+        last24Hours: parseInt(dbStats.total) || 0,
+        rateLimitHits: parseInt(dbStats.rate_limit_hits) || 0,
+        errors: parseInt(dbStats.errors) || 0,
+        totalCalls: stats.totalCalls,
+        successCount: stats.successCount,
+        errorCount: stats.errorCount,
+        cacheHits: stats.cacheHits,
+        lastCallTime: stats.lastCallTime,
+        lastError: stats.lastError
+      },
+      cache: {
+        size: cacheStats.size,
+        maxAgeHours: cacheStats.maxAge / (1000 * 60 * 60)
+      },
+      history: last7dCalls.rows
+    });
+  } catch (error) {
+    logger.error('Error fetching location API monitoring data:', error);
+    res.status(500).json({ error: 'Failed to fetch location API monitoring data' });
+  }
+});
+
 // Reset metrics (for testing or monthly reset)
 router.post('/api/monitoring/reset-metrics', (req, res) => {
   apiMetrics = {
