@@ -206,6 +206,112 @@ router.get('/debug/custom-fields/:taskId', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/clickup/debug/list-tasks/:listId
+ * Explore tasks (properties) within a list (location)
+ * This shows the ClickUp hierarchy: List -> Tasks
+ */
+router.get('/debug/list-tasks/:listId', async (req, res) => {
+  try {
+    const { listId } = req.params;
+    const client = await clickupClient.getAuthorizedClient('default');
+
+    // First get the list info
+    const listRes = await client.get(`/list/${listId}`);
+    const list = listRes.data;
+
+    // Get tasks within this list
+    const tasksRes = await client.get(`/list/${listId}/task`, {
+      params: { archived: false, page: 0 }
+    });
+    const tasks = tasksRes.data.tasks || [];
+
+    res.json({
+      list: {
+        id: list.id,
+        name: list.name,
+        task_count: list.task_count,
+        folder: list.folder,
+        space: list.space
+      },
+      tasks: tasks.map(t => ({
+        id: t.id,
+        name: t.name,
+        status: t.status?.status,
+        url: t.url,
+        custom_fields_count: t.custom_fields?.length || 0
+      })),
+      first_task_full: tasks[0] || null
+    });
+  } catch (error) {
+    logger.error('Error getting list tasks:', sanitizeError(error));
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/clickup/debug/explore-hierarchy
+ * Full exploration of ClickUp hierarchy for first space with tasks
+ */
+router.get('/debug/explore-hierarchy', async (req, res) => {
+  try {
+    const client = await clickupClient.getAuthorizedClient('default');
+
+    // Get workspaces
+    const workspacesRes = await client.get('/team');
+    const workspaceId = workspacesRes.data.teams[0].id;
+
+    // Get spaces
+    const spacesRes = await client.get(`/team/${workspaceId}/space`);
+    const spaces = spacesRes.data.spaces;
+
+    // Find Active Accounts or first space
+    const activeSpace = spaces.find(s => s.name.includes('Active')) || spaces[0];
+
+    // Get folderless lists
+    const listsRes = await client.get(`/space/${activeSpace.id}/list`, { params: { archived: false } });
+    const allLists = listsRes.data.lists;
+
+    // Find a list with tasks
+    const listWithTasks = allLists.find(l => l.task_count > 0);
+    let tasksPreview = null;
+
+    if (listWithTasks) {
+      const tasksRes = await client.get(`/list/${listWithTasks.id}/task`, {
+        params: { archived: false, page: 0 }
+      });
+      const tasks = tasksRes.data.tasks || [];
+      tasksPreview = {
+        list_name: listWithTasks.name,
+        list_id: listWithTasks.id,
+        task_count: tasks.length,
+        tasks: tasks.slice(0, 5).map(t => ({
+          id: t.id,
+          name: t.name,
+          status: t.status?.status,
+          url: t.url
+        })),
+        first_task_full: tasks[0] || null
+      };
+    }
+
+    res.json({
+      workspace_id: workspaceId,
+      space: { id: activeSpace.id, name: activeSpace.name },
+      lists_count: allLists.length,
+      first_5_lists: allLists.slice(0, 5).map(l => ({
+        id: l.id,
+        name: l.name,
+        task_count: l.task_count
+      })),
+      tasks_preview: tasksPreview
+    });
+  } catch (error) {
+    logger.error('Error exploring hierarchy:', sanitizeError(error));
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
 
 
