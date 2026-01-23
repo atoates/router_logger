@@ -847,6 +847,11 @@ async function startClickUpSync(intervalMinutes = 30, runImmediately = false) {
     syncAllRoutersToClickUp().catch(error => {
       logger.error('Scheduled ClickUp sync failed:', error.message);
     });
+    
+    // Also check for extended offline routers (24+ hours)
+    checkExtendedOfflineRouters().catch(error => {
+      logger.error('Extended offline check failed:', error.message);
+    });
   }, intervalMinutes * 60 * 1000);
 
   logger.info(`ClickUp sync will run every ${intervalMinutes} minutes`);
@@ -1165,6 +1170,168 @@ async function createMissingClickUpTasks() {
   }
 }
 
+/**
+ * Check for routers that have been offline for 24+ hours and post alerts to their property tasks
+ * Only posts alert once per offline period (uses a tracking table or metadata)
+ * 
+ * @returns {Promise<Object>} Summary of alerts posted
+ */
+async function checkExtendedOfflineRouters() {
+  try {
+    logger.info('Checking for routers offline for 24+ hours...');
+    const startTime = Date.now();
+    
+    // Find routers that:
+    // 1. Have a property task link (clickup_location_task_id that is alphanumeric = task not list)
+    // 2. Are currently offline
+    // 3. Last seen more than 24 hours ago
+    // 4. Haven't had an extended offline alert posted in this offline period
+    const result = await pool.query(`
+      SELECT 
+        r.router_id,
+        r.name,
+        r.clickup_task_id,
+        r.clickup_location_task_id,
+        r.clickup_location_task_name,
+        r.current_status,
+        r.last_seen,
+        r.serial,
+        r.imei,
+        r.operator,
+        r.extended_offline_alert_sent_at,
+        EXTRACT(EPOCH FROM (NOW() - r.last_seen)) / 3600 as hours_offline
+      FROM routers r
+      WHERE r.clickup_location_task_id IS NOT NULL
+        AND r.clickup_location_task_id ~ '[a-zA-Z]'  -- Only task IDs (alphanumeric), not list IDs (numeric)
+        AND r.current_status = 'offline'
+        AND r.last_seen < NOW() - INTERVAL '24 hours'
+        AND (
+          r.extended_offline_alert_sent_at IS NULL 
+          OR r.extended_offline_alert_sent_at < r.last_seen  -- Reset alert if router came back online then went offline again
+        )
+    `);
+
+    if (result.rows.length === 0) {
+      logger.info('No routers offline for 24+ hours requiring alerts');
+      return { alerts: 0, errors: 0 };
+    }
+
+    logger.info(`Found ${result.rows.length} routers offline for 24+ hours`);
+
+    let alerts = 0;
+    let errors = 0;
+
+    for (const router of result.rows) {
+      try {
+        const hoursOffline = Math.round(router.hours_offline);
+        const daysOffline = Math.floor(hoursOffline / 24);
+        const remainingHours = hoursOffline % 24;
+        
+        // Format duration
+        let durationText;
+        if (daysOffline > 0) {
+          durationText = `${daysOffline} day${daysOffline > 1 ? 's' : ''}`;
+          if (remainingHours > 0) {
+            durationText += ` ${remainingHours} hour${remainingHours > 1 ? 's' : ''}`;
+          }
+        } else {
+          durationText = `${hoursOffline} hours`;
+        }
+        
+        // Format last seen date
+        const lastSeenDate = new Date(router.last_seen);
+        const lastSeenFormatted = lastSeenDate.toLocaleString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Europe/London'
+        });
+        
+        const dashboardUrl = `https://routerlogger-frontend-production.up.railway.app/router/${router.router_id}`;
+        
+        // Build alert comment
+        const commentLines = [
+          `⚠️ **ALERT: Router #${router.router_id} Offline for ${durationText}** ⚠️`,
+          '',
+          `🔴 **Connectivity Issue Detected**`,
+          `• Last Online: ${lastSeenFormatted}`,
+          `• Duration Offline: ${durationText}`,
+          `• Dashboard: ${dashboardUrl}`,
+        ];
+        
+        // Add router task link if available
+        if (router.clickup_task_id) {
+          const clickupTaskUrl = `https://app.clickup.com/t/${router.clickup_task_id}`;
+          commentLines.push(`• Router Task: ${clickupTaskUrl}`);
+        }
+        
+        // Add device info
+        commentLines.push('', `📱 **Device Info**`);
+        if (router.name) {
+          commentLines.push(`• Name: ${router.name}`);
+        }
+        if (router.serial) {
+          commentLines.push(`• Serial: ${router.serial}`);
+        }
+        if (router.operator) {
+          commentLines.push(`• Last Operator: ${router.operator}`);
+        }
+        
+        // Add recommendations
+        commentLines.push('', `🔧 **Possible Causes**`);
+        commentLines.push(`• Power outage at property`);
+        commentLines.push(`• Router unplugged or powered off`);
+        commentLines.push(`• Network/SIM issues`);
+        commentLines.push(`• Hardware failure`);
+        
+        commentLines.push('', `⏰ Alert generated: ${new Date().toLocaleString('en-GB', { timeZone: 'Europe/London' })}`);
+        
+        const commentText = commentLines.join('\n');
+        
+        // Post comment to the property task
+        await clickupClient.createTaskComment(
+          router.clickup_location_task_id,
+          commentText,
+          { notifyAll: false },
+          'default'
+        );
+        
+        // Update the tracking timestamp to prevent duplicate alerts
+        await pool.query(
+          'UPDATE routers SET extended_offline_alert_sent_at = NOW() WHERE router_id = $1',
+          [router.router_id]
+        );
+        
+        logger.info('Posted extended offline alert to property task', {
+          routerId: router.router_id,
+          propertyTaskId: router.clickup_location_task_id,
+          propertyName: router.clickup_location_task_name,
+          hoursOffline
+        });
+        
+        alerts++;
+        
+        // Rate limiting delay
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+      } catch (error) {
+        errors++;
+        logger.warn(`Failed to post offline alert for router ${router.router_id}:`, error.message);
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    logger.info(`Extended offline check complete: ${alerts} alerts posted, ${errors} errors (${duration}ms)`);
+
+    return { alerts, errors, duration };
+  } catch (error) {
+    logger.error('Error checking extended offline routers:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   syncRouterToClickUp,
   syncAllRoutersToClickUp,
@@ -1174,5 +1341,6 @@ module.exports = {
   stopClickUpSync,
   getSyncStats,
   autoCreateClickUpTask,
-  createMissingClickUpTasks
+  createMissingClickUpTasks,
+  checkExtendedOfflineRouters
 };

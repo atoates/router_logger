@@ -794,6 +794,7 @@ router.post('/refresh/:routerId', async (req, res) => {
         : existingRouter.last_seen;
 
     // Update router with fresh data
+    // Reset extended_offline_alert_sent_at if router is online (so new alert can be sent if it goes offline again)
     const updateQuery = `
       UPDATE routers SET
         name = $1,
@@ -802,7 +803,8 @@ router.post('/refresh/:routerId', async (req, res) => {
         current_status = $4,
         last_seen = $5,
         operator = $6,
-        wan_ip = $7
+        wan_ip = $7,
+        extended_offline_alert_sent_at = CASE WHEN $4 = 'online' THEN NULL ELSE extended_offline_alert_sent_at END
       WHERE router_id = $8
       RETURNING *
     `;
@@ -886,7 +888,8 @@ router.post('/status/:routerId', async (req, res) => {
         await pool.query(
           `UPDATE routers SET 
             current_status = $1,
-            last_seen = $2
+            last_seen = $2,
+            extended_offline_alert_sent_at = NULL
           WHERE router_id = $3`,
           [status, lastSeen, routerId]
         );
