@@ -6,6 +6,7 @@ import ClickUpAuthButton from './components/ClickUpAuthButton';
 import DashboardV3 from './components/DashboardV3';
 import RouterDashboard from './components/RouterDashboard';
 import HeaderRouterSelect from './components/HeaderRouterSelect';
+import SystemStatusIndicator from './components/SystemStatusIndicator';
 import ReturnsPage from './components/ReturnsPage';
 import DecommissionedPage from './components/DecommissionedPage';
 import LoginPage from './components/LoginPage';
@@ -147,6 +148,7 @@ function AppContent() {
             </Link>
           </div>
           <div className="app-header-right">
+            {!isGuest && <SystemStatusIndicator />}
             {!isGuest && <HeaderRouterSelect onSelect={handleHeaderRouterSelect} />}
             {currentUser && (
               <div ref={userMenuRef} style={{ position: 'relative' }}>
