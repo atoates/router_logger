@@ -235,6 +235,12 @@ async function linkRouterToLocation(linkage) {
           `• Dashboard: ${dashboardUrl}`,
         ];
         
+        // Add ClickUp task link if available
+        if (clickupTaskId) {
+          const clickupTaskUrl = `https://app.clickup.com/t/${clickupTaskId}`;
+          commentLines.push(`• Router Task: ${clickupTaskUrl}`);
+        }
+        
         // Add last seen if available
         if (router.last_seen) {
           commentLines.push(`• Last Online: ${lastSeenFormatted}`);
