@@ -528,6 +528,72 @@ router.use(requireAdmin);
 const { syncFromRMS } = require('../services/rmsSync');
 const { mergeDuplicateRouters } = require('../models/router');
 const RMSClient = require('../services/rmsClient');
+const distributedLockService = require('../services/distributedLockService');
+
+// ============================================================================
+// LOCK MANAGEMENT ENDPOINTS (admin only)
+// ============================================================================
+
+/**
+ * GET /api/rms/locks/status
+ * Get current distributed lock status for monitoring
+ */
+router.get('/locks/status', async (req, res) => {
+  try {
+    const status = await distributedLockService.getLockStatus();
+    res.json({
+      ...status,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/rms/locks/force-release/:lockName
+ * Force-release a stale lock (USE WITH CAUTION)
+ */
+router.post('/locks/force-release/:lockName', async (req, res) => {
+  const { lockName } = req.params;
+  const fullLockName = `scheduler:${lockName}`;
+  
+  try {
+    const { logger } = require('../config/database');
+    logger.warn(`Admin force-release requested for lock: ${fullLockName}`);
+    
+    // Check if lock appears stale first
+    const isStale = await distributedLockService.isLockStale(fullLockName);
+    
+    if (!isStale) {
+      return res.status(400).json({
+        success: false,
+        error: 'Lock does not appear stale - refusing to force-release an active lock',
+        lockName: fullLockName,
+        recommendation: 'Wait for the lock to become stale (30+ minutes idle) or check if sync is actually running'
+      });
+    }
+    
+    const released = await distributedLockService.forceReleaseStaleLock(fullLockName);
+    
+    if (released) {
+      res.json({
+        success: true,
+        message: `Force-released stale lock: ${fullLockName}`,
+        lockName: fullLockName,
+        recommendation: 'The lock holder connection was terminated. Sync should restart on the next scheduled interval.'
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to force-release lock',
+        lockName: fullLockName
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message, lockName: fullLockName });
+  }
+});
 const oauthService = require('../services/oauthService');
 const { logger } = require('../config/database');
 

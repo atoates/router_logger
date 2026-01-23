@@ -815,18 +815,18 @@ async function startClickUpSync(intervalMinutes = 30, runImmediately = false) {
   }
 
   // Distributed singleton: only one instance should run ClickUp sync
-  // Try to acquire lock, with retry in case previous instance is still shutting down
-  let acquired = await distributedLockService.tryAcquire('scheduler:clickup_sync');
+  // Use stale-lock detection to automatically release locks from dead containers
+  let acquired = await distributedLockService.tryAcquireWithStaleCheck('scheduler:clickup_sync');
   
   if (!acquired) {
-    // Wait 10 seconds and try again - the old instance might be shutting down
-    logger.info('ClickUp sync lock held by another instance, retrying in 10 seconds...');
+    // Wait 10 seconds and try again with stale check - covers deployment race conditions
+    logger.info('ClickUp sync lock held by another instance, retrying in 10 seconds with stale-lock check...');
     await new Promise(resolve => setTimeout(resolve, 10000));
-    acquired = await distributedLockService.tryAcquire('scheduler:clickup_sync');
+    acquired = await distributedLockService.tryAcquireWithStaleCheck('scheduler:clickup_sync');
   }
   
   if (!acquired) {
-    logger.info('ClickUp sync scheduler not started on this instance (lock held by another instance)');
+    logger.warn('ClickUp sync scheduler not started on this instance (lock held by active instance)');
     return;
   }
 

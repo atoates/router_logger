@@ -988,4 +988,122 @@ router.get('/api/monitoring/config', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/monitoring/sync-health
+ * Comprehensive sync health check - detects data gaps and stale locks
+ */
+router.get('/api/monitoring/sync-health', async (req, res) => {
+  try {
+    const distributedLockService = require('../services/distributedLockService');
+    const { getRMSSyncStats, isRMSSyncRunning } = require('../services/rmsSync');
+    
+    const syncStats = getRMSSyncStats();
+    const syncIntervalMinutes = parseInt(process.env.RMS_SYNC_INTERVAL_MINUTES || '15', 10);
+    
+    // Check for data gaps
+    const lastLogResult = await pool.query('SELECT MAX(timestamp) as last_log FROM router_logs');
+    const lastLog = lastLogResult.rows[0]?.last_log;
+    const minutesSinceLastLog = lastLog 
+      ? (Date.now() - new Date(lastLog).getTime()) / 60000 
+      : Infinity;
+    
+    // Get lock status
+    const lockStatus = await distributedLockService.getLockStatus();
+    
+    // Check for stale RMS sync lock
+    const rmsLockStale = await distributedLockService.isLockStale('scheduler:rms_sync');
+    const clickupLockStale = await distributedLockService.isLockStale('scheduler:clickup_sync');
+    
+    // Determine overall health
+    const issues = [];
+    
+    // Data gap detection (allow 3x interval before warning)
+    const staleThresholdMinutes = syncIntervalMinutes * 3;
+    if (minutesSinceLastLog > staleThresholdMinutes) {
+      issues.push({
+        severity: minutesSinceLastLog > syncIntervalMinutes * 6 ? 'critical' : 'warning',
+        type: 'data_gap',
+        message: `No new data for ${Math.round(minutesSinceLastLog)} minutes (threshold: ${staleThresholdMinutes} min)`,
+        lastLog,
+        recommendation: 'Check if RMS sync is running. May need to force-release stale lock.'
+      });
+    }
+    
+    // Stale lock detection
+    if (rmsLockStale) {
+      issues.push({
+        severity: 'critical',
+        type: 'stale_lock',
+        lockName: 'scheduler:rms_sync',
+        message: 'RMS sync lock appears stale - held by dead connection',
+        recommendation: 'POST /api/rms/locks/force-release/rms_sync to release'
+      });
+    }
+    
+    if (clickupLockStale) {
+      issues.push({
+        severity: 'warning',
+        type: 'stale_lock',
+        lockName: 'scheduler:clickup_sync',
+        message: 'ClickUp sync lock appears stale',
+        recommendation: 'POST /api/rms/locks/force-release/clickup_sync to release'
+      });
+    }
+    
+    // Check if sync scheduler is running on this instance
+    const schedulerRunning = isRMSSyncRunning();
+    if (!schedulerRunning && !rmsLockStale) {
+      // Lock is held by another (active) instance, this is OK
+      issues.push({
+        severity: 'info',
+        type: 'scheduler_elsewhere',
+        message: 'RMS sync scheduler running on another instance',
+        recommendation: 'This is normal in multi-instance deployments'
+      });
+    }
+    
+    const overallHealth = issues.some(i => i.severity === 'critical') ? 'critical' 
+      : issues.some(i => i.severity === 'warning') ? 'warning' 
+      : 'healthy';
+    
+    res.json({
+      health: overallHealth,
+      healthy: overallHealth === 'healthy',
+      issues,
+      syncStatus: {
+        lastSyncTime: syncStats.lastSyncTime,
+        lastSyncSuccess: syncStats.lastSyncSuccess,
+        lastSyncErrors: syncStats.lastSyncErrors,
+        isRunning: syncStats.isRunning,
+        schedulerActiveOnThisInstance: schedulerRunning
+      },
+      dataStatus: {
+        lastLog,
+        minutesSinceLastLog: Math.round(minutesSinceLastLog * 10) / 10,
+        syncIntervalMinutes,
+        staleThresholdMinutes
+      },
+      locks: {
+        rmsSync: {
+          stale: rmsLockStale,
+          heldByThisProcess: !!lockStatus.heldByThisProcess['scheduler:rms_sync']
+        },
+        clickupSync: {
+          stale: clickupLockStale,
+          heldByThisProcess: !!lockStatus.heldByThisProcess['scheduler:clickup_sync']
+        },
+        allLocks: lockStatus.allAdvisoryLocks || []
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error checking sync health:', error);
+    res.status(500).json({ 
+      health: 'unknown',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 module.exports = { router, trackRMSCall, trackClickUpCall, apiMetrics, clickupMetrics, isApproachingQuota, getQuotaStatus };

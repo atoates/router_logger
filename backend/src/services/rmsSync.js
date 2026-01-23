@@ -381,18 +381,18 @@ async function startRMSSync(intervalMinutes = 15) {
   }
 
   // Distributed singleton: only one instance should run RMS sync
-  // Try to acquire lock, with retry in case previous instance is still shutting down
-  let acquired = await distributedLockService.tryAcquire('scheduler:rms_sync');
+  // Use stale-lock detection to automatically release locks from dead containers
+  let acquired = await distributedLockService.tryAcquireWithStaleCheck('scheduler:rms_sync');
   
   if (!acquired) {
-    // Wait 10 seconds and try again - the old instance might be shutting down
-    logger.info('RMS sync lock held by another instance, retrying in 10 seconds...');
+    // Wait 10 seconds and try again with stale check - covers deployment race conditions
+    logger.info('RMS sync lock held by another instance, retrying in 10 seconds with stale-lock check...');
     await new Promise(resolve => setTimeout(resolve, 10000));
-    acquired = await distributedLockService.tryAcquire('scheduler:rms_sync');
+    acquired = await distributedLockService.tryAcquireWithStaleCheck('scheduler:rms_sync');
   }
   
   if (!acquired) {
-    logger.info('RMS sync scheduler not started on this instance (lock held by another instance)');
+    logger.warn('RMS sync scheduler not started on this instance (lock held by active instance)');
     return null;
   }
 
