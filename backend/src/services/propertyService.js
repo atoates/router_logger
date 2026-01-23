@@ -198,6 +198,114 @@ async function linkRouterToLocation(linkage) {
       }
     }
 
+    // Add installation comment to the LOCATION/PROPERTY task (if it's a task, not a list)
+    // Task IDs are alphanumeric, list IDs are purely numeric
+    const isTaskId = /[a-zA-Z]/.test(locationTaskId);
+    if (isTaskId) {
+      try {
+        const router = result.rows[0];
+        const dashboardUrl = `https://routerlogger-frontend-production.up.railway.app/router/${routerId}`;
+        
+        // Format last_seen nicely
+        let lastSeenFormatted = 'Unknown';
+        if (router.last_seen) {
+          const lastSeenDate = new Date(router.last_seen);
+          lastSeenFormatted = lastSeenDate.toLocaleString('en-GB', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Europe/London'
+          });
+        }
+        
+        // Determine online/offline status
+        const isOnline = router.current_status === 'online' || router.current_status === 1;
+        const statusEmoji = isOnline ? '🟢' : '🔴';
+        const statusText = isOnline ? 'Online' : 'Offline';
+        
+        // Build rich comment
+        const commentLines = [
+          `✅ **Router #${routerId} Installed** ✅`,
+          '',
+          `📍 **Installation Details**`,
+          `• Status: ${statusEmoji} ${statusText}`,
+          `• Installed: ${new Date().toLocaleString('en-GB', { timeZone: 'Europe/London' })}`,
+          `• Dashboard: ${dashboardUrl}`,
+        ];
+        
+        // Add last seen if available
+        if (router.last_seen) {
+          commentLines.push(`• Last Online: ${lastSeenFormatted}`);
+        }
+        
+        // Add device info section
+        commentLines.push('', `📱 **Device Info**`);
+        if (router.name) {
+          commentLines.push(`• Name: ${router.name}`);
+        }
+        if (router.serial) {
+          commentLines.push(`• Serial: ${router.serial}`);
+        }
+        if (router.imei) {
+          commentLines.push(`• IMEI: ${router.imei}`);
+        }
+        if (router.mac) {
+          commentLines.push(`• MAC: ${router.mac}`);
+        }
+        
+        // Add network info if available
+        if (router.operator || router.signal_strength || router.connection_type) {
+          commentLines.push('', `📶 **Network Info**`);
+          if (router.operator) {
+            commentLines.push(`• Operator: ${router.operator}`);
+          }
+          if (router.signal_strength) {
+            commentLines.push(`• Signal: ${router.signal_strength} dBm`);
+          }
+          if (router.connection_type) {
+            commentLines.push(`• Connection: ${router.connection_type}`);
+          }
+        }
+        
+        // Add location info if available
+        if (router.latitude && router.longitude) {
+          const mapsUrl = `https://www.google.com/maps?q=${router.latitude},${router.longitude}`;
+          commentLines.push('', `🗺️ **Location**`);
+          commentLines.push(`• Coordinates: ${router.latitude}, ${router.longitude}`);
+          commentLines.push(`• Map: ${mapsUrl}`);
+        }
+        
+        // Add notes if provided
+        if (notes) {
+          commentLines.push('', `📝 **Notes**`);
+          commentLines.push(notes);
+        }
+        
+        const commentText = commentLines.join('\n');
+        
+        await clickupClient.createTaskComment(
+          locationTaskId,
+          commentText,
+          { notifyAll: false },
+          'default'
+        );
+        
+        logger.info('Added installation comment to property task', {
+          routerId,
+          locationTaskId,
+          locationTaskName
+        });
+      } catch (commentError) {
+        logger.warn('Failed to add installation comment to property task (link still recorded)', {
+          routerId,
+          locationTaskId,
+          error: commentError.message
+        });
+      }
+    }
+
     return result.rows[0];
 
   } catch (error) {
@@ -344,6 +452,52 @@ async function unlinkRouterFromLocation(unlinkage) {
           routerId,
           clickupTaskId: router.clickup_task_id,
           error: clickupError.message
+        });
+      }
+    }
+
+    // Add uninstall comment to the LOCATION/PROPERTY task (if it was a task, not a list)
+    const isTaskId = /[a-zA-Z]/.test(wasLinkedToLocation);
+    if (isTaskId) {
+      try {
+        const dashboardUrl = `https://routerlogger-frontend-production.up.railway.app/router/${routerId}`;
+        
+        const commentLines = [
+          `🔄 **Router #${routerId} Uninstalled** 🔄`,
+          '',
+          `📍 **Removal Details**`,
+          `• Uninstalled: ${new Date().toLocaleString('en-GB', { timeZone: 'Europe/London' })}`,
+          `• Dashboard: ${dashboardUrl}`,
+        ];
+        
+        if (unlinkedBy) {
+          commentLines.push(`• Removed by: ${unlinkedBy}`);
+        }
+        
+        if (notes) {
+          commentLines.push('', `📝 **Notes**`);
+          commentLines.push(notes);
+        }
+        
+        const commentText = commentLines.join('\n');
+        
+        await clickupClient.createTaskComment(
+          wasLinkedToLocation,
+          commentText,
+          { notifyAll: false },
+          'default'
+        );
+        
+        logger.info('Added uninstall comment to property task', {
+          routerId,
+          locationTaskId: wasLinkedToLocation,
+          locationTaskName: wasLinkedToLocationName
+        });
+      } catch (commentError) {
+        logger.warn('Failed to add uninstall comment to property task (unlink still recorded)', {
+          routerId,
+          locationTaskId: wasLinkedToLocation,
+          error: commentError.message
         });
       }
     }
