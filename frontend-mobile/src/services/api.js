@@ -149,6 +149,8 @@ export const getClickUpSpaceLists = async (spaceId) => {
 export const getClickUpLists = (workspaceId) => api.get(`/clickup/lists/${workspaceId}`);
 export const getClickUpTasks = (listId, search = '') => 
   api.get(`/clickup/tasks/${listId}`, { params: { search } });
+export const getClickUpListTasks = (listId) => 
+  api.get(`/clickup/tasks/${listId}`);
 export const getClickUpWorkspaceMembers = (workspaceId) => 
   api.get(`/clickup/workspaces/${workspaceId}/members`);
 

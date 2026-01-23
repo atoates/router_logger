@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getRouters, getClickUpSpaces, getClickUpSpacesForWorkspace, getClickUpSpaceLists, getClickUpTasks, linkRouterToLocation } from '../services/api';
+import { getRouters, getClickUpSpaces, getClickUpSpacesForWorkspace, getClickUpSpaceLists, getClickUpListTasks, linkRouterToLocation } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import './LocationPage.css';
@@ -17,6 +17,12 @@ function LocationPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  
+  // Two-step selection state
+  const [selectionStep, setSelectionStep] = useState(1); // 1 = select location, 2 = select property
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [propertyTasks, setPropertyTasks] = useState([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
 
   useEffect(() => {
     fetchRouters();
@@ -154,6 +160,63 @@ function LocationPage() {
     setFilteredLists(filtered);
   };
 
+  // Step 1: Select a location (list) - then load its property tasks
+  const handleSelectLocation = async (list) => {
+    try {
+      setLoadingTasks(true);
+      setError(null);
+      setSelectedLocation(list);
+      
+      // Fetch tasks (properties) from this location
+      const response = await getClickUpListTasks(list.id);
+      const tasks = response.data.tasks || [];
+      setPropertyTasks(tasks);
+      setSelectionStep(2);
+    } catch (err) {
+      setError('Failed to load properties for this location: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
+  // Step 2: Select a property task and link the router
+  const handleSelectProperty = async (task) => {
+    if (!selectedRouter) {
+      setError('Please select a router first');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      // Link to the task (property) - this is the new approach
+      await linkRouterToLocation(selectedRouter.router_id, {
+        location_task_id: task.id,
+        location_task_name: task.name
+      });
+      setSuccess(`Router #${selectedRouter.router_id} linked to ${task.name} (${selectedLocation.name}) successfully!`);
+      setSelectedRouter(null);
+      setSearchQuery('');
+      setFilteredLists([]);
+      setSelectionStep(1);
+      setSelectedLocation(null);
+      setPropertyTasks([]);
+      fetchRouters(); // Refresh router list
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to link router to property');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Go back to step 1 (location selection)
+  const handleBackToLocations = () => {
+    setSelectionStep(1);
+    setSelectedLocation(null);
+    setPropertyTasks([]);
+  };
+
+  // Legacy function for locations with no tasks (link directly to location)
   const handleLinkRouter = async (list) => {
     if (!selectedRouter) {
       setError('Please select a router first');
@@ -242,11 +305,17 @@ function LocationPage() {
           <span className="breadcrumb-item">{workspace.name}</span>
           <span className="breadcrumb-separator">›</span>
           <span className="breadcrumb-item">{space.name}</span>
+          {selectedLocation && (
+            <>
+              <span className="breadcrumb-separator">›</span>
+              <span className="breadcrumb-item">{selectedLocation.name}</span>
+            </>
+          )}
         </div>
       )}
 
-      {/* Step 2: Search and Select Location (List) */}
-      {space && (
+      {/* Step 2: Search and Select Location (List) - then Property (Task) */}
+      {space && selectionStep === 1 && (
         <div className="location-section">
           <h2>2. Search and Select Location</h2>
           <input
@@ -257,8 +326,8 @@ function LocationPage() {
             className="search-input"
           />
           
-          {loading && allLists.length === 0 ? (
-            <LoadingSpinner size="small" text="Loading locations..." />
+          {(loading && allLists.length === 0) || loadingTasks ? (
+            <LoadingSpinner size="small" text={loadingTasks ? "Loading properties..." : "Loading locations..."} />
           ) : (
             <div className="tasks-list">
               {filteredLists.length === 0 ? (
@@ -272,12 +341,77 @@ function LocationPage() {
                   <div key={list.id} className="task-item">
                     <div className="task-info">
                       <div className="task-name">{list.name}</div>
-                      {list.folderName && (
-                        <div className="task-status">📁 {list.folderName}</div>
-                      )}
+                      <div className="task-meta">
+                        {list.folderName && (
+                          <span className="task-folder">📁 {list.folderName}</span>
+                        )}
+                        {list.task_count !== undefined && (
+                          <span className="task-count-badge">
+                            {list.task_count} {list.task_count === 1 ? 'property' : 'properties'}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <button
-                      onClick={() => handleLinkRouter(list)}
+                      onClick={() => list.task_count > 0 ? handleSelectLocation(list) : handleLinkRouter(list)}
+                      className="link-button"
+                      disabled={!selectedRouter || loading || loadingTasks}
+                    >
+                      {list.task_count > 0 ? 'Select' : 'Link'}
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Step 3: Select Property (Task) from the Location */}
+      {space && selectionStep === 2 && selectedLocation && (
+        <div className="location-section">
+          <div className="step-header">
+            <button 
+              className="back-button"
+              onClick={handleBackToLocations}
+            >
+              ← Back
+            </button>
+            <h2>3. Select Property</h2>
+          </div>
+          <div className="selected-location-banner">
+            📍 {selectedLocation.name}
+          </div>
+          
+          {loadingTasks ? (
+            <LoadingSpinner size="small" text="Loading properties..." />
+          ) : (
+            <div className="tasks-list">
+              {propertyTasks.length === 0 ? (
+                <p className="empty-hint">
+                  No properties found in this location.
+                </p>
+              ) : (
+                propertyTasks.map(task => (
+                  <div key={task.id} className="task-item property-task-item">
+                    <div className="task-info">
+                      <div className="task-name">{task.name}</div>
+                      <div className="task-meta">
+                        {task.status?.status && (
+                          <span 
+                            className="status-badge"
+                            style={{ 
+                              backgroundColor: task.status.color || 'var(--text-secondary)',
+                              color: '#fff'
+                            }}
+                          >
+                            {task.status.status}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleSelectProperty(task)}
                       className="link-button"
                       disabled={!selectedRouter || loading}
                     >

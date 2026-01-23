@@ -9,6 +9,15 @@ import AssignmentModal from '../components/AssignmentModal';
 import RouterMap from '../components/RouterMap';
 import './RouterDetailPage.css';
 
+// Helper to generate ClickUp URL - list IDs are numeric, task IDs are alphanumeric
+const getClickUpUrl = (id) => {
+  if (!id) return null;
+  const isTaskId = /[a-zA-Z]/.test(id);
+  return isTaskId 
+    ? `https://app.clickup.com/t/${id}`
+    : `https://app.clickup.com/list/${id}`;
+};
+
 function RouterDetailPage() {
   const { routerId } = useParams();
   const navigate = useNavigate();
@@ -426,7 +435,7 @@ function RouterDetailPage() {
             <span className="detail-value">
               {router.clickup_location_task_id ? (
                 <a
-                  href={`https://app.clickup.com/t/${router.clickup_location_task_id}`}
+                  href={getClickUpUrl(router.clickup_location_task_id)}
                   className="detail-value-link"
                 >
                   {router.clickup_location_task_name || 'Unknown'}
