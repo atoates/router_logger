@@ -31,8 +31,8 @@ async function syncDateInstalledFromClickUp() {
   
   for (const router of routers) {
     try {
-      // Fetch date_installed from ClickUp
-      const rawDate = await clickupClient.getListCustomFieldValue(
+      // Fetch date_installed from ClickUp (auto-detects list vs task ID)
+      const rawDate = await clickupClient.getLocationCustomFieldValue(
         router.clickup_location_task_id,
         CLICKUP_FIELD_IDS.DATE_INSTALLED,
         'default'

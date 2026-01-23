@@ -239,7 +239,70 @@ class ClickUpClient {
       logger.error('Error getting custom field value:', error.message);
       return null;
     }
-  }  /**
+  }
+
+  /**
+   * Get custom field value directly from a task
+   * @param {string} taskId - Task ID (alphanumeric like "86c2xfpaa")
+   * @param {string} fieldId - Custom field ID
+   * @param {string} userId - User identifier
+   * @returns {Promise<any>} Custom field value or null
+   */
+  async getTaskCustomFieldValue(taskId, fieldId, userId = 'default') {
+    try {
+      const task = await this.getTask(taskId, userId);
+      
+      if (!task) {
+        logger.warn('Task not found', { taskId });
+        return null;
+      }
+      
+      const customField = task.custom_fields?.find(field => field.id === fieldId);
+      
+      if (!customField) {
+        logger.warn('Custom field not found in task', { taskId, fieldId });
+        return null;
+      }
+      
+      return customField.value || null;
+    } catch (error) {
+      logger.error('Error getting task custom field value:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Detect if an ID is a list ID (numeric) or task ID (alphanumeric)
+   * List IDs are purely numeric (e.g., "901506769295")
+   * Task IDs are alphanumeric (e.g., "86c2xfpaa")
+   * @param {string} id - The ID to check
+   * @returns {string} "list" or "task"
+   */
+  static detectIdType(id) {
+    if (!id) return null;
+    // List IDs are purely numeric, task IDs contain letters
+    return /^[0-9]+$/.test(id) ? 'list' : 'task';
+  }
+
+  /**
+   * Get custom field value from either a list (legacy) or task (new)
+   * Automatically detects the ID type and uses the appropriate method
+   * @param {string} locationId - List ID or Task ID
+   * @param {string} fieldId - Custom field ID
+   * @param {string} userId - User identifier
+   * @returns {Promise<any>} Custom field value or null
+   */
+  async getLocationCustomFieldValue(locationId, fieldId, userId = 'default') {
+    const idType = ClickUpClient.detectIdType(locationId);
+    
+    if (idType === 'task') {
+      return this.getTaskCustomFieldValue(locationId, fieldId, userId);
+    } else {
+      return this.getListCustomFieldValue(locationId, fieldId, userId);
+    }
+  }
+
+  /**
    * Get tasks from a list
    * @param {string} listId - List ID
    * @param {Object} options - Query options (page, archived, etc.)

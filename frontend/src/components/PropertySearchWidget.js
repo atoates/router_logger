@@ -16,6 +16,12 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
   const [availableUsers, setAvailableUsers] = useState([]);
   const [workspaceId, setWorkspaceId] = useState(null);
   const [spaceId, setSpaceId] = useState(null);
+  
+  // Two-step selection state
+  const [selectionStep, setSelectionStep] = useState(1); // 1 = select location, 2 = select property
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [propertyTasks, setPropertyTasks] = useState([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
 
   const routerId = router?.router_id;
 
@@ -115,7 +121,8 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
         const formattedResults = filtered.map(list => ({
           id: list.id,
           name: list.name,
-          folderName: list.folderName
+          folderName: list.folderName,
+          task_count: list.task_count
         }));
         
         setSearchResults(formattedResults);
@@ -194,14 +201,63 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
     }
   }, [routerId, currentLocation]);
 
-  const handleSelectProperty = (property) => {
-    assignLocation(property.id, property.name);
+  // Step 1: User selects a location (list) - then fetch property tasks
+  const handleSelectLocation = useCallback(async (location) => {
+    setSelectedLocation(location);
+    setLoadingTasks(true);
+    setPropertyTasks([]);
+    
+    try {
+      const res = await api.get(`/clickup/tasks/${location.id}`);
+      const tasks = res.data.tasks || [];
+      
+      if (tasks.length === 0) {
+        // No tasks in this list - assign directly to the list (legacy behavior)
+        toast.info('No property tasks found - linking to location directly');
+        assignLocation(location.id, location.name);
+        setShowSearchModal(false);
+        return;
+      }
+      
+      if (tasks.length === 1) {
+        // Only one task - auto-select it
+        const task = tasks[0];
+        assignLocation(task.id, task.name);
+        setShowSearchModal(false);
+        toast.success(`Linked to property: ${task.name.substring(0, 40)}...`);
+        return;
+      }
+      
+      // Multiple tasks - show step 2
+      setPropertyTasks(tasks);
+      setSelectionStep(2);
+    } catch (error) {
+      console.error('Error fetching property tasks:', error);
+      toast.error('Failed to load property tasks');
+    } finally {
+      setLoadingTasks(false);
+    }
+  }, [assignLocation]);
+
+  // Step 2: User selects a property task
+  const handleSelectPropertyTask = (task) => {
+    assignLocation(task.id, task.name);
     setShowSearchModal(false);
+  };
+
+  // Back to step 1
+  const handleBackToLocations = () => {
+    setSelectionStep(1);
+    setSelectedLocation(null);
+    setPropertyTasks([]);
   };
 
   const handleOpenSearchModal = () => {
     setSearchQuery('');
     setSearchResults([]);
+    setSelectionStep(1);
+    setSelectedLocation(null);
+    setPropertyTasks([]);
     setShowSearchModal(true);
   };
 
@@ -370,58 +426,110 @@ const PropertySearchWidget = forwardRef(({ router, onAssigned }, ref) => {
         )}
       </div>
 
-      {/* Search Modal */}
+      {/* Search Modal - Two Step Selection */}
       {showSearchModal && (
         <div className="psw-modal-overlay" onClick={() => setShowSearchModal(false)}>
           <div className="psw-modal" onClick={(e) => e.stopPropagation()}>
             <div className="psw-modal-header">
-              <h3>Assign to Location</h3>
+              {selectionStep === 1 ? (
+                <h3>Step 1: Select Location</h3>
+              ) : (
+                <h3>Step 2: Select Property</h3>
+              )}
               <button className="psw-modal-close" onClick={() => setShowSearchModal(false)}>×</button>
             </div>
             
             <div className="psw-modal-body">
-              <div className="psw-search-input-wrapper">
-                <input
-                  type="text"
-                  placeholder="Search locations (e.g., 123 or Cambridge)..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
-                  className="psw-search-input"
-                  disabled={loading}
-                  autoFocus
-                />
-                {searching && <span className="psw-spinner">⏳</span>}
-              </div>
+              {selectionStep === 1 ? (
+                <>
+                  {/* Step 1: Search and select a location (list) */}
+                  <div className="psw-search-input-wrapper">
+                    <input
+                      type="text"
+                      placeholder="Search locations (e.g., 37 or Cambridge)..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
+                      className="psw-search-input"
+                      disabled={loading || loadingTasks}
+                      autoFocus
+                    />
+                    {(searching || loadingTasks) && <span className="psw-spinner">⏳</span>}
+                  </div>
 
-              {showDropdown && searchResults.length > 0 && (
-                <div className="psw-modal-results">
-                  {searchResults.map(result => (
-                    <div
-                      key={result.id}
-                      className="psw-result-item"
-                      onClick={() => handleSelectProperty(result)}
-                    >
-                      <div className="psw-result-name">{result.name}</div>
-                      <div className="psw-result-meta">
-                        {result.folder_name && <span className="psw-badge">{result.folder_name}</span>}
-                        {result.task_count !== undefined && <span className="psw-badge-count">{result.task_count} tasks</span>}
-                      </div>
+                  {showDropdown && searchResults.length > 0 && (
+                    <div className="psw-modal-results">
+                      {searchResults.map(result => (
+                        <div
+                          key={result.id}
+                          className="psw-result-item"
+                          onClick={() => handleSelectLocation(result)}
+                        >
+                          <div className="psw-result-name">{result.name}</div>
+                          <div className="psw-result-meta">
+                            {result.folderName && <span className="psw-badge">{result.folderName}</span>}
+                            {result.task_count !== undefined && (
+                              <span className="psw-badge-count">
+                                {result.task_count} {result.task_count === 1 ? 'property' : 'properties'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
+                  )}
 
-              {searchQuery.length >= 2 && !searching && searchResults.length === 0 && (
-                <div className="psw-no-results">
-                  No locations found for "{searchQuery}"
-                </div>
-              )}
+                  {searchQuery.length >= 2 && !searching && searchResults.length === 0 && (
+                    <div className="psw-no-results">
+                      No locations found for "{searchQuery}"
+                    </div>
+                  )}
 
-              {searchQuery.length < 2 && (
-                <div className="psw-hint">
-                  Type at least 2 characters to search locations...
-                </div>
+                  {searchQuery.length < 2 && (
+                    <div className="psw-hint">
+                      Type at least 2 characters to search locations...
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Step 2: Select a property task from the location */}
+                  <div className="psw-step2-header">
+                    <button 
+                      className="psw-back-btn"
+                      onClick={handleBackToLocations}
+                    >
+                      ← Back
+                    </button>
+                    <div className="psw-selected-location">
+                      <span className="psw-label">Location:</span>
+                      <span className="psw-value">{selectedLocation?.name}</span>
+                    </div>
+                  </div>
+
+                  <div className="psw-hint" style={{ marginBottom: '12px' }}>
+                    Select a property to link this router:
+                  </div>
+
+                  {propertyTasks.length > 0 && (
+                    <div className="psw-modal-results">
+                      {propertyTasks.map(task => (
+                        <div
+                          key={task.id}
+                          className="psw-result-item"
+                          onClick={() => handleSelectPropertyTask(task)}
+                        >
+                          <div className="psw-result-name">{task.name}</div>
+                          <div className="psw-result-meta">
+                            <span className={`psw-status-badge ${task.status?.status?.toLowerCase().replace(/\s+/g, '-')}`}>
+                              {task.status?.status || 'No status'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
