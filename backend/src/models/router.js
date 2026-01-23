@@ -167,26 +167,12 @@ async function insertLog(logData) {
   try {
     const result = await pool.query(query, values);
     
-    // DEBUG: Log successful insert with ID
-    if (result.rows[0]?.id) {
-      logger.info('[INSERT_LOG_DEBUG] Successfully inserted log', {
-        logId: result.rows[0].id,
-        routerId: logData.router_id,
-        timestamp: logData.timestamp
-      });
-    } else {
-      logger.warn('[INSERT_LOG_DEBUG] Insert returned no rows!', {
-        routerId: logData.router_id,
-        rowCount: result.rowCount
-      });
-    }
-    
     // Update the denormalized current status table for fast dashboard queries
     await updateRouterCurrentStatus(logData);
     
     return result.rows[0];
   } catch (error) {
-    logger.error('[INSERT_LOG_DEBUG] Error inserting log:', {
+    logger.error('Error inserting router log:', {
       error: error.message,
       routerId: logData.router_id,
       code: error.code

@@ -45,25 +45,10 @@ function transformRMSDeviceToTelemetry(device, monitoring) {
   const vpn = monitoring?.vpn || {};
   const eth = monitoring?.ethernet || {};
   
-  // Debug: Log device keys to understand what data RMS returns
-  const deviceKeys = Object.keys(device || {});
-  const monitoringKeys = Object.keys(monitoring || {});
-  const cellularKeys = Object.keys(cellular || {});
-  
-  // Log once per sync (first device) to avoid spam
-  if (!transformRMSDeviceToTelemetry._logged) {
-    transformRMSDeviceToTelemetry._logged = true;
-    logger.info(`RMS device fields: ${deviceKeys.join(', ')}`);
-    logger.info(`RMS monitoring fields: ${monitoringKeys.join(', ')}`);
-    logger.info(`RMS cellular fields: ${cellularKeys.join(', ')}`);
-    // Log sample device to see structure
-    logger.debug(`Sample RMS device data: ${JSON.stringify(device).substring(0, 1000)}`);
-  }
-  
-  // Debug: Log if cell info is found
+  // Debug: Log cell info at debug level
   const hasCellInfo = !!(cellular.cell_id || cellular.cid || cellular.tac || cellular.mcc);
   if (hasCellInfo) {
-    logger.info(`Cell info found for ${device.serial_number || device.id}: mcc=${cellular.mcc}, mnc=${cellular.mnc}, tac=${cellular.tac}, cid=${cellular.cell_id || cellular.cid}`);
+    logger.debug(`Cell info for ${device.serial_number || device.id}: mcc=${cellular.mcc}, mnc=${cellular.mnc}, tac=${cellular.tac}, cid=${cellular.cell_id || cellular.cid}`);
   }
 
   // Helper to coerce to finite number
@@ -255,9 +240,9 @@ async function syncFromRMS() {
           telemetry.counters.total_tx_bytes = lastTx;
           telemetry.counters.total_rx_bytes = lastRx;
           
-          logger.info(`[SYNC ${syncId}] ${deviceName}: Zero counters from RMS → using DB fallback: tx=${(lastTx/1024/1024).toFixed(2)}MB, rx=${(lastRx/1024/1024).toFixed(2)}MB`);
+          logger.debug(`[SYNC ${syncId}] ${deviceName}: Zero counters → DB fallback: tx=${(lastTx/1024/1024).toFixed(2)}MB, rx=${(lastRx/1024/1024).toFixed(2)}MB`);
         } else {
-          logger.info(`[SYNC ${syncId}] ${deviceName}: Got counters from RMS: tx=${(tx0/1024/1024).toFixed(2)}MB, rx=${(rx0/1024/1024).toFixed(2)}MB, status=${telemetry.status}`);
+          logger.debug(`[SYNC ${syncId}] ${deviceName}: tx=${(tx0/1024/1024).toFixed(2)}MB, rx=${(rx0/1024/1024).toFixed(2)}MB, status=${telemetry.status}`);
         }
         
         await processRouterTelemetry(telemetry);
