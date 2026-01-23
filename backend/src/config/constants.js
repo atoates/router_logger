@@ -21,7 +21,9 @@ const CLICKUP_FIELD_IDS = {
 const CACHE_TTL = {
   ROUTERS: 60 * 1000, // 60 seconds (from env or default)
   ROUTERS_WITH_LOCATIONS: 15 * 60 * 1000, // 15 minutes
-  ASSIGNEES: 7 * 24 * 60 * 60 * 1000 // 1 week
+  ASSIGNEES: 7 * 24 * 60 * 60 * 1000, // 1 week
+  NETWORK_STATS: 5 * 60 * 1000, // 5 minutes for dashboard stats
+  STORAGE_STATS: 15 * 60 * 1000 // 15 minutes for storage stats (expensive query)
 };
 
 // Router status values

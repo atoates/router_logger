@@ -4,6 +4,7 @@
  */
 
 const { pool, logger } = require('../config/database');
+const cacheManager = require('../services/cacheManager');
 
 /**
  * Compute storage-related stats:
@@ -14,6 +15,12 @@ const { pool, logger } = require('../config/database');
  */
 async function getStorageStats(sampleSize = 1000) {
   try {
+    // Check cache first (expensive query, 15 min TTL)
+    const cached = cacheManager.getStorageStatsCache();
+    if (cached) {
+      return cached;
+    }
+
     // Totals
     const totalsRes = await pool.query(`
       SELECT 
@@ -124,7 +131,7 @@ async function getStorageStats(sampleSize = 1000) {
     const sizePerDay = recordsPerDay * avgBytes;
     const sizeGrowthRate = recordsGrowthRate;
 
-    return {
+    const result = {
       totalRouters: Number(totals.total_routers || 0),
       totalLogs: Number(totals.total_logs || 0),
       logsPerDay7,
@@ -152,6 +159,11 @@ async function getStorageStats(sampleSize = 1000) {
         }
       }
     };
+
+    // Cache the result (15 min TTL)
+    cacheManager.setStorageStatsCache(result);
+    
+    return result;
   } catch (error) {
     logger.error('Error computing storage stats:', error);
     throw error;
@@ -388,6 +400,12 @@ async function getNetworkUsageRolling(hours = 24, bucket = 'hour') {
     const VALID_BUCKETS = ['hour', 'day'];
     const buck = VALID_BUCKETS.includes(bucket) ? bucket : 'hour';
     
+    // Check cache first (5 min TTL for dashboard stats)
+    const cached = cacheManager.getNetworkStatsCache(hrs, buck);
+    if (cached) {
+      return cached;
+    }
+    
     const query = `
       WITH params AS (
         SELECT NOW() - ($1::int || ' hours')::interval AS start_ts
@@ -435,6 +453,10 @@ async function getNetworkUsageRolling(hours = 24, bucket = 'hour') {
       ORDER BY bucket_ts ASC;
     `;
     const result = await pool.query(query, [hrs]);
+    
+    // Cache the result (5 min TTL)
+    cacheManager.setNetworkStatsCache(hrs, buck, result.rows);
+    
     return result.rows;
   } catch (error) {
     logger.error('Error fetching rolling network usage:', error);

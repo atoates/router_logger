@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
@@ -73,6 +74,7 @@ const corsOrigin = (() => {
 
 // Middleware
 app.use(helmet());
+app.use(compression()); // Gzip compression for responses
 app.use(cors({
   origin: corsOrigin,
   credentials: true

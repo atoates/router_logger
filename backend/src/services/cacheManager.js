@@ -10,7 +10,10 @@ const { CACHE_TTL } = require('../config/constants');
 const caches = {
   routers: { data: null, etag: null, expiresAt: 0 },
   routersWithLocations: { data: null, timestamp: null, TTL: CACHE_TTL.ROUTERS_WITH_LOCATIONS },
-  assignees: { data: null, timestamp: null, TTL: CACHE_TTL.ASSIGNEES }
+  assignees: { data: null, timestamp: null, TTL: CACHE_TTL.ASSIGNEES },
+  // Stats caches - keyed by query parameters
+  networkStats: new Map(), // key: `${hours}-${bucket}`, value: { data, expiresAt }
+  storageStats: { data: null, expiresAt: 0 }
 };
 
 /**
@@ -155,8 +158,86 @@ function getCacheStats() {
       age: caches.assignees.timestamp 
         ? now - caches.assignees.timestamp 
         : null
+    },
+    networkStats: {
+      cachedQueries: caches.networkStats.size,
+      keys: Array.from(caches.networkStats.keys())
+    },
+    storageStats: {
+      cached: !!caches.storageStats.data,
+      expiresIn: caches.storageStats.expiresAt ? Math.max(0, caches.storageStats.expiresAt - now) : 0
     }
   };
+}
+
+/**
+ * Get network stats cache
+ * @param {number} hours - Number of hours
+ * @param {string} bucket - Bucket type (hour/day)
+ */
+function getNetworkStatsCache(hours, bucket) {
+  const key = `${hours}-${bucket}`;
+  const cached = caches.networkStats.get(key);
+  
+  if (cached && cached.expiresAt > Date.now()) {
+    logger.debug('Network stats cache hit', { key, age: Math.round((Date.now() - (cached.expiresAt - CACHE_TTL.NETWORK_STATS)) / 1000) });
+    return cached.data;
+  }
+  
+  // Clean up expired entry
+  if (cached) {
+    caches.networkStats.delete(key);
+  }
+  
+  logger.debug('Network stats cache miss', { key });
+  return null;
+}
+
+/**
+ * Set network stats cache
+ * @param {number} hours - Number of hours
+ * @param {string} bucket - Bucket type (hour/day)
+ * @param {Array} data - The stats data
+ */
+function setNetworkStatsCache(hours, bucket, data) {
+  const key = `${hours}-${bucket}`;
+  caches.networkStats.set(key, {
+    data,
+    expiresAt: Date.now() + CACHE_TTL.NETWORK_STATS
+  });
+  
+  // Limit cache size to prevent memory bloat (max 20 different queries)
+  if (caches.networkStats.size > 20) {
+    const oldestKey = caches.networkStats.keys().next().value;
+    caches.networkStats.delete(oldestKey);
+    logger.debug('Network stats cache evicted oldest entry', { evictedKey: oldestKey });
+  }
+  
+  logger.debug('Network stats cache set', { key, count: data?.length, ttl: CACHE_TTL.NETWORK_STATS / 1000 });
+}
+
+/**
+ * Get storage stats cache
+ */
+function getStorageStatsCache() {
+  if (caches.storageStats.data && caches.storageStats.expiresAt > Date.now()) {
+    logger.debug('Storage stats cache hit');
+    return caches.storageStats.data;
+  }
+  
+  logger.debug('Storage stats cache miss');
+  return null;
+}
+
+/**
+ * Set storage stats cache
+ */
+function setStorageStatsCache(data) {
+  caches.storageStats = {
+    data,
+    expiresAt: Date.now() + CACHE_TTL.STORAGE_STATS
+  };
+  logger.debug('Storage stats cache set', { ttl: CACHE_TTL.STORAGE_STATS / 1000 });
 }
 
 module.exports = {
@@ -164,11 +245,15 @@ module.exports = {
   getRoutersCache,
   getRoutersWithLocationsCache,
   getAssigneesCache,
+  getNetworkStatsCache,
+  getStorageStatsCache,
   
   // Setters
   setRoutersCache,
   setRoutersWithLocationsCache,
   setAssigneesCache,
+  setNetworkStatsCache,
+  setStorageStatsCache,
   
   // Invalidation
   invalidateCache,
