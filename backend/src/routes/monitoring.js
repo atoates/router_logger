@@ -362,6 +362,21 @@ router.get('/api/monitoring/location-usage', async (req, res) => {
     const dbStats = last24hCalls.rows[0];
     const dailyLimit = stats.dailyLimit;
     
+    // Get DB cache stats
+    let dbCacheStats = { total: 0, totalHits: 0 };
+    try {
+      const cacheResult = await pool.query(`
+        SELECT COUNT(*) as total, COALESCE(SUM(hit_count), 0) as total_hits
+        FROM cell_tower_cache
+      `);
+      dbCacheStats = {
+        total: parseInt(cacheResult.rows[0]?.total) || 0,
+        totalHits: parseInt(cacheResult.rows[0]?.total_hits) || 0
+      };
+    } catch (e) {
+      // Table might not exist yet
+    }
+
     res.json({
       enabled: !!process.env.LOCATION_API,
       apiUsage: {
@@ -380,8 +395,10 @@ router.get('/api/monitoring/location-usage', async (req, res) => {
         lastError: stats.lastError
       },
       cache: {
-        size: cacheStats.size,
-        maxAgeHours: cacheStats.maxAge / (1000 * 60 * 60)
+        memorySize: cacheStats.size,
+        maxAgeHours: cacheStats.maxAge / (1000 * 60 * 60),
+        dbCachedTowers: dbCacheStats.total,
+        dbTotalHits: dbCacheStats.totalHits
       },
       history: last7dCalls.rows
     });

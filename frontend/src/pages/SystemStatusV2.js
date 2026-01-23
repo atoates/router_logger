@@ -575,7 +575,7 @@ export default function SystemStatusV2() {
               </div>
               <div className="metric-sub">
                 {data.locationUsage?.apiUsage?.today || 0} / {data.locationUsage?.apiUsage?.dailyLimit || 100} calls today
-                {data.locationUsage?.apiUsage?.cacheHits > 0 && ` • ${data.locationUsage?.apiUsage?.cacheHits} cache hits`}
+                {data.locationUsage?.cache?.dbCachedTowers > 0 && ` • ${data.locationUsage?.cache?.dbCachedTowers} towers cached`}
               </div>
             </div>
           </div>

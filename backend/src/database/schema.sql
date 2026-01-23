@@ -229,6 +229,25 @@ CREATE TABLE IF NOT EXISTS router_locations (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Cell tower coordinate cache (persistent, survives server restarts)
+-- Saves Unwired Labs API calls - cell towers don't move!
+CREATE TABLE IF NOT EXISTS cell_tower_cache (
+  id SERIAL PRIMARY KEY,
+  cache_key VARCHAR(100) NOT NULL UNIQUE, -- Format: {mcc}-{mnc}-{lac/tac}-{cell_id}
+  mcc VARCHAR(10) NOT NULL,
+  mnc VARCHAR(10) NOT NULL,
+  lac_or_tac VARCHAR(20) NOT NULL,
+  cell_id VARCHAR(50) NOT NULL,
+  latitude DECIMAL(10, 8) NOT NULL,
+  longitude DECIMAL(11, 8) NOT NULL,
+  accuracy INTEGER,
+  radio_type VARCHAR(10), -- gsm, umts, lte
+  source VARCHAR(50) DEFAULT 'unwiredlabs',
+  hit_count INTEGER DEFAULT 1, -- Track how often this tower is used
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ============================================================================
 -- OAUTH & INTEGRATION TABLES
 -- ============================================================================

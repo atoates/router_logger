@@ -114,6 +114,73 @@ function getCacheKey(cellInfo) {
 }
 
 /**
+ * Check database cache for cell tower location
+ */
+async function getFromDbCache(cacheKey) {
+  try {
+    const result = await pool.query(
+      `SELECT latitude, longitude, accuracy, radio_type 
+       FROM cell_tower_cache 
+       WHERE cache_key = $1`,
+      [cacheKey]
+    );
+    
+    if (result.rows.length > 0) {
+      // Update hit count and last_used_at
+      pool.query(
+        `UPDATE cell_tower_cache 
+         SET hit_count = hit_count + 1, last_used_at = CURRENT_TIMESTAMP 
+         WHERE cache_key = $1`,
+        [cacheKey]
+      ).catch(() => {}); // Fire and forget
+      
+      return {
+        latitude: parseFloat(result.rows[0].latitude),
+        longitude: parseFloat(result.rows[0].longitude),
+        accuracy: result.rows[0].accuracy || 'unknown',
+        source: 'db_cache'
+      };
+    }
+    return null;
+  } catch (err) {
+    logger.warn('Error checking DB cache for cell tower:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Save cell tower location to database cache
+ */
+async function saveToDbCache(cacheKey, cellInfo, locationData, radioType) {
+  try {
+    const lacOrTac = cellInfo.tac || cellInfo.lac;
+    await pool.query(
+      `INSERT INTO cell_tower_cache 
+       (cache_key, mcc, mnc, lac_or_tac, cell_id, latitude, longitude, accuracy, radio_type, source)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (cache_key) DO UPDATE SET
+         hit_count = cell_tower_cache.hit_count + 1,
+         last_used_at = CURRENT_TIMESTAMP`,
+      [
+        cacheKey,
+        cellInfo.mcc,
+        cellInfo.mnc,
+        lacOrTac,
+        cellInfo.cell_id,
+        locationData.latitude,
+        locationData.longitude,
+        locationData.accuracy,
+        radioType,
+        'unwiredlabs'
+      ]
+    );
+    logger.debug(`Saved cell tower to DB cache: ${cacheKey}`);
+  } catch (err) {
+    logger.warn('Error saving to DB cache:', err.message);
+  }
+}
+
+/**
  * Detect radio type from network_type or EARFCN
  * LTE EARFCN: 0-65535 (but commonly 0-54999)
  * UMTS UARFCN: 0-16383
@@ -177,13 +244,24 @@ async function getCellLocation(cellInfo) {
     return null;
   }
 
-  // Check cache first
   const cacheKey = getCacheKey(cellInfo);
+
+  // Check in-memory cache first (fastest)
   const cached = cellLocationCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    logger.debug(`Cell location cache hit for ${cacheKey}`);
+    logger.debug(`Cell location memory cache hit for ${cacheKey}`);
     apiUsageStats.cacheHits++;
     return cached.data;
+  }
+
+  // Check database cache (survives restarts)
+  const dbCached = await getFromDbCache(cacheKey);
+  if (dbCached) {
+    logger.debug(`Cell location DB cache hit for ${cacheKey}`);
+    apiUsageStats.cacheHits++;
+    // Also populate in-memory cache
+    cellLocationCache.set(cacheKey, { data: dbCached, timestamp: Date.now() });
+    return dbCached;
   }
 
   // Check rate limits before making API call
@@ -248,8 +326,11 @@ async function getCellLocation(cellInfo) {
         fallback: response.data.fallback || null
       };
       
-      // Cache the result
+      // Cache the result in memory
       cellLocationCache.set(cacheKey, { data: locationData, timestamp: Date.now() });
+      
+      // Also save to database cache (persistent)
+      await saveToDbCache(cacheKey, cellInfo, locationData, radio);
       
       logger.info(`Cell location resolved: ${locationData.latitude}, ${locationData.longitude} (accuracy: ${locationData.accuracy}m)`);
       return locationData;
