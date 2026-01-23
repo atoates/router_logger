@@ -39,7 +39,7 @@ function SystemStatusIndicator() {
   const checkAllStatus = async () => {
     // Check RMS
     try {
-      const rmsRes = await api.get('/api/rms/status');
+      const rmsRes = await api.get('/rms/status');
       setStatus(prev => ({
         ...prev,
         rms: {
@@ -52,13 +52,13 @@ function SystemStatusIndicator() {
     } catch (err) {
       setStatus(prev => ({
         ...prev,
-        rms: { healthy: false, message: 'API error' }
+        rms: { healthy: false, message: 'Unreachable' }
       }));
     }
 
     // Check ClickUp
     try {
-      const clickupRes = await api.get('/api/clickup/auth/status');
+      const clickupRes = await api.get('/clickup/auth/status');
       setStatus(prev => ({
         ...prev,
         clickup: {
@@ -71,13 +71,13 @@ function SystemStatusIndicator() {
     } catch (err) {
       setStatus(prev => ({
         ...prev,
-        clickup: { healthy: false, message: 'API error' }
+        clickup: { healthy: false, message: 'Unreachable' }
       }));
     }
 
     // Check Database (use a simple endpoint)
     try {
-      const dbRes = await api.get('/api/routers?limit=1');
+      const dbRes = await api.get('/routers?limit=1');
       setStatus(prev => ({
         ...prev,
         database: { healthy: true, message: 'Connected' }
@@ -85,7 +85,7 @@ function SystemStatusIndicator() {
     } catch (err) {
       setStatus(prev => ({
         ...prev,
-        database: { healthy: false, message: 'Connection error' }
+        database: { healthy: false, message: 'Unreachable' }
       }));
     }
   };
