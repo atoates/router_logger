@@ -199,28 +199,8 @@ async function syncRouterToClickUp(router, dataUsageMap = {}, force = false) {
       // Note: MAC Address is updated separately below to ensure reliability
     }
 
-    // Last Online (date timestamp in milliseconds)
-    if (router.last_seen) {
-      const timestampMs = new Date(router.last_seen).getTime();
-      logger.info('[LAST_ONLINE_DEBUG] Adding Last Online to sync payload', {
-        routerId: router.router_id,
-        fieldId: CUSTOM_FIELDS.LAST_ONLINE,
-        rawLastSeen: router.last_seen,
-        timestampMs,
-        timestampISO: new Date(router.last_seen).toISOString(),
-        valueType: typeof timestampMs
-      });
-      
-      customFields.push({
-        id: CUSTOM_FIELDS.LAST_ONLINE,
-        value: timestampMs
-      });
-    } else {
-      logger.warn('[LAST_ONLINE_DEBUG] Router has no last_seen value', {
-        routerId: router.router_id,
-        lastSeen: router.last_seen
-      });
-    }
+    // Last Online (date timestamp) - will be updated separately via individual field API
+    // Date/timestamp fields require individual API calls, bulk updates are silently ignored by ClickUp
 
     // Operational Status (dropdown) - will be updated separately via individual field API
     // Calculate the value but don't add to customFields array
@@ -389,6 +369,33 @@ async function syncRouterToClickUp(router, dataUsageMap = {}, force = false) {
       }
     } else {
       logger.warn(`Router ${router.router_id}: No data usage calculated (not in map) - skipping field update`);
+    }
+
+    // Update Last Online separately using the individual field API
+    // Date/timestamp fields MUST use individual API - bulk updates are silently ignored by ClickUp
+    if (router.last_seen) {
+      try {
+        const timestampMs = new Date(router.last_seen).getTime();
+        logger.info(`[LAST_ONLINE_DEBUG] Updating Last Online field individually for router ${router.router_id}`, {
+          fieldId: CUSTOM_FIELDS.LAST_ONLINE,
+          rawLastSeen: router.last_seen,
+          timestampMs,
+          timestampISO: new Date(router.last_seen).toISOString()
+        });
+        
+        await clickupClient.updateCustomField(
+          router.clickup_task_id,
+          CUSTOM_FIELDS.LAST_ONLINE,
+          timestampMs,
+          'default'
+        );
+        logger.info(`[LAST_ONLINE_DEBUG] ✓ Successfully updated Last Online for router ${router.router_id}`);
+      } catch (lastOnlineError) {
+        logger.error(`[LAST_ONLINE_DEBUG] Failed to update Last Online for router ${router.router_id}:`, lastOnlineError.message);
+        // Don't fail the whole sync if just the Last Online field fails
+      }
+    } else {
+      logger.warn(`[LAST_ONLINE_DEBUG] Router ${router.router_id}: No last_seen value - skipping Last Online update`);
     }
 
     // Store the hash in database for future comparison (smart sync)
