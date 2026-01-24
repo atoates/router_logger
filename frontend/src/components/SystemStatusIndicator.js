@@ -141,16 +141,6 @@ function SystemStatusIndicator() {
               <span className="status-message">{status.database.message}</span>
             </div>
           </div>
-          
-          <button 
-            className="refresh-btn" 
-            onClick={(e) => {
-              e.stopPropagation();
-              checkAllStatus();
-            }}
-          >
-            ↻ Refresh
-          </button>
         </div>
       )}
     </div>
