@@ -78,7 +78,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 14px;
+  padding: 10px 14px;
   background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border-color);
   font-weight: 600;
@@ -99,14 +99,14 @@
 }
 
 .status-items {
-  padding: 0 0 8px 0;
+  padding: 4px 0;
 }
 
 .status-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  padding: 8px 14px;
   transition: background 0.2s;
 }
 
