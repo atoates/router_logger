@@ -142,7 +142,13 @@ function SystemStatusIndicator() {
             </div>
           </div>
           
-          <button className="refresh-btn" onClick={checkAllStatus}>
+          <button 
+            className="refresh-btn" 
+            onClick={(e) => {
+              e.stopPropagation();
+              checkAllStatus();
+            }}
+          >
             ↻ Refresh
           </button>
         </div>
