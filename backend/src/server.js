@@ -356,19 +356,30 @@ async function startServer() {
 }
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM signal received: closing HTTP server');
-  closeMQTT();
-  distributedLockService.releaseAll().catch(() => {});
+const shutdown = async (signal) => {
+  logger.info(`${signal} received: shutting down gracefully...`);
+  
+  try {
+    // Stop accepting new connections
+    closeMQTT();
+    
+    // Release distributed locks
+    await distributedLockService.releaseAll().catch(() => {});
+    
+    // Close database pool
+    const { gracefulShutdown } = require('./config/database');
+    await gracefulShutdown();
+    
+    logger.info('Graceful shutdown complete');
+  } catch (err) {
+    // Ignore shutdown errors
+  }
+  
   process.exit(0);
-});
+};
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT signal received: closing HTTP server');
-  closeMQTT();
-  distributedLockService.releaseAll().catch(() => {});
-  process.exit(0);
-});
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 startServer();
 

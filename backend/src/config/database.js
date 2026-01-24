@@ -17,6 +17,36 @@ const pool = new Pool({
   statement_timeout: parseInt(process.env.DB_STATEMENT_TIMEOUT || '60000', 10) // 60s max query time
 });
 
+// Handle pool errors gracefully (e.g., connection terminated during deployment)
+pool.on('error', (err, client) => {
+  // 57P01 = admin_shutdown (connection terminated by administrator)
+  // This happens during deployments when old containers are killed
+  if (err.code === '57P01') {
+    console.warn('Database connection terminated (deployment in progress)');
+  } else {
+    console.error('Unexpected database pool error:', err.message);
+  }
+  // Don't crash - the pool will create new connections as needed
+});
+
+// Track if we're shutting down to avoid noisy logs
+let isShuttingDown = false;
+
+const gracefulShutdown = async () => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  
+  try {
+    await pool.end();
+    console.log('Database pool closed gracefully');
+  } catch (err) {
+    // Ignore errors during shutdown
+  }
+};
+
+// Export shutdown function for server.js to use
+module.exports.gracefulShutdown = gracefulShutdown;
+
 // Logger configuration
 const logger = winston.createLogger({
   level: 'info',
