@@ -1,19 +1,26 @@
 /**
- * Distributed lock service using Postgres advisory locks with stale lock detection.
+ * Distributed lock service using Postgres advisory locks with heartbeat-based stale detection.
  *
  * - Uses pg_try_advisory_lock(int,int) so it works across instances.
  * - Holds the lock for the lifetime of the acquired client connection.
  * - Automatically releases locks on process exit when the DB connection closes.
- * - NEW: Tracks lock ownership in database for stale lock detection and force-release
+ * - Uses a heartbeat table to detect stale locks from dead containers
+ * - Heartbeat updated every 30 seconds, stale after 2 minutes
  */
 
 const crypto = require('crypto');
 const { pool, logger } = require('../config/database');
 
-const heldLocks = new Map(); // name -> { client, acquiredAt }
+const heldLocks = new Map(); // name -> { client, acquiredAt, heartbeatInterval }
 
-// Lock timeout - if a lock is held longer than this, consider it stale
-const LOCK_TIMEOUT_MS = parseInt(process.env.LOCK_TIMEOUT_MS || '1800000', 10); // 30 minutes default
+// Heartbeat interval - how often to update the heartbeat
+const HEARTBEAT_INTERVAL_MS = parseInt(process.env.LOCK_HEARTBEAT_MS || '30000', 10); // 30 seconds
+
+// Stale threshold - if heartbeat is older than this, consider the lock stale
+const STALE_THRESHOLD_MS = parseInt(process.env.LOCK_STALE_THRESHOLD_MS || '120000', 10); // 2 minutes
+
+// Instance ID for this process
+const INSTANCE_ID = `${process.env.RAILWAY_DEPLOYMENT_ID || 'local'}-${process.pid}-${Date.now()}`;
 
 function nameToAdvisoryKeys(name) {
   // Deterministic 64-bit-ish mapping -> 2 x int32.
@@ -24,16 +31,107 @@ function nameToAdvisoryKeys(name) {
 }
 
 /**
+ * Ensure the heartbeat table exists
+ */
+async function ensureHeartbeatTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS distributed_lock_heartbeats (
+        lock_name VARCHAR(255) PRIMARY KEY,
+        instance_id VARCHAR(255) NOT NULL,
+        heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        acquired_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+  } catch (error) {
+    // Table might already exist, that's fine
+    logger.debug('Heartbeat table check:', error.message);
+  }
+}
+
+/**
+ * Update heartbeat for a lock we hold
+ */
+async function updateHeartbeat(name) {
+  try {
+    await pool.query(`
+      INSERT INTO distributed_lock_heartbeats (lock_name, instance_id, heartbeat_at, acquired_at)
+      VALUES ($1, $2, NOW(), NOW())
+      ON CONFLICT (lock_name) DO UPDATE SET
+        heartbeat_at = NOW(),
+        instance_id = $2
+    `, [name, INSTANCE_ID]);
+  } catch (error) {
+    logger.warn(`Failed to update heartbeat for lock "${name}":`, error.message);
+  }
+}
+
+/**
+ * Remove heartbeat entry when releasing a lock
+ */
+async function removeHeartbeat(name) {
+  try {
+    await pool.query('DELETE FROM distributed_lock_heartbeats WHERE lock_name = $1', [name]);
+  } catch (error) {
+    logger.warn(`Failed to remove heartbeat for lock "${name}":`, error.message);
+  }
+}
+
+/**
+ * Check if a lock is stale based on heartbeat
+ * Returns { stale: boolean, heartbeatAge: number, instanceId: string } or null if no heartbeat
+ */
+async function checkHeartbeat(name) {
+  try {
+    const result = await pool.query(`
+      SELECT instance_id, heartbeat_at, acquired_at,
+             EXTRACT(EPOCH FROM (NOW() - heartbeat_at)) * 1000 as age_ms
+      FROM distributed_lock_heartbeats
+      WHERE lock_name = $1
+    `, [name]);
+    
+    if (result.rows.length === 0) {
+      return null; // No heartbeat record
+    }
+    
+    const row = result.rows[0];
+    const ageMs = parseFloat(row.age_ms);
+    
+    return {
+      stale: ageMs > STALE_THRESHOLD_MS,
+      heartbeatAgeMs: ageMs,
+      instanceId: row.instance_id,
+      acquiredAt: row.acquired_at
+    };
+  } catch (error) {
+    logger.warn(`Failed to check heartbeat for lock "${name}":`, error.message);
+    return null;
+  }
+}
+
+/**
  * Check if a lock appears to be stale (held by a dead process)
- * Uses pg_stat_activity to check if the holding connection is still active
+ * Uses heartbeat table first, falls back to pg_stat_activity
  */
 async function isLockStale(name) {
+  // First check heartbeat table
+  const heartbeat = await checkHeartbeat(name);
+  
+  if (heartbeat) {
+    if (heartbeat.stale) {
+      logger.warn(`Lock "${name}" is stale - heartbeat ${Math.round(heartbeat.heartbeatAgeMs / 1000)}s old (threshold: ${STALE_THRESHOLD_MS / 1000}s), held by ${heartbeat.instanceId}`);
+      return true;
+    }
+    logger.info(`Lock "${name}" has fresh heartbeat (${Math.round(heartbeat.heartbeatAgeMs / 1000)}s old) from ${heartbeat.instanceId}`);
+    return false;
+  }
+  
+  // Fallback: check pg_stat_activity for very old idle connections
   const { key1, key2 } = nameToAdvisoryKeys(name);
   
   try {
-    // Check if any connection holds this lock
     const result = await pool.query(`
-      SELECT l.pid, a.state, a.query_start, a.state_change,
+      SELECT l.pid, a.state, 
              EXTRACT(EPOCH FROM (NOW() - a.state_change)) as idle_seconds
       FROM pg_locks l
       JOIN pg_stat_activity a ON l.pid = a.pid
@@ -44,17 +142,16 @@ async function isLockStale(name) {
     `, [key1, key2]);
     
     if (result.rows.length === 0) {
-      // No one holds the lock
+      // No one holds the lock according to pg_locks
       return false;
     }
     
     const holder = result.rows[0];
     const idleSeconds = parseFloat(holder.idle_seconds) || 0;
-    const timeoutSeconds = LOCK_TIMEOUT_MS / 1000;
     
-    // Consider stale if connection has been idle for longer than timeout
-    if (holder.state === 'idle' && idleSeconds > timeoutSeconds) {
-      logger.warn(`Lock "${name}" appears stale - held by PID ${holder.pid} idle for ${Math.round(idleSeconds)}s (timeout: ${timeoutSeconds}s)`);
+    // Consider stale if idle for more than stale threshold
+    if (holder.state === 'idle' && idleSeconds > STALE_THRESHOLD_MS / 1000) {
+      logger.warn(`Lock "${name}" appears stale - PID ${holder.pid} idle for ${Math.round(idleSeconds)}s`);
       return true;
     }
     
@@ -66,13 +163,15 @@ async function isLockStale(name) {
 }
 
 /**
- * Force-release a stale lock by terminating the holding connection
- * USE WITH CAUTION - this terminates another database connection
+ * Force-release a stale lock by terminating the holding connection and clearing heartbeat
  */
 async function forceReleaseStaleLock(name) {
   const { key1, key2 } = nameToAdvisoryKeys(name);
   
   try {
+    // Clear the heartbeat entry first
+    await removeHeartbeat(name);
+    
     // Find the PID holding this lock
     const lockResult = await pool.query(`
       SELECT l.pid
@@ -108,6 +207,8 @@ async function forceReleaseStaleLock(name) {
 async function tryAcquire(name) {
   if (heldLocks.has(name)) return true;
 
+  await ensureHeartbeatTable();
+  
   const { key1, key2 } = nameToAdvisoryKeys(name);
   const client = await pool.connect();
 
@@ -122,8 +223,18 @@ async function tryAcquire(name) {
       return false;
     }
 
-    heldLocks.set(name, { client, acquiredAt: Date.now() });
-    logger.info(`Acquired distributed lock: ${name}`);
+    // Record heartbeat immediately
+    await updateHeartbeat(name);
+    
+    // Start heartbeat interval
+    const heartbeatInterval = setInterval(() => {
+      updateHeartbeat(name).catch(err => {
+        logger.warn(`Heartbeat update failed for "${name}":`, err.message);
+      });
+    }, HEARTBEAT_INTERVAL_MS);
+
+    heldLocks.set(name, { client, acquiredAt: Date.now(), heartbeatInterval });
+    logger.info(`Acquired distributed lock: ${name} (instance: ${INSTANCE_ID})`);
     return true;
   } catch (error) {
     client.release();
@@ -136,6 +247,8 @@ async function tryAcquire(name) {
  * Try to acquire lock, with automatic stale lock detection and force-release
  */
 async function tryAcquireWithStaleCheck(name) {
+  await ensureHeartbeatTable();
+  
   // First try normal acquisition
   if (await tryAcquire(name)) {
     return true;
@@ -164,10 +277,20 @@ async function release(name) {
   const lockInfo = heldLocks.get(name);
   if (!lockInfo) return;
 
-  const { client } = lockInfo;
+  const { client, heartbeatInterval } = lockInfo;
   const { key1, key2 } = nameToAdvisoryKeys(name);
+  
+  // Stop heartbeat
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+  }
+  
+  // Remove heartbeat record
+  await removeHeartbeat(name);
+  
   try {
     await client.query('SELECT pg_advisory_unlock($1, $2)', [key1, key2]);
+    logger.info(`Released distributed lock: ${name}`);
   } catch (error) {
     logger.warn(`Failed to release distributed lock: ${name}`, { error: error.message });
   } finally {
@@ -196,9 +319,17 @@ async function getLockStatus() {
     };
   }
   
-  // Also check for any advisory locks in the database
   try {
-    const result = await pool.query(`
+    // Check heartbeat table
+    const heartbeats = await pool.query(`
+      SELECT lock_name, instance_id, heartbeat_at, acquired_at,
+             EXTRACT(EPOCH FROM (NOW() - heartbeat_at)) * 1000 as age_ms
+      FROM distributed_lock_heartbeats
+      ORDER BY lock_name
+    `);
+    
+    // Check advisory locks
+    const locks = await pool.query(`
       SELECT l.classid, l.objid, l.pid, a.state, 
              EXTRACT(EPOCH FROM (NOW() - a.state_change)) as idle_seconds
       FROM pg_locks l
@@ -207,18 +338,30 @@ async function getLockStatus() {
     `);
     
     return {
+      instanceId: INSTANCE_ID,
       heldByThisProcess: held,
-      allAdvisoryLocks: result.rows.map(r => ({
+      heartbeats: heartbeats.rows.map(r => ({
+        lockName: r.lock_name,
+        instanceId: r.instance_id,
+        heartbeatAt: r.heartbeat_at,
+        ageMs: Math.round(parseFloat(r.age_ms)),
+        stale: parseFloat(r.age_ms) > STALE_THRESHOLD_MS
+      })),
+      advisoryLocks: locks.rows.map(r => ({
         classid: r.classid,
         objid: r.objid,
         pid: r.pid,
         state: r.state,
         idleSeconds: Math.round(parseFloat(r.idle_seconds) || 0)
       })),
-      lockTimeoutMs: LOCK_TIMEOUT_MS
+      config: {
+        heartbeatIntervalMs: HEARTBEAT_INTERVAL_MS,
+        staleThresholdMs: STALE_THRESHOLD_MS
+      }
     };
   } catch (error) {
     return {
+      instanceId: INSTANCE_ID,
       heldByThisProcess: held,
       error: error.message
     };
@@ -233,7 +376,9 @@ module.exports = {
   isLockStale,
   forceReleaseStaleLock,
   getLockStatus,
-  nameToAdvisoryKeys
+  nameToAdvisoryKeys,
+  checkHeartbeat,
+  INSTANCE_ID
 };
 
 

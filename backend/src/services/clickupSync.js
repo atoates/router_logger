@@ -1195,7 +1195,7 @@ async function checkExtendedOfflineRouters() {
         r.clickup_location_task_name,
         r.current_status,
         r.last_seen,
-        r.serial,
+        r.device_serial as serial,
         r.imei,
         r.operator,
         r.extended_offline_alert_sent_at,
