@@ -663,17 +663,19 @@ export default function RouterDashboard({ router }) {
                 </div>
                 <div className="wifi-avatars">
                   {filteredGuests.slice(0, 8).map((guest, idx) => {
-                    const userName = guest.username || guest.email || 'Unknown';
-                    const userColor = userColors[userName];
+                    // Prefer email or guest_name for display (username is technical RADIUS ID like "free-123456")
+                    const displayName = guest.email || guest.guest_name || guest.username || 'Unknown';
+                    const userColor = userColors[guest.username || guest.email || 'Unknown'];
+                    const guestId = guest.id || guest.session_id;
                     return (
                       <div 
-                        key={guest.id || idx} 
+                        key={guest.id || guest.session_id || idx} 
                         className="wifi-avatar"
                         style={{ backgroundColor: userColor }}
-                        title={userName}
-                        onClick={() => navigate(`/wifi-guest/${guest.id}`)}
+                        title={displayName}
+                        onClick={() => guestId && navigate(`/wifi-guest/${guestId}`)}
                       >
-                        {userName.charAt(0).toUpperCase()}
+                        {displayName.charAt(0).toUpperCase()}
                       </div>
                     );
                   })}

@@ -663,7 +663,8 @@ router.get('/stats', async (req, res) => {
         COUNT(DISTINCT router_id) as routers_used,
         COUNT(DISTINCT user_mac) as unique_devices,
         AVG(session_duration_seconds) as avg_session_duration,
-        COUNT(*) FILTER (WHERE session_end IS NULL) as active_sessions
+        COUNT(*) FILTER (WHERE session_end IS NULL) as active_sessions,
+        AVG(COALESCE(bytes_total, 0)) as avg_data_used
       FROM wifi_guest_sessions
       ${whereClause}
     `;
@@ -740,6 +741,7 @@ router.get('/router/:routerId', async (req, res) => {
     
     const result = await pool.query(`
       SELECT 
+        id,
         session_id,
         username,
         email,

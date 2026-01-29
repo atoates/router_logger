@@ -302,6 +302,7 @@ const Users = () => {
   const totalSessions = stats?.summary?.total_sessions || 0;
   const uniqueGuests = stats?.summary?.unique_guests || 0;
   const avgDuration = stats?.summary?.avg_session_duration || 0;
+  const avgDataUsed = stats?.summary?.avg_data_used || 0;
 
   return (
     <div className="users-container">
@@ -373,6 +374,16 @@ const Users = () => {
           <div className="stat-content">
             <div className="stat-value">{formatDuration(avgDuration)}</div>
             <div className="stat-label">Avg Session</div>
+          </div>
+        </div>
+        
+        <div className="users-stat-card">
+          <div className="stat-icon data">
+            <span>📡</span>
+          </div>
+          <div className="stat-content">
+            <div className="stat-value">{formatDataUsage(avgDataUsed)}</div>
+            <div className="stat-label">Average data used</div>
           </div>
         </div>
       </div>
