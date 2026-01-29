@@ -365,21 +365,46 @@ async function startRMSSync(intervalMinutes = 15) {
     return syncIntervalId;
   }
 
+  const LOCK_NAME = 'scheduler:rms_sync';
+  
+  // On startup, aggressively try to acquire the scheduler lock
+  // This handles cases where a previous deployment crashed without releasing the lock
+  logger.info(`🔒 Attempting to acquire RMS sync scheduler lock: ${LOCK_NAME}`);
+  
+  // First, check if there's a stale lock and log its status
+  const lockStatus = await distributedLockService.checkHeartbeat?.(LOCK_NAME);
+  if (lockStatus) {
+    const ageMinutes = (lockStatus.heartbeatAgeMs / 60000).toFixed(1);
+    logger.info(`🔒 Existing lock status: instance=${lockStatus.instanceId}, heartbeat=${ageMinutes}min ago, stale=${lockStatus.stale}`);
+  } else {
+    logger.info(`🔒 No existing lock heartbeat found for ${LOCK_NAME}`);
+  }
+  
   // Distributed singleton: only one instance should run RMS sync
   // Use stale-lock detection to automatically release locks from dead containers
-  let acquired = await distributedLockService.tryAcquireWithStaleCheck('scheduler:rms_sync');
+  let acquired = await distributedLockService.tryAcquireWithStaleCheck(LOCK_NAME);
   
   if (!acquired) {
     // Wait 10 seconds and try again with stale check - covers deployment race conditions
-    logger.info('RMS sync lock held by another instance, retrying in 10 seconds with stale-lock check...');
+    logger.info('🔒 RMS sync lock held by another instance, retrying in 10 seconds with stale-lock check...');
     await new Promise(resolve => setTimeout(resolve, 10000));
-    acquired = await distributedLockService.tryAcquireWithStaleCheck('scheduler:rms_sync');
+    acquired = await distributedLockService.tryAcquireWithStaleCheck(LOCK_NAME);
   }
   
   if (!acquired) {
-    logger.warn('RMS sync scheduler not started on this instance (lock held by active instance)');
+    // Third attempt after 20 more seconds - sometimes deployments take time to clean up
+    logger.warn('🔒 RMS sync lock still held, final retry in 20 seconds...');
+    await new Promise(resolve => setTimeout(resolve, 20000));
+    acquired = await distributedLockService.tryAcquireWithStaleCheck(LOCK_NAME);
+  }
+  
+  if (!acquired) {
+    logger.error('❌ RMS SYNC SCHEDULER FAILED TO START - could not acquire lock after 3 attempts');
+    logger.error('❌ Manual intervention may be required: POST /api/rms/locks/force-release/rms_sync');
     return null;
   }
+  
+  logger.info('✅ Successfully acquired RMS sync scheduler lock');
 
   const intervalMs = intervalMinutes * 60 * 1000;
   logger.info(`Starting RMS sync scheduler (every ${intervalMinutes} minutes)`);

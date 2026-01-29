@@ -525,7 +525,7 @@ router.get('/debug/sync-status', async (req, res) => {
 
 // All other RMS routes require admin access
 router.use(requireAdmin);
-const { syncFromRMS } = require('../services/rmsSync');
+const { syncFromRMS, startRMSSync, isRMSSyncRunning } = require('../services/rmsSync');
 const { mergeDuplicateRouters } = require('../models/router');
 const RMSClient = require('../services/rmsClient');
 const distributedLockService = require('../services/distributedLockService');
@@ -533,6 +533,63 @@ const distributedLockService = require('../services/distributedLockService');
 // ============================================================================
 // LOCK MANAGEMENT ENDPOINTS (admin only)
 // ============================================================================
+
+/**
+ * POST /api/rms/scheduler/start
+ * Manually start the RMS sync scheduler if it's not running
+ * Use this after fixing stuck locks or if scheduler failed to start on boot
+ */
+router.post('/scheduler/start', async (req, res) => {
+  try {
+    if (isRMSSyncRunning()) {
+      return res.json({
+        success: false,
+        message: 'RMS sync scheduler is already running on this instance',
+        recommendation: 'If syncs are not happening, check /api/rms/locks/status for stale locks'
+      });
+    }
+    
+    const rmsSyncInterval = parseInt(process.env.RMS_SYNC_INTERVAL_MINUTES || '5', 10);
+    logger.info(`Admin requested manual start of RMS sync scheduler (${rmsSyncInterval} minute interval)`);
+    
+    const result = await startRMSSync(rmsSyncInterval);
+    
+    if (result) {
+      res.json({
+        success: true,
+        message: `RMS sync scheduler started successfully (every ${rmsSyncInterval} minutes)`,
+        note: 'First sync will run in 5 seconds'
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to start RMS sync scheduler',
+        recommendation: 'Check /api/rms/locks/status for stuck locks. You may need to force-release with POST /api/rms/locks/force-release/rms_sync'
+      });
+    }
+  } catch (error) {
+    logger.error('Failed to start RMS scheduler manually:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/rms/scheduler/status
+ * Check if the RMS sync scheduler is running on this instance
+ */
+router.get('/scheduler/status', async (req, res) => {
+  const isRunning = isRMSSyncRunning();
+  const lockStatus = await distributedLockService.getLockStatus();
+  
+  res.json({
+    schedulerRunning: isRunning,
+    instanceId: lockStatus.instanceId,
+    locks: lockStatus.heartbeats?.filter(h => h.lockName.includes('rms')) || [],
+    recommendation: !isRunning 
+      ? 'Scheduler not running on this instance. Use POST /api/rms/scheduler/start to start it.'
+      : 'Scheduler is running normally'
+  });
+});
 
 /**
  * GET /api/rms/locks/status

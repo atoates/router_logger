@@ -291,12 +291,17 @@ async function startServer() {
         canSync = true;
         logger.info('RMS sync enabled via OAuth');
       } else {
-        logger.info('RMS sync not started yet (no PAT or OAuth token)');
+        logger.warn('⚠️ RMS sync not started - no PAT or OAuth token available');
+        logger.warn('⚠️ To enable RMS sync, either set RMS_ACCESS_TOKEN env var or complete OAuth at /api/rms/oauth/start');
       }
     }
     if (canSync) {
-      await startRMSSync(parseInt(rmsSyncInterval));
-      logger.info('RMS sync scheduler startup attempted');
+      const syncStarted = await startRMSSync(parseInt(rmsSyncInterval));
+      if (syncStarted) {
+        logger.info(`✅ RMS sync scheduler started successfully (every ${rmsSyncInterval} minutes)`);
+      } else {
+        logger.error('❌ RMS sync scheduler FAILED to start - check distributed lock status');
+      }
     }
     
     // Start ClickUp sync (every 30 minutes by default)
