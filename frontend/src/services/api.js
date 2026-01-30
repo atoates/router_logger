@@ -134,26 +134,7 @@ export const updateRouterStatus = (routerId, status, notes) => api.patch(`/route
 export const uploadReportToClickUp = (routerId, pdfData, reportType, dateRange) => 
   api.post(`/routers/${routerId}/upload-report`, { pdfData, reportType, dateRange });
 
-// Admin - Cache Management
-export const clearRouterCache = () => {
-  // Clear frontend cache immediately
-  _routersCache = { data: null, expiresAt: 0 };
-  // Clear backend cache
-  return api.post('/admin/clear-cache');
-};
-
-// Admin - Deduplication Report
-export const getDeduplicationReport = () => api.get('/admin/deduplication-report');
-
-// Force refresh routers (bypass cache)
-export const forceRefreshRouters = async () => {
-  _routersCache = { data: null, expiresAt: 0 };
-  return api.get('/routers');
-};
-
-// Admin - ClickUp Sync
-export const forceClickUpSync = () => api.post('/clickup/sync');
-export const getClickUpSyncStats = () => api.get('/clickup/sync/stats');
+// Admin - ClickUp Sync (single router)
 export const syncSingleRouterToClickUp = (routerId) => api.post(`/clickup/sync/${routerId}`);
 
 export default api;
