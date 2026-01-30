@@ -3,18 +3,17 @@ import { Routes, Route, useParams, useNavigate, useLocation, Link } from 'react-
 import './App.css';
 import ErrorBoundary from './components/ErrorBoundary';
 import ClickUpAuthButton from './components/ClickUpAuthButton';
-import DashboardV3 from './components/DashboardV3';
 import RouterDashboard from './components/RouterDashboard';
 import HeaderRouterSelect from './components/HeaderRouterSelect';
 import SystemStatusIndicator from './components/SystemStatusIndicator';
-import ReturnsPage from './components/ReturnsPage';
-import DecommissionedPage from './components/DecommissionedPage';
 import LoginPage from './components/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import UsersManagement from './components/UsersManagement';
 import GuestDashboard from './components/GuestDashboard';
 import Users from './components/Users';
 import AnalyticsBeta from './components/AnalyticsBeta';
+import FleetPage from './components/FleetPage';
+import SystemStatusV2 from './pages/SystemStatusV2';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer, toast } from 'react-toastify';
 import { getRouters } from './services/api';
@@ -110,24 +109,22 @@ function AppContent() {
   const navItems = isGuest ? [
     { path: '/', label: 'My Routers', icon: '📱', title: 'My Routers' },
   ] : [
-    { path: '/', label: 'Dashboard', icon: '📊', title: 'Dashboard' },
-    { path: '/users-activity', label: 'Users', icon: '👤', title: 'User Activity' },
-    { path: '/assignments', label: 'Assign', icon: '📍', title: 'Router Assignments' },
-    { path: '/stored', label: 'Stored', icon: '📦', title: 'Stored Routers' },
-    { path: '/returns', label: 'Returns', icon: '🔄', title: 'Returns' },
-    { path: '/decommissioned', label: 'Decom', icon: '⚠️', title: 'Decommissioned' },
-    { path: '/status', label: 'Status', icon: '⚙️', title: 'System Status' },
+    { path: '/', label: 'Overview', icon: '📊', title: 'Fleet Overview' },
+    { path: '/fleet', label: 'Fleet', icon: '📡', title: 'Router Fleet Management' },
+    { path: '/guests', label: 'Guests', icon: '👤', title: 'Guest WiFi Sessions' },
+    { path: '/system', label: 'System', icon: '⚙️', title: 'System Health & Monitoring' },
   ];
 
   // Admin-only navigation items
   const adminNavItems = [
-    { path: '/users', label: 'Users', icon: '👥', title: 'User Management' },
+    { path: '/team', label: 'Team', icon: '👥', title: 'Team & User Management' },
   ];
 
   // If login page, render standalone without header/nav
   if (isLoginPage) {
     return <LoginPage />;
   }
+
 
   return (
     <div className="app">
@@ -227,28 +224,37 @@ function AppContent() {
         {/* Navigation Menu - Only show on main pages, not on router detail page */}
         {!isRouterPage && (
           <nav className="app-nav">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`app-nav-link ${location.pathname === item.path ? 'active' : ''}`}
-                title={item.title || item.label}
-              >
-                <span className="app-nav-icon">{item.icon}</span>
-                <span className="app-nav-label">{item.label}</span>
-              </Link>
-            ))}
-            {isAdmin && adminNavItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`app-nav-link ${location.pathname === item.path ? 'active' : ''}`}
-                title={item.title || item.label}
-              >
-                <span className="app-nav-icon">{item.icon}</span>
-                <span className="app-nav-label">{item.label}</span>
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              // Check if current path matches (exact for / or startsWith for others)
+              const isActive = item.path === '/' 
+                ? location.pathname === '/' 
+                : location.pathname.startsWith(item.path);
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`app-nav-link ${isActive ? 'active' : ''}`}
+                  title={item.title || item.label}
+                >
+                  <span className="app-nav-icon">{item.icon}</span>
+                  <span className="app-nav-label">{item.label}</span>
+                </Link>
+              );
+            })}
+            {isAdmin && adminNavItems.map((item) => {
+              const isActive = location.pathname.startsWith(item.path);
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`app-nav-link ${isActive ? 'active' : ''}`}
+                  title={item.title || item.label}
+                >
+                  <span className="app-nav-icon">{item.icon}</span>
+                  <span className="app-nav-label">{item.label}</span>
+                </Link>
+              );
+            })}
           </nav>
         )}
 
@@ -265,34 +271,19 @@ function AppContent() {
                 )}
               </ProtectedRoute>
             } />
-            <Route path="/users-activity" element={
+            <Route path="/fleet" element={
+              <ProtectedRoute requireAdmin>
+                <FleetPage onOpenRouter={handleHeaderRouterSelect} />
+              </ProtectedRoute>
+            } />
+            <Route path="/guests" element={
               <ProtectedRoute requireAdmin>
                 <Users />
               </ProtectedRoute>
             } />
-            <Route path="/assignments" element={
+            <Route path="/system" element={
               <ProtectedRoute requireAdmin>
-                <DashboardV3 page="assignments" onOpenRouter={handleHeaderRouterSelect} />
-              </ProtectedRoute>
-            } />
-            <Route path="/stored" element={
-              <ProtectedRoute requireAdmin>
-                <DashboardV3 page="stored" onOpenRouter={handleHeaderRouterSelect} />
-              </ProtectedRoute>
-            } />
-            <Route path="/status" element={
-              <ProtectedRoute requireAdmin>
-                <DashboardV3 page="status" onOpenRouter={handleHeaderRouterSelect} />
-              </ProtectedRoute>
-            } />
-            <Route path="/returns" element={
-              <ProtectedRoute requireAdmin>
-                <ReturnsPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/decommissioned" element={
-              <ProtectedRoute requireAdmin>
-                <DecommissionedPage />
+                <SystemStatusV2 />
               </ProtectedRoute>
             } />
             <Route path="/router/:routerId" element={
@@ -300,7 +291,7 @@ function AppContent() {
                 <RouterDetailPage />
               </ProtectedRoute>
             } />
-            <Route path="/users" element={
+            <Route path="/team" element={
               <ProtectedRoute requireAdmin>
                 <UsersManagement />
               </ProtectedRoute>
