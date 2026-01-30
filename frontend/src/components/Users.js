@@ -209,6 +209,26 @@ const Users = () => {
     );
   }, [groupedDevices, searchQuery]);
 
+  // Calculate most active router by user count
+  const mostActiveRouter = useMemo(() => {
+    if (recentGuests.length === 0) return { name: 'N/A', count: 0 };
+    
+    const routerMap = new Map();
+    recentGuests.forEach(session => {
+      const routerName = session.router_name || `Router #${session.router_id}`;
+      routerMap.set(routerName, (routerMap.get(routerName) || 0) + 1);
+    });
+    
+    let maxRouter = { name: 'N/A', count: 0 };
+    routerMap.forEach((count, name) => {
+      if (count > maxRouter.count) {
+        maxRouter = { name, count };
+      }
+    });
+    
+    return maxRouter;
+  }, [recentGuests]);
+
   const toggleDevice = (mac) => {
     const newExpanded = new Set(expandedDevices);
     if (newExpanded.has(mac)) {
@@ -303,26 +323,6 @@ const Users = () => {
   const uniqueGuests = stats?.summary?.unique_guests || 0;
   const avgDuration = stats?.summary?.avg_session_duration || 0;
   const avgDataUsed = stats?.summary?.avg_data_used || 0;
-
-  // Calculate most active router by user count
-  const mostActiveRouter = useMemo(() => {
-    if (recentGuests.length === 0) return { name: 'N/A', count: 0 };
-    
-    const routerMap = new Map();
-    recentGuests.forEach(session => {
-      const routerName = session.router_name || `Router #${session.router_id}`;
-      routerMap.set(routerName, (routerMap.get(routerName) || 0) + 1);
-    });
-    
-    let maxRouter = { name: 'N/A', count: 0 };
-    routerMap.forEach((count, name) => {
-      if (count > maxRouter.count) {
-        maxRouter = { name, count };
-      }
-    });
-    
-    return maxRouter;
-  }, [recentGuests]);
 
   return (
     <div className="users-container">
