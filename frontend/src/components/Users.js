@@ -304,6 +304,26 @@ const Users = () => {
   const avgDuration = stats?.summary?.avg_session_duration || 0;
   const avgDataUsed = stats?.summary?.avg_data_used || 0;
 
+  // Calculate most active router by user count
+  const mostActiveRouter = useMemo(() => {
+    if (recentGuests.length === 0) return { name: 'N/A', count: 0 };
+    
+    const routerMap = new Map();
+    recentGuests.forEach(session => {
+      const routerName = session.router_name || `Router #${session.router_id}`;
+      routerMap.set(routerName, (routerMap.get(routerName) || 0) + 1);
+    });
+    
+    let maxRouter = { name: 'N/A', count: 0 };
+    routerMap.forEach((count, name) => {
+      if (count > maxRouter.count) {
+        maxRouter = { name, count };
+      }
+    });
+    
+    return maxRouter;
+  }, [recentGuests]);
+
   return (
     <div className="users-container">
       {/* Header */}
@@ -374,6 +394,17 @@ const Users = () => {
           <div className="stat-content">
             <div className="stat-value">{formatDataUsage(avgDataUsed)}</div>
             <div className="stat-label">Average data used</div>
+          </div>
+        </div>
+
+        <div className="users-stat-card">
+          <div className="stat-icon router">
+            <span>🔥</span>
+          </div>
+          <div className="stat-content">
+            <div className="stat-value">{mostActiveRouter.count}</div>
+            <div className="stat-label">Most Active</div>
+            <div className="stat-sublabel">{mostActiveRouter.name}</div>
           </div>
         </div>
       </div>
