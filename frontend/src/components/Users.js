@@ -358,16 +358,6 @@ const Users = () => {
         </div>
         
         <div className="users-stat-card">
-          <div className="stat-icon devices">
-            <span>📱</span>
-          </div>
-          <div className="stat-content">
-            <div className="stat-value">{parseInt(uniqueGuests).toLocaleString()}</div>
-            <div className="stat-label">Unique Devices</div>
-          </div>
-        </div>
-        
-        <div className="users-stat-card">
           <div className="stat-icon duration">
             <span>⏱️</span>
           </div>
