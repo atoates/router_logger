@@ -50,7 +50,15 @@ async function linkRouterToLocation(linkage) {
     });
 
     const linkDate = new Date();
-    
+
+    // End any existing active assignment so we can insert a new one (unique constraint: one active per router)
+    await client.query(
+      `UPDATE router_property_assignments
+       SET removed_at = $1, removed_by = $2
+       WHERE router_id = $3 AND removed_at IS NULL`,
+      [linkDate, linkedBy, routerId]
+    );
+
     // Update router with location task info
     const result = await client.query(
       `UPDATE routers 
