@@ -134,10 +134,6 @@ app.get('/', (req, res) => {
 // Guest WiFi routes (webhook + API for session queries)
 app.use('/api/guests', guestWifiRoutes);
 
-// Backwards compatibility: RADIUS server sends to /api/ironwifi/* endpoints
-// Route these to the new /api/guests/* handlers
-app.use('/api/ironwifi', guestWifiRoutes);
-
 // Other API routes
 app.use('/api/rms', rmsRoutes);
 app.use('/api/auth', authRoutes);
@@ -252,7 +248,6 @@ async function runCaptivePortalDiagnostic() {
     } else {
       logger.warn('⚠️  No guest sessions found - webhook may not be receiving events');
       logger.info('   Expected webhook endpoint: POST /api/guests/captive-portal/event');
-      logger.info('   Or legacy endpoint: POST /api/ironwifi/captive-portal/event');
     }
 
     // Check if RADIUS sync is configured

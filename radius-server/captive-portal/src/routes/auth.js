@@ -292,7 +292,7 @@ async function recordFreeUsage(macAddress, guestId, email = null) {
 async function notifyRouterLogger(eventData) {
     try {
         console.log(`📤 Sending ${eventData.type} to RouterLogger:`, JSON.stringify(eventData, null, 2));
-        await axios.post(`${ROUTERLOGGER_API_URL}/api/ironwifi/captive-portal/event`, eventData, {
+        await axios.post(`${ROUTERLOGGER_API_URL}/api/guests/captive-portal/event`, eventData, {
             timeout: 5000,
             headers: { 'Content-Type': 'application/json' }
         });
@@ -900,7 +900,7 @@ router.post('/login', async (req, res) => {
 
             // Notify RouterLogger
             try {
-                await axios.post(`${ROUTERLOGGER_API_URL}/api/ironwifi/webhook`, {
+                await axios.post(`${ROUTERLOGGER_API_URL}/api/guests/webhook`, {
                     type: 'guest_login',
                     username,
                     mac_address,
@@ -1089,7 +1089,7 @@ router.post('/verify-code', async (req, res) => {
 
         // Notify RouterLogger
         try {
-            await axios.post(`${ROUTERLOGGER_API_URL}/api/ironwifi/webhook`, {
+            await axios.post(`${ROUTERLOGGER_API_URL}/api/guests/webhook`, {
                 type: 'guest_registration',
                 username,
                 email,
@@ -1157,7 +1157,7 @@ router.post('/voucher', async (req, res) => {
 
             // Notify RouterLogger
             try {
-                await axios.post(`${ROUTERLOGGER_API_URL}/api/ironwifi/webhook`, {
+                await axios.post(`${ROUTERLOGGER_API_URL}/api/guests/webhook`, {
                     type: 'voucher_redemption',
                     voucher_code,
                     name,
@@ -1210,7 +1210,7 @@ router.post('/logout', async (req, res) => {
 
             // Notify RouterLogger
             try {
-                await axios.post(`${ROUTERLOGGER_API_URL}/api/ironwifi/webhook`, {
+                await axios.post(`${ROUTERLOGGER_API_URL}/api/guests/webhook`, {
                     type: 'guest_logout',
                     username: req.session.username,
                     session_id: req.session.sessionId,

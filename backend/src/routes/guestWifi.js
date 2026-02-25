@@ -14,7 +14,7 @@ const { pool, logger } = require('../config/database');
 // =============================================================================
 
 /**
- * POST /api/guests/captive-portal/event (or /api/ironwifi/webhook for legacy compatibility)
+ * POST /api/guests/captive-portal/event
  * Receive events from self-hosted captive portal (RADIUS server)
  *
  * Event types:
