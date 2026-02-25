@@ -119,7 +119,7 @@ router.get('/rms/callback', async (req, res) => {
     logger.info('OAuth flow completed successfully', { userId });
     
     // Ensure RMS sync is running now that OAuth token exists
-    const interval = parseInt(process.env.RMS_SYNC_INTERVAL_MINUTES || '15', 10);
+    const interval = parseInt(process.env.RMS_SYNC_INTERVAL_MINUTES || '5', 10);
     if (!isRMSSyncRunning()) {
       startRMSSync(interval);
       logger.info('RMS sync started after OAuth');

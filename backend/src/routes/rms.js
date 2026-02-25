@@ -687,24 +687,34 @@ router.get('/status', async (req, res) => {
   const { getRMSSyncStats } = require('../services/rmsSync');
   const syncStats = getRMSSyncStats();
   
-  // Query actual last log from database (not in-memory stats which reset on deploy)
+  // Query when telemetry was last processed (not the RMS-reported timestamp, which lags 10-15min)
   let lastLogFromDB = null;
+  let lastProcessedAt = null;
   let syncHealthy = false;
-  const syncIntervalMinutes = parseInt(process.env.RMS_SYNC_INTERVAL_MINUTES || '15', 10);
-  const staleThresholdMinutes = syncIntervalMinutes * 3; // Allow 3x interval before marking unhealthy
+  const syncIntervalMinutes = parseInt(process.env.RMS_SYNC_INTERVAL_MINUTES || '5', 10);
+  const staleThresholdMinutes = syncIntervalMinutes * 3 + 15; // 3x interval + 15min buffer for RMS timestamp lag
   
   try {
-    const result = await pool.query(
+    // Prefer router_current_status.updated_at (set to NOW() on each sync) over
+    // router_logs.timestamp (which is the RMS last_connection time, inherently 10-15min stale)
+    const statusResult = await pool.query(
+      'SELECT MAX(updated_at) as last_processed FROM router_current_status'
+    );
+    lastProcessedAt = statusResult.rows[0]?.last_processed || null;
+    
+    // Also get the latest log timestamp for diagnostics
+    const logResult = await pool.query(
       'SELECT MAX(timestamp) as last_log FROM router_logs'
     );
-    lastLogFromDB = result.rows[0]?.last_log || null;
+    lastLogFromDB = logResult.rows[0]?.last_log || null;
     
-    if (lastLogFromDB) {
-      const minutesSinceLastLog = (Date.now() - new Date(lastLogFromDB).getTime()) / 60000;
-      syncHealthy = minutesSinceLastLog < staleThresholdMinutes;
+    const effectiveTimestamp = lastProcessedAt || lastLogFromDB;
+    if (effectiveTimestamp) {
+      const minutesSinceLastSync = (Date.now() - new Date(effectiveTimestamp).getTime()) / 60000;
+      syncHealthy = minutesSinceLastSync < staleThresholdMinutes;
     }
   } catch (err) {
-    logger.error('Failed to query last log time for status', { error: err.message });
+    logger.error('Failed to query last sync time for status', { error: err.message });
   }
   
   res.json({
@@ -714,8 +724,8 @@ router.get('/status', async (req, res) => {
     message: rmsEnabled 
       ? `RMS integration is enabled via ${hasOAuth ? 'OAuth' : 'PAT'}` 
       : 'RMS integration is disabled (no token)',
-    // New health status based on actual database data
     healthy: syncHealthy,
+    lastProcessedAt,
     lastLogFromDB,
     staleThresholdMinutes,
     syncStats: {

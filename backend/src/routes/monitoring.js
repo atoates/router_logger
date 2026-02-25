@@ -998,13 +998,22 @@ router.get('/api/monitoring/sync-health', async (req, res) => {
     const { getRMSSyncStats, isRMSSyncRunning } = require('../services/rmsSync');
     
     const syncStats = getRMSSyncStats();
-    const syncIntervalMinutes = parseInt(process.env.RMS_SYNC_INTERVAL_MINUTES || '15', 10);
+    const syncIntervalMinutes = parseInt(process.env.RMS_SYNC_INTERVAL_MINUTES || '5', 10);
     
-    // Check for data gaps
+    // Use router_current_status.updated_at (set to NOW() on each sync) for freshness checks
+    // router_logs.timestamp is the RMS-reported last_connection time, which lags 10-15min
+    let lastProcessedAt = null;
+    try {
+      const statusResult = await pool.query('SELECT MAX(updated_at) as last_processed FROM router_current_status');
+      lastProcessedAt = statusResult.rows[0]?.last_processed;
+    } catch (e) { /* table may not exist yet */ }
+    
     const lastLogResult = await pool.query('SELECT MAX(timestamp) as last_log FROM router_logs');
     const lastLog = lastLogResult.rows[0]?.last_log;
-    const minutesSinceLastLog = lastLog 
-      ? (Date.now() - new Date(lastLog).getTime()) / 60000 
+    
+    const effectiveTimestamp = lastProcessedAt || lastLog;
+    const minutesSinceLastLog = effectiveTimestamp 
+      ? (Date.now() - new Date(effectiveTimestamp).getTime()) / 60000 
       : Infinity;
     
     // Get lock status
@@ -1017,14 +1026,15 @@ router.get('/api/monitoring/sync-health', async (req, res) => {
     // Determine overall health
     const issues = [];
     
-    // Data gap detection (allow 3x interval before warning)
-    const staleThresholdMinutes = syncIntervalMinutes * 3;
+    // Data gap detection: 3x interval + 15min buffer for inherent RMS timestamp lag
+    const staleThresholdMinutes = syncIntervalMinutes * 3 + 15;
     if (minutesSinceLastLog > staleThresholdMinutes) {
       issues.push({
-        severity: minutesSinceLastLog > syncIntervalMinutes * 6 ? 'critical' : 'warning',
+        severity: minutesSinceLastLog > syncIntervalMinutes * 6 + 15 ? 'critical' : 'warning',
         type: 'data_gap',
         message: `No new data for ${Math.round(minutesSinceLastLog)} minutes (threshold: ${staleThresholdMinutes} min)`,
         lastLog,
+        lastProcessedAt,
         recommendation: 'Check if RMS sync is running. May need to force-release stale lock.'
       });
     }
@@ -1078,8 +1088,9 @@ router.get('/api/monitoring/sync-health', async (req, res) => {
         schedulerActiveOnThisInstance: schedulerRunning
       },
       dataStatus: {
+        lastProcessedAt,
         lastLog,
-        minutesSinceLastLog: Math.round(minutesSinceLastLog * 10) / 10,
+        minutesSinceLastSync: Math.round(minutesSinceLastLog * 10) / 10,
         syncIntervalMinutes,
         staleThresholdMinutes
       },
