@@ -332,6 +332,33 @@ async function startServer() {
       }
     }, 2 * 60 * 1000); // Every 2 minutes
     
+    // Diagnostic: check what the RMS status health check sees
+    try {
+      const statusResult = await pool.query('SELECT MAX(updated_at) as last_processed, COUNT(*) as row_count FROM router_current_status');
+      const logResult = await pool.query('SELECT MAX(timestamp) as last_log FROM router_logs');
+      const lastProcessed = statusResult.rows[0]?.last_processed;
+      const rowCount = statusResult.rows[0]?.row_count;
+      const lastLog = logResult.rows[0]?.last_log;
+      const syncInterval = parseInt(process.env.RMS_SYNC_INTERVAL_MINUTES || '5', 10);
+      const threshold = syncInterval * 3 + 15;
+      
+      const processedAge = lastProcessed ? ((Date.now() - new Date(lastProcessed).getTime()) / 60000).toFixed(1) : 'NULL';
+      const logAge = lastLog ? ((Date.now() - new Date(lastLog).getTime()) / 60000).toFixed(1) : 'NULL';
+      const effective = lastProcessed || lastLog;
+      const effectiveAge = effective ? ((Date.now() - new Date(effective).getTime()) / 60000).toFixed(1) : 'NULL';
+      const healthy = effective ? (parseFloat(effectiveAge) < threshold) : false;
+      
+      logger.info(`🔍 RMS HEALTH DIAGNOSTIC:`);
+      logger.info(`   router_current_status rows: ${rowCount}`);
+      logger.info(`   MAX(updated_at): ${lastProcessed || 'NULL'} (${processedAge} min ago)`);
+      logger.info(`   MAX(router_logs.timestamp): ${lastLog || 'NULL'} (${logAge} min ago)`);
+      logger.info(`   Effective timestamp: ${effective || 'NULL'} (${effectiveAge} min ago)`);
+      logger.info(`   Threshold: ${threshold} min (interval=${syncInterval} * 3 + 15)`);
+      logger.info(`   Healthy: ${healthy}`);
+    } catch (diagErr) {
+      logger.warn('RMS health diagnostic failed:', diagErr.message);
+    }
+
     // Run startup diagnostic for captive portal integration
     await runCaptivePortalDiagnostic();
 
