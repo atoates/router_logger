@@ -694,27 +694,29 @@ router.get('/status', async (req, res) => {
   const syncIntervalMinutes = parseInt(process.env.RMS_SYNC_INTERVAL_MINUTES || '5', 10);
   const staleThresholdMinutes = syncIntervalMinutes * 3 + 15; // 3x interval + 15min buffer for RMS timestamp lag
   
+  // Each query in its own try/catch so a missing table doesn't block the fallback
   try {
-    // Prefer router_current_status.updated_at (set to NOW() on each sync) over
-    // router_logs.timestamp (which is the RMS last_connection time, inherently 10-15min stale)
     const statusResult = await pool.query(
       'SELECT MAX(updated_at) as last_processed FROM router_current_status'
     );
     lastProcessedAt = statusResult.rows[0]?.last_processed || null;
-    
-    // Also get the latest log timestamp for diagnostics
+  } catch (err) {
+    logger.debug('router_current_status not available, falling back to router_logs', { error: err.message });
+  }
+  
+  try {
     const logResult = await pool.query(
       'SELECT MAX(timestamp) as last_log FROM router_logs'
     );
     lastLogFromDB = logResult.rows[0]?.last_log || null;
-    
-    const effectiveTimestamp = lastProcessedAt || lastLogFromDB;
-    if (effectiveTimestamp) {
-      const minutesSinceLastSync = (Date.now() - new Date(effectiveTimestamp).getTime()) / 60000;
-      syncHealthy = minutesSinceLastSync < staleThresholdMinutes;
-    }
   } catch (err) {
-    logger.error('Failed to query last sync time for status', { error: err.message });
+    logger.error('Failed to query last log time for status', { error: err.message });
+  }
+  
+  const effectiveTimestamp = lastProcessedAt || lastLogFromDB;
+  if (effectiveTimestamp) {
+    const minutesSinceLastSync = (Date.now() - new Date(effectiveTimestamp).getTime()) / 60000;
+    syncHealthy = minutesSinceLastSync < staleThresholdMinutes;
   }
   
   res.json({
