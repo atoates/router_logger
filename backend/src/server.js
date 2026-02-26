@@ -332,6 +332,111 @@ async function startServer() {
       }
     }, 2 * 60 * 1000); // Every 2 minutes
     
+    // One-time log integrity check for the last 7 days
+    try {
+      logger.info('📊 LOG INTEGRITY CHECK — Last 7 days');
+      
+      // Daily log counts and router counts
+      const dailyResult = await pool.query(`
+        SELECT 
+          DATE(timestamp) as log_date,
+          COUNT(*) as log_count,
+          COUNT(DISTINCT router_id) as router_count,
+          MIN(timestamp) as first_log,
+          MAX(timestamp) as last_log
+        FROM router_logs
+        WHERE timestamp >= NOW() - INTERVAL '7 days'
+        GROUP BY DATE(timestamp)
+        ORDER BY log_date
+      `);
+      
+      if (dailyResult.rows.length === 0) {
+        logger.warn('   ⚠️  NO LOGS found in the last 7 days!');
+      } else {
+        dailyResult.rows.forEach(row => {
+          const date = new Date(row.log_date).toISOString().split('T')[0];
+          logger.info(`   ${date}: ${row.log_count} logs from ${row.router_count} routers (${row.first_log.toISOString().substr(11,8)} → ${row.last_log.toISOString().substr(11,8)})`);
+        });
+      }
+
+      // Total stats
+      const totalResult = await pool.query(`
+        SELECT 
+          COUNT(*) as total_logs,
+          COUNT(DISTINCT router_id) as total_routers,
+          COUNT(DISTINCT DATE(timestamp)) as days_with_data
+        FROM router_logs
+        WHERE timestamp >= NOW() - INTERVAL '7 days'
+      `);
+      const t = totalResult.rows[0];
+      logger.info(`   TOTAL: ${t.total_logs} logs, ${t.total_routers} routers, ${t.days_with_data}/7 days with data`);
+      
+      // Check for gaps (hours with no logs in the last 48h)
+      const gapResult = await pool.query(`
+        WITH hours AS (
+          SELECT generate_series(
+            date_trunc('hour', NOW() - INTERVAL '48 hours'),
+            date_trunc('hour', NOW()),
+            '1 hour'::interval
+          ) as hour_start
+        ),
+        hourly_counts AS (
+          SELECT h.hour_start, COUNT(l.id) as cnt
+          FROM hours h
+          LEFT JOIN router_logs l ON l.timestamp >= h.hour_start AND l.timestamp < h.hour_start + INTERVAL '1 hour'
+          GROUP BY h.hour_start
+        )
+        SELECT hour_start, cnt FROM hourly_counts WHERE cnt = 0 ORDER BY hour_start
+      `);
+      
+      if (gapResult.rows.length === 0) {
+        logger.info('   ✅ No gaps found in last 48 hours — every hour has log data');
+      } else {
+        logger.warn(`   ⚠️  ${gapResult.rows.length} hours with ZERO logs in the last 48h:`);
+        gapResult.rows.forEach(row => {
+          logger.warn(`      ${new Date(row.hour_start).toISOString()}`);
+        });
+      }
+      
+      // router_current_status table check
+      const statusResult = await pool.query(`
+        SELECT 
+          COUNT(*) as total_rows,
+          MAX(updated_at) as newest_update,
+          MIN(updated_at) as oldest_update,
+          COUNT(*) FILTER (WHERE updated_at > NOW() - INTERVAL '1 hour') as updated_last_hour
+        FROM router_current_status
+      `);
+      const s = statusResult.rows[0];
+      const newestAge = s.newest_update ? ((Date.now() - new Date(s.newest_update).getTime()) / 60000).toFixed(1) : 'N/A';
+      logger.info(`   router_current_status: ${s.total_rows} rows, newest ${newestAge} min ago, ${s.updated_last_hour} updated in last hour`);
+      
+      // Partition check
+      const partResult = await pool.query(`
+        SELECT c.relname as partition_name
+        FROM pg_class c 
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        JOIN pg_inherits i ON i.inhrelid = c.oid
+        JOIN pg_class parent ON parent.oid = i.inhparent
+        WHERE parent.relname = 'router_logs' AND n.nspname = 'public'
+        ORDER BY c.relname
+      `);
+      if (partResult.rows.length > 0) {
+        logger.info(`   Partitions: ${partResult.rows.map(r => r.partition_name).join(', ')}`);
+      } else {
+        logger.info('   router_logs is not partitioned (or no child tables found)');
+      }
+      
+      // RMS sync health status
+      const syncIntervalMinutes = parseInt(process.env.RMS_SYNC_INTERVAL_MINUTES || '5', 10);
+      const threshold = syncIntervalMinutes * 3 + 15;
+      logger.info(`   Sync healthy threshold: ${threshold} min (interval=${syncIntervalMinutes}×3+15)`);
+      logger.info(`   Status endpoint will report: healthy=${newestAge !== 'N/A' && parseFloat(newestAge) < threshold}`);
+      
+    } catch (diagErr) {
+      logger.warn('Log integrity check failed:', diagErr.message);
+    }
+
     // Run startup diagnostic for captive portal integration
     await runCaptivePortalDiagnostic();
 
